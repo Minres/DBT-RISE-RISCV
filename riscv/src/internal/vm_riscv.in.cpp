@@ -30,6 +30,8 @@
 // 
 // Contributors:
 //       eyck@minres.com - initial API and implementation
+//
+//
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iss/iss.h>
@@ -356,14 +358,14 @@ std::tuple<vm::continuation_e, llvm::BasicBlock*> vm_impl<ARCH>::gen_single_inst
     uint8_t* const data = (uint8_t*)&insn;
         paddr=this->core.v2p(pc);
         if((pc.val&upper_bits) != ((pc.val+2)&upper_bits)){ // we may cross a page boundary
-            auto res = this->core.read_mem(paddr, 2, data);
+            auto res = this->core.read(paddr, 2, data);
             if(res!=iss::Ok)
                 throw trap_access(1, pc.val);
             if((insn & 0x3) == 0x3){ // this is a 32bit instruction
-                res = this->core.read_mem(this->core.v2p(pc+2), 2, data+2);
+                res = this->core.read(this->core.v2p(pc+2), 2, data+2);
             }
     } else {
-            auto res = this->core.read_mem(paddr, 4, data);
+            auto res = this->core.read(paddr, 4, data);
             if(res!=iss::Ok)
                 throw trap_access(1, pc.val);
         }
@@ -371,7 +373,7 @@ std::tuple<vm::continuation_e, llvm::BasicBlock*> vm_impl<ARCH>::gen_single_inst
         throw trap_access(ta.id, pc.val);
     }
     if(insn==0x0000006f)
-        throw vm::simulation_stopped(0);
+        throw simulation_stopped(0);
     // curr pc on stack
     typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;
@@ -563,7 +565,7 @@ namespace CORE_DEF_NAME {
             data.resize(sizeof(typename traits<ARCH>::reg_t));
             avail.resize(sizeof(typename traits<ARCH>::reg_t));
             std::fill(avail.begin(), avail.end(), 0xff);
-            vm->get_arch()->read_mem(a, data.size(), data.data());
+            vm->get_arch()->read(a, data.size(), data.data());
         }
         return data.size()>0?Ok:Err;
     }
@@ -574,7 +576,7 @@ namespace CORE_DEF_NAME {
             vm->get_arch()->set_reg(reg_no, data);
         else {
             typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_WRITE, traits<ARCH>::CSR, reg_no-65);
-            vm->get_arch()->write_mem(a, data.size(), data.data());
+            vm->get_arch()->write(a, data.size(), data.data());
         }
         return Ok;
     }
@@ -583,7 +585,7 @@ namespace CORE_DEF_NAME {
     status target_adapter<ARCH>::read_mem(uint64_t addr, std::vector<uint8_t>& data) {
         auto a=map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
         auto f = [&]()->status {
-            return vm->get_arch()->read_mem(a, data.size(), data.data());
+            return vm->get_arch()->read(a, data.size(), data.data());
         };
         return srv->execute_syncronized(f);
 
@@ -592,7 +594,7 @@ namespace CORE_DEF_NAME {
     template<typename ARCH>
     status target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t>& data) {
         auto a=map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
-        return srv->execute_syncronized(&arch_if::write_mem, vm->get_arch(), a, data.size(), data.data());
+        return srv->execute_syncronized(&arch_if::write, vm->get_arch(), a, data.size(), data.data());
     }
 
     template<typename ARCH>

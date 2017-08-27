@@ -30,6 +30,8 @@
 // 
 // Contributors:
 //       eyck@minres.com - initial API and implementation
+//
+//
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iss/iss.h>
@@ -501,7 +503,7 @@ private:
     // instruction LUI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LUI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -528,7 +530,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_const(32U, fld_imm_val);
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -543,7 +545,7 @@ private:
     // instruction AUIPC
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AUIPC");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -570,7 +572,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
                 this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
@@ -587,7 +589,7 @@ private:
     // instruction JAL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JAL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -614,7 +616,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
                 this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
@@ -633,7 +635,7 @@ private:
     // instruction JALR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JALR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -661,7 +663,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
                 this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
@@ -683,7 +685,7 @@ private:
     // instruction BEQ
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BEQ");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -711,7 +713,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_EQ,
@@ -733,7 +735,7 @@ private:
     // instruction BNE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BNE");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -761,7 +763,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
@@ -783,7 +785,7 @@ private:
     // instruction BLT
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLT");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -811,7 +813,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_SLT,
@@ -837,7 +839,7 @@ private:
     // instruction BGE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGE");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -865,7 +867,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_SGE,
@@ -891,7 +893,7 @@ private:
     // instruction BLTU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLTU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -919,7 +921,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_ULT,
@@ -941,7 +943,7 @@ private:
     // instruction BGEU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGEU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -969,7 +971,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_UGE,
@@ -991,7 +993,7 @@ private:
     // instruction LB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LB");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1019,7 +1021,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1040,7 +1042,7 @@ private:
     // instruction LH
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LH");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1068,7 +1070,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1089,7 +1091,7 @@ private:
     // instruction LW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LW");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1117,7 +1119,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1138,7 +1140,7 @@ private:
     // instruction LBU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LBU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1166,7 +1168,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1187,7 +1189,7 @@ private:
     // instruction LHU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LHU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1215,7 +1217,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1236,7 +1238,7 @@ private:
     // instruction SB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SB");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1264,7 +1266,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1283,7 +1285,7 @@ private:
     // instruction SH
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SH");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1311,7 +1313,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1330,7 +1332,7 @@ private:
     // instruction SW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SW");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1358,7 +1360,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
             this->gen_const(32U, fld_imm_val));
@@ -1377,7 +1379,7 @@ private:
     // instruction ADDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADDI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1405,7 +1407,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1422,7 +1424,7 @@ private:
     // instruction SLTI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1450,7 +1452,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
                 this->builder->CreateICmp(
@@ -1476,7 +1478,7 @@ private:
     // instruction SLTIU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTIU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1504,7 +1506,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         int32_t full_imm_val = fld_imm_val;
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
@@ -1531,7 +1533,7 @@ private:
     // instruction XORI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XORI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1559,7 +1561,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateXor(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1576,7 +1578,7 @@ private:
     // instruction ORI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ORI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1604,7 +1606,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateOr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1621,7 +1623,7 @@ private:
     // instruction ANDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ANDI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1649,7 +1651,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAnd(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1666,7 +1668,7 @@ private:
     // instruction SLLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLLI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1694,7 +1696,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateShl(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1711,7 +1713,7 @@ private:
     // instruction SRLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRLI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1739,7 +1741,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateLShr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1756,7 +1758,7 @@ private:
     // instruction SRAI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRAI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1784,7 +1786,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAShr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1801,7 +1803,7 @@ private:
     // instruction ADD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADD");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1829,7 +1831,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1846,7 +1848,7 @@ private:
     // instruction SUB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SUB");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1874,7 +1876,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateSub(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1891,7 +1893,7 @@ private:
     // instruction SLL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1919,7 +1921,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateShl(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -1938,7 +1940,7 @@ private:
     // instruction SLT
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLT");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -1966,7 +1968,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
                 this->builder->CreateICmp(
@@ -1992,7 +1994,7 @@ private:
     // instruction SLTU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2020,7 +2022,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
                 this->builder->CreateICmp(
@@ -2048,7 +2050,7 @@ private:
     // instruction XOR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XOR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2076,7 +2078,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateXor(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -2093,7 +2095,7 @@ private:
     // instruction SRL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2121,7 +2123,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateLShr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -2140,7 +2142,7 @@ private:
     // instruction SRA
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRA");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2168,7 +2170,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAShr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -2187,7 +2189,7 @@ private:
     // instruction OR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("OR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2215,7 +2217,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateOr(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -2232,7 +2234,7 @@ private:
     // instruction AND
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AND");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2260,7 +2262,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAnd(
                 this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
@@ -2277,7 +2279,7 @@ private:
     // instruction FENCE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2305,7 +2307,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* FENCE_fence_val = this->builder->CreateOr(
             this->builder->CreateShl(
                 this->gen_const(32U, fld_pred_val),
@@ -2325,7 +2327,7 @@ private:
     // instruction FENCE_I
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE_I");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2352,7 +2354,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* FENCE_fencei_val = this->gen_const(32U, fld_imm_val);
         this->gen_write_mem(
             traits<ARCH>::FENCE,
@@ -2367,7 +2369,7 @@ private:
     // instruction ECALL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ECALL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2392,7 +2394,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_raise_trap(0, 11);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -2402,7 +2404,7 @@ private:
     // instruction EBREAK
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("EBREAK");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2427,7 +2429,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_raise_trap(0, 3);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -2437,7 +2439,7 @@ private:
     // instruction URET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("URET");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2462,7 +2464,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_leave_trap(0);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -2472,7 +2474,7 @@ private:
     // instruction SRET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRET");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2497,7 +2499,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_leave_trap(1);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -2507,7 +2509,7 @@ private:
     // instruction MRET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MRET");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2532,7 +2534,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_leave_trap(3);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -2542,7 +2544,7 @@ private:
     // instruction WFI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("WFI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2567,7 +2569,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         this->gen_wait(1);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2579,7 +2581,7 @@ private:
     // instruction SFENCE.VMA
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SFENCE.VMA");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2605,7 +2607,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* FENCE_fencevmal_val = this->gen_const(32U, fld_rs1_val);
         this->gen_write_mem(
             traits<ARCH>::FENCE,
@@ -2626,7 +2628,7 @@ private:
     // instruction CSRRW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRW");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2654,7 +2656,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* rs_val_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         if(fld_rd_val != 0){
             Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
@@ -2682,7 +2684,7 @@ private:
     // instruction CSRRS
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRS");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2710,7 +2712,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         Value* xrs1_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         if(fld_rd_val != 0){
@@ -2736,7 +2738,7 @@ private:
     // instruction CSRRC
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRC");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2764,7 +2766,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         Value* xrs1_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         if(fld_rd_val != 0){
@@ -2790,7 +2792,7 @@ private:
     // instruction CSRRWI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRWI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2818,7 +2820,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -2841,7 +2843,7 @@ private:
     // instruction CSRRSI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRSI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2869,7 +2871,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         if(fld_zimm_val != 0){
             Value* CSR_csr_val = this->builder->CreateOr(
@@ -2897,7 +2899,7 @@ private:
     // instruction CSRRCI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRCI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2925,7 +2927,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         if(fld_rd_val != 0){
             Value* X_rd_val = res_val;
@@ -2953,7 +2955,7 @@ private:
     // instruction MUL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mul(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MUL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -2981,7 +2983,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
@@ -3008,7 +3010,7 @@ private:
     // instruction MULH
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULH");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3036,7 +3038,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
@@ -3065,7 +3067,7 @@ private:
     // instruction MULHSU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhsu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULHSU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3093,7 +3095,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
@@ -3122,7 +3124,7 @@ private:
     // instruction MULHU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULHU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3150,7 +3152,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
@@ -3179,7 +3181,7 @@ private:
     // instruction DIV
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __div(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("DIV");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3207,7 +3209,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3252,7 +3254,7 @@ private:
     // instruction DIVU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __divu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("DIVU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3280,7 +3282,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3325,7 +3327,7 @@ private:
     // instruction REM
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __rem(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("REM");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3353,7 +3355,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3398,7 +3400,7 @@ private:
     // instruction REMU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __remu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("REMU");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3426,7 +3428,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3471,7 +3473,7 @@ private:
     // instruction LR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LR.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3500,7 +3502,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         if(fld_rd_val != 0){
             Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
             Value* X_rd_val = this->gen_ext(
@@ -3527,7 +3529,7 @@ private:
     // instruction SC.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SC.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3557,7 +3559,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
         llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
@@ -3601,7 +3603,7 @@ private:
     // instruction AMOSWAP.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOSWAP.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3631,7 +3633,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -3655,7 +3657,7 @@ private:
     // instruction AMOADD.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOADD.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3685,7 +3687,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3713,7 +3715,7 @@ private:
     // instruction AMOXOR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOXOR.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3743,7 +3745,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3771,7 +3773,7 @@ private:
     // instruction AMOAND.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOAND.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3801,7 +3803,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3829,7 +3831,7 @@ private:
     // instruction AMOOR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOOR.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3859,7 +3861,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3887,7 +3889,7 @@ private:
     // instruction AMOMIN.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMIN.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3917,7 +3919,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3954,7 +3956,7 @@ private:
     // instruction AMOMAX.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAX.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -3984,7 +3986,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -4021,7 +4023,7 @@ private:
     // instruction AMOMINU.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMINU.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4051,7 +4053,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -4084,7 +4086,7 @@ private:
     // instruction AMOMAXU.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAXU.W");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4114,7 +4116,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
-        
+    
         Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -4151,7 +4153,7 @@ private:
     // instruction C.ADDI4SPN
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI4SPN");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4178,7 +4180,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_nzuimm_val == 0){
             this->gen_raise_trap(0, 2);
         }
@@ -4198,7 +4200,7 @@ private:
     // instruction C.LW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LW");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4226,7 +4228,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* adr_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
@@ -4244,7 +4246,7 @@ private:
     // instruction C.SW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SW");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4272,7 +4274,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* adr_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
@@ -4293,7 +4295,7 @@ private:
     // instruction C.NOP
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.NOP");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4319,7 +4321,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         /* TODO: describe operations for C.NOP ! */
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4331,7 +4333,7 @@ private:
     // instruction C.ADDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4358,7 +4360,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_nzimm_val == 0){
             this->gen_raise_trap(0, 2);
         }
@@ -4376,7 +4378,7 @@ private:
     // instruction C.JAL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JAL");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4402,7 +4404,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_val = 1;
         Value* X_rd_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
@@ -4420,7 +4422,7 @@ private:
     // instruction C.LI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4447,7 +4449,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_rd_val == 0){
             this->gen_raise_trap(0, 2);
         }
@@ -4463,7 +4465,7 @@ private:
     // instruction C.LUI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LUI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4490,7 +4492,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_rd_val == 0){
             this->gen_raise_trap(0, 2);
         }
@@ -4512,7 +4514,7 @@ private:
     // instruction C.ADDI16SP
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI16SP");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4538,7 +4540,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t x2_idx_val = 2;
         Value* X_x2_idx_val = this->builder->CreateAdd(
             this->gen_ext(
@@ -4556,7 +4558,7 @@ private:
     // instruction C.SRLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SRLI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4583,7 +4585,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_shamt_val > 31){
             this->gen_raise_trap(0, 2);
         }
@@ -4602,7 +4604,7 @@ private:
     // instruction C.SRAI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SRAI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4629,7 +4631,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_shamt_val > 31){
             this->gen_raise_trap(0, 2);
         }
@@ -4648,7 +4650,7 @@ private:
     // instruction C.ANDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ANDI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4675,7 +4677,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateAnd(
             this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
@@ -4691,7 +4693,7 @@ private:
     // instruction C.SUB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SUB");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4718,7 +4720,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateSub(
@@ -4735,7 +4737,7 @@ private:
     // instruction C.XOR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.XOR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4762,7 +4764,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateXor(
@@ -4779,7 +4781,7 @@ private:
     // instruction C.OR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.OR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4806,7 +4808,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateOr(
@@ -4823,7 +4825,7 @@ private:
     // instruction C.AND
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.AND");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4850,7 +4852,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateAnd(
@@ -4867,7 +4869,7 @@ private:
     // instruction C.J
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.J");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4893,7 +4895,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         Value* PC_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
             this->gen_const(32U, fld_imm_val));
@@ -4906,7 +4908,7 @@ private:
     // instruction C.BEQZ
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.BEQZ");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4933,7 +4935,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rs1_val = (fld_rs1d_val + 8);
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
@@ -4956,7 +4958,7 @@ private:
     // instruction C.BNEZ
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.BNEZ");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -4983,7 +4985,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rs1_val = (fld_rs1d_val + 8);
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
@@ -5006,7 +5008,7 @@ private:
     // instruction C.SLLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SLLI");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5033,7 +5035,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         if(fld_rs1_val == 0){
             this->gen_raise_trap(0, 2);
         }
@@ -5054,7 +5056,7 @@ private:
     // instruction C.LQSP
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lqsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LQSP");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5080,7 +5082,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         /* TODO: describe operations for C.LQSP ! */
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -5092,7 +5094,7 @@ private:
     // instruction C.LWSP
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LWSP");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5119,7 +5121,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t x2_idx_val = 2;
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),
@@ -5136,7 +5138,7 @@ private:
     // instruction C.MV
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.MV");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5163,7 +5165,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         Value* X_rd_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
         this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -5176,7 +5178,7 @@ private:
     // instruction C.JR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5202,7 +5204,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         Value* PC_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -5213,7 +5215,7 @@ private:
     // instruction C.EBREAK
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.EBREAK");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5238,7 +5240,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         this->gen_raise_trap(0, 3);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -5248,7 +5250,7 @@ private:
     // instruction C.ADD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADD");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5275,7 +5277,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         Value* X_rd_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(fld_rd_val), false),
             this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
@@ -5290,7 +5292,7 @@ private:
     // instruction C.JALR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JALR");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5316,7 +5318,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t rd_val = 1;
         Value* X_rd_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
@@ -5332,7 +5334,7 @@ private:
     // instruction C.SWSP
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SWSP");
-        
+    
         this->gen_set_pc(pc, traits<ARCH>::PC);
         this->builder->CreateStore(
             this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
@@ -5359,7 +5361,7 @@ private:
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
-        
+    
         uint8_t x2_idx_val = 2;
         Value* offs_val = this->builder->CreateAdd(
             this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),

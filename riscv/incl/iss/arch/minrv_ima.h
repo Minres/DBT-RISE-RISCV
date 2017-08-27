@@ -1,36 +1,37 @@
-/*******************************************************************************
- * Copyright (C) 2017, MINRES Technologies GmbH
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- * 
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- * 
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 
- * 3. Neither the name of the copyright holder nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- * 
- * Contributors:
- *       eyck@minres.com - initial API and implementation
- ******************************************************************************/
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2017, MINRES Technologies GmbH
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+// 
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+// 
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+// 
+// 3. Neither the name of the copyright holder nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+// 
+// Created on: Sun Aug 27 17:03:32 CEST 2017
+//             *      minrv_ima.h Author: <CoreDSL Generator>
+//
+////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _MINRV_IMA_H_
 #define _MINRV_IMA_H_
@@ -94,9 +95,9 @@ struct traits<minrv_ima> {
     typedef uint32_t reg_t;
 
     typedef uint32_t addr_t;
-            
+
     typedef uint32_t code_word_t; //TODO: check removal
-            
+
     typedef iss::typed_addr_t<iss::VIRTUAL>  virt_addr_t;
 
     typedef iss::typed_addr_t<iss::PHYSICAL> phys_addr_t;
@@ -127,21 +128,19 @@ struct minrv_ima: public arch_if {
     minrv_ima();
     ~minrv_ima();
 
-    void reset(uint64_t address=0);
+    virtual void reset(uint64_t address=0) override;
 
-//    virtual void loadFile(std::string name, int type=-1);
+    virtual uint8_t* get_regs_base_ptr() override;
+    /// deprecated
+    virtual void get_reg(short idx, std::vector<uint8_t>& value) override {}
+    virtual void set_reg(short idx, const std::vector<uint8_t>& value) override {}
+    /// deprecated
+    virtual bool get_flag(int flag) override {return false;}
+    virtual void set_flag(int, bool value) override {};
+    /// deprecated
+    virtual void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
 
-    uint8_t* get_regs_base_ptr() override;
-
-    void get_reg(short idx, std::vector<uint8_t>& value) override;
-    void set_reg(short idx, const std::vector<uint8_t>& value) override;
-
-    bool get_flag(int flag) override;
-    void set_flag(int, bool value) override;
-
-    void update_flags(operations op, uint64_t opr1, uint64_t opr2) override;
-
-    void notify_phase(exec_phase phase){
+    virtual void notify_phase(exec_phase phase){
         if(phase==ISTART){
             ++reg.icount;
             reg.PC=reg.NEXT_PC;
