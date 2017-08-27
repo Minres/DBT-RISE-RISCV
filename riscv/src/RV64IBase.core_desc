@@ -1,0 +1,99 @@
+import "RV32IBase.core_desc"
+
+InsructionSet RV64IBase extends RV32IBase {
+	instructions{
+		LWU {
+		    encoding: imm[11:0]s | rs1[4:0] | b010 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=zext(MEM[offs]{32});
+		}
+		LD{
+			encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=sext(MEM[offs]{64});
+		}
+		SD{
+			encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0] | b0100011;
+		    args_disass:"x%rs2$d, %imm%(x%rs1$d)";
+	    	val offs[XLEN] <= X[rs1] + sext(imm, XLEN);
+	    	MEM[offs]{64} <= X[rs2];
+		}
+		SLLI {
+			encoding: b000000 | shamt[5:0] | rs1[4:0] | b001 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shll(X[rs1], shamt);
+		}
+		SRLI {
+			encoding: b000000 | shamt[5:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shrl(X[rs1], shamt);
+		}
+		SRAI {
+			encoding: b010000 | shamt[5:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shra(X[rs1], shamt);
+		}
+		ADDIW {
+			encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b0011011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if(rd != 0) X[rd] <= sext(X[rs1]{32}, XLEN) + sext(imm, XLEN);
+		}
+		SLLIW {
+			encoding: b0000000 | shamt[4:0] | rs1[4:0] | b001 | rd[4:0] | b0011011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0){
+		    	val sh_val[32] <= shll(X[rs1]{32}, shamt);
+		    	X[rd] <= sext(sh_val, XLEN);
+		    } 
+		}
+		SRLIW {
+			encoding: b0000000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0011011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0){
+		    	val sh_val[32] <= shrl(X[rs1], shamt);
+		    	X[rd] <= sext(sh_val, XLEN);
+		    } 
+		}
+		SRAIW {
+			encoding: b0100000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0011011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0){
+		    	val sh_val[32] <= shra(X[rs1], shamt);	
+		    	X[rd] <= sext(sh_val, XLEN);
+		    }
+		}
+		ADDW {
+			encoding: b0000000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0111011;
+		}
+		SUBW {
+			encoding: b0100000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0111011;
+		}
+		SLLW {
+			encoding: b0000000 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0111011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	val sh_val[32] <= shll(X[rs1], X[rs2]&0x1f);
+		    	X[rd] <= sext(sh_val, XLEN);
+		    } 
+		}
+		SRLW {
+			encoding: b0000000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0111011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	val sh_val[32] <= shrl(X[rs1], X[rs2]&0x1f);
+		    	X[rd] <= sext(sh_val, XLEN);
+		    } 
+		}
+		SRAW {
+			encoding: b0100000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0111011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	val sh_val[32] <= shra(X[rs1], X[rs2]&0x1f);
+		    	X[rd] <= sext(sh_val, XLEN);
+		    } 
+		}
+	}	
+}
+

@@ -1,0 +1,105 @@
+import "RV32IBase.core_desc"
+
+InsructionSet RV32F extends RV32IBase{
+	constants {
+		FLEN, fcsr
+	} 
+	registers {
+		[31:0]    F[FLEN]
+    }	
+	instructions{
+		FLW {
+			encoding: imm[11:0]s | rs1[4:0] | b010 | rd[4:0] | b0000111;
+			val offs[XLEN] <= X[rs1]+imm;
+			F[rd]<=MEM[offs];
+		}
+		FSW {
+			encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b010 | imm[4:0]s | b0100111;
+			val offs[XLEN] <= X[rs1]+imm;
+			MEM[offs]<=F[rs2];
+		}
+		FMADD.S {
+			encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000011;
+			F[rd]f<= F[rs1]f * F[rs2]f * F[rs3]f;
+		}
+		FMSUB.S {
+			encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000111;
+			F[rd]f<=F[rs1]f * F[rs2]f -F[rs3]f;
+		}
+		FNMSUB.S {
+			encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001011;
+			F[rd]f<=-F[rs1]f * F[rs2]f- F[rs3]f;
+		}
+		FNMADD.S {
+			encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001111;
+			F[rd]f<=-F[rs1]f*F[rs2]f+F[rs3]f;
+		}
+		FADD.S {
+			encoding: b0000000 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+			F[rd]f <= F[rs1]f + F[rs2]f;
+		}
+		FSUB.S {
+			encoding: b0000100 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+			F[rd]f <= F[rs1]f - F[rs2]f;
+		}
+		FMUL.S {
+			encoding: b0001000 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+			F[rd]f <= F[rs1]f * F[rs2];
+		}
+		FDIV.S {
+			encoding: b0001100 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+			F[rd]f <= F[rs1]f / F[rs2]f;
+		}
+		FSQRT.S {
+			encoding: b0101100 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+			F[rd]f<=sqrt(F[rs1]f);
+		}
+		FSGNJ.S {
+			encoding: b0010000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+		}
+		FSGNJN.S {
+			encoding: b0010000 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+		}
+		FSGNJX.S {
+			encoding: b0010000 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
+		}
+		FMIN.S  {
+			encoding: b0010100 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+			F[rd]f<= choose(F[rs1]f<F[rs2]f, F[rs1]f, F[rs2]f);
+		}
+		FMAX.S {
+			encoding: b0010100 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+			F[rd]f<= choose(F[rs1]f>F[rs2]f, F[rs1]f, F[rs2]f);
+		}
+		FCVT.W.S {
+			encoding: b1100000 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+		}
+		FCVT.WU.S {
+			encoding: b1100000 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+		}
+		FMV.X.W {
+			encoding: b1110000 | b00000 | rs1[4:0] | b000 | rd[4:0] | b1010011;
+		}
+		FEQ.S {
+			encoding: b1010000 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
+		}
+		FLT.S {
+			encoding: b1010000 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+		}
+		FLE.S {
+			encoding: b1010000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+		}
+		FCLASS.S {
+			encoding: b1110000 | b00000 | rs1[4:0] | b001 | rd[4:0] | b1010011;
+		}
+		FCVT.S.W {
+			encoding: b1101000 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+		}
+		FCVT.S.WU {
+			encoding: b1101000 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+		}
+		FMV.W.X {
+			encoding: b1111000 | b00000 | rs1[4:0] | b000 | rd[4:0] | b1010011;
+		}
+	}
+}

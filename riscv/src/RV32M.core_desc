@@ -1,0 +1,81 @@
+import "RV32IBase.core_desc"
+
+InsructionSet RV32M extends RV32IBase {
+	constants {
+		XLEN2
+	}
+	instructions{       
+		MUL{
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		        val res[XLEN2] <= zext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+		    	X[rd]<= zext(res , XLEN);
+		    }
+		}
+		MULH {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		        val res[XLEN2] <= sext(X[rs1], XLEN2) * sext(X[rs2], XLEN2);
+                X[rd]<= zext(res >> XLEN, XLEN);
+		    }
+		}
+		MULHSU {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+                val res[XLEN2] <= sext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+                X[rd]<= zext(res >> XLEN, XLEN);
+		    }
+		}
+		MULHU {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+                val res[XLEN2] <= zext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+                X[rd]<= zext(res >> XLEN, XLEN);
+		    }
+		}
+		DIV {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	if(X[rs2]!=0)
+		    		X[rd] <= sext(X[rs1], 32) / sext(X[rs2], 32);
+		    	else 
+		    		X[rd] <= -1;
+		    }
+		}
+		DIVU {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	if(X[rs2]!=0)
+		    		X[rd] <= zext(X[rs1], 32) / zext(X[rs2], 32);
+		    	else 
+		    		X[rd] <= -1;
+		    }
+		}
+		REM {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	if(X[rs2]!=0)
+		    		X[rd] <= sext(X[rs1], 32) % sext(X[rs2], 32);
+		    	else 
+		    		X[rd] <= X[rs1];
+		    }
+		}
+		REMU {
+			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0){
+		    	if(X[rs2]!=0)
+			    	X[rd] <= zext(X[rs1], 32) % zext(X[rs2], 32);
+		    	else 
+		    		X[rd] <= X[rs1];
+		    }
+		}
+	}
+}

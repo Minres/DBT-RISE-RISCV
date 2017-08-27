@@ -1,0 +1,308 @@
+InsructionSet RV32IBase {
+	constants {
+		XLEN,
+		XLEN_BIT_MASK,
+		PCLEN,
+		fence,
+		fencei,
+		fencevmal,
+		fencevmau
+	}
+	
+	address_spaces { 
+		MEM[8], CSR[XLEN], FENCE[XLEN]
+	}
+				
+	registers { 
+		[31:0]   X[XLEN],
+                PC[XLEN](is_pc)
+	}
+	 
+	instructions { 
+		LUI{
+		    encoding: imm[31:12]s | rd[4:0] | b0110111;
+		    args_disass: "x%rd$d, 0x%imm$05x";
+		    if(rd!=0) X[rd] <= imm;
+		}
+		AUIPC{
+		    encoding: imm[31:12]s | rd[4:0] | b0010111;
+		    args_disass: "x%rd%, 0x%imm$08x";
+		    if(rd!=0) X[rd] <= PC+imm;
+		}
+	    JAL(no_cont){
+    		encoding: imm[20:20]s | imm[10:1]s | imm[11:11]s | imm[19:12]s | rd[4:0] | b1101111;
+		    args_disass: "x%rd$d, 0x%imm$x";
+    		if(rd!=0) X[rd] <= PC+4;
+    		PC<=PC+imm;
+		}
+	    JALR(no_cont){
+	    	encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
+		    args_disass: "x%rd$d, x%rs1$d, 0x%imm$x";
+    		if(rd!=0) X[rd] <= PC+4;
+    		val ret[XLEN] <= X[rs1]+ imm;
+    		PC<=ret& ~0x1;
+	    }
+		BEQ(no_cont){
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b000 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+		    PC<=choose(X[rs1]==X[rs2], PC+imm, PC+4);
+		}
+		BNE(no_cont){
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b001 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+	    	PC<=choose(X[rs1]!=X[rs2], PC+imm, PC+4);
+		}
+		BLT(no_cont){
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b100 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+	    	PC<=choose(X[rs1]s<X[rs2]s, PC+imm, PC+4);
+		}
+		BGE(no_cont) {
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b101 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+	    	PC<=choose(X[rs1]s>=X[rs2]s, PC+imm, PC+4);
+		}
+		BLTU(no_cont) {
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b110 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+	    	PC<=choose(X[rs1]<X[rs2],PC+imm, PC+4);
+		}
+		BGEU(no_cont) {
+		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b111 | imm[4:1]s | imm[11:11]s | b1100011;
+		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
+	    	PC<=choose(X[rs1]>=X[rs2], PC+imm, PC+4);
+		}
+		LB {
+		    encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=sext(MEM[offs]);
+		}
+		LH {
+		    encoding: imm[11:0]s | rs1[4:0] | b001 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=sext(MEM[offs]{16});		    
+		}
+		LW {
+		    encoding: imm[11:0]s | rs1[4:0] | b010 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=sext(MEM[offs]{32});
+		}
+		LBU {
+		    encoding: imm[11:0]s | rs1[4:0] | b100 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=zext(MEM[offs]);
+		}
+		LHU {
+		    encoding: imm[11:0]s | rs1[4:0] | b101 | rd[4:0] | b0000011;
+		    args_disass:"x%rd$d, %imm%(x%rs1$d)";
+		    val offs[XLEN] <= X[rs1]+imm;
+		    if(rd!=0) X[rd]<=zext(MEM[offs]{16});		    
+		}
+		SB {
+		    encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b000 | imm[4:0]s | b0100011;
+		    args_disass:"x%rs2$d, %imm%(x%rs1$d)";
+	    	val offs[XLEN] <= X[rs1] + imm;
+	    	MEM[offs] <= X[rs2];
+		}
+		SH {
+		    encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b001 | imm[4:0]s | b0100011;
+		    args_disass:"x%rs2$d, %imm%(x%rs1$d)";
+	    	val offs[XLEN] <= X[rs1] + imm;
+	    	MEM[offs]{16} <= X[rs2];
+		}
+	    SW {
+	    	encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b010 | imm[4:0]s | b0100011;
+		    args_disass:"x%rs2$d, %imm%(x%rs1$d)";
+	    	val offs[XLEN] <= X[rs1] + imm;
+	    	MEM[offs]{32} <= X[rs2];
+	    }
+		ADDI {
+			encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if(rd != 0) X[rd] <= X[rs1] + imm;
+		}
+		SLTI {
+			encoding: imm[11:0]s | rs1[4:0] | b010 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if (rd != 0) X[rd] <= choose(X[rs1]s < imm's, 1, 0); //TODO: needs fix
+		}
+	    SLTIU {
+	        encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+		    val full_imm[XLEN] <= imm's;
+	        if (rd != 0) X[rd] <= choose(X[rs1]'u < full_imm'u, 1, 0);
+	    }
+		XORI {
+			encoding: imm[11:0]s | rs1[4:0] | b100 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if(rd != 0) X[rd] <= X[rs1] ^ imm;
+		}
+		ORI {
+			encoding: imm[11:0]s | rs1[4:0] | b110 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if(rd != 0) X[rd] <= X[rs1] | imm;
+		}
+		ANDI {
+			encoding: imm[11:0]s | rs1[4:0] | b111 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %imm%";
+			if(rd != 0) X[rd] <= X[rs1] & imm;
+		}
+		SLLI {
+		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b001 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shll(X[rs1], shamt);
+		}
+		SRLI {
+		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shrl(X[rs1], shamt);
+		}
+		SRAI {
+		    encoding: b0100000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
+		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
+		    if(rd != 0) X[rd] <= shra(X[rs1], shamt);
+		}
+		ADD {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+			if(rd != 0) X[rd] <= X[rs1] + X[rs2];
+		}
+		SUB {
+		    encoding: b0100000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+			if(rd != 0) X[rd] <= X[rs1] - X[rs2];
+		}
+		SLL {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0) X[rd] <= shll(X[rs1], X[rs2]&XLEN_BIT_MASK);
+		}
+		SLT {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+	        if (rd != 0) X[rd] <= choose(X[rs1]s < X[rs2]s, 1, 0);
+		}
+		SLTU {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+	        if (rd != 0) X[rd] <= choose(zext(X[rs1]) < zext(X[rs2]), 1, 0);
+		}
+		XOR {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+			if(rd != 0) X[rd] <= X[rs1] ^ X[rs2];
+		}
+		SRL {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0) X[rd] <= shrl(X[rs1], X[rs2]&XLEN_BIT_MASK);
+		}
+		SRA {
+		    encoding: b0100000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+		    if(rd != 0) X[rd] <= shra(X[rs1], X[rs2]&XLEN_BIT_MASK);
+		}
+		OR {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+			if(rd != 0) X[rd] <= X[rs1] | X[rs2];
+		}
+		AND {
+		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0110011;
+		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+			if(rd != 0) X[rd] <= X[rs1] & X[rs2];
+		}
+		FENCE {
+			encoding: b0000 | pred[3:0] | succ[3:0] | rs1[4:0] | b000 | rd[4:0] | b0001111;
+		    FENCE[fence] <= pred<<4 | succ;
+		}
+		FENCE_I(flush) {
+		    encoding: imm[11:0] | rs1[4:0] | b001 | rd[4:0] | b0001111 ;
+		    FENCE[fencei] <= imm;
+		}
+		ECALL(no_cont) {
+		    encoding: b000000000000 | b00000 | b000 | b00000 | b1110011;
+		    raise(0, 11);
+		}
+		EBREAK(no_cont) {
+		    encoding: b000000000001 | b00000 | b000 | b00000 | b1110011;
+		    raise(0, 3);
+		}
+		URET(no_cont) {
+			encoding: b0000000 | b00010 | b00000 | b000 | b00000 | b1110011;
+			leave(0);
+		}
+		SRET(no_cont)  {
+			encoding: b0001000 | b00010 | b00000 | b000 | b00000 | b1110011;
+			leave(1);
+		}
+		MRET(no_cont) {
+			encoding: b0011000 | b00010 | b00000 | b000 | b00000 | b1110011;
+			leave(3);
+		}
+		WFI  {
+			encoding: b0001000 | b00101 | b00000 | b000 | b00000 | b1110011;
+			wait(1);
+		}
+		SFENCE.VMA {
+			encoding: b0001001 | rs2[4:0] | rs1[4:0] | b000 | b00000 | b1110011;
+		    FENCE[fencevmal] <= rs1;
+		    FENCE[fencevmau] <= rs2;
+		}
+		CSRRW {
+		    encoding: csr[11:0] | rs1[4:0] | b001 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, x%rs1$d";
+            val rs_val[XLEN] <= X[rs1];
+		    if(rd!=0){
+		        val csr_val[XLEN] <= CSR[csr];
+                CSR[csr] <= rs_val; 
+                // make sure Xrd is updated once CSR write succeeds
+	   	        X[rd] <= csr_val;
+   	        } else {
+		        CSR[csr] <= rs_val;
+	        }
+		}
+		CSRRS {
+		    encoding: csr[11:0] | rs1[4:0] | b010 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, x%rs1$d";
+		    val xrd[XLEN] <= CSR[csr];
+		    val xrs1[XLEN] <= X[rs1];
+		    if(rd!=0) X[rd] <= xrd;
+		    if(rs1!=0) CSR[csr] <= xrd | xrs1;	
+		}
+		CSRRC {
+		    encoding: csr[11:0] | rs1[4:0] | b011 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, x%rs1$d";
+		    val xrd[XLEN] <= CSR[csr];
+		    val xrs1[XLEN] <= X[rs1];
+		    if(rd!=0) X[rd] <= xrd;
+		    if(rs1!=0) CSR[csr] <= xrd & ~xrs1;	
+		}
+		CSRRWI {
+		    encoding: csr[11:0] | zimm[4:0] | b101 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, 0x%zimm$x";
+		    if(rd!=0) X[rd] <= CSR[csr];
+		    CSR[csr] <= zext(zimm);	
+		}
+		CSRRSI {
+		    encoding: csr[11:0] | zimm[4:0] | b110 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, 0x%zimm$x";
+		    val res[XLEN] <= CSR[csr];
+		    if(zimm!=0) CSR[csr] <= res | zext(zimm);
+		    // make sure rd is written after csr write succeeds	
+            if(rd!=0) X[rd] <= res;
+		}
+		CSRRCI {
+		    encoding: csr[11:0] | zimm[4:0] | b111 | rd[4:0] | b1110011;
+		    args_disass:"x%rd$d, %csr$d, 0x%zimm$x";
+		    val res[XLEN] <= CSR[csr];
+		    if(rd!=0) X[rd] <= res;
+		    if(zimm!=0) CSR[csr] <= res & ~zext(zimm, XLEN);	
+		}   
+	}
+}
+

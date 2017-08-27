@@ -1,0 +1,38 @@
+import "RV32IBase.core_desc"
+import "RV32M.core_desc"
+import "RV32A.core_desc"
+import "RV32C.core_desc"
+//import "RV64IBase.core_desc"
+//import "RV64M.core_desc"
+//import "RV64A.core_desc"
+
+Core MinRV_IMA provides RV32IBase,RV32M,RV32A, RV32CI  {
+    template:"vm_riscv.in.cpp";
+    constants {
+        XLEN:=32;
+        XLEN2:=64;
+        XLEN_BIT_MASK:=0x1f;
+        PCLEN:=32;
+        fence:=0;
+        fencei:=1;
+		fencevmal:=2;
+		fencevmau:=3;
+        //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        MISA_VAL:=0b01000000000101000001000100000001;
+        PGSIZE := 4096; //1 << 12;
+        PGMASK := 4095; //PGSIZE-1
+    }
+}
+
+/*
+Core RV64IMA provides RV64IBase, RV64M, RV64A {
+   template:"vm_riscv.in.cpp";
+    constants {
+        XLEN:=64;
+        XLEN_BIT_MASK:=0x3f;
+        PCLEN:=64;
+        fence:=0;
+        fencei:=1;
+    }
+}
+*/
