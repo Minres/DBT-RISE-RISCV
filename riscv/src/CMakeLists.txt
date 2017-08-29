@@ -2,8 +2,8 @@
 FILE(GLOB RiscVHeaders *.h)
 set(LIB_HEADERS ${RiscVHeaders} )
 set(LIB_SOURCES
-    iss/minrv_ima.cpp
-    internal/vm_minrv_ima.cpp
+    iss/rv32imac.cpp
+    internal/vm_rv32imac.cpp
 )
 
 set(APP_HEADERS )

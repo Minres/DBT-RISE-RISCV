@@ -28,13 +28,13 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Sun Aug 27 17:03:32 CEST 2017
-//             *      minrv_ima.h Author: <CoreDSL Generator>
+// Created on: Tue Aug 29 16:45:20 CEST 2017
+//             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _MINRV_IMA_H_
-#define _MINRV_IMA_H_
+#ifndef _RV32IMAC_H_
+#define _RV32IMAC_H_
 
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
@@ -43,10 +43,10 @@
 namespace iss {
 namespace arch {
 
-struct minrv_ima;
+struct rv32imac;
 
 template<>
-struct traits<minrv_ima> {
+struct traits<rv32imac> {
 
     enum constants {XLEN=32,XLEN2=64,XLEN_BIT_MASK=31,PCLEN=32,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=1075056897,PGSIZE=4096,PGMASK=4095};
 
@@ -103,13 +103,13 @@ struct traits<minrv_ima> {
     typedef iss::typed_addr_t<iss::PHYSICAL> phys_addr_t;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        const uint32_t MinRV_IMA_reg_size[] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64};
-        return MinRV_IMA_reg_size[r];
+        const uint32_t RV32IMAC_reg_size[] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64};
+        return RV32IMAC_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-        const uint32_t MinRV_IMA_reg_byte_offset[] = {0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160};
-        return MinRV_IMA_reg_byte_offset[r];
+        const uint32_t RV32IMAC_reg_byte_offset[] = {0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160};
+        return RV32IMAC_reg_byte_offset[r];
     }
 
     enum sreg_flag_e {FLAGS};
@@ -118,15 +118,15 @@ struct traits<minrv_ima> {
 
 };
 
-struct minrv_ima: public arch_if {
+struct rv32imac: public arch_if {
 
-    using virt_addr_t = typename traits<minrv_ima>::virt_addr_t;
-    using phys_addr_t = typename traits<minrv_ima>::phys_addr_t;
-    using reg_t =  typename traits<minrv_ima>::reg_t;
-    using addr_t = typename traits<minrv_ima>::addr_t;
+    using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
+    using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
+    using reg_t =  typename traits<rv32imac>::reg_t;
+    using addr_t = typename traits<rv32imac>::addr_t;
 
-    minrv_ima();
-    ~minrv_ima();
+    rv32imac();
+    ~rv32imac();
 
     virtual void reset(uint64_t address=0) override;
 
@@ -154,7 +154,7 @@ struct minrv_ima: public arch_if {
     virtual iss::sync_type needed_sync() const { return iss::PRE_SYNC; }
 
 protected:
-    struct MinRV_IMA_regs {
+    struct RV32IMAC_regs {
         uint32_t X0;
         uint32_t X1;
         uint32_t X2;
@@ -196,4 +196,4 @@ protected:
 
 }
 }            
-#endif /* _MINRV_IMA_H_ */
+#endif /* _RV32IMAC_H_ */

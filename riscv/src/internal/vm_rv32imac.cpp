@@ -41,14 +41,14 @@
 #include <cstring>
 
 #include "iss/vm_base.h"
-#include "iss/arch/minrv_ima.h"
-#include "iss/arch/riscv_core.h"
+#include "iss/arch/rv32imac.h"
 #include "iss/debugger/server.h"
 
 #include <boost/format.hpp>
+#include "../../incl/iss/arch/riscv_hart_msu_vp.h"
 
 namespace iss {
-namespace minrv_ima {
+namespace rv32imac {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
@@ -5521,27 +5521,27 @@ void vm_impl<ARCH>::gen_trap_check(llvm::BasicBlock* bb){
                     this->trap_blk, 1);
 }
 
-} // namespace minrv_ima
+} // namespace rv32imac
 
 #define CREATE_FUNCS(ARCH) \
 template<> std::unique_ptr<vm_if> create<ARCH>(ARCH* core, unsigned short port, bool dump) {\
-    std::unique_ptr<minrv_ima::vm_impl<ARCH> > ret = std::make_unique<minrv_ima::vm_impl<ARCH> >(*core, dump);\
+    std::unique_ptr<rv32imac::vm_impl<ARCH> > ret = std::make_unique<rv32imac::vm_impl<ARCH> >(*core, dump);\
     debugger::server<debugger::gdb_session>::run_server(ret.get(), port);\
     return ret;\
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, unsigned short port, bool dump) {\
-    return create<ARCH>(new arch::riscv_core<ARCH>(), port, dump); /* FIXME: memory leak!!!!!!! */\
+    return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), port, dump); /* FIXME: memory leak!!!!!!! */\
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(ARCH* core, bool dump) {\
-    return std::make_unique<minrv_ima::vm_impl<ARCH> >(*core, dump); /* FIXME: memory leak!!!!!!! */ \
+    return std::make_unique<rv32imac::vm_impl<ARCH> >(*core, dump); /* FIXME: memory leak!!!!!!! */ \
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, bool dump) { \
-    return create<ARCH>(new arch::riscv_core<ARCH>(), dump);\
+    return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), dump);\
 }
 
-CREATE_FUNCS(arch::minrv_ima)
+CREATE_FUNCS(arch::rv32imac)
 
-namespace minrv_ima {
+namespace rv32imac {
 
     template<typename ARCH>
     status target_adapter<ARCH>::set_gen_thread(rp_thread_ref& thread) {
@@ -5758,5 +5758,5 @@ namespace minrv_ima {
         vm->get_arch()->set_reg(reg_no, data);
         return resume_from_current(step, sig);
     }
-} // namespace minrv_ima
+} // namespace rv32imac
 } // namespace iss

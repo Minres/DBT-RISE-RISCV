@@ -459,9 +459,9 @@ constexpr uint64_t get_misa(uint64_t mask){
 }
 
 template<typename BASE>
-struct riscv_core: public BASE {
+struct riscv_hart_msu_vp: public BASE {
     using super = BASE;
-    using this_class = riscv_core<BASE>;
+    using this_class = riscv_hart_msu_vp<BASE>;
     using virt_addr_t= typename super::virt_addr_t;
     using phys_addr_t= typename super::phys_addr_t;
     using reg_t =  typename super::reg_t;
@@ -483,8 +483,8 @@ struct riscv_core: public BASE {
         return m[mode];
     }
 
-    riscv_core();
-    virtual ~riscv_core();
+    riscv_hart_msu_vp();
+    virtual ~riscv_hart_msu_vp();
 
     virtual void load_file(std::string name, int type=-1);
 
@@ -493,7 +493,7 @@ struct riscv_core: public BASE {
     virtual iss::status read(const iss::addr_t& addr, unsigned length, uint8_t* const data) override;
     virtual iss::status write(const iss::addr_t& addr, unsigned length, const uint8_t* const data) override;
 
-    virtual uint64_t enter_trap(uint64_t flags) override {return riscv_core::enter_trap(flags, fault_data);}
+    virtual uint64_t enter_trap(uint64_t flags) override {return riscv_hart_msu_vp::enter_trap(flags, fault_data);}
     virtual uint64_t enter_trap(uint64_t flags, uint64_t addr) override;
     virtual uint64_t leave_trap(uint64_t flags) override;
     virtual void wait_until(uint64_t flags) override;
@@ -542,7 +542,7 @@ private:
 };
 
 template<typename BASE>
-riscv_core<BASE>::riscv_core() {
+riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp() {
     csr[misa]=traits<BASE>::XLEN==32?1ULL<<(traits<BASE>::XLEN-2):2ULL<<(traits<BASE>::XLEN-2);
     uart_buf.str("");
     // read-only registers
@@ -552,38 +552,38 @@ riscv_core<BASE>::riscv_core() {
     for(unsigned addr=mcycleh; addr<=hpmcounter31h; ++addr)
         csr_wr_cb[addr]=nullptr;
     // special handling
-    csr_rd_cb[mcycle]=&riscv_core<BASE>::read_cycle;
-    csr_rd_cb[mcycleh]=&riscv_core<BASE>::read_cycle;
-    csr_rd_cb[minstret]=&riscv_core<BASE>::read_cycle;
-    csr_rd_cb[minstreth]=&riscv_core<BASE>::read_cycle;
-    csr_rd_cb[mstatus]=&riscv_core<BASE>::read_status;
-    csr_wr_cb[mstatus]=&riscv_core<BASE>::write_status;
-    csr_rd_cb[sstatus]=&riscv_core<BASE>::read_status;
-    csr_wr_cb[sstatus]=&riscv_core<BASE>::write_status;
-    csr_rd_cb[ustatus]=&riscv_core<BASE>::read_status;
-    csr_wr_cb[ustatus]=&riscv_core<BASE>::write_status;
-    csr_rd_cb[mip]=&riscv_core<BASE>::read_ip;
-    csr_wr_cb[mip]=&riscv_core<BASE>::write_ip;
-    csr_rd_cb[sip]=&riscv_core<BASE>::read_ip;
-    csr_wr_cb[sip]=&riscv_core<BASE>::write_ip;
-    csr_rd_cb[uip]=&riscv_core<BASE>::read_ip;
-    csr_wr_cb[uip]=&riscv_core<BASE>::write_ip;
-    csr_rd_cb[mie]=&riscv_core<BASE>::read_ie;
-    csr_wr_cb[mie]=&riscv_core<BASE>::write_ie;
-    csr_rd_cb[sie]=&riscv_core<BASE>::read_ie;
-    csr_wr_cb[sie]=&riscv_core<BASE>::write_ie;
-    csr_rd_cb[uie]=&riscv_core<BASE>::read_ie;
-    csr_wr_cb[uie]=&riscv_core<BASE>::write_ie;
-    csr_rd_cb[satp]=&riscv_core<BASE>::read_satp;
-    csr_wr_cb[satp]=&riscv_core<BASE>::write_satp;
+    csr_rd_cb[mcycle]=&riscv_hart_msu_vp<BASE>::read_cycle;
+    csr_rd_cb[mcycleh]=&riscv_hart_msu_vp<BASE>::read_cycle;
+    csr_rd_cb[minstret]=&riscv_hart_msu_vp<BASE>::read_cycle;
+    csr_rd_cb[minstreth]=&riscv_hart_msu_vp<BASE>::read_cycle;
+    csr_rd_cb[mstatus]=&riscv_hart_msu_vp<BASE>::read_status;
+    csr_wr_cb[mstatus]=&riscv_hart_msu_vp<BASE>::write_status;
+    csr_rd_cb[sstatus]=&riscv_hart_msu_vp<BASE>::read_status;
+    csr_wr_cb[sstatus]=&riscv_hart_msu_vp<BASE>::write_status;
+    csr_rd_cb[ustatus]=&riscv_hart_msu_vp<BASE>::read_status;
+    csr_wr_cb[ustatus]=&riscv_hart_msu_vp<BASE>::write_status;
+    csr_rd_cb[mip]=&riscv_hart_msu_vp<BASE>::read_ip;
+    csr_wr_cb[mip]=&riscv_hart_msu_vp<BASE>::write_ip;
+    csr_rd_cb[sip]=&riscv_hart_msu_vp<BASE>::read_ip;
+    csr_wr_cb[sip]=&riscv_hart_msu_vp<BASE>::write_ip;
+    csr_rd_cb[uip]=&riscv_hart_msu_vp<BASE>::read_ip;
+    csr_wr_cb[uip]=&riscv_hart_msu_vp<BASE>::write_ip;
+    csr_rd_cb[mie]=&riscv_hart_msu_vp<BASE>::read_ie;
+    csr_wr_cb[mie]=&riscv_hart_msu_vp<BASE>::write_ie;
+    csr_rd_cb[sie]=&riscv_hart_msu_vp<BASE>::read_ie;
+    csr_wr_cb[sie]=&riscv_hart_msu_vp<BASE>::write_ie;
+    csr_rd_cb[uie]=&riscv_hart_msu_vp<BASE>::read_ie;
+    csr_wr_cb[uie]=&riscv_hart_msu_vp<BASE>::write_ie;
+    csr_rd_cb[satp]=&riscv_hart_msu_vp<BASE>::read_satp;
+    csr_wr_cb[satp]=&riscv_hart_msu_vp<BASE>::write_satp;
 }
 
 template<typename BASE>
-riscv_core<BASE>::~riscv_core() {
+riscv_hart_msu_vp<BASE>::~riscv_hart_msu_vp() {
 }
 
 template<typename BASE>
-void riscv_core<BASE>::load_file(std::string name, int type) {
+void riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
     FILE* fp = fopen(name.c_str(), "r");
     if(fp){
         char buf[5];
@@ -606,7 +606,7 @@ void riscv_core<BASE>::load_file(std::string name, int type) {
                 const auto fsize=pseg->get_file_size();         // 0x42c/0x0
                 const auto seg_data=pseg->get_data();
                 if(fsize>0){
-                    this->write(typed_addr_t<PHYSICAL>(iss::DEBUG_WRITE, traits<minrv_ima>::MEM, pseg->get_virtual_address()), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
+                    this->write(typed_addr_t<PHYSICAL>(iss::DEBUG_WRITE, traits<BASE>::MEM, pseg->get_virtual_address()), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                 }
             }
             for (const auto sec :reader.sections ) {
@@ -621,7 +621,7 @@ void riscv_core<BASE>::load_file(std::string name, int type) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read(const iss::addr_t& addr, unsigned length, uint8_t* const data){
+iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t& addr, unsigned length, uint8_t* const data){
 #ifndef NDEBUG
     if(addr.type& iss::DEBUG){
         LOG(DEBUG)<<"debug read of "<<length<<" bytes @addr "<<addr;
@@ -717,7 +717,7 @@ iss::status riscv_core<BASE>::read(const iss::addr_t& addr, unsigned length, uin
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write(const iss::addr_t& addr, unsigned length, const uint8_t* const data){
+iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t& addr, unsigned length, const uint8_t* const data){
 #ifndef NDEBUG
     const char* prefix = addr.type & iss::DEBUG?"debug ":"";
     switch(length){
@@ -813,7 +813,7 @@ iss::status riscv_core<BASE>::write(const iss::addr_t& addr, unsigned length, co
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_csr(unsigned addr, reg_t& val){
+iss::status riscv_hart_msu_vp<BASE>::read_csr(unsigned addr, reg_t& val){
     if(addr >= csr.size()) return iss::Err;
     auto it = csr_rd_cb.find(addr);
     if(it == csr_rd_cb.end()){
@@ -827,7 +827,7 @@ iss::status riscv_core<BASE>::read_csr(unsigned addr, reg_t& val){
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_csr(unsigned addr, reg_t val){
+iss::status riscv_hart_msu_vp<BASE>::write_csr(unsigned addr, reg_t val){
     if(addr>=csr.size()) return iss::Err;
     auto it = csr_wr_cb.find(addr);
     if(it == csr_wr_cb.end()){
@@ -842,7 +842,7 @@ iss::status riscv_core<BASE>::write_csr(unsigned addr, reg_t val){
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_cycle(unsigned addr, reg_t& val) {
+iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigned addr, reg_t& val) {
     if( addr== mcycle) {
         val = static_cast<reg_t>(this->reg.icount);
     }else if(addr==mcycleh) {
@@ -853,7 +853,7 @@ iss::status riscv_core<BASE>::read_cycle(unsigned addr, reg_t& val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_status(unsigned addr, reg_t& val) {
+iss::status riscv_hart_msu_vp<BASE>::read_status(unsigned addr, reg_t& val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask = get_mask(req_priv_lvl, (reg_t) (std::numeric_limits<reg_t>::max()));
@@ -862,7 +862,7 @@ iss::status riscv_core<BASE>::read_status(unsigned addr, reg_t& val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_status(unsigned addr, reg_t val) {
+iss::status riscv_hart_msu_vp<BASE>::write_status(unsigned addr, reg_t val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask=get_mask(req_priv_lvl, (reg_t)std::numeric_limits<reg_t>::max());
@@ -874,7 +874,7 @@ iss::status riscv_core<BASE>::write_status(unsigned addr, reg_t val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_ie(unsigned addr, reg_t& val) {
+iss::status riscv_hart_msu_vp<BASE>::read_ie(unsigned addr, reg_t& val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     val = csr[mie];
@@ -884,7 +884,7 @@ iss::status riscv_core<BASE>::read_ie(unsigned addr, reg_t& val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_ie(unsigned addr, reg_t val) {
+iss::status riscv_hart_msu_vp<BASE>::write_ie(unsigned addr, reg_t val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask=get_irq_mask(req_priv_lvl);
@@ -894,7 +894,7 @@ iss::status riscv_core<BASE>::write_ie(unsigned addr, reg_t val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_ip(unsigned addr, reg_t& val) {
+iss::status riscv_hart_msu_vp<BASE>::read_ip(unsigned addr, reg_t& val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     val = csr[mie];
@@ -904,7 +904,7 @@ iss::status riscv_core<BASE>::read_ip(unsigned addr, reg_t& val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_ip(unsigned addr, reg_t val) {
+iss::status riscv_hart_msu_vp<BASE>::write_ip(unsigned addr, reg_t val) {
     auto req_priv_lvl=addr>>8;
     if(this->reg.machine_state<req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask=get_irq_mask(req_priv_lvl);
@@ -914,7 +914,7 @@ iss::status riscv_core<BASE>::write_ip(unsigned addr, reg_t val) {
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_satp(unsigned addr, reg_t& val){
+iss::status riscv_hart_msu_vp<BASE>::read_satp(unsigned addr, reg_t& val){
     auto status = csr[mstatus];
     auto tvm = status&(1<<20);
     if(this->reg.machine_state==PRIV_S & tvm!=0){
@@ -927,7 +927,7 @@ iss::status riscv_core<BASE>::read_satp(unsigned addr, reg_t& val){
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_satp(unsigned addr, reg_t val){
+iss::status riscv_hart_msu_vp<BASE>::write_satp(unsigned addr, reg_t val){
     auto status = csr[mstatus];
     auto tvm = status&(1<<20);
     if(this->reg.machine_state==PRIV_S & tvm!=0){
@@ -940,7 +940,7 @@ iss::status riscv_core<BASE>::write_satp(unsigned addr, reg_t val){
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::read_mem(phys_addr_t addr, unsigned length, uint8_t* const data) {
+iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t addr, unsigned length, uint8_t* const data) {
     const auto& p = mem(addr.val/mem.page_size);
     auto offs=addr.val&mem.page_addr_mask;
     std::copy(p.data() + offs, p.data() + offs+length, data);
@@ -948,7 +948,7 @@ iss::status riscv_core<BASE>::read_mem(phys_addr_t addr, unsigned length, uint8_
 }
 
 template<typename BASE>
-iss::status riscv_core<BASE>::write_mem(phys_addr_t addr, unsigned length, const uint8_t* const data) {
+iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t addr, unsigned length, const uint8_t* const data) {
     mem_type::page_type& p = mem(addr.val/mem.page_size);
     std::copy(data, data+length, p.data()+(addr.val&mem.page_addr_mask));
     // tohost handling in case of riscv-test
@@ -987,7 +987,7 @@ iss::status riscv_core<BASE>::write_mem(phys_addr_t addr, unsigned length, const
 }
 
 template<typename BASE>
-void riscv_core<BASE>::check_interrupt(){
+void riscv_hart_msu_vp<BASE>::check_interrupt(){
     auto status = csr[mstatus];
     auto ip = csr[mip];
     auto ie = csr[mie];
@@ -1015,7 +1015,7 @@ void riscv_core<BASE>::check_interrupt(){
 }
 
 template<typename BASE>
-typename riscv_core<BASE>::phys_addr_t riscv_core<BASE>::v2p(const iss::addr_t& addr){
+typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const iss::addr_t& addr){
     const uint64_t tmp = reg_t(1) << (traits<BASE>::XLEN-1);
     const uint64_t msk = tmp | (tmp-1);
 
@@ -1123,7 +1123,7 @@ typename riscv_core<BASE>::phys_addr_t riscv_core<BASE>::v2p(const iss::addr_t& 
 }
 
 template<typename BASE>
-uint64_t riscv_core<BASE>::enter_trap(uint64_t flags, uint64_t addr) {
+uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t flags, uint64_t addr) {
     auto cur_priv=this->reg.machine_state;
     // calculate and write mcause val
     auto trap_id=flags&0xffff;
@@ -1195,7 +1195,7 @@ uint64_t riscv_core<BASE>::enter_trap(uint64_t flags, uint64_t addr) {
 }
 
 template<typename BASE>
-uint64_t riscv_core<BASE>::leave_trap(uint64_t flags) {
+uint64_t riscv_hart_msu_vp<BASE>::leave_trap(uint64_t flags) {
     auto cur_priv=this->reg.machine_state;
     auto inst_priv=flags&0x3;
     auto status=csr[mstatus];
@@ -1235,7 +1235,7 @@ uint64_t riscv_core<BASE>::leave_trap(uint64_t flags) {
 }
 
 template<typename BASE>
-void riscv_core<BASE>::wait_until(uint64_t flags) {
+void riscv_hart_msu_vp<BASE>::wait_until(uint64_t flags) {
     auto status=csr[mstatus];
     auto tw = status & (1<<21);
     if(this->reg.machine_state==PRIV_S && tw!=0){

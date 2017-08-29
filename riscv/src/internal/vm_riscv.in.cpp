@@ -42,10 +42,10 @@
 
 #include "iss/vm_base.h"
 #include "iss/arch/CORE_DEF_NAME.h"
-#include "iss/arch/riscv_core.h"
 #include "iss/debugger/server.h"
 
 #include <boost/format.hpp>
+#include "../../incl/iss/arch/riscv_hart_msu_vp.h"
 
 namespace iss {
 namespace CORE_DEF_NAME {
@@ -452,13 +452,13 @@ template<> std::unique_ptr<vm_if> create<ARCH>(ARCH* core, unsigned short port, 
     return ret;\
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, unsigned short port, bool dump) {\
-    return create<ARCH>(new arch::riscv_core<ARCH>(), port, dump); /* FIXME: memory leak!!!!!!! */\
+    return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), port, dump); /* FIXME: memory leak!!!!!!! */\
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(ARCH* core, bool dump) {\
     return std::make_unique<CORE_DEF_NAME::vm_impl<ARCH> >(*core, dump); /* FIXME: memory leak!!!!!!! */ \
 }\
 template<> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, bool dump) { \
-    return create<ARCH>(new arch::riscv_core<ARCH>(), dump);\
+    return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), dump);\
 }
 
 CREATE_FUNCS(arch::CORE_DEF_NAME)

@@ -37,7 +37,7 @@
 #include <iss/iss.h>
 #include <iostream>
 
-#include <iss/arch/minrv_ima.h>
+#include <iss/arch/rv32imac.h>
 #ifndef WITHOUT_LLVM
 #include <iss/jit/MCJIThelper.h>
 #endif
@@ -72,13 +72,13 @@ int main(int argc, char *argv[]) {
             bool  dump=vm.count("dump-ir");
             // instantiate the simulator
             std::unique_ptr<iss::vm_if> cpu = vm.count("gdb-port")?
-                    iss::create<iss::arch::minrv_ima>("rv32ima", vm["gdb-port"].as<unsigned>(), dump):
-                    iss::create<iss::arch::minrv_ima>("rv32ima", dump);
+                    iss::create<iss::arch::rv32imac>("rv32ima", vm["gdb-port"].as<unsigned>(), dump):
+                    iss::create<iss::arch::rv32imac>("rv32ima", dump);
             if(vm.count("elf")){
                 for(std::string input: vm["elf"].as<std::vector<std::string> >())
                     cpu->get_arch()->load_file(input);
             } else if(vm.count("mem")){
-                cpu->get_arch()->load_file(vm["mem"].as<std::string>() , iss::arch::traits<iss::arch::minrv_ima>::MEM);
+                cpu->get_arch()->load_file(vm["mem"].as<std::string>() , iss::arch::traits<iss::arch::rv32imac>::MEM);
             } //else
               //  LOG(FATAL)<<"At least one (flash-)input file (ELF or IHEX) needs to be specified";
 
