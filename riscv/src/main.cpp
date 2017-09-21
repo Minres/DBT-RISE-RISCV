@@ -38,17 +38,14 @@
 #include <iostream>
 
 #include <iss/arch/rv32imac.h>
-#ifndef WITHOUT_LLVM
+#include <iss/arch/rv64ia.h>
 #include <iss/jit/MCJIThelper.h>
-#endif
 #ifdef WITH_SYSTEMC
 #include <sysc/kernel/sc_externs.h>
 #endif
 #include <boost/lexical_cast.hpp>
 
 namespace po= boost::program_options;
-
-INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
     try{
@@ -63,17 +60,26 @@ int main(int argc, char *argv[]) {
         // application code comes here //
         iss::init_jit(argc, argv);
         if(vm.count("systemc")){
-//#ifdef WITH_SYSTEMC
-//            return sc_core::sc_elab_and_sim(argc, argv);
-//#else
+#ifdef WITH_SYSTEMC
+            return sc_core::sc_elab_and_sim(argc, argv);
+#else
             std::cerr<<"SystemC simulation is currently not supported, please rebuild with -DWITH_SYSTEMC"<<std::endl;
-//#endif
+#endif
         } else {
             bool  dump=vm.count("dump-ir");
             // instantiate the simulator
-            std::unique_ptr<iss::vm_if> cpu = vm.count("gdb-port")?
-                    iss::create<iss::arch::rv32imac>("rv32ima", vm["gdb-port"].as<unsigned>(), dump):
-                    iss::create<iss::arch::rv32imac>("rv32ima", dump);
+            std::unique_ptr<iss::vm_if> cpu = nullptr;
+            if(vm.count("rv64")==1){
+                if(vm.count("gdb-port")==1)
+                    cpu = iss::create<iss::arch::rv64ia>("rv64ia", vm["gdb-port"].as<unsigned>(), dump);
+                else
+                    cpu = iss::create<iss::arch::rv64ia>("rv64ia", dump);
+            } else {
+                if(vm.count("gdb-port")==1)
+                    cpu = iss::create<iss::arch::rv32imac>("rv32ima", vm["gdb-port"].as<unsigned>(), dump);
+                else
+                    cpu = iss::create<iss::arch::rv32imac>("rv32ima", dump);
+            }
             if(vm.count("elf")){
                 for(std::string input: vm["elf"].as<std::vector<std::string> >())
                     cpu->get_arch()->load_file(input);
@@ -96,7 +102,7 @@ int main(int argc, char *argv[]) {
             return cpu->start(vm["cycles"].as<int64_t>());
         }
     } catch(std::exception& e){
-        LOG(ERROR) << "Unhandled Exception reached the top of main: "
+        LOG(logging::ERROR) << "Unhandled Exception reached the top of main: "
                 << e.what() << ", application will now exit" << std::endl;
         return ERROR_UNHANDLED_EXCEPTION;
     }

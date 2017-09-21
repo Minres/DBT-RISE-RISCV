@@ -40,8 +40,10 @@
 #include <util/ities.h>
 #include <util/sparse_array.h>
 #include <elfio/elfio.hpp>
-#include <easylogging++.h>
+#include <util/logging.h>
 #include <sstream>
+#include <iomanip>
+#include <unordered_map>
 
 namespace iss {
 namespace arch {
@@ -156,7 +158,9 @@ enum csr_name {
     dscratch=0x7B2
 };
 
-char lvl[]={'U', 'S', 'H', 'M'};
+namespace {
+
+const char lvl[]={'U', 'S', 'H', 'M'};
 
 const char* trap_str[] = {
         "Instruction address misaligned",
@@ -191,7 +195,6 @@ const char* irq_str[] = {
         "Machine external interrupt"
 };
 
-namespace {
 enum {
     PGSHIFT=12,
     PTE_PPN_SHIFT=10,
@@ -500,8 +503,7 @@ struct riscv_hart_msu_vp: public BASE {
 
     virtual std::string get_additional_disass_info(){
         std::stringstream s;
-        auto status = csr[mstatus];
-        s<<"[p:"<<lvl[this->reg.machine_state]<<";s:0x"<<std::hex<<std::setfill('0')<<std::setw(sizeof(reg_t)*2)<<status<<std::dec<<";c:"<<this->reg.icount<<"]";
+        s<<"[p:"<<lvl[this->reg.machine_state]<<";s:0x"<<std::hex<<std::setfill('0')<<std::setw(sizeof(reg_t)*2)<<mstatus_r<<std::dec<<";c:"<<this->reg.icount<<"]";
         return s.str();
     };
 
@@ -521,6 +523,7 @@ protected:
     using csr_page_type = typename csr_type::page_type;
     mem_type mem;
     csr_type csr;
+    reg_t& mstatus_r, satp_r;
     unsigned to_host_wr_cnt=0;
     std::stringstream uart_buf;
     std::unordered_map<reg_t, uint64_t> ptw;
@@ -542,7 +545,7 @@ private:
 };
 
 template<typename BASE>
-riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp() {
+riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp() : mstatus_r(csr[mstatus]), satp_r(csr[satp]) {
     csr[misa]=traits<BASE>::XLEN==32?1ULL<<(traits<BASE>::XLEN-2):2ULL<<(traits<BASE>::XLEN-2);
     uart_buf.str("");
     // read-only registers
@@ -624,9 +627,9 @@ template<typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t& addr, unsigned length, uint8_t* const data){
 #ifndef NDEBUG
     if(addr.type& iss::DEBUG){
-        LOG(DEBUG)<<"debug read of "<<length<<" bytes @addr "<<addr;
+        LOG(logging::DEBUG)<<"debug read of "<<length<<" bytes @addr "<<addr;
     } else {
-        LOG(DEBUG)<<"read of "<<length<<" bytes  @addr "<<addr;
+        LOG(logging::DEBUG)<<"read of "<<length<<" bytes  @addr "<<addr;
     }
 #endif
     switch(addr.space){
@@ -722,19 +725,19 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t& addr, unsigned len
     const char* prefix = addr.type & iss::DEBUG?"debug ":"";
     switch(length){
     case 8:
-        LOG(DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint64_t*)&data[0]<<std::dec<<") @addr "<<addr;
+        LOG(logging::DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint64_t*)&data[0]<<std::dec<<") @addr "<<addr;
         break;
     case 4:
-        LOG(DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint32_t*)&data[0]<<std::dec<<") @addr "<<addr;
+        LOG(logging::DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint32_t*)&data[0]<<std::dec<<") @addr "<<addr;
         break;
     case 2:
-        LOG(DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint16_t*)&data[0]<<std::dec<<") @addr "<<addr;
+        LOG(logging::DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<*(uint16_t*)&data[0]<<std::dec<<") @addr "<<addr;
         break;
     case 1:
-        LOG(DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<(uint16_t)data[0]<<std::dec<<") @addr "<<addr;
+        LOG(logging::DEBUG)<<prefix<<"write of "<<length<<" bytes (0x"<<std::hex<<(uint16_t)data[0]<<std::dec<<") @addr "<<addr;
         break;
     default:
-        LOG(DEBUG)<<prefix<<"write of "<<length<<" bytes @addr "<<addr;
+        LOG(logging::DEBUG)<<prefix<<"write of "<<length<<" bytes @addr "<<addr;
     }
 #endif
     try {
@@ -960,13 +963,15 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t addr, unsigned length
             if(tohost_upper || (tohost_lower && to_host_wr_cnt>0)){
                 switch(hostvar>>48){
                 case 0:
-                    (hostvar!=0x1?LOG(FATAL):LOG(INFO))<<"tohost value is 0x"<<std::hex<<hostvar<<std::dec<<
-                    " ("<<hostvar<<"), stopping simulation";
+                    if(hostvar!=0x1)
+                        LOG(logging::FATAL)<<"tohost value is 0x"<<std::hex<<hostvar<<std::dec<<" ("<<hostvar<<"), stopping simulation";
+                    else
+                        LOG(logging::INFO)<<"tohost value is 0x"<<std::hex<<hostvar<<std::dec<<" ("<<hostvar<<"), stopping simulation";
                     throw(iss::simulation_stopped(hostvar));
                 case 0x0101:{
                     char c = static_cast<char>(hostvar & 0xff);
                     if(c=='\n' || c==0){
-                        LOG(INFO)<<"tohost send '"<<uart_buf.str()<<"'";
+                        LOG(logging::INFO)<<"tohost send '"<<uart_buf.str()<<"'";
                         uart_buf.str("");
                     } else
                         uart_buf<<c;
@@ -1025,13 +1030,12 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const
         return ret;
     }
 
-    const reg_t mstatus_r = csr[mstatus];
     const access_type type = (access_type)(addr.getAccessType()&~iss::DEBUG);
     uint32_t mode =type != iss::FETCH && bit_sub<17,1>(mstatus_r)? // MPRV
         mode = bit_sub<11,2>(mstatus_r):// MPV
         this->reg.machine_state;
 
-    const vm_info vm = decode_vm_info<traits<BASE>::XLEN>(mode, csr[satp]);
+    const vm_info vm = decode_vm_info<traits<BASE>::XLEN>(mode, satp_r);
 
     if (vm.levels == 0){
         phys_addr_t ret(addr);
@@ -1185,12 +1189,8 @@ uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t flags, uint64_t addr) {
     this->reg.trap_state=0;
     char buffer[32];
     sprintf(buffer, "0x%016lx", addr);
-    if(trap_id)
-        el::Loggers::getLogger("disass", true)->info("Interrupt %v with cause '%v' at address %v occurred, changing privilege level from %v to %v",
-            trap_id, irq_str[cause], buffer , lvl[cur_priv], lvl[new_priv]);
-    else
-        el::Loggers::getLogger("disass", true)->info("Trap %v with cause '%v' at address %v occurred, changing privilege level from %v to %v",
-            trap_id, trap_str[cause], buffer , lvl[cur_priv], lvl[new_priv]);
+    CLOG(logging::INFO, "disass")<<(trap_id?"Interrupt ":"Trap ")<<trap_id<<" with cause '"<<irq_str[cause]<<"' at address "<<buffer
+        <<" occurred, changing privilege level from "<<lvl[cur_priv]<<" to "<<lvl[new_priv];
     return this->reg.NEXT_PC;
 }
 
@@ -1229,8 +1229,7 @@ uint64_t riscv_hart_msu_vp<BASE>::leave_trap(uint64_t flags) {
     status|= pie<<inst_priv; // and set the pie
     csr[mstatus]=status;
     this->reg.machine_state=ppl;
-    el::Loggers::getLogger("disass", true)->info("Executing xRET , changing privilege level from %v to %v",
-        lvl[cur_priv], lvl[ppl]);
+    CLOG(logging::INFO, "disass")<<"Executing xRET , changing privilege level from "<<lvl[cur_priv]<<" to "<<lvl[ppl];
     return this->reg.NEXT_PC;
 }
 

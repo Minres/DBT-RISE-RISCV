@@ -8,6 +8,7 @@ set(GIT_SUBMODULE_DIR_dbt-core .)
 ### set each submodules's commit or tag that is to be checked out
 ### (leave empty if you want master)
 #set(GIT_SUBMODULE_VERSION_sc-comp 3af6b9836589b082c19d9131c5d0b7afa8ddd7cd)
+set(GIT_SUBMODULE_BRANCH_sc-components "develop")
 
 include(GNUInstallDirs)
 include(cmake/Submodules.cmake)

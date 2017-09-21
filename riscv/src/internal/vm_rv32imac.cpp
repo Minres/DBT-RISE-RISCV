@@ -36,7 +36,7 @@
 
 #include <iss/iss.h>
 #include <iss/debugger/gdb_session.h>
-#include <easylogging++.h>
+#include <util/logging.h>
 #include <memory>
 #include <cstring>
 
@@ -45,7 +45,7 @@
 #include "iss/debugger/server.h"
 
 #include <boost/format.hpp>
-#include "../../incl/iss/arch/riscv_hart_msu_vp.h"
+#include "iss/arch/riscv_hart_msu_vp.h"
 
 namespace iss {
 namespace rv32imac {
@@ -223,6 +223,17 @@ protected:
                         reinterpret_cast<uint64_t>(ptr)
                 )),
                 ptrType);
+    }
+
+    inline
+    llvm::Value* gen_reg_load(unsigned i, unsigned level=0){
+        if(level){
+            return this->builder->CreateLoad(get_reg_ptr(i), false);
+        } else {
+            if(!this->loaded_regs[i])
+                this->loaded_regs[i]=this->builder->CreateLoad(get_reg_ptr(i), false);
+            return this->loaded_regs[i];
+        }
     }
 
     inline
@@ -504,15 +515,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LUI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -546,15 +548,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AUIPC");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -575,7 +568,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -590,15 +583,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JAL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -619,12 +603,12 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* PC_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+            this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -636,15 +620,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JALR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -666,12 +641,12 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* ret_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         Value* PC_val = this->builder->CreateAnd(
             ret_val,
@@ -686,15 +661,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BEQ");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -717,13 +683,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_EQ,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false)),
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -736,15 +702,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BNE");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -767,13 +724,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false)),
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -786,15 +743,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLT");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -818,16 +766,16 @@ private:
             this->builder->CreateICmp(
                 ICmpInst::ICMP_SLT,
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     32, true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -840,15 +788,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGE");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -872,16 +811,16 @@ private:
             this->builder->CreateICmp(
                 ICmpInst::ICMP_SGE,
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     32, true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -894,15 +833,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLTU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -925,13 +855,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_ULT,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false)),
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -944,15 +874,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGEU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
@@ -975,13 +896,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_UGE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false)),
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -994,15 +915,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LB");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1023,7 +935,7 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -1043,15 +955,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LH");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1072,7 +975,7 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -1092,15 +995,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LW");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1121,7 +1015,7 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -1141,15 +1035,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LBU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1170,7 +1055,7 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -1190,15 +1075,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LHU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1219,7 +1095,7 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
@@ -1239,15 +1115,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SB");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
@@ -1268,9 +1135,9 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
-        Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
@@ -1286,15 +1153,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SH");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
@@ -1315,9 +1173,9 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
-        Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
@@ -1333,15 +1191,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SW");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
@@ -1362,9 +1211,9 @@ private:
         pc=pc+4;
     
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
-        Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
@@ -1380,15 +1229,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADDI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1410,7 +1250,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1425,15 +1265,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1458,7 +1289,7 @@ private:
                 this->builder->CreateICmp(
                     ICmpInst::ICMP_SLT,
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 0),
                         32, true),
                     this->gen_ext(
                         this->gen_const(32U, fld_imm_val),
@@ -1479,15 +1310,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTIU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1513,7 +1335,7 @@ private:
                 this->builder->CreateICmp(
                     ICmpInst::ICMP_ULT,
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 0),
                         32, false),
                     this->gen_ext(
                         full_imm_val,
@@ -1534,15 +1356,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XORI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1564,7 +1377,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateXor(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1579,15 +1392,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ORI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1609,7 +1413,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateOr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1624,15 +1428,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ANDI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1654,7 +1449,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAnd(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1669,15 +1464,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLLI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1699,7 +1485,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateShl(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_shamt_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1714,15 +1500,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRLI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1744,7 +1521,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateLShr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_shamt_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1759,15 +1536,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRAI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1789,7 +1557,7 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAShr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_shamt_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1804,15 +1572,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADD");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1834,8 +1593,8 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1849,15 +1608,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SUB");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1879,8 +1629,8 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateSub(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1894,15 +1644,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1924,9 +1665,9 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateShl(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->builder->CreateAnd(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     31));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1941,15 +1682,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLT");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -1974,10 +1706,10 @@ private:
                 this->builder->CreateICmp(
                     ICmpInst::ICMP_SLT,
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 0),
                         32, true),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 0),
                         32, true)),
                 this->gen_const(32U, 1),
                 this->gen_const(32U, 0),
@@ -1995,15 +1727,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2028,11 +1751,11 @@ private:
                 this->builder->CreateICmp(
                     ICmpInst::ICMP_ULT,
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 0),
                         32,
                         false),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 0),
                         32,
                         false)),
                 this->gen_const(32U, 1),
@@ -2051,15 +1774,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XOR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2081,8 +1795,8 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateXor(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2096,15 +1810,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2126,9 +1831,9 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateLShr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->builder->CreateAnd(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     31));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -2143,15 +1848,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRA");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2173,9 +1869,9 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAShr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                this->gen_reg_load(fld_rs1_val, 0),
                 this->builder->CreateAnd(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     31));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -2190,15 +1886,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("OR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2220,8 +1907,8 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateOr(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2235,15 +1922,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AND");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2265,8 +1943,8 @@ private:
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder->CreateAnd(
-                this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_reg_load(fld_rs2_val, 0));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2280,15 +1958,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2328,15 +1997,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE_I");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2370,15 +2030,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ECALL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2405,15 +2056,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("EBREAK");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2440,15 +2082,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("URET");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2475,15 +2108,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRET");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2510,15 +2134,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MRET");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2545,15 +2160,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("WFI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -2582,15 +2188,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SFENCE.VMA");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2629,15 +2226,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRW");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2657,7 +2245,7 @@ private:
         }
         pc=pc+4;
     
-        Value* rs_val_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* rs_val_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
             Value* CSR_csr_val = rs_val_val;
@@ -2685,15 +2273,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRS");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2714,7 +2293,7 @@ private:
         pc=pc+4;
     
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
-        Value* xrs1_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* xrs1_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* X_rd_val = xrd_val;
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -2739,15 +2318,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRC");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2768,7 +2338,7 @@ private:
         pc=pc+4;
     
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
-        Value* xrs1_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* xrs1_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* X_rd_val = xrd_val;
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -2793,15 +2363,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRWI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2844,15 +2405,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRSI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2900,15 +2452,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRCI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2956,15 +2499,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mul(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MUL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -2987,11 +2521,11 @@ private:
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     64,
                     false),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     64,
                     false));
             Value* X_rd_val = this->gen_ext(
@@ -3011,15 +2545,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULH");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3042,11 +2567,11 @@ private:
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     64,
                     true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     64,
                     true));
             Value* X_rd_val = this->gen_ext(
@@ -3068,15 +2593,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhsu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULHSU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3099,11 +2615,11 @@ private:
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     64,
                     true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     64,
                     false));
             Value* X_rd_val = this->gen_ext(
@@ -3125,15 +2641,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MULHU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3156,11 +2663,11 @@ private:
         if(fld_rd_val != 0){
             Value* res_val = this->builder->CreateMul(
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                    this->gen_reg_load(fld_rs1_val, 0),
                     64,
                     false),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     64,
                     false));
             Value* X_rd_val = this->gen_ext(
@@ -3182,15 +2689,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __div(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("DIV");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3217,7 +2715,7 @@ private:
             // this->builder->SetInsertPoint(bb);
             this->gen_cond_branch(this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
@@ -3225,11 +2723,11 @@ private:
             {
                 Value* X_rd_val = this->builder->CreateSDiv(
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 1),
                         32,
                         true),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         true));
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -3255,15 +2753,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __divu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("DIVU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3290,7 +2779,7 @@ private:
             // this->builder->SetInsertPoint(bb);
             this->gen_cond_branch(this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
@@ -3298,11 +2787,11 @@ private:
             {
                 Value* X_rd_val = this->builder->CreateUDiv(
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 1),
                         32,
                         false),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         false));
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -3328,15 +2817,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __rem(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("REM");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3363,7 +2843,7 @@ private:
             // this->builder->SetInsertPoint(bb);
             this->gen_cond_branch(this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
@@ -3371,11 +2851,11 @@ private:
             {
                 Value* X_rd_val = this->builder->CreateSRem(
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 1),
                         32,
                         true),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         true));
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -3383,7 +2863,7 @@ private:
             this->builder->CreateBr(bbnext);
             this->builder->SetInsertPoint(bb_else);
             {
-                Value* X_rd_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+                Value* X_rd_val = this->gen_reg_load(fld_rs1_val, 1);
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
             this->builder->CreateBr(bbnext);
@@ -3401,15 +2881,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __remu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("REMU");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3436,7 +2907,7 @@ private:
             // this->builder->SetInsertPoint(bb);
             this->gen_cond_branch(this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
@@ -3444,11 +2915,11 @@ private:
             {
                 Value* X_rd_val = this->builder->CreateURem(
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+                        this->gen_reg_load(fld_rs1_val, 1),
                         32,
                         false),
                     this->gen_ext(
-                        this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                        this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         false));
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -3456,7 +2927,7 @@ private:
             this->builder->CreateBr(bbnext);
             this->builder->SetInsertPoint(bb_else);
             {
-                Value* X_rd_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+                Value* X_rd_val = this->gen_reg_load(fld_rs1_val, 1);
                 this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
             this->builder->CreateBr(bbnext);
@@ -3474,15 +2945,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LR.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3504,7 +2966,7 @@ private:
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+            Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
             Value* X_rd_val = this->gen_ext(
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
                 32,
@@ -3530,15 +2992,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SC.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3560,7 +3013,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
         llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
         llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3573,7 +3026,7 @@ private:
             bbnext);
         this->builder->SetInsertPoint(bb_then);
         {
-            Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+            Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 1);
             this->gen_write_mem(
                 traits<ARCH>::MEM,
                 offs_val,
@@ -3604,15 +3057,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOSWAP.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3634,7 +3078,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_ext(
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
@@ -3642,7 +3086,7 @@ private:
                 true);
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
@@ -3658,15 +3102,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOADD.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3688,7 +3123,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -3699,7 +3134,7 @@ private:
         }
         Value* res2_val = this->builder->CreateAdd(
             res1_val,
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+            this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
@@ -3716,15 +3151,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOXOR.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3746,7 +3172,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -3757,7 +3183,7 @@ private:
         }
         Value* res2_val = this->builder->CreateXor(
             res1_val,
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+            this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
@@ -3774,15 +3200,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOAND.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3804,7 +3221,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -3815,7 +3232,7 @@ private:
         }
         Value* res2_val = this->builder->CreateAnd(
             res1_val,
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+            this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
@@ -3832,15 +3249,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOOR.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3862,7 +3270,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -3873,7 +3281,7 @@ private:
         }
         Value* res2_val = this->builder->CreateOr(
             res1_val,
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+            this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
@@ -3890,15 +3298,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMIN.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3920,7 +3319,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -3936,9 +3335,9 @@ private:
                     res1_val,
                     32, true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+            this->gen_reg_load(fld_rs2_val, 0),
             res1_val,
             32);
         Value* MEM_offs_val = res2_val;
@@ -3957,15 +3356,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAX.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -3987,7 +3377,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -4003,9 +3393,9 @@ private:
                     res1_val,
                     32, true),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+            this->gen_reg_load(fld_rs2_val, 0),
             res1_val,
             32);
         Value* MEM_offs_val = res2_val;
@@ -4024,15 +3414,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMINU.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -4054,7 +3435,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -4067,8 +3448,8 @@ private:
             this->builder->CreateICmp(
                 ICmpInst::ICMP_UGT,
                 res1_val,
-                this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false)),
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                this->gen_reg_load(fld_rs2_val, 0)),
+            this->gen_reg_load(fld_rs2_val, 0),
             res1_val,
             32);
         Value* MEM_offs_val = res2_val;
@@ -4087,15 +3468,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAXU.W");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
@@ -4117,7 +3489,7 @@ private:
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
         Value* res1_val = this->gen_ext(
             this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
             32,
@@ -4133,9 +3505,9 @@ private:
                     res1_val,
                     32, false),
                 this->gen_ext(
-                    this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+                    this->gen_reg_load(fld_rs2_val, 0),
                     32, false)),
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false),
+            this->gen_reg_load(fld_rs2_val, 0),
             res1_val,
             32);
         Value* MEM_offs_val = res2_val;
@@ -4154,15 +3526,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI4SPN");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<2,3>(instr));
@@ -4187,7 +3550,7 @@ private:
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t x2_idx_val = 2;
         Value* X_rd_idx_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),
+            this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_nzuimm_val));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -4201,15 +3564,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LW");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<2,3>(instr));
@@ -4231,7 +3585,7 @@ private:
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* adr_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
+            this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         uint8_t rd_idx_val = (fld_rd_val + 8);
         Value* X_rd_idx_val = this->gen_read_mem(traits<ARCH>::MEM, adr_val, 32/8);
@@ -4247,15 +3601,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SW");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,3>(instr));
@@ -4277,10 +3622,10 @@ private:
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* adr_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
+            this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* MEM_adr_val = this->builder->CreateLoad(get_reg_ptr(rs2_idx_val), false);
+        Value* MEM_adr_val = this->gen_reg_load(rs2_idx_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             adr_val,
@@ -4296,15 +3641,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.NOP");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -4334,15 +3670,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int8_t fld_nzimm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
@@ -4365,7 +3692,7 @@ private:
             this->gen_raise_trap(0, 2);
         }
         Value* X_rs1_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_nzimm_val));
         this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -4379,15 +3706,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JAL");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (signed_bit_sub<12,1>(instr) << 11);
@@ -4407,11 +3725,11 @@ private:
     
         uint8_t rd_val = 1;
         Value* X_rd_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+            this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, 2));
         this->builder->CreateStore(X_rd_val, get_reg_ptr(rd_val), false);
         Value* PC_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+            this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4423,15 +3741,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int8_t fld_imm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
@@ -4466,15 +3775,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LUI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int32_t fld_nzimm_val = 0 | (bit_sub<2,5>(instr) << 12) | (signed_bit_sub<12,1>(instr) << 17);
@@ -4515,15 +3815,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADDI16SP");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_nzimm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (signed_bit_sub<12,1>(instr) << 9);
@@ -4544,7 +3835,7 @@ private:
         uint8_t x2_idx_val = 2;
         Value* X_x2_idx_val = this->builder->CreateAdd(
             this->gen_ext(
-                this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),
+                this->gen_reg_load(x2_idx_val, 0),
                 32, true),
             this->gen_const(32U, fld_nzimm_val));
         this->builder->CreateStore(X_x2_idx_val, get_reg_ptr(x2_idx_val), false);
@@ -4559,15 +3850,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SRLI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
@@ -4591,7 +3873,7 @@ private:
         }
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateLShr(
-            this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
+            this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_shamt_val));
         this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -4605,15 +3887,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SRAI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
@@ -4637,7 +3910,7 @@ private:
         }
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateAShr(
-            this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
+            this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_shamt_val));
         this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -4651,15 +3924,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ANDI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int8_t fld_imm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
@@ -4680,7 +3944,7 @@ private:
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateAnd(
-            this->builder->CreateLoad(get_reg_ptr(rs1_idx_val), false),
+            this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -4694,15 +3958,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SUB");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,3>(instr));
@@ -4724,8 +3979,8 @@ private:
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateSub(
-            this->builder->CreateLoad(get_reg_ptr(rd_idx_val), false),
-            this->builder->CreateLoad(get_reg_ptr(rs2_idx_val), false));
+            this->gen_reg_load(rd_idx_val, 0),
+            this->gen_reg_load(rs2_idx_val, 0));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4738,15 +3993,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.XOR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,3>(instr));
@@ -4768,8 +4014,8 @@ private:
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateXor(
-            this->builder->CreateLoad(get_reg_ptr(rd_idx_val), false),
-            this->builder->CreateLoad(get_reg_ptr(rs2_idx_val), false));
+            this->gen_reg_load(rd_idx_val, 0),
+            this->gen_reg_load(rs2_idx_val, 0));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4782,15 +4028,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.OR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,3>(instr));
@@ -4812,8 +4049,8 @@ private:
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateOr(
-            this->builder->CreateLoad(get_reg_ptr(rd_idx_val), false),
-            this->builder->CreateLoad(get_reg_ptr(rs2_idx_val), false));
+            this->gen_reg_load(rd_idx_val, 0),
+            this->gen_reg_load(rs2_idx_val, 0));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4826,15 +4063,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.AND");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,3>(instr));
@@ -4856,8 +4084,8 @@ private:
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
         Value* X_rd_idx_val = this->builder->CreateAnd(
-            this->builder->CreateLoad(get_reg_ptr(rd_idx_val), false),
-            this->builder->CreateLoad(get_reg_ptr(rs2_idx_val), false));
+            this->gen_reg_load(rd_idx_val, 0),
+            this->gen_reg_load(rs2_idx_val, 0));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4870,15 +4098,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.J");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (signed_bit_sub<12,1>(instr) << 11);
@@ -4897,7 +4116,7 @@ private:
         pc=pc+2;
     
         Value* PC_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+            this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -4909,15 +4128,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.BEQZ");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (signed_bit_sub<12,1>(instr) << 8);
@@ -4940,13 +4150,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_EQ,
-                this->builder->CreateLoad(get_reg_ptr(rs1_val), false),
+                this->gen_reg_load(rs1_val, 0),
                 this->gen_const(32U, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 2)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -4959,15 +4169,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.BNEZ");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8);
@@ -4990,13 +4191,13 @@ private:
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->builder->CreateLoad(get_reg_ptr(rs1_val), false),
+                this->gen_reg_load(rs1_val, 0),
                 this->gen_const(32U, 0)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
             this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+                this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 2)),
             32);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -5009,15 +4210,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SLLI");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
@@ -5043,7 +4235,7 @@ private:
             this->gen_raise_trap(0, 2);
         }
         Value* X_rs1_val = this->builder->CreateShl(
-            this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false),
+            this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_shamt_val));
         this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -5057,15 +4249,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lqsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LQSP");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint16_t fld_uimm_val = 0 | (bit_sub<2,4>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 5);
@@ -5095,15 +4278,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.LWSP");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_uimm_val = 0 | (bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5);
@@ -5124,7 +4298,7 @@ private:
     
         uint8_t x2_idx_val = 2;
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),
+            this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         Value* X_rd_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
         this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
@@ -5139,15 +4313,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.MV");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,5>(instr));
@@ -5166,7 +4331,7 @@ private:
         }
         pc=pc+2;
     
-        Value* X_rd_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* X_rd_val = this->gen_reg_load(fld_rs2_val, 0);
         this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -5179,15 +4344,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs1_val = 0 | (bit_sub<7,5>(instr));
@@ -5205,7 +4361,7 @@ private:
         }
         pc=pc+2;
     
-        Value* PC_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* PC_val = this->gen_reg_load(fld_rs1_val, 0);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -5216,15 +4372,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.EBREAK");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         ;
@@ -5251,15 +4398,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADD");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,5>(instr));
@@ -5279,8 +4417,8 @@ private:
         pc=pc+2;
     
         Value* X_rd_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(fld_rd_val), false),
-            this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false));
+            this->gen_reg_load(fld_rd_val, 0),
+            this->gen_reg_load(fld_rs2_val, 0));
         this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -5293,15 +4431,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.JALR");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs1_val = 0 | (bit_sub<7,5>(instr));
@@ -5321,10 +4450,10 @@ private:
     
         uint8_t rd_val = 1;
         Value* X_rd_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false),
+            this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, 2));
         this->builder->CreateStore(X_rd_val, get_reg_ptr(rd_val), false);
-        Value* PC_val = this->builder->CreateLoad(get_reg_ptr(fld_rs1_val), false);
+        Value* PC_val = this->gen_reg_load(fld_rs1_val, 0);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -5335,15 +4464,6 @@ private:
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.SWSP");
     
-        this->gen_set_pc(pc, traits<ARCH>::PC);
-        this->builder->CreateStore(
-            this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PENDING_TRAP), true),
-            get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(
-                this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), false),
-                this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), false);
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rs2_val = 0 | (bit_sub<2,5>(instr));
@@ -5364,9 +4484,9 @@ private:
     
         uint8_t x2_idx_val = 2;
         Value* offs_val = this->builder->CreateAdd(
-            this->builder->CreateLoad(get_reg_ptr(x2_idx_val), false),
+            this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
-        Value* MEM_offs_val = this->builder->CreateLoad(get_reg_ptr(fld_rs2_val), false);
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
@@ -5588,7 +4708,7 @@ namespace rv32imac {
 
     template<typename ARCH>
     status target_adapter<ARCH>::read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
-        LOG(TRACE)<<"reading target registers";
+        LOG(logging::TRACE)<<"reading target registers";
         //return idx<0?:;
         data.clear();
         avail.clear();
@@ -5730,8 +4850,8 @@ namespace rv32imac {
         auto saddr=map_addr({iss::CODE, iss::PHYSICAL, addr});
         auto eaddr=map_addr({iss::CODE, iss::PHYSICAL, addr+length});
         target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val-saddr.val);
-        LOG(TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
-        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(logging::TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Ok;
     }
 
@@ -5741,12 +4861,12 @@ namespace rv32imac {
         unsigned handle=target_adapter_base::bp_lut.getEntry(saddr.val);
         // TODO: check length of addr range
         if(handle){
-            LOG(TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+            LOG(logging::TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
             target_adapter_base::bp_lut.removeEntry(handle);
-            LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+            LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
             return Ok;
         }
-        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Err;
     }
 

@@ -1,0 +1,37 @@
+regfile plic_regs {
+	reg {
+		name="priority";
+		desc="interrupt source priority";
+		field {
+			name = "priority";
+		} priority[2:0];
+	} priority[255] @0x004;
+	reg {
+		name="pending";
+		desc="pending irq";
+		field {
+			name = "pending";
+		} pending[31:0];
+	} pending @0x1000;
+	reg {
+		name="enabled";
+		desc="enabled interrupts";
+		field {
+			name = "enabled";
+		} enabled[31:0];
+	} enabled @0x2000;
+	reg {
+		name="threshold";
+		desc="interrupt priority threshold";
+		field {
+			name = "threshold";
+		} \threshold[2:0];
+	} \threshold @0x0C200000;
+	reg {
+		name="claim/complete";
+		desc="interrupt handling completed";
+		field {
+			name = "interrupt_claimed";
+		} interrupt_claimed[31:0];
+	} claim_complete @0x0C200004;
+};

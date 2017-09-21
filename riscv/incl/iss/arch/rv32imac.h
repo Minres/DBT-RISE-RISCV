@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Tue Aug 29 16:45:20 CEST 2017
+// Created on: Tue Sep 05 18:57:24 CEST 2017
 //             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +144,7 @@ struct rv32imac: public arch_if {
         if(phase==ISTART){
             ++reg.icount;
             reg.PC=reg.NEXT_PC;
+            reg.trap_state=reg.pending_trap;
         }
     }
 

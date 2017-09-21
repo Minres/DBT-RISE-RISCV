@@ -35,7 +35,9 @@
 #ifndef _CLI_OPTIONS_H_
 #define _CLI_OPTIONS_H_
 #include <boost/program_options.hpp>
-#include <easylogging++.h>
+#include <util/logging.h>
+#include <iostream>
+#include <cstdio>
 
 namespace {
 const size_t ERROR_IN_COMMAND_LINE = 1;
@@ -43,88 +45,88 @@ const size_t SUCCESS = 0;
 const size_t ERROR_UNHANDLED_EXCEPTION = 2;
 
 
-inline void enable_log_level(el::Configurations& conf, int level){
+inline void enable_log_level(int level){
 	switch(level){
 	case 0:
-		conf.set(el::Level::Fatal, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::FATAL;
 		/* no break */
 	case 1:
-		conf.set(el::Level::Error, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::ERROR;
 		/* no break */
 	case 2:
-		conf.set(el::Level::Warning, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::WARNING;
 		/* no break */
 	case 3:
-		conf.set(el::Level::Info, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::INFO;
 		/* no break */
 	case 4:
-		conf.set(el::Level::Debug, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::DEBUG;
 		/* no break */
 	case 5:
-		conf.set(el::Level::Trace, el::ConfigurationType::Enabled, "false");
+        logging::Logger::reporting_level()= logging::TRACE;
 		/* no break */
 	}
 }
 
 inline void configure_default_logger(boost::program_options::variables_map& vm){
-	el::Configurations defaultConf;
-	defaultConf.setToDefault();
-	defaultConf.set(el::Level::Error, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
-	defaultConf.set(el::Level::Warning, el::ConfigurationType::Format, "%datetime{%H:%m:%s.%g} %level %msg");
-	defaultConf.set(el::Level::Info, el::ConfigurationType::Format,    "%datetime{%H:%m:%s.%g} %level %msg");
-	defaultConf.set(el::Level::Debug, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
-	defaultConf.set(el::Level::Trace, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
+//	el::Configurations defaultConf;
+//	defaultConf.setToDefault();
+//	defaultConf.set(el::Level::Error, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
+//	defaultConf.set(el::Level::Warning, el::ConfigurationType::Format, "%datetime{%H:%m:%s.%g} %level %msg");
+//	defaultConf.set(el::Level::Info, el::ConfigurationType::Format,    "%datetime{%H:%m:%s.%g} %level %msg");
+//	defaultConf.set(el::Level::Debug, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
+//	defaultConf.set(el::Level::Trace, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
     if(vm.count("verbose"))
-    	enable_log_level(defaultConf, vm["verbose"].as<int>());
+    	enable_log_level(vm["verbose"].as<int>());
 	if(vm.count("log-file"))
-		defaultConf.set(el::Level::Global,el::ConfigurationType::Filename, vm["log-file"].as<std::string>());
+	    logging::Output2FILE::stream() = fopen(vm["log-file"].as<std::string>().c_str(), "w");
 	// default logger uses default configurations
-	el::Loggers::reconfigureLogger("default", defaultConf);
+//	el::Loggers::reconfigureLogger("default", defaultConf);
 }
 
 inline void configure_debugger_logger() {
 	// configure the connection logger
-	el::Logger* gdbServerLogger = el::Loggers::getLogger("connection");
-	el::Configurations gdbServerConf;
-	gdbServerConf.setToDefault();
-	gdbServerConf.set(el::Level::Error, el::ConfigurationType::Format,
-			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-	gdbServerConf.set(el::Level::Warning, el::ConfigurationType::Format,
-			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-	gdbServerConf.set(el::Level::Info, el::ConfigurationType::Format,
-			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-	gdbServerConf.set(el::Level::Debug, el::ConfigurationType::Format,
-			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-	gdbServerConf.set(el::Level::Trace, el::ConfigurationType::Format,
-			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-	enable_log_level(gdbServerConf, 5);
-	gdbServerLogger->configure(gdbServerConf);
+//	el::Logger* gdbServerLogger = el::Loggers::getLogger("connection");
+//	el::Configurations gdbServerConf;
+//	gdbServerConf.setToDefault();
+//	gdbServerConf.set(el::Level::Error, el::ConfigurationType::Format,
+//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
+//	gdbServerConf.set(el::Level::Warning, el::ConfigurationType::Format,
+//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
+//	gdbServerConf.set(el::Level::Info, el::ConfigurationType::Format,
+//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
+//	gdbServerConf.set(el::Level::Debug, el::ConfigurationType::Format,
+//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
+//	gdbServerConf.set(el::Level::Trace, el::ConfigurationType::Format,
+//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
+//	enable_log_level(gdbServerConf, 5);
+//	gdbServerLogger->configure(gdbServerConf);
 }
 
 inline void configure_disass_logger(boost::program_options::variables_map& vm) {
-    el::Logger* disassLogger = el::Loggers::getLogger("disass");
-    el::Configurations disassConf;
-    if(vm.count("disass")){
-        auto file_name=vm["disass"].as<std::string>();
-        disassConf.setToDefault();
-        if (file_name.length() > 0) {
-            disassConf.set(el::Level::Global, el::ConfigurationType::ToFile,
-                    std::string("true"));
-            disassConf.set(el::Level::Global,
-                    el::ConfigurationType::ToStandardOutput, std::string("false"));
-            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
-                    std::string("%msg"));
-            disassConf.set(el::Level::Global, el::ConfigurationType::Filename,
-                    file_name);
-            std::ofstream str(file_name); // just to clear the file
-        } else {
-            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
-                    "%datetime{%H:%m:%s.%g} [%logger] %msg");
-        }
-    } else {
-        enable_log_level(disassConf, 0);
-    }
-	disassLogger->configure(disassConf);
+//    el::Logger* disassLogger = el::Loggers::getLogger("disass");
+//    el::Configurations disassConf;
+//    if(vm.count("disass")){
+//        auto file_name=vm["disass"].as<std::string>();
+//        disassConf.setToDefault();
+//        if (file_name.length() > 0) {
+//            disassConf.set(el::Level::Global, el::ConfigurationType::ToFile,
+//                    std::string("true"));
+//            disassConf.set(el::Level::Global,
+//                    el::ConfigurationType::ToStandardOutput, std::string("false"));
+//            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
+//                    std::string("%msg"));
+//            disassConf.set(el::Level::Global, el::ConfigurationType::Filename,
+//                    file_name);
+//            std::ofstream str(file_name); // just to clear the file
+//        } else {
+//            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
+//                    "%datetime{%H:%m:%s.%g} [%logger] %msg");
+//        }
+//    } else {
+//        enable_log_level(disassConf, 0);
+//    }
+//	disassLogger->configure(disassConf);
 }
 
 } // namespace
@@ -148,12 +150,13 @@ inline int parse_cli_options(boost::program_options::variables_map& vm, int argc
         ("time", po::value<int>(), "SystemC siimulation time in ms")
         ("reset,r", po::value<std::string>(), "reset address")
         ("trace", po::value<uint8_t>(),  "enable tracing, or cmbintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")\
-        ("mem,m", po::value<std::string>(), "the memory input file");
+        ("mem,m", po::value<std::string>(), "the memory input file")
+        ("rv64", "run RV64");
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm); // can throw
         // --help option
         if ( vm.count("help")  ){
-            std::cout << "JIT-ISS simulator for AVR" << std::endl << desc << std::endl;
+            std::cout << "DBT-RISE-RiscV" << std::endl << desc << std::endl;
             return SUCCESS;
         }
         po::notify(vm); // throws on error, so do after help in case

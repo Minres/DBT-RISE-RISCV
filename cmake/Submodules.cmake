@@ -24,7 +24,11 @@ foreach(GIT_SUBMODULE ${GIT_SUBMODULES})
 
     if( "${GIT_SUBMODULE_VERSION_${GIT_SUBMODULE}}" STREQUAL "" )
         message(STATUS "no specific version given for submodule ${GIT_SUBMODULE}, checking out master")
-        set(GIT_SUBMODULE_VERSION_${GIT_SUBMODULE} "master")
+        if( "${GIT_SUBMODULE_BRANCH_${GIT_SUBMODULE}}" STREQUAL "" )
+            set(GIT_SUBMODULE_VERSION_${GIT_SUBMODULE} "master")
+        else()
+            set(GIT_SUBMODULE_VERSION_${GIT_SUBMODULE} ${GIT_SUBMODULE_BRANCH_${GIT_SUBMODULE}})
+        endif()
     endif()
 
     if( "${GIT_SUBMODULE_DIR_${GIT_SUBMODULE}}" STREQUAL "" )

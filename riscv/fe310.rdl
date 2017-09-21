@@ -1,0 +1,11 @@
+`include "gpio.rdl"
+`include "uart.rdl"
+`include "spi.rdl"
+`include "plic.rdl"
+
+addrmap e300_plat_t {
+    plic_regs plic @0x0C000000;
+    gpio_regs gpio @0x10012000;
+    uart_regs uart @0x10013000;
+    spi_regs  spi  @0x10014000;
+} e300_plat;

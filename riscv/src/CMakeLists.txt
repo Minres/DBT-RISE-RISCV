@@ -3,12 +3,21 @@ FILE(GLOB RiscVHeaders *.h)
 set(LIB_HEADERS ${RiscVHeaders} )
 set(LIB_SOURCES
     iss/rv32imac.cpp
+    iss/rv64ia.cpp
     internal/vm_rv32imac.cpp
+    internal/vm_rv64ia.cpp
+    sysc/core_complex.cpp
+    sysc/gpio.cpp
+    sysc/plic.cpp
+    sysc/platform.cpp
+    sysc/spi.cpp
+    sysc/uart.cpp
 )
 
 set(APP_HEADERS )
 
-set(APP_SOURCES main.cpp)
+set(APP_SOURCES main.cpp sc_main.cpp
+)
 
 # Define two variables in order not to repeat ourselves.
 set(LIBRARY_NAME riscv)
@@ -33,10 +42,10 @@ target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
-#target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
-#if(SCV_FOUND)
-    #target_link_libraries (${APPLICATION_NAME} ${SCV_LIBRARIES})
-#endif(SCV_FOUND)
+target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
+if(SCV_FOUND)
+    target_link_libraries (${APPLICATION_NAME} ${SCV_LIBRARIES})
+endif()
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
 
 # Says how and where to install software

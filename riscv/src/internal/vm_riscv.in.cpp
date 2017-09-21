@@ -36,7 +36,7 @@
 
 #include <iss/iss.h>
 #include <iss/debugger/gdb_session.h>
-#include <easylogging++.h>
+#include <util/logging.h>
 #include <memory>
 #include <cstring>
 
@@ -45,7 +45,7 @@
 #include "iss/debugger/server.h"
 
 #include <boost/format.hpp>
-#include "../../incl/iss/arch/riscv_hart_msu_vp.h"
+#include "iss/arch/riscv_hart_msu_vp.h"
 
 namespace iss {
 namespace CORE_DEF_NAME {
@@ -226,6 +226,17 @@ protected:
     }
 
     inline
+    llvm::Value* gen_reg_load(unsigned i, unsigned level=0){
+//        if(level){
+            return this->builder->CreateLoad(get_reg_ptr(i), false);
+//        } else {
+//            if(!this->loaded_regs[i])
+//                this->loaded_regs[i]=this->builder->CreateLoad(get_reg_ptr(i), false);
+//            return this->loaded_regs[i];
+//        }
+    }
+
+    inline
     void gen_set_pc(virt_addr_t pc){
         llvm::Value* pc_l = this->builder->CreateSExt(this->gen_const(traits<ARCH>::caddr_bit_width, (unsigned)pc), this->get_type(traits<ARCH>::caddr_bit_width));
         super::gen_set_reg(traits<ARCH>::PC, pc_l);
@@ -393,7 +404,7 @@ void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock* leave_blk){
 
 template<typename ARCH>
 void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause){
-    auto* TRAP_val = this->gen_const(traits<ARCH>::XLEN, 0x80<<24| (cause<<16) | trap_id  );
+    auto* TRAP_val = this->gen_const(32, 0x80<<24| (cause<<16) | trap_id  );
     this->builder->CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
 }
 
@@ -510,7 +521,7 @@ namespace CORE_DEF_NAME {
 
     template<typename ARCH>
     status target_adapter<ARCH>::read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
-        LOG(TRACE)<<"reading target registers";
+        LOG(logging::TRACE)<<"reading target registers";
         //return idx<0?:;
         data.clear();
         avail.clear();
@@ -652,8 +663,8 @@ namespace CORE_DEF_NAME {
         auto saddr=map_addr({iss::CODE, iss::PHYSICAL, addr});
         auto eaddr=map_addr({iss::CODE, iss::PHYSICAL, addr+length});
         target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val-saddr.val);
-        LOG(TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
-        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(logging::TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Ok;
     }
 
@@ -663,12 +674,12 @@ namespace CORE_DEF_NAME {
         unsigned handle=target_adapter_base::bp_lut.getEntry(saddr.val);
         // TODO: check length of addr range
         if(handle){
-            LOG(TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+            LOG(logging::TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
             target_adapter_base::bp_lut.removeEntry(handle);
-            LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+            LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
             return Ok;
         }
-        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Err;
     }
 
