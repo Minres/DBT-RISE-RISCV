@@ -26,12 +26,12 @@ regfile plic_regs {
 		field {
 			name = "threshold";
 		} \threshold[2:0];
-	} \threshold @0x0C200000;
+	} \threshold @0x200000;
 	reg {
 		name="claim/complete";
 		desc="interrupt handling completed";
 		field {
 			name = "interrupt_claimed";
 		} interrupt_claimed[31:0];
-	} claim_complete @0x0C200004;
+	} claim_complete @0x200004;
 };

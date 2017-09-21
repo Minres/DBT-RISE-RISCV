@@ -8,18 +8,16 @@ project("external")
 include(Common)
 
 
-include_directories( ${PROJECT_SOURCE_DIR}/external/libGIS ${PROJECT_SOURCE_DIR}/external/easyloggingpp/src )
+include_directories( ${PROJECT_SOURCE_DIR}/external/libGIS )
 
 FILE(GLOB ElfioHeaders elfio *.hpp)
 FILE(GLOB GISHeaders libGis *.h)
-FILE(GLOB LogHeaders easyloggingpp/src *.h)
 
-set(LIB_HEADERS ${ElfioHeaders} ${GISHeaders} ${LogHeaders})
+set(LIB_HEADERS ${ElfioHeaders} ${GISHeaders})
 set(LIB_SOURCES
     libGIS/atmel_generic.c
     libGIS/ihex.c
     libGIS/srecord.c
-    easyloggingpp/src/easylogging++.cc
 )
 
 # Define two variables in order not to repeat ourselves.

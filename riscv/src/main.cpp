@@ -40,9 +40,6 @@
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv64ia.h>
 #include <iss/jit/MCJIThelper.h>
-#ifdef WITH_SYSTEMC
-#include <sysc/kernel/sc_externs.h>
-#endif
 #include <boost/lexical_cast.hpp>
 
 namespace po= boost::program_options;
@@ -55,52 +52,43 @@ int main(int argc, char *argv[]) {
         if(parse_cli_options(vm, argc, argv)) return ERROR_IN_COMMAND_LINE;
         configure_default_logger(vm);
         // configure the connection logger
-    	configure_debugger_logger();
+        configure_debugger_logger();
 
         // application code comes here //
         iss::init_jit(argc, argv);
-        if(vm.count("systemc")){
-#ifdef WITH_SYSTEMC
-            return sc_core::sc_elab_and_sim(argc, argv);
-#else
-            std::cerr<<"SystemC simulation is currently not supported, please rebuild with -DWITH_SYSTEMC"<<std::endl;
-#endif
+        bool  dump=vm.count("dump-ir");
+        // instantiate the simulator
+        std::unique_ptr<iss::vm_if> cpu = nullptr;
+        if(vm.count("rv64")==1){
+            if(vm.count("gdb-port")==1)
+                cpu = iss::create<iss::arch::rv64ia>("rv64ia", vm["gdb-port"].as<unsigned>(), dump);
+            else
+                cpu = iss::create<iss::arch::rv64ia>("rv64ia", dump);
         } else {
-            bool  dump=vm.count("dump-ir");
-            // instantiate the simulator
-            std::unique_ptr<iss::vm_if> cpu = nullptr;
-            if(vm.count("rv64")==1){
-                if(vm.count("gdb-port")==1)
-                    cpu = iss::create<iss::arch::rv64ia>("rv64ia", vm["gdb-port"].as<unsigned>(), dump);
-                else
-                    cpu = iss::create<iss::arch::rv64ia>("rv64ia", dump);
-            } else {
-                if(vm.count("gdb-port")==1)
-                    cpu = iss::create<iss::arch::rv32imac>("rv32ima", vm["gdb-port"].as<unsigned>(), dump);
-                else
-                    cpu = iss::create<iss::arch::rv32imac>("rv32ima", dump);
-            }
-            if(vm.count("elf")){
-                for(std::string input: vm["elf"].as<std::vector<std::string> >())
-                    cpu->get_arch()->load_file(input);
-            } else if(vm.count("mem")){
-                cpu->get_arch()->load_file(vm["mem"].as<std::string>() , iss::arch::traits<iss::arch::rv32imac>::MEM);
-            } //else
-              //  LOG(FATAL)<<"At least one (flash-)input file (ELF or IHEX) needs to be specified";
-
-            configure_disass_logger(vm);
-            if(vm.count("disass")){
-                cpu->setDisassEnabled(true);
-            }
-            if(vm.count("reset")){
-                auto str = vm["reset"].as<std::string>();
-                auto start_address = str.find("0x")==0? std::stoull(str, 0, 16):std::stoull(str, 0, 10);
-                cpu->reset(start_address);
-            } else {
-                cpu->reset();
-            }
-            return cpu->start(vm["cycles"].as<int64_t>());
+            if(vm.count("gdb-port")==1)
+                cpu = iss::create<iss::arch::rv32imac>("rv32ima", vm["gdb-port"].as<unsigned>(), dump);
+            else
+                cpu = iss::create<iss::arch::rv32imac>("rv32ima", dump);
         }
+        if(vm.count("elf")){
+            for(std::string input: vm["elf"].as<std::vector<std::string> >())
+                cpu->get_arch()->load_file(input);
+        } else if(vm.count("mem")){
+            cpu->get_arch()->load_file(vm["mem"].as<std::string>() , iss::arch::traits<iss::arch::rv32imac>::MEM);
+        }
+
+        configure_disass_logger(vm);
+        if(vm.count("disass")){
+            cpu->setDisassEnabled(true);
+        }
+        if(vm.count("reset")){
+            auto str = vm["reset"].as<std::string>();
+            auto start_address = str.find("0x")==0? std::stoull(str, 0, 16):std::stoull(str, 0, 10);
+            cpu->reset(start_address);
+        } else {
+            cpu->reset();
+        }
+        return cpu->start(vm["cycles"].as<int64_t>());
     } catch(std::exception& e){
         LOG(logging::ERROR) << "Unhandled Exception reached the top of main: "
                 << e.what() << ", application will now exit" << std::endl;

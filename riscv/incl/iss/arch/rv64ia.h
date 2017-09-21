@@ -29,12 +29,12 @@
 // POSSIBILITY OF SUCH DAMAGE.
 // 
 // Created on: Thu Sep 21 17:01:54 CEST 2017
-//             *      rv32imac.h Author: <CoreDSL Generator>
+//             *      rv64ia.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _RV32IMAC_H_
-#define _RV32IMAC_H_
+#ifndef _RV64IA_H_
+#define _RV64IA_H_
 
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
@@ -43,12 +43,12 @@
 namespace iss {
 namespace arch {
 
-struct rv32imac;
+struct rv64ia;
 
 template<>
-struct traits<rv32imac> {
+struct traits<rv64ia> {
 
-    enum constants {XLEN=32,XLEN2=64,XLEN_BIT_MASK=31,PCLEN=32,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=1075056897,PGSIZE=4096,PGMASK=4095};
+    enum constants {XLEN=64,XLEN2=128,XLEN_BIT_MASK=63,PCLEN=64,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=2147750144,PGSIZE=4096,PGMASK=4095};
 
     enum reg_e {
         X0,
@@ -92,24 +92,24 @@ struct traits<rv32imac> {
         ICOUNT
     };
 
-    typedef uint32_t reg_t;
+    typedef uint64_t reg_t;
 
-    typedef uint32_t addr_t;
+    typedef uint64_t addr_t;
 
-    typedef uint32_t code_word_t; //TODO: check removal
+    typedef uint64_t code_word_t; //TODO: check removal
 
     typedef iss::typed_addr_t<iss::VIRTUAL>  virt_addr_t;
 
     typedef iss::typed_addr_t<iss::PHYSICAL> phys_addr_t;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        const uint32_t RV32IMAC_reg_size[] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64};
-        return RV32IMAC_reg_size[r];
+        const uint32_t RV64IA_reg_size[] = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,64};
+        return RV64IA_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-        const uint32_t RV32IMAC_reg_byte_offset[] = {0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160};
-        return RV32IMAC_reg_byte_offset[r];
+        const uint32_t RV64IA_reg_byte_offset[] = {0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,288,296};
+        return RV64IA_reg_byte_offset[r];
     }
 
     enum sreg_flag_e {FLAGS};
@@ -118,15 +118,15 @@ struct traits<rv32imac> {
 
 };
 
-struct rv32imac: public arch_if {
+struct rv64ia: public arch_if {
 
-    using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
-    using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
-    using reg_t =  typename traits<rv32imac>::reg_t;
-    using addr_t = typename traits<rv32imac>::addr_t;
+    using virt_addr_t = typename traits<rv64ia>::virt_addr_t;
+    using phys_addr_t = typename traits<rv64ia>::phys_addr_t;
+    using reg_t =  typename traits<rv64ia>::reg_t;
+    using addr_t = typename traits<rv64ia>::addr_t;
 
-    rv32imac();
-    ~rv32imac();
+    rv64ia();
+    ~rv64ia();
 
     virtual void reset(uint64_t address=0) override;
 
@@ -155,41 +155,41 @@ struct rv32imac: public arch_if {
     virtual iss::sync_type needed_sync() const { return iss::PRE_SYNC; }
 
 protected:
-    struct RV32IMAC_regs {
-        uint32_t X0;
-        uint32_t X1;
-        uint32_t X2;
-        uint32_t X3;
-        uint32_t X4;
-        uint32_t X5;
-        uint32_t X6;
-        uint32_t X7;
-        uint32_t X8;
-        uint32_t X9;
-        uint32_t X10;
-        uint32_t X11;
-        uint32_t X12;
-        uint32_t X13;
-        uint32_t X14;
-        uint32_t X15;
-        uint32_t X16;
-        uint32_t X17;
-        uint32_t X18;
-        uint32_t X19;
-        uint32_t X20;
-        uint32_t X21;
-        uint32_t X22;
-        uint32_t X23;
-        uint32_t X24;
-        uint32_t X25;
-        uint32_t X26;
-        uint32_t X27;
-        uint32_t X28;
-        uint32_t X29;
-        uint32_t X30;
-        uint32_t X31;
-        uint32_t PC;
-        uint32_t NEXT_PC;
+    struct RV64IA_regs {
+        uint64_t X0;
+        uint64_t X1;
+        uint64_t X2;
+        uint64_t X3;
+        uint64_t X4;
+        uint64_t X5;
+        uint64_t X6;
+        uint64_t X7;
+        uint64_t X8;
+        uint64_t X9;
+        uint64_t X10;
+        uint64_t X11;
+        uint64_t X12;
+        uint64_t X13;
+        uint64_t X14;
+        uint64_t X15;
+        uint64_t X16;
+        uint64_t X17;
+        uint64_t X18;
+        uint64_t X19;
+        uint64_t X20;
+        uint64_t X21;
+        uint64_t X22;
+        uint64_t X23;
+        uint64_t X24;
+        uint64_t X25;
+        uint64_t X26;
+        uint64_t X27;
+        uint64_t X28;
+        uint64_t X29;
+        uint64_t X30;
+        uint64_t X31;
+        uint64_t PC;
+        uint64_t NEXT_PC;
         uint32_t trap_state, pending_trap, machine_state;
         uint64_t icount;
     } reg;
@@ -197,4 +197,4 @@ protected:
 
 }
 }            
-#endif /* _RV32IMAC_H_ */
+#endif /* _RV64IA_H_ */

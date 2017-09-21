@@ -1,19 +1,22 @@
 # library files
-FILE(GLOB RiscVHeaders *.h)
-set(LIB_HEADERS ${RiscVHeaders} )
+FILE(GLOB RiscVSCHeaders *.h)
+set(LIB_HEADERS ${RiscVSCHeaders} )
 set(LIB_SOURCES
-    iss/rv32imac.cpp
-    iss/rv64ia.cpp
-    internal/vm_rv32imac.cpp
-    internal/vm_rv64ia.cpp
+    sysc/core_complex.cpp
+    sysc/gpio.cpp
+    sysc/plic.cpp
+    sysc/platform.cpp
+    sysc/spi.cpp
+    sysc/uart.cpp
 )
 
 set(APP_HEADERS )
 
-set(APP_SOURCES main.cpp)
+set(APP_SOURCES sc_main.cpp
+)
 
 # Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME risc-v)
+set(LIBRARY_NAME risc-v.sc)
 
 # Define the library
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})
@@ -25,7 +28,7 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 )
 
 # This is a make target, so you can do a "make riscv-sc"
-set(APPLICATION_NAME riscv)
+set(APPLICATION_NAME riscv.sc)
 
 add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 
@@ -34,7 +37,12 @@ target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
+target_link_libraries(${APPLICATION_NAME} risc-v)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
+target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
+if(SCV_FOUND)
+    target_link_libraries (${APPLICATION_NAME} ${SCV_LIBRARIES})
+endif()
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
 
 # Says how and where to install software

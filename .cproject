@@ -151,11 +151,8 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="cdt.managedbuild.config.gnu.exe.release.446935686.748801612" name="vm_riscv.in.cpp" rcbsApplicability="disable" resourcePath="riscv/src/internal/vm_riscv.in.cpp" toolsToInvoke="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release.1265053613.1256835897">
-						<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release.1265053613.1256835897" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release.1265053613"/>
-					</fileInfo>
 					<sourceEntries>
-						<entry excluding="riscv/src/internal/vm_riscv.in.cpp|riscv/src-gen|blink.S" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="riscv/src-gen|blink.S|riscv/src/internal/vm_riscv.in.cpp" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
