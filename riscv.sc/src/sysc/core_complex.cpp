@@ -43,9 +43,6 @@ core_complex::core_complex(sc_core::sc_module_name name) : sc_core::sc_module(na
     // TODO Auto-generated constructor stub
 }
 
-core_complex::~core_complex() {
-    // TODO Auto-generated destructor stub
-}
 
 } /* namespace SiFive */
 } /* namespace sysc */

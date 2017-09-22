@@ -29,9 +29,10 @@ gpio::gpio(sc_core::sc_module_name nm)
     sensitive << rst_i;
 }
 
-gpio::~gpio() {}
-
 void gpio::clock_cb() {}
+
+gpio::~gpio() {
+}
 
 void gpio::reset_cb() {
     if (rst_i.read())

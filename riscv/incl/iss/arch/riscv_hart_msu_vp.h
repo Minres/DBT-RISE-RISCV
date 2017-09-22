@@ -240,7 +240,7 @@ struct trap_store_page_fault : public trap_access {
 };
 }
 
-typedef union {
+using mstatus32_t = union {
     uint32_t val;
     struct /*mstatus*/ {
         uint32_t SD : 1, // SD bit is read-only and is set when either the FS or XS
@@ -277,9 +277,9 @@ typedef union {
         uint32_t SD : 1, _WPRI4 : 11, MXR : 1, SUM : 1, _WPRI3 : 1, XS : 2, FS : 2, _WPRI2 : 8, UPIE : 1, _WPRI0 : 3,
             UIE : 1;
     } u;
-} mstatus32_t;
+} ;
 
-typedef union {
+using mstatus64_t = union {
     uint64_t val;
     struct /*mstatus*/ {
         uint64_t SD : 1, // SD bit is read-only and is set when either the FS or XS
@@ -324,7 +324,7 @@ typedef union {
             UXL : 2,     // value of XLEN for U-mode
             _WPRI3 : 12, MXR : 1, SUM : 1, _WPRI2 : 1, XS : 2, FS : 2, _WPRI1 : 8, UPIE : 1, _WPRI0 : 3, UIE : 1;
     } u;
-} mstatus64_t;
+} ;
 
 template <unsigned L> inline vm_info decode_vm_info(uint32_t state, uint64_t sptbr);
 
@@ -424,19 +424,19 @@ template <typename BASE> struct riscv_hart_msu_vp : public BASE {
     }
 
     riscv_hart_msu_vp();
-    virtual ~riscv_hart_msu_vp();
+    virtual ~riscv_hart_msu_vp() = default;
 
     virtual void load_file(std::string name, int type = -1);
 
     virtual phys_addr_t v2p(const iss::addr_t &addr);
 
-    virtual iss::status read(const iss::addr_t &addr, unsigned length, uint8_t *const data) override;
-    virtual iss::status write(const iss::addr_t &addr, unsigned length, const uint8_t *const data) override;
+    iss::status read(const iss::addr_t &addr, unsigned length, uint8_t *const data) override;
+    iss::status write(const iss::addr_t &addr, unsigned length, const uint8_t *const data) override;
 
     virtual uint64_t enter_trap(uint64_t flags) override { return riscv_hart_msu_vp::enter_trap(flags, fault_data); }
     virtual uint64_t enter_trap(uint64_t flags, uint64_t addr) override;
     virtual uint64_t leave_trap(uint64_t flags) override;
-    virtual void wait_until(uint64_t flags) override;
+    void wait_until(uint64_t flags) override;
 
     virtual std::string get_additional_disass_info() {
         std::stringstream s;
@@ -516,8 +516,6 @@ template <typename BASE> riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp() : mstatus_
     csr_rd_cb[satp] = &riscv_hart_msu_vp<BASE>::read_satp;
     csr_wr_cb[satp] = &riscv_hart_msu_vp<BASE>::write_satp;
 }
-
-template <typename BASE> riscv_hart_msu_vp<BASE>::~riscv_hart_msu_vp() {}
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
     FILE *fp = fopen(name.c_str(), "r");
@@ -941,7 +939,7 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const
         return ret;
     }
 
-    const access_type type = (access_type)(addr.getAccessType() & ~iss::DEBUG);
+    const auto type = (access_type)(addr.getAccessType() & ~iss::DEBUG);
     uint32_t mode = type != iss::FETCH && bit_sub<17, 1>(mstatus_r) ? // MPRV
                         mode = bit_sub<11, 2>(mstatus_r)
                                                                     : // MPV

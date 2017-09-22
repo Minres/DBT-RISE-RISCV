@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         iss::init_jit(argc, argv);
         bool dump = vm.count("dump-ir");
         // instantiate the simulator
-        std::unique_ptr<iss::vm_if> cpu = nullptr;
+        std::unique_ptr<iss::vm_if> cpu{nullptr};
         if (vm.count("rv64") == 1) {
             if (vm.count("gdb-port") == 1)
                 cpu = iss::create<iss::arch::rv64ia>("rv64ia", vm["gdb-port"].as<unsigned>(), dump);
@@ -102,7 +102,9 @@ int main(int argc, char *argv[]) {
         } else {
             cpu->reset();
         }
-        return cpu->start(vm["cycles"].as<int64_t>());
+        int64_t cycles = -1;
+        cycles = vm["cycles"].as<int64_t>();
+        return cpu->start(cycles);
     } catch (std::exception &e) {
         LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
                    << std::endl;

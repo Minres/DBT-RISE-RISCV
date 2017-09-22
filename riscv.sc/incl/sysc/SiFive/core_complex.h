@@ -51,7 +51,7 @@ public:
 
     sc_core::sc_in<bool> rst_i;
     core_complex(sc_core::sc_module_name name);
-    virtual ~core_complex();
+    virtual ~core_complex() = default;
 };
 
 } /* namespace SiFive */

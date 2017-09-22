@@ -29,7 +29,7 @@ public:
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
     spi(sc_core::sc_module_name nm);
-    virtual ~spi();
+    virtual ~spi() override;
 
 protected:
     void clock_cb();
