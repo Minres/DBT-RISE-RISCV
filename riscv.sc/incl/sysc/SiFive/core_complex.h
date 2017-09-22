@@ -1,4 +1,4 @@
-    ////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Copyright (C) 2017, MINRES Technologies GmbH
 // All rights reserved.
 //
@@ -37,25 +37,21 @@
 #ifndef _SYSC_SIFIVE_FE310_H_
 #define _SYSC_SIFIVE_FE310_H_
 
-#include <iss/arch/rv32imac.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
-#include <tlm>
+#include <iss/arch/rv32imac.h>
 #include <sysc/utilities.h>
+#include <tlm>
 
 namespace sysc {
 namespace SiFive {
 
-class core_complex:
-        public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>,
-        public sc_core::sc_module {
+class core_complex : public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>, public sc_core::sc_module {
 public:
-
     tlm::tlm_initiator_socket<32> initiator;
 
     sc_core::sc_in<bool> rst_i;
     core_complex(sc_core::sc_module_name name);
     virtual ~core_complex();
-
 };
 
 } /* namespace SiFive */

@@ -36,46 +36,42 @@
 #ifndef _PLIC_REGS_H_
 #define _PLIC_REGS_H_
 
-#include <sysc/utilities.h>
-#include <util/bit_field.h>
 #include <sysc/register.h>
 #include <sysc/tlm_target.h>
+#include <sysc/utilities.h>
+#include <util/bit_field.h>
 
 namespace sysc {
 
-class plic_regs :
-        public sc_core::sc_module,
-        public sysc::resetable
-{
+class plic_regs : public sc_core::sc_module, public sysc::resetable {
 protected:
     // storage declarations
     BEGIN_BF_DECL(priority_t, uint32_t);
-        BF_FIELD(priority, 0, 3);
-    END_BF_DECL() ;
+    BF_FIELD(priority, 0, 3);
+    END_BF_DECL();
     std::array<priority_t, 255> r_priority;
-    
+
     uint32_t r_pending;
-    
+
     uint32_t r_enabled;
-    
+
     BEGIN_BF_DECL(threshold_t, uint32_t);
-        BF_FIELD(threshold, 0, 3);
+    BF_FIELD(threshold, 0, 3);
     END_BF_DECL() r_threshold;
-    
+
     uint32_t r_claim_complete;
-    
+
     // register declarations
     sysc::sc_register_indexed<priority_t, 255> priority;
     sysc::sc_register<uint32_t> pending;
     sysc::sc_register<uint32_t> enabled;
     sysc::sc_register<threshold_t> threshold;
     sysc::sc_register<uint32_t> claim_complete;
-    
+
 public:
     plic_regs(sc_core::sc_module_name nm);
 
-    template<unsigned BUSWIDTH=32>
-    void registerResources(sysc::tlm_target<BUSWIDTH>& target);
+    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -83,17 +79,11 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::plic_regs::plic_regs(sc_core::sc_module_name nm)
-: sc_core::sc_module(nm)
-, NAMED(priority, r_priority, 0, *this)
-, NAMED(pending, r_pending, 0, *this)
-, NAMED(enabled, r_enabled, 0, *this)
-, NAMED(threshold, r_threshold, 0, *this)
-, NAMED(claim_complete, r_claim_complete, 0, *this)
-{
-}
+    : sc_core::sc_module(nm), NAMED(priority, r_priority, 0, *this), NAMED(pending, r_pending, 0, *this),
+      NAMED(enabled, r_enabled, 0, *this), NAMED(threshold, r_threshold, 0, *this),
+      NAMED(claim_complete, r_claim_complete, 0, *this) {}
 
-template<unsigned BUSWIDTH>
-inline void sysc::plic_regs::registerResources(sysc::tlm_target<BUSWIDTH>& target) {
+template <unsigned BUSWIDTH> inline void sysc::plic_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(priority, 0x4UL);
     target.addResource(pending, 0x1000UL);
     target.addResource(enabled, 0x2000UL);

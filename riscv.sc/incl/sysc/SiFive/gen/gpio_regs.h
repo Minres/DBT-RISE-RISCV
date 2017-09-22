@@ -36,53 +36,50 @@
 #ifndef _GPIO_REGS_H_
 #define _GPIO_REGS_H_
 
-#include <sysc/utilities.h>
-#include <util/bit_field.h>
 #include <sysc/register.h>
 #include <sysc/tlm_target.h>
+#include <sysc/utilities.h>
+#include <util/bit_field.h>
 
 namespace sysc {
 
-class gpio_regs :
-        public sc_core::sc_module,
-        public sysc::resetable
-{
+class gpio_regs : public sc_core::sc_module, public sysc::resetable {
 protected:
     // storage declarations
     uint32_t r_value;
-    
+
     uint32_t r_input_en;
-    
+
     uint32_t r_output_en;
-    
+
     uint32_t r_port;
-    
+
     uint32_t r_pue;
-    
+
     uint32_t r_ds;
-    
+
     uint32_t r_rise_ie;
-    
+
     uint32_t r_rise_ip;
-    
+
     uint32_t r_fall_ie;
-    
+
     uint32_t r_fall_ip;
-    
+
     uint32_t r_high_ie;
-    
+
     uint32_t r_high_ip;
-    
+
     uint32_t r_low_ie;
-    
+
     uint32_t r_low_ip;
-    
+
     uint32_t r_iof_en;
-    
+
     uint32_t r_iof_sel;
-    
+
     uint32_t r_out_xor;
-    
+
     // register declarations
     sysc::sc_register<uint32_t> value;
     sysc::sc_register<uint32_t> input_en;
@@ -101,12 +98,11 @@ protected:
     sysc::sc_register<uint32_t> iof_en;
     sysc::sc_register<uint32_t> iof_sel;
     sysc::sc_register<uint32_t> out_xor;
-    
+
 public:
     gpio_regs(sc_core::sc_module_name nm);
 
-    template<unsigned BUSWIDTH=32>
-    void registerResources(sysc::tlm_target<BUSWIDTH>& target);
+    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -114,29 +110,14 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::gpio_regs::gpio_regs(sc_core::sc_module_name nm)
-: sc_core::sc_module(nm)
-, NAMED(value, r_value, 0, *this)
-, NAMED(input_en, r_input_en, 0, *this)
-, NAMED(output_en, r_output_en, 0, *this)
-, NAMED(port, r_port, 0, *this)
-, NAMED(pue, r_pue, 0, *this)
-, NAMED(ds, r_ds, 0, *this)
-, NAMED(rise_ie, r_rise_ie, 0, *this)
-, NAMED(rise_ip, r_rise_ip, 0, *this)
-, NAMED(fall_ie, r_fall_ie, 0, *this)
-, NAMED(fall_ip, r_fall_ip, 0, *this)
-, NAMED(high_ie, r_high_ie, 0, *this)
-, NAMED(high_ip, r_high_ip, 0, *this)
-, NAMED(low_ie, r_low_ie, 0, *this)
-, NAMED(low_ip, r_low_ip, 0, *this)
-, NAMED(iof_en, r_iof_en, 0, *this)
-, NAMED(iof_sel, r_iof_sel, 0, *this)
-, NAMED(out_xor, r_out_xor, 0, *this)
-{
-}
+    : sc_core::sc_module(nm), NAMED(value, r_value, 0, *this), NAMED(input_en, r_input_en, 0, *this),
+      NAMED(output_en, r_output_en, 0, *this), NAMED(port, r_port, 0, *this), NAMED(pue, r_pue, 0, *this),
+      NAMED(ds, r_ds, 0, *this), NAMED(rise_ie, r_rise_ie, 0, *this), NAMED(rise_ip, r_rise_ip, 0, *this),
+      NAMED(fall_ie, r_fall_ie, 0, *this), NAMED(fall_ip, r_fall_ip, 0, *this), NAMED(high_ie, r_high_ie, 0, *this),
+      NAMED(high_ip, r_high_ip, 0, *this), NAMED(low_ie, r_low_ie, 0, *this), NAMED(low_ip, r_low_ip, 0, *this),
+      NAMED(iof_en, r_iof_en, 0, *this), NAMED(iof_sel, r_iof_sel, 0, *this), NAMED(out_xor, r_out_xor, 0, *this) {}
 
-template<unsigned BUSWIDTH>
-inline void sysc::gpio_regs::registerResources(sysc::tlm_target<BUSWIDTH>& target) {
+template <unsigned BUSWIDTH> inline void sysc::gpio_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(value, 0x0UL);
     target.addResource(input_en, 0x4UL);
     target.addResource(output_en, 0x8UL);

@@ -27,6 +27,9 @@ endif()
 
 FIND_PACKAGE(Threads)
 
+set(PROJECT_3PARTY_DIRS external sr_report sr_signal)
+include(sc-components/cmake/clang-format.cmake)
+
 add_subdirectory(external)
 add_subdirectory(dbt-core)
 add_subdirectory(sc-components)
