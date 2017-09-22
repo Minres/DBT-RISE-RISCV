@@ -86,7 +86,7 @@ inline void configure_default_logger(boost::program_options::variables_map& vm){
 
 inline void configure_debugger_logger() {
 	// configure the connection logger
-//	el::Logger* gdbServerLogger = el::Loggers::getLogger("connection");
+//	el::Logger* gdbServerLogger = el::Loggers::getLogger(connection);
 //	el::Configurations gdbServerConf;
 //	gdbServerConf.setToDefault();
 //	gdbServerConf.set(el::Level::Error, el::ConfigurationType::Format,
@@ -104,10 +104,10 @@ inline void configure_debugger_logger() {
 }
 
 inline void configure_disass_logger(boost::program_options::variables_map& vm) {
-//    el::Logger* disassLogger = el::Loggers::getLogger("disass");
+//    el::Logger* disassLogger = el::Loggers::getLogger(disass);
 //    el::Configurations disassConf;
-//    if(vm.count("disass")){
-//        auto file_name=vm["disass"].as<std::string>();
+//    if(vm.count(disass)){
+//        auto file_name=vm[disass].as<std::string>();
 //        disassConf.setToDefault();
 //        if (file_name.length() > 0) {
 //            disassConf.set(el::Level::Global, el::ConfigurationType::ToFile,

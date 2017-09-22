@@ -4708,7 +4708,7 @@ namespace rv32imac {
 
     template<typename ARCH>
     status target_adapter<ARCH>::read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
-        LOG(logging::TRACE)<<"reading target registers";
+        LOG(TRACE)<<"reading target registers";
         //return idx<0?:;
         data.clear();
         avail.clear();
@@ -4850,8 +4850,8 @@ namespace rv32imac {
         auto saddr=map_addr({iss::CODE, iss::PHYSICAL, addr});
         auto eaddr=map_addr({iss::CODE, iss::PHYSICAL, addr+length});
         target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val-saddr.val);
-        LOG(logging::TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
-        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(TRACE)<<"Adding breakpoint with handle "<<target_adapter_base::bp_count<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Ok;
     }
 
@@ -4861,12 +4861,12 @@ namespace rv32imac {
         unsigned handle=target_adapter_base::bp_lut.getEntry(saddr.val);
         // TODO: check length of addr range
         if(handle){
-            LOG(logging::TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
+            LOG(TRACE)<<"Removing breakpoint with handle "<<handle<<" for addr 0x"<<std::hex<<saddr.val<<std::dec;
             target_adapter_base::bp_lut.removeEntry(handle);
-            LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+            LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
             return Ok;
         }
-        LOG(logging::TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
+        LOG(TRACE)<<"Now having "<<target_adapter_base::bp_lut.size()<<" breakpoints";
         return Err;
     }
 

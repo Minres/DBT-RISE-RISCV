@@ -37,6 +37,7 @@
 #include <iss/iss.h>
 #include <iostream>
 
+#include <iss/log_categories.h>
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv64ia.h>
 #include <iss/jit/MCJIThelper.h>
@@ -46,13 +47,22 @@ namespace po= boost::program_options;
 
 int main(int argc, char *argv[]) {
     try{
-        /** Define and parse the program options
+        /*
+         *  Define and parse the program options
          */
         po::variables_map vm;
         if(parse_cli_options(vm, argc, argv)) return ERROR_IN_COMMAND_LINE;
-        configure_default_logger(vm);
-        // configure the connection logger
-        configure_debugger_logger();
+        if(vm.count("verbose")){
+            auto l = logging::as_log_level(vm["verbose"].as<int>());
+            LOGGER(DEFAULT)::reporting_level() = l;
+            LOGGER(connection)::reporting_level()=l;
+        }
+        if(vm.count("log-file")){
+            // configure the connection logger
+            auto f = fopen(vm["log-file"].as<std::string>().c_str(), "w");
+            LOG_OUTPUT(DEFAULT)::stream() = f;
+            LOG_OUTPUT(connection)::stream() = f;
+        }
 
         // application code comes here //
         iss::init_jit(argc, argv);
@@ -77,9 +87,15 @@ int main(int argc, char *argv[]) {
             cpu->get_arch()->load_file(vm["mem"].as<std::string>() , iss::arch::traits<iss::arch::rv32imac>::MEM);
         }
 
-        configure_disass_logger(vm);
         if(vm.count("disass")){
             cpu->setDisassEnabled(true);
+            LOGGER(disass)::reporting_level()=logging::INFO;
+            auto file_name=vm["disass"].as<std::string>();
+            if (file_name.length() > 0) {
+                LOG_OUTPUT(disass)::stream() = fopen(file_name.c_str(), "w");
+                LOGGER(disass)::print_time() = false;
+                LOGGER(disass)::print_severity() = false;
+            }
         }
         if(vm.count("reset")){
             auto str = vm["reset"].as<std::string>();
@@ -90,7 +106,7 @@ int main(int argc, char *argv[]) {
         }
         return cpu->start(vm["cycles"].as<int64_t>());
     } catch(std::exception& e){
-        LOG(logging::ERROR) << "Unhandled Exception reached the top of main: "
+        LOG(ERROR) << "Unhandled Exception reached the top of main: "
                 << e.what() << ", application will now exit" << std::endl;
         return ERROR_UNHANDLED_EXCEPTION;
     }

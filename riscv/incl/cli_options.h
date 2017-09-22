@@ -39,97 +39,9 @@
 #include <iostream>
 #include <cstdio>
 
-namespace {
 const size_t ERROR_IN_COMMAND_LINE = 1;
 const size_t SUCCESS = 0;
 const size_t ERROR_UNHANDLED_EXCEPTION = 2;
-
-
-inline void enable_log_level(int level){
-	switch(level){
-	case 0:
-        logging::Logger::reporting_level()= logging::FATAL;
-		/* no break */
-	case 1:
-        logging::Logger::reporting_level()= logging::ERROR;
-		/* no break */
-	case 2:
-        logging::Logger::reporting_level()= logging::WARNING;
-		/* no break */
-	case 3:
-        logging::Logger::reporting_level()= logging::INFO;
-		/* no break */
-	case 4:
-        logging::Logger::reporting_level()= logging::DEBUG;
-		/* no break */
-	case 5:
-        logging::Logger::reporting_level()= logging::TRACE;
-		/* no break */
-	}
-}
-
-inline void configure_default_logger(boost::program_options::variables_map& vm){
-//	el::Configurations defaultConf;
-//	defaultConf.setToDefault();
-//	defaultConf.set(el::Level::Error, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
-//	defaultConf.set(el::Level::Warning, el::ConfigurationType::Format, "%datetime{%H:%m:%s.%g} %level %msg");
-//	defaultConf.set(el::Level::Info, el::ConfigurationType::Format,    "%datetime{%H:%m:%s.%g} %level %msg");
-//	defaultConf.set(el::Level::Debug, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
-//	defaultConf.set(el::Level::Trace, el::ConfigurationType::Format,   "%datetime{%H:%m:%s.%g} %level %msg");
-    if(vm.count("verbose"))
-    	enable_log_level(vm["verbose"].as<int>());
-	if(vm.count("log-file"))
-	    logging::Output2FILE::stream() = fopen(vm["log-file"].as<std::string>().c_str(), "w");
-	// default logger uses default configurations
-//	el::Loggers::reconfigureLogger("default", defaultConf);
-}
-
-inline void configure_debugger_logger() {
-	// configure the connection logger
-//	el::Logger* gdbServerLogger = el::Loggers::getLogger("connection");
-//	el::Configurations gdbServerConf;
-//	gdbServerConf.setToDefault();
-//	gdbServerConf.set(el::Level::Error, el::ConfigurationType::Format,
-//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-//	gdbServerConf.set(el::Level::Warning, el::ConfigurationType::Format,
-//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-//	gdbServerConf.set(el::Level::Info, el::ConfigurationType::Format,
-//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-//	gdbServerConf.set(el::Level::Debug, el::ConfigurationType::Format,
-//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-//	gdbServerConf.set(el::Level::Trace, el::ConfigurationType::Format,
-//			"%datetime{%H:%m:%s.%g} %level [%logger] %msg");
-//	enable_log_level(gdbServerConf, 5);
-//	gdbServerLogger->configure(gdbServerConf);
-}
-
-inline void configure_disass_logger(boost::program_options::variables_map& vm) {
-//    el::Logger* disassLogger = el::Loggers::getLogger("disass");
-//    el::Configurations disassConf;
-//    if(vm.count("disass")){
-//        auto file_name=vm["disass"].as<std::string>();
-//        disassConf.setToDefault();
-//        if (file_name.length() > 0) {
-//            disassConf.set(el::Level::Global, el::ConfigurationType::ToFile,
-//                    std::string("true"));
-//            disassConf.set(el::Level::Global,
-//                    el::ConfigurationType::ToStandardOutput, std::string("false"));
-//            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
-//                    std::string("%msg"));
-//            disassConf.set(el::Level::Global, el::ConfigurationType::Filename,
-//                    file_name);
-//            std::ofstream str(file_name); // just to clear the file
-//        } else {
-//            disassConf.set(el::Level::Global, el::ConfigurationType::Format,
-//                    "%datetime{%H:%m:%s.%g} [%logger] %msg");
-//        }
-//    } else {
-//        enable_log_level(disassConf, 0);
-//    }
-//	disassLogger->configure(disassConf);
-}
-
-} // namespace
 
 inline int parse_cli_options(boost::program_options::variables_map& vm, int argc, char *argv[]){
     namespace po = boost::program_options;

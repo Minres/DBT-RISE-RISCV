@@ -66,9 +66,9 @@ add_dependent_header(util)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
+    ${PROJECT_SOURCE_DIR}/../riscv/incl
     ${PROJECT_SOURCE_DIR}/../external/elfio
     ${PROJECT_SOURCE_DIR}/../external/libGIS
-    ${PROJECT_SOURCE_DIR}/../riscv
     ${Boost_INCLUDE_DIRS}
 )
 
