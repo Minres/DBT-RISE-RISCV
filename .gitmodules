@@ -4,9 +4,6 @@
 [submodule "sc-components"]
 	path = sc-components
 	url = https://minres.com/git/SystemC/SystemC-Components.git
-[submodule "external/easyloggingpp"]
-	path = external/easyloggingpp
-	url = https://github.com/muflihun/easyloggingpp.git
 [submodule "external/elfio"]
 	path = external/elfio
 	url = http://git.code.sf.net/p/elfio/code
