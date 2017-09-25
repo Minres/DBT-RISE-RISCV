@@ -1,42 +1,44 @@
-# JIT-ISS
-A versatile Just-in-time (JIT) compiling instruction set simulator (ISS)
+# DBT-RISE-RiscV
+Am instruction set simulator based on DBT-RISE implementing the Risc-V ISA
 
-**JIT-ISS README**
+**DBT-RISE-RiscV README**
 
-This is currently a proof of concept and work in progress, so use at your own risk. It is currently set-up as an Eclipse CDT project and based on LLVM. To build it you need latest LLVM and Eclipse CDT version 4.6 aka Neon.
+This is work in progress, so use at your own risk. Goal is to implement an open-source ISS which can easily embedded e.g. into SystemC Virtual Prototypes. It used code generation to allow easy extension and adaptation of the used instruction.
+The Risc-V ISS reaches about 20MIPS at an Intel Core i7-2600K.
 
-To build with SystemC the define WITH_SYSTEMC needs to be set. Then a simple proof-of-concept system is created. Mainly missing are platform peripherals and interrupt handling. It reaches about 5 MIPS in lock-step mode on a MacBook Pro (Core i7-4870HQ@2.5GHz) running in a Docker container.
+The implementation is based on LLVM 4.0. Eclipse CDT 4.7 (Oxygen) is recommended as IDE.
 
-JIT-ISS uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO (http://elfio.sourceforge.net/), both under MIT license 
+DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO (http://elfio.sourceforge.net/), both under MIT license 
 
 **What's missing**
 
-* only AVR instruction set implemented but not verified
+* RV64I is only preliminary verified
+* F & D standard extensions to be implemented
 
 **Planned features**
 
-* add platform peripherals
-  * timers
+* add platform peripherals to resemble E300 platform
+  * PLIC
   * gpio
-  * ext interrupt registers and functionality
+  * ...
 * and more
 
 **Quick start**
 
 * you need to have a decent compiler, make and cmake installed
-* install LLVM 3.9 or 4.0 according to http://apt.llvm.org/
+* install LLVM 4.0 according to http://apt.llvm.org/
 * download and install SystemC from http://accellera.org/downloads/standards/systemc
   * optionally download and install SystemC Verification Library (SCV) from Accelera into the same location
 * checkout source from git
 * start an out-of-source build like so (e.g. when using LLVM 3.9 and bash)
 ```    
-    cd JIT-ISS
+    cd DBT-RISE-RiscV
     mkdir build
     cd build
-    LLVM_HOME=/usr/lib/llvm-3.9 cmake ..
+    cmake ..
     make
 ```
-* if the SystemC installation is not to be found be cmake you can optionally specify the location by either setting the following environment variables pointing to the installation
+* if the SystemC installation is not found by cmake you can optionally specify the location by either setting the following environment variables pointing to the installation
   - SYSTEMC_HOME
   - SYSTEMC_PREFIX
   
