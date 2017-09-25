@@ -17,8 +17,8 @@ include(cmake/Submodules.cmake)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(warnings "-Wall -Wextra -Werror")
-    set(CMAKE_CXX_FLAG_RELEASE "-O2 -DNDEBUG")
-    set(CMAKE_C_FLAG_RELEASE "-O2 -DNDEBUG")
+    set(CMAKE_CXX_FLAG_RELEASE "-O3 -DNDEBUG")
+    set(CMAKE_C_FLAG_RELEASE "-O3 -DNDEBUG")
     set(CMAKE_CXX_FLAG_DEBUG "-Og")
     set(CMAKE_C_FLAG_DEBUG "-Og")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -26,6 +26,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 FIND_PACKAGE(Threads)
+FIND_PACKAGE(Tcmalloc)
 
 set(PROJECT_3PARTY_DIRS external sr_report sr_signal)
 include(sc-components/cmake/clang-format.cmake)

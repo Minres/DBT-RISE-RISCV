@@ -4094,7 +4094,8 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
 
 #define CREATE_FUNCS(ARCH)                                                                                             \
     template <> std::unique_ptr<vm_if> create<ARCH>(ARCH * core, unsigned short port, bool dump) {                     \
-        std::unique_ptr<rv32imac::vm_impl<ARCH>> ret = std::make_unique<rv32imac::vm_impl<ARCH>>(*core, dump);         \
+        std::unique_ptr<rv32imac::vm_impl<ARCH>> ret =                                                                 \
+            std::make_unique<rv32imac::vm_impl<ARCH>>(*core, dump);                                                    \
         debugger::server<debugger::gdb_session>::run_server(ret.get(), port);                                          \
         return ret;                                                                                                    \
     }                                                                                                                  \
@@ -4157,14 +4158,12 @@ status target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, std::vec
     // return idx<0?:;
     data.clear();
     avail.clear();
-    std::vector<uint8_t> reg_data;
+    const uint8_t* reg_base = vm->get_arch()->get_regs_base_ptr();
     for (size_t reg_no = 0; reg_no < arch::traits<ARCH>::NUM_REGS; ++reg_no) {
-        auto reg_bit_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no));
-        auto reg_width = reg_bit_width / 8;
-        reg_data.resize(reg_width);
-        vm->get_arch()->get_reg(reg_no, reg_data);
-        for (size_t j = 0; j < reg_data.size(); ++j) {
-            data.push_back(reg_data[j]);
+        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no))/8;
+        unsigned offset = traits<ARCH>::reg_byte_offset(reg_no);
+        for (size_t j = 0; j < reg_width; ++j) {
+            data.push_back(*(reg_base+offset+j));
             avail.push_back(0xff);
         }
     }
@@ -4182,15 +4181,15 @@ status target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, std::vec
 }
 
 template <typename ARCH> status target_adapter<ARCH>::write_registers(const std::vector<uint8_t> &data) {
-    size_t data_index = 0;
     auto reg_count = arch::traits<ARCH>::NUM_REGS;
-    std::vector<uint8_t> reg_data;
+    auto* reg_base = vm->get_arch()->get_regs_base_ptr();
+    auto iter = data.data();
     for (size_t reg_no = 0; reg_no < reg_count; ++reg_no) {
-        auto reg_bit_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no));
-        auto reg_width = reg_bit_width / 8;
-        vm->get_arch()->set_reg(reg_no,
-                                std::vector<uint8_t>(data.begin() + data_index, data.begin() + data_index + reg_width));
-        data_index += reg_width;
+        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no))/8;
+        auto offset = traits<ARCH>::reg_byte_offset(reg_no);
+        std::copy(iter , iter + reg_width, reg_base);
+        iter+=4;
+        reg_base+=offset;
     }
     return Ok;
 }
@@ -4201,9 +4200,12 @@ status target_adapter<ARCH>::read_single_register(unsigned int reg_no, std::vect
     if (reg_no < 65) {
         // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
         // arch::traits<ARCH>::reg_e>(reg_no))/8;
-        data.resize(0);
-        vm->get_arch()->get_reg(reg_no, data);
-        avail.resize(data.size());
+        auto* reg_base = vm->get_arch()->get_regs_base_ptr();
+        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no))/8;
+        data.resize(reg_width);
+        avail.resize(reg_width);
+        auto offset = traits<ARCH>::reg_byte_offset(reg_no);
+        std::copy(reg_base+offset, reg_base+offset+reg_width, data.begin());
         std::fill(avail.begin(), avail.end(), 0xff);
     } else {
         typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_READ, traits<ARCH>::CSR, reg_no - 65);
@@ -4217,9 +4219,12 @@ status target_adapter<ARCH>::read_single_register(unsigned int reg_no, std::vect
 
 template <typename ARCH>
 status target_adapter<ARCH>::write_single_register(unsigned int reg_no, const std::vector<uint8_t> &data) {
-    if (reg_no < 65)
-        vm->get_arch()->set_reg(reg_no, data);
-    else {
+    if (reg_no < 65){
+        auto* reg_base = vm->get_arch()->get_regs_base_ptr();
+        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no))/8;
+        auto  offset = traits<ARCH>::reg_byte_offset(reg_no);
+        std::copy(data.begin(), data.begin() + reg_width, reg_base+offset);
+    } else {
         typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
         vm->get_arch()->write(a, data.size(), data.data());
     }

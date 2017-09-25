@@ -44,6 +44,9 @@ if(SCV_FOUND)
     target_link_libraries (${APPLICATION_NAME} ${SCV_LIBRARIES})
 endif()
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
+if (Tcmalloc_FOUND)
+    target_link_libraries(${APPLICATION_NAME} ${Tcmalloc_LIBRARIES})
+endif(Tcmalloc_FOUND)
 
 # Says how and where to install software
 # Targets:

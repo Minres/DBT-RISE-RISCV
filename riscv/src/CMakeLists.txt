@@ -36,6 +36,9 @@ target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
+if (Tcmalloc_FOUND)
+    target_link_libraries(${APPLICATION_NAME} ${Tcmalloc_LIBRARIES})
+endif(Tcmalloc_FOUND)
 
 # Says how and where to install software
 # Targets:
