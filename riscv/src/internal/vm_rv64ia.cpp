@@ -34,106 +34,23 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <cstring>
+#include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/rv64ia.h>
 #include <iss/debugger/gdb_session.h>
+#include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <memory>
+#include <iss/vm_base.h>
 #include <util/logging.h>
 
-#include "iss/arch/rv64ia.h"
-#include "iss/debugger/server.h"
-#include "iss/vm_base.h"
-
-#include "iss/arch/riscv_hart_msu_vp.h"
 #include <boost/format.hpp>
+
+#include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
 namespace rv64ia {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
-
-template <typename ARCH> struct vm_impl;
-
-template <typename ARCH> struct target_adapter : public target_adapter_base {
-
-    target_adapter(server_if *srv, vm_impl<ARCH> *vm) : target_adapter_base(srv), vm(vm) {}
-
-    /*============== Thread Control ===============================*/
-
-    /* Set generic thread */
-    status set_gen_thread(rp_thread_ref &thread) override;
-
-    /* Set control thread */
-    status set_ctrl_thread(rp_thread_ref &thread) override;
-
-    /* Get thread status */
-    status is_thread_alive(rp_thread_ref &thread, bool &alive) override;
-
-    /*============= Register Access ================================*/
-
-    /* Read all registers. buf is 4-byte aligned and it is in
-     target byte order. If  register is not available
-     corresponding bytes in avail_buf are 0, otherwise
-     avail buf is 1 */
-    status read_registers(std::vector<uint8_t> &data, std::vector<uint8_t> &avail) override;
-
-    /* Write all registers. buf is 4-byte aligned and it is in target
-     byte order */
-    status write_registers(const std::vector<uint8_t> &data) override;
-
-    /* Read one register. buf is 4-byte aligned and it is in
-     target byte order. If  register is not available
-     corresponding bytes in avail_buf are 0, otherwise
-     avail buf is 1 */
-    status read_single_register(unsigned int reg_no, std::vector<uint8_t> &buf,
-                                std::vector<uint8_t> &avail_buf) override;
-
-    /* Write one register. buf is 4-byte aligned and it is in target byte
-     order */
-    status write_single_register(unsigned int reg_no, const std::vector<uint8_t> &buf) override;
-
-    /*=================== Memory Access =====================*/
-
-    /* Read memory, buf is 4-bytes aligned and it is in target
-     byte order */
-    status read_mem(uint64_t addr, std::vector<uint8_t> &buf) override;
-
-    /* Write memory, buf is 4-bytes aligned and it is in target
-     byte order */
-    status write_mem(uint64_t addr, const std::vector<uint8_t> &buf) override;
-
-    status process_query(unsigned int &mask, const rp_thread_ref &arg, rp_thread_info &info) override;
-
-    status thread_list_query(int first, const rp_thread_ref &arg, std::vector<rp_thread_ref> &result, size_t max_num,
-                             size_t &num, bool &done) override;
-
-    status current_thread_query(rp_thread_ref &thread) override;
-
-    status offsets_query(uint64_t &text, uint64_t &data, uint64_t &bss) override;
-
-    status crc_query(uint64_t addr, size_t len, uint32_t &val) override;
-
-    status raw_query(std::string in_buf, std::string &out_buf) override;
-
-    status threadinfo_query(int first, std::string &out_buf) override;
-
-    status threadextrainfo_query(const rp_thread_ref &thread, std::string &out_buf) override;
-
-    status packetsize_query(std::string &out_buf) override;
-
-    status add_break(int type, uint64_t addr, unsigned int length) override;
-
-    status remove_break(int type, uint64_t addr, unsigned int length) override;
-
-    status resume_from_addr(bool step, int sig, uint64_t addr) override;
-
-protected:
-    static inline constexpr addr_t map_addr(const addr_t &i) { return i; }
-
-    vm_impl<ARCH> *vm;
-    rp_thread_ref thread_idx;
-};
 
 template <typename ARCH> struct vm_impl : public vm::vm_base<ARCH> {
     using super = typename vm::vm_base<ARCH>;
@@ -151,7 +68,7 @@ template <typename ARCH> struct vm_impl : public vm::vm_base<ARCH> {
     target_adapter_if *accquire_target_adapter(server_if *srv) {
         debugger_if::dbg_enabled = true;
         if (vm::vm_base<ARCH>::tgt_adapter == nullptr)
-            vm::vm_base<ARCH>::tgt_adapter = new target_adapter<ARCH>(srv, this);
+            vm::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
         return vm::vm_base<ARCH>::tgt_adapter;
     }
 
@@ -3087,7 +3004,9 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
 
 template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
-template <typename ARCH> vm_impl<ARCH>::vm_impl(ARCH &core, bool dump) : vm::vm_base<ARCH>(core, dump) {
+template <typename ARCH>
+vm_impl<ARCH>::vm_impl(ARCH &core, bool dump)
+: vm::vm_base<ARCH>(core, dump) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -3180,227 +3099,23 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
 
 } // namespace rv64ia
 
-#define CREATE_FUNCS(ARCH)                                                                                             \
-    template <> std::unique_ptr<vm_if> create<ARCH>(ARCH * core, unsigned short port, bool dump) {                     \
-        std::unique_ptr<rv64ia::vm_impl<ARCH>> ret = std::make_unique<rv64ia::vm_impl<ARCH>>(*core, dump);             \
-        debugger::server<debugger::gdb_session>::run_server(ret.get(), port);                                          \
-        return ret;                                                                                                    \
-    }                                                                                                                  \
-    template <> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, unsigned short port, bool dump) {           \
-        return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), port, dump); /* FIXME: memory leak!!!!!!! */          \
-    }                                                                                                                  \
-    template <> std::unique_ptr<vm_if> create<ARCH>(ARCH * core, bool dump) {                                          \
-        return std::make_unique<rv64ia::vm_impl<ARCH>>(*core, dump); /* FIXME: memory leak!!!!!!! */                   \
-    }                                                                                                                  \
-    template <> std::unique_ptr<vm_if> create<ARCH>(std::string inst_name, bool dump) {                                \
-        return create<ARCH>(new arch::riscv_hart_msu_vp<ARCH>(), dump);                                                \
-    }
-
-CREATE_FUNCS(arch::rv64ia)
-
-namespace rv64ia {
-
-template <typename ARCH> status target_adapter<ARCH>::set_gen_thread(rp_thread_ref &thread) {
-    thread_idx = thread;
-    return Ok;
+template <> std::unique_ptr<vm_if> create<arch::rv64ia>(arch::rv64ia *core, unsigned short port, bool dump) {
+    std::unique_ptr<rv64ia::vm_impl<arch::rv64ia>> ret = std::make_unique<rv64ia::vm_impl<arch::rv64ia>>(*core, dump);
+    debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
+    return ret;
 }
 
-template <typename ARCH> status target_adapter<ARCH>::set_ctrl_thread(rp_thread_ref &thread) {
-    thread_idx = thread;
-    return Ok;
+template <> std::unique_ptr<vm_if> create<arch::rv64ia>(std::string inst_name, unsigned short port, bool dump) {
+    return create<arch::rv64ia>(new arch::riscv_hart_msu_vp<arch::rv64ia>(), port,
+                                dump); /* FIXME: memory leak!!!!!!! */
 }
 
-template <typename ARCH> status target_adapter<ARCH>::is_thread_alive(rp_thread_ref &thread, bool &alive) {
-    alive = 1;
-    return Ok;
+template <> std::unique_ptr<vm_if> create<arch::rv64ia>(arch::rv64ia *core, bool dump) {
+    return std::make_unique<rv64ia::vm_impl<arch::rv64ia>>(*core, dump); /* FIXME: memory leak!!!!!!! */
 }
 
-/* List threads. If first is non-zero then start from the first thread,
- * otherwise start from arg, result points to array of threads to be
- * filled out, result size is number of elements in the result,
- * num points to the actual number of threads found, done is
- * set if all threads are processed.
- */
-template <typename ARCH>
-status target_adapter<ARCH>::thread_list_query(int first, const rp_thread_ref &arg, std::vector<rp_thread_ref> &result,
-                                               size_t max_num, size_t &num, bool &done) {
-    if (first == 0) {
-        result.clear();
-        result.push_back(thread_idx);
-        num = 1;
-        done = true;
-        return Ok;
-    } else
-        return NotSupported;
+template <> std::unique_ptr<vm_if> create<arch::rv64ia>(std::string inst_name, bool dump) {
+    return create<arch::rv64ia>(new arch::riscv_hart_msu_vp<arch::rv64ia>(), dump);
 }
 
-template <typename ARCH> status target_adapter<ARCH>::current_thread_query(rp_thread_ref &thread) {
-    thread = thread_idx;
-    return Ok;
-}
-
-template <typename ARCH>
-status target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, std::vector<uint8_t> &avail) {
-    LOG(TRACE) << "reading target registers";
-    // return idx<0?:;
-    data.clear();
-    avail.clear();
-    std::vector<uint8_t> reg_data;
-    for (size_t reg_no = 0; reg_no < arch::traits<ARCH>::NUM_REGS; ++reg_no) {
-        auto reg_bit_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no));
-        auto reg_width = reg_bit_width / 8;
-        reg_data.resize(reg_width);
-        vm->get_arch()->get_reg(reg_no, reg_data);
-        for (size_t j = 0; j < reg_data.size(); ++j) {
-            data.push_back(reg_data[j]);
-            avail.push_back(0xff);
-        }
-    }
-    // work around fill with F type registers
-    if (arch::traits<ARCH>::NUM_REGS < 65) {
-        auto reg_width = sizeof(typename arch::traits<ARCH>::reg_t);
-        for (size_t reg_no = 0; reg_no < 33; ++reg_no) {
-            for (size_t j = 0; j < reg_width; ++j) {
-                data.push_back(0x0);
-                avail.push_back(0x00);
-            }
-        }
-    }
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::write_registers(const std::vector<uint8_t> &data) {
-    size_t data_index = 0;
-    auto reg_count = arch::traits<ARCH>::NUM_REGS;
-    std::vector<uint8_t> reg_data;
-    for (size_t reg_no = 0; reg_no < reg_count; ++reg_no) {
-        auto reg_bit_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no));
-        auto reg_width = reg_bit_width / 8;
-        vm->get_arch()->set_reg(reg_no,
-                                std::vector<uint8_t>(data.begin() + data_index, data.begin() + data_index + reg_width));
-        data_index += reg_width;
-    }
-    return Ok;
-}
-
-template <typename ARCH>
-status target_adapter<ARCH>::read_single_register(unsigned int reg_no, std::vector<uint8_t> &data,
-                                                  std::vector<uint8_t> &avail) {
-    if (reg_no < 65) {
-        // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
-        // arch::traits<ARCH>::reg_e>(reg_no))/8;
-        data.resize(0);
-        vm->get_arch()->get_reg(reg_no, data);
-        avail.resize(data.size());
-        std::fill(avail.begin(), avail.end(), 0xff);
-    } else {
-        typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_READ, traits<ARCH>::CSR, reg_no - 65);
-        data.resize(sizeof(typename traits<ARCH>::reg_t));
-        avail.resize(sizeof(typename traits<ARCH>::reg_t));
-        std::fill(avail.begin(), avail.end(), 0xff);
-        vm->get_arch()->read(a, data.size(), data.data());
-    }
-    return data.size() > 0 ? Ok : Err;
-}
-
-template <typename ARCH>
-status target_adapter<ARCH>::write_single_register(unsigned int reg_no, const std::vector<uint8_t> &data) {
-    if (reg_no < 65)
-        vm->get_arch()->set_reg(reg_no, data);
-    else {
-        typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
-        vm->get_arch()->write(a, data.size(), data.data());
-    }
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::read_mem(uint64_t addr, std::vector<uint8_t> &data) {
-    auto a = map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
-    auto f = [&]() -> status { return vm->get_arch()->read(a, data.size(), data.data()); };
-    return srv->execute_syncronized(f);
-}
-
-template <typename ARCH> status target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t> &data) {
-    auto a = map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
-    return srv->execute_syncronized(&arch_if::write, vm->get_arch(), a, data.size(), data.data());
-}
-
-template <typename ARCH>
-status target_adapter<ARCH>::process_query(unsigned int &mask, const rp_thread_ref &arg, rp_thread_info &info) {
-    return NotSupported;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::offsets_query(uint64_t &text, uint64_t &data, uint64_t &bss) {
-    text = 0;
-    data = 0;
-    bss = 0;
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::crc_query(uint64_t addr, size_t len, uint32_t &val) {
-    return NotSupported;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::raw_query(std::string in_buf, std::string &out_buf) {
-    return NotSupported;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::threadinfo_query(int first, std::string &out_buf) {
-    if (first) {
-        std::stringstream ss;
-        ss << "m" << std::hex << thread_idx.val;
-        out_buf = ss.str();
-    } else {
-        out_buf = "l";
-    }
-    return Ok;
-}
-
-template <typename ARCH>
-status target_adapter<ARCH>::threadextrainfo_query(const rp_thread_ref &thread, std::string &out_buf) {
-    char buf[20];
-    memset(buf, 0, 20);
-    sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x", 'R', 'u', 'n', 'n', 'a', 'b', 'l', 'e', 0);
-    out_buf = buf;
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::packetsize_query(std::string &out_buf) {
-    out_buf = "PacketSize=1000";
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::add_break(int type, uint64_t addr, unsigned int length) {
-    auto saddr = map_addr({iss::CODE, iss::PHYSICAL, addr});
-    auto eaddr = map_addr({iss::CODE, iss::PHYSICAL, addr + length});
-    target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val - saddr.val);
-    LOG(TRACE) << "Adding breakpoint with handle " << target_adapter_base::bp_count << " for addr 0x" << std::hex
-               << saddr.val << std::dec;
-    LOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-    return Ok;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::remove_break(int type, uint64_t addr, unsigned int length) {
-    auto saddr = map_addr({iss::CODE, iss::PHYSICAL, addr});
-    unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
-    // TODO: check length of addr range
-    if (handle) {
-        LOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val
-                   << std::dec;
-        target_adapter_base::bp_lut.removeEntry(handle);
-        LOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-        return Ok;
-    }
-    LOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-    return Err;
-}
-
-template <typename ARCH> status target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr) {
-    unsigned reg_no = arch::traits<ARCH>::PC;
-    std::vector<uint8_t> data(8);
-    *(reinterpret_cast<uint64_t *>(&data[0])) = addr;
-    vm->get_arch()->set_reg(reg_no, data);
-    return resume_from_current(step, sig);
-}
-} // namespace rv64ia
 } // namespace iss

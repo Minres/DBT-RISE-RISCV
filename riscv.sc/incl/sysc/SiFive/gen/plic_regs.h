@@ -79,9 +79,12 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::plic_regs::plic_regs(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), NAMED(priority, r_priority, 0, *this), NAMED(pending, r_pending, 0, *this),
-      NAMED(enabled, r_enabled, 0, *this), NAMED(threshold, r_threshold, 0, *this),
-      NAMED(claim_complete, r_claim_complete, 0, *this) {}
+: sc_core::sc_module(nm)
+, NAMED(priority, r_priority, 0, *this)
+, NAMED(pending, r_pending, 0, *this)
+, NAMED(enabled, r_enabled, 0, *this)
+, NAMED(threshold, r_threshold, 0, *this)
+, NAMED(claim_complete, r_claim_complete, 0, *this) {}
 
 template <unsigned BUSWIDTH> inline void sysc::plic_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(priority, 0x4UL);

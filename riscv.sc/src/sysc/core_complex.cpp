@@ -39,10 +39,12 @@
 namespace sysc {
 namespace SiFive {
 
-core_complex::core_complex(sc_core::sc_module_name name) : sc_core::sc_module(name), NAMED(initiator), NAMED(rst_i) {
+core_complex::core_complex(sc_core::sc_module_name name)
+: sc_core::sc_module(name)
+, NAMED(initiator)
+, NAMED(rst_i) {
     // TODO Auto-generated constructor stub
 }
-
 
 } /* namespace SiFive */
 } /* namespace sysc */

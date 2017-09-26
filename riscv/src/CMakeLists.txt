@@ -16,8 +16,8 @@ set(APP_SOURCES main.cpp)
 set(LIBRARY_NAME risc-v)
 
 # Define the library
-add_library(${LIBRARY_NAME} ${LIB_SOURCES})
-
+add_library(${LIBRARY_NAME} SHARED ${LIB_SOURCES})
+SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
   FRAMEWORK FALSE

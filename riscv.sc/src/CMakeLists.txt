@@ -34,10 +34,10 @@ add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 
 # Links the target exe against the libraries
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
+target_link_libraries(${APPLICATION_NAME} risc-v)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
-target_link_libraries(${APPLICATION_NAME} risc-v)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
 target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
 if(SCV_FOUND)

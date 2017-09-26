@@ -21,7 +21,11 @@
 namespace sysc {
 
 plic::plic(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), tlm_target<>(clk), NAMED(clk_i), NAMED(rst_i), NAMEDD(plic_regs, regs) {
+: sc_core::sc_module(nm)
+, tlm_target<>(clk)
+, NAMED(clk_i)
+, NAMED(rst_i)
+, NAMEDD(plic_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;

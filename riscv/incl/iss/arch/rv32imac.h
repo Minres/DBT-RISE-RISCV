@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Thu Sep 21 17:01:54 CEST 2017
+// Created on: Tue Sep 26 17:41:14 CEST 2017
 //             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -103,15 +103,15 @@ template <> struct traits<rv32imac> {
         ICOUNT
     };
 
-    typedef uint32_t reg_t;
+    using reg_t = uint32_t;
 
-    typedef uint32_t addr_t;
+    using addr_t = uint32_t;
 
-    typedef uint32_t code_word_t; // TODO: check removal
+    using code_word_t = uint32_t; // TODO: check removal
 
-    typedef iss::typed_addr_t<iss::VIRTUAL> virt_addr_t;
+    using virt_addr_t = iss::typed_addr_t<iss::VIRTUAL>;
 
-    typedef iss::typed_addr_t<iss::PHYSICAL> phys_addr_t;
+    using phys_addr_t = iss::typed_addr_t<iss::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
         const uint32_t RV32IMAC_reg_size[] = {32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
@@ -142,19 +142,19 @@ struct rv32imac : public arch_if {
     rv32imac();
     ~rv32imac();
 
-    virtual void reset(uint64_t address = 0) override;
+    void reset(uint64_t address = 0) override;
 
-    virtual uint8_t *get_regs_base_ptr() override;
+    uint8_t *get_regs_base_ptr() override;
     /// deprecated
-    virtual void get_reg(short idx, std::vector<uint8_t> &value) override {}
-    virtual void set_reg(short idx, const std::vector<uint8_t> &value) override {}
+    void get_reg(short idx, std::vector<uint8_t> &value) override {}
+    void set_reg(short idx, const std::vector<uint8_t> &value) override {}
     /// deprecated
-    virtual bool get_flag(int flag) override { return false; }
-    virtual void set_flag(int, bool value) override{};
+    bool get_flag(int flag) override { return false; }
+    void set_flag(int, bool value) override{};
     /// deprecated
-    virtual void update_flags(operations op, uint64_t opr1, uint64_t opr2) override{};
+    void update_flags(operations op, uint64_t opr1, uint64_t opr2) override{};
 
-    virtual void notify_phase(exec_phase phase) {
+    void notify_phase(exec_phase phase) {
         if (phase == ISTART) {
             ++reg.icount;
             reg.PC = reg.NEXT_PC;

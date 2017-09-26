@@ -25,8 +25,15 @@
 namespace sysc {
 
 platform::platform(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), NAMED(i_master), NAMED(i_router, 4, 1), NAMED(i_uart), NAMED(i_spi), NAMED(i_gpio),
-      NAMED(i_plic), NAMED(s_clk), NAMED(s_rst) {
+: sc_core::sc_module(nm)
+, NAMED(i_master)
+, NAMED(i_router, 4, 1)
+, NAMED(i_uart)
+, NAMED(i_spi)
+, NAMED(i_gpio)
+, NAMED(i_plic)
+, NAMED(s_clk)
+, NAMED(s_rst) {
     i_master.initiator(i_router.target[0]);
     size_t i = 0;
     for (const auto &e : e300_plat_map) {

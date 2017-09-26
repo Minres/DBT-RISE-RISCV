@@ -103,9 +103,14 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::uart_regs::uart_regs(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), NAMED(txdata, r_txdata, 0, *this), NAMED(rxdata, r_rxdata, 0, *this),
-      NAMED(txctrl, r_txctrl, 0, *this), NAMED(rxctrl, r_rxctrl, 0, *this), NAMED(ie, r_ie, 0, *this),
-      NAMED(ip, r_ip, 0, *this), NAMED(div, r_div, 0, *this) {}
+: sc_core::sc_module(nm)
+, NAMED(txdata, r_txdata, 0, *this)
+, NAMED(rxdata, r_rxdata, 0, *this)
+, NAMED(txctrl, r_txctrl, 0, *this)
+, NAMED(rxctrl, r_rxctrl, 0, *this)
+, NAMED(ie, r_ie, 0, *this)
+, NAMED(ip, r_ip, 0, *this)
+, NAMED(div, r_div, 0, *this) {}
 
 template <unsigned BUSWIDTH> inline void sysc::uart_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(txdata, 0x0UL);

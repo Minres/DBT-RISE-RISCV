@@ -21,7 +21,11 @@
 namespace sysc {
 
 uart::uart(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), tlm_target<>(clk), NAMED(clk_i), NAMED(rst_i), NAMEDD(uart_regs, regs) {
+: sc_core::sc_module(nm)
+, tlm_target<>(clk)
+, NAMED(clk_i)
+, NAMED(rst_i)
+, NAMEDD(uart_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;

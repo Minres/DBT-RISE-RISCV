@@ -21,7 +21,11 @@
 namespace sysc {
 
 gpio::gpio(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), tlm_target<>(clk), NAMED(clk_i), NAMED(rst_i), NAMEDD(gpio_regs, regs) {
+: sc_core::sc_module(nm)
+, tlm_target<>(clk)
+, NAMED(clk_i)
+, NAMED(rst_i)
+, NAMEDD(gpio_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
@@ -31,8 +35,7 @@ gpio::gpio(sc_core::sc_module_name nm)
 
 void gpio::clock_cb() {}
 
-gpio::~gpio() {
-}
+gpio::~gpio() {}
 
 void gpio::reset_cb() {
     if (rst_i.read())

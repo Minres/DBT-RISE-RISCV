@@ -152,12 +152,23 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::spi_regs::spi_regs(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), NAMED(sckdiv, r_sckdiv, 0, *this), NAMED(sckmode, r_sckmode, 0, *this),
-      NAMED(csid, r_csid, 0, *this), NAMED(csdef, r_csdef, 0, *this), NAMED(csmode, r_csmode, 0, *this),
-      NAMED(delay0, r_delay0, 0, *this), NAMED(delay1, r_delay1, 0, *this), NAMED(fmt, r_fmt, 0, *this),
-      NAMED(txdata, r_txdata, 0, *this), NAMED(rxdata, r_rxdata, 0, *this), NAMED(txmark, r_txmark, 0, *this),
-      NAMED(rxmark, r_rxmark, 0, *this), NAMED(fctrl, r_fctrl, 0, *this), NAMED(ffmt, r_ffmt, 0, *this),
-      NAMED(ie, r_ie, 0, *this), NAMED(ip, r_ip, 0, *this) {}
+: sc_core::sc_module(nm)
+, NAMED(sckdiv, r_sckdiv, 0, *this)
+, NAMED(sckmode, r_sckmode, 0, *this)
+, NAMED(csid, r_csid, 0, *this)
+, NAMED(csdef, r_csdef, 0, *this)
+, NAMED(csmode, r_csmode, 0, *this)
+, NAMED(delay0, r_delay0, 0, *this)
+, NAMED(delay1, r_delay1, 0, *this)
+, NAMED(fmt, r_fmt, 0, *this)
+, NAMED(txdata, r_txdata, 0, *this)
+, NAMED(rxdata, r_rxdata, 0, *this)
+, NAMED(txmark, r_txmark, 0, *this)
+, NAMED(rxmark, r_rxmark, 0, *this)
+, NAMED(fctrl, r_fctrl, 0, *this)
+, NAMED(ffmt, r_ffmt, 0, *this)
+, NAMED(ie, r_ie, 0, *this)
+, NAMED(ip, r_ip, 0, *this) {}
 
 template <unsigned BUSWIDTH> inline void sysc::spi_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(sckdiv, 0x0UL);

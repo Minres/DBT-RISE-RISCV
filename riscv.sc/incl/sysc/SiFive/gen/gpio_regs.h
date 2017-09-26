@@ -110,12 +110,24 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 inline sysc::gpio_regs::gpio_regs(sc_core::sc_module_name nm)
-    : sc_core::sc_module(nm), NAMED(value, r_value, 0, *this), NAMED(input_en, r_input_en, 0, *this),
-      NAMED(output_en, r_output_en, 0, *this), NAMED(port, r_port, 0, *this), NAMED(pue, r_pue, 0, *this),
-      NAMED(ds, r_ds, 0, *this), NAMED(rise_ie, r_rise_ie, 0, *this), NAMED(rise_ip, r_rise_ip, 0, *this),
-      NAMED(fall_ie, r_fall_ie, 0, *this), NAMED(fall_ip, r_fall_ip, 0, *this), NAMED(high_ie, r_high_ie, 0, *this),
-      NAMED(high_ip, r_high_ip, 0, *this), NAMED(low_ie, r_low_ie, 0, *this), NAMED(low_ip, r_low_ip, 0, *this),
-      NAMED(iof_en, r_iof_en, 0, *this), NAMED(iof_sel, r_iof_sel, 0, *this), NAMED(out_xor, r_out_xor, 0, *this) {}
+: sc_core::sc_module(nm)
+, NAMED(value, r_value, 0, *this)
+, NAMED(input_en, r_input_en, 0, *this)
+, NAMED(output_en, r_output_en, 0, *this)
+, NAMED(port, r_port, 0, *this)
+, NAMED(pue, r_pue, 0, *this)
+, NAMED(ds, r_ds, 0, *this)
+, NAMED(rise_ie, r_rise_ie, 0, *this)
+, NAMED(rise_ip, r_rise_ip, 0, *this)
+, NAMED(fall_ie, r_fall_ie, 0, *this)
+, NAMED(fall_ip, r_fall_ip, 0, *this)
+, NAMED(high_ie, r_high_ie, 0, *this)
+, NAMED(high_ip, r_high_ip, 0, *this)
+, NAMED(low_ie, r_low_ie, 0, *this)
+, NAMED(low_ip, r_low_ip, 0, *this)
+, NAMED(iof_en, r_iof_en, 0, *this)
+, NAMED(iof_sel, r_iof_sel, 0, *this)
+, NAMED(out_xor, r_out_xor, 0, *this) {}
 
 template <unsigned BUSWIDTH> inline void sysc::gpio_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
     target.addResource(value, 0x0UL);

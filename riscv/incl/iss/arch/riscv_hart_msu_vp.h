@@ -224,19 +224,24 @@ struct vm_info {
 };
 
 struct trap_load_access_fault : public trap_access {
-    trap_load_access_fault(uint64_t badaddr) : trap_access(5 << 16, badaddr) {}
+    trap_load_access_fault(uint64_t badaddr)
+    : trap_access(5 << 16, badaddr) {}
 };
 struct illegal_instruction_fault : public trap_access {
-    illegal_instruction_fault(uint64_t badaddr) : trap_access(2 << 16, badaddr) {}
+    illegal_instruction_fault(uint64_t badaddr)
+    : trap_access(2 << 16, badaddr) {}
 };
 struct trap_instruction_page_fault : public trap_access {
-    trap_instruction_page_fault(uint64_t badaddr) : trap_access(12 << 16, badaddr) {}
+    trap_instruction_page_fault(uint64_t badaddr)
+    : trap_access(12 << 16, badaddr) {}
 };
 struct trap_load_page_fault : public trap_access {
-    trap_load_page_fault(uint64_t badaddr) : trap_access(13 << 16, badaddr) {}
+    trap_load_page_fault(uint64_t badaddr)
+    : trap_access(13 << 16, badaddr) {}
 };
 struct trap_store_page_fault : public trap_access {
-    trap_store_page_fault(uint64_t badaddr) : trap_access(15 << 16, badaddr) {}
+    trap_store_page_fault(uint64_t badaddr)
+    : trap_access(15 << 16, badaddr) {}
 };
 }
 
@@ -277,7 +282,7 @@ using mstatus32_t = union {
         uint32_t SD : 1, _WPRI4 : 11, MXR : 1, SUM : 1, _WPRI3 : 1, XS : 2, FS : 2, _WPRI2 : 8, UPIE : 1, _WPRI0 : 3,
             UIE : 1;
     } u;
-} ;
+};
 
 using mstatus64_t = union {
     uint64_t val;
@@ -324,7 +329,7 @@ using mstatus64_t = union {
             UXL : 2,     // value of XLEN for U-mode
             _WPRI3 : 12, MXR : 1, SUM : 1, _WPRI2 : 1, XS : 2, FS : 2, _WPRI1 : 8, UPIE : 1, _WPRI0 : 3, UIE : 1;
     } u;
-} ;
+};
 
 template <unsigned L> inline vm_info decode_vm_info(uint32_t state, uint64_t sptbr);
 
@@ -483,7 +488,10 @@ private:
     void check_interrupt();
 };
 
-template <typename BASE> riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp() : mstatus_r(csr[mstatus]), satp_r(csr[satp]) {
+template <typename BASE>
+riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
+: mstatus_r(csr[mstatus])
+, satp_r(csr[satp]) {
     csr[misa] = traits<BASE>::XLEN == 32 ? 1ULL << (traits<BASE>::XLEN - 2) : 2ULL << (traits<BASE>::XLEN - 2);
     uart_buf.str("");
     // read-only registers
