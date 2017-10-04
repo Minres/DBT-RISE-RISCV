@@ -140,7 +140,7 @@ struct rv32imac : public arch_if {
     using addr_t = typename traits<rv32imac>::addr_t;
 
     rv32imac();
-    ~rv32imac();
+    ~rv32imac() = default;
 
     void reset(uint64_t address = 0) override;
 
@@ -154,7 +154,7 @@ struct rv32imac : public arch_if {
     /// deprecated
     void update_flags(operations op, uint64_t opr1, uint64_t opr2) override{};
 
-    void notify_phase(exec_phase phase) {
+    void notify_phase(exec_phase phase) override {
         if (phase == ISTART) {
             ++reg.icount;
             reg.PC = reg.NEXT_PC;

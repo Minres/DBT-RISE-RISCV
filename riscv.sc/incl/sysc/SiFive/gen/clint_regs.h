@@ -29,12 +29,12 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 // Created on: Wed Oct 04 10:06:35 CEST 2017
-//             *      plic_regs.h Author: <RDL Generator>
+//             *      clint_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _PLIC_REGS_H_
-#define _PLIC_REGS_H_
+#ifndef _CLINT_REGS_H_
+#define _CLINT_REGS_H_
 
 #include <sysc/register.h>
 #include <sysc/tlm_target.h>
@@ -43,32 +43,23 @@
 
 namespace sysc {
 
-class plic_regs : public sc_core::sc_module, public sysc::resetable {
+class clint_regs : public sc_core::sc_module, public sysc::resetable {
 public:
     // storage declarations
-    BEGIN_BF_DECL(priority_t, uint32_t);
-    BF_FIELD(priority, 0, 3);
-    END_BF_DECL();
-    std::array<priority_t, 255> r_priority;
+    BEGIN_BF_DECL(msip_t, uint32_t);
+    BF_FIELD(msip, 0, 1);
+    END_BF_DECL() r_msip;
 
-    uint32_t r_pending;
+    uint64_t r_mtimecmp;
 
-    uint32_t r_enabled;
-
-    BEGIN_BF_DECL(threshold_t, uint32_t);
-    BF_FIELD(threshold, 0, 3);
-    END_BF_DECL() r_threshold;
-
-    uint32_t r_claim_complete;
+    uint64_t r_mtime;
 
     // register declarations
-    sysc::sc_register_indexed<priority_t, 255> priority;
-    sysc::sc_register<uint32_t> pending;
-    sysc::sc_register<uint32_t> enabled;
-    sysc::sc_register<threshold_t> threshold;
-    sysc::sc_register<uint32_t> claim_complete;
+    sysc::sc_register<msip_t> msip;
+    sysc::sc_register<uint64_t> mtimecmp;
+    sysc::sc_register<uint64_t> mtime;
 
-    plic_regs(sc_core::sc_module_name nm);
+    clint_regs(sc_core::sc_module_name nm);
 
     template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
 };
@@ -77,20 +68,16 @@ public:
 // member functions
 //////////////////////////////////////////////////////////////////////////////
 
-inline sysc::plic_regs::plic_regs(sc_core::sc_module_name nm)
+inline sysc::clint_regs::clint_regs(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
-, NAMED(priority, r_priority, 0, *this)
-, NAMED(pending, r_pending, 0, *this)
-, NAMED(enabled, r_enabled, 0, *this)
-, NAMED(threshold, r_threshold, 0, *this)
-, NAMED(claim_complete, r_claim_complete, 0, *this) {}
+, NAMED(msip, r_msip, 0, *this)
+, NAMED(mtimecmp, r_mtimecmp, 0, *this)
+, NAMED(mtime, r_mtime, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::plic_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
-    target.addResource(priority, 0x4UL);
-    target.addResource(pending, 0x1000UL);
-    target.addResource(enabled, 0x2000UL);
-    target.addResource(threshold, 0x200000UL);
-    target.addResource(claim_complete, 0x200004UL);
+template <unsigned BUSWIDTH> inline void sysc::clint_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+    target.addResource(msip, 0x0UL);
+    target.addResource(mtimecmp, 0x4000UL);
+    target.addResource(mtime, 0xbff8UL);
 }
 
-#endif // _PLIC_REGS_H_
+#endif // _CLINT_REGS_H_

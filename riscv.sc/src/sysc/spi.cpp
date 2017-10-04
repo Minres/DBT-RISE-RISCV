@@ -31,6 +31,7 @@ spi::spi(sc_core::sc_module_name nm)
     sensitive << clk_i;
     SC_METHOD(reset_cb);
     sensitive << rst_i;
+    dont_initialize();
 }
 
 spi::~spi() {}

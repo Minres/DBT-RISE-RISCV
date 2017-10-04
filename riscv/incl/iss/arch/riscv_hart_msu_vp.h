@@ -431,7 +431,7 @@ template <typename BASE> struct riscv_hart_msu_vp : public BASE {
     riscv_hart_msu_vp();
     virtual ~riscv_hart_msu_vp() = default;
 
-    virtual void load_file(std::string name, int type = -1);
+    void load_file(std::string name, int type = -1) override;
 
     virtual phys_addr_t v2p(const iss::addr_t &addr);
 
@@ -550,9 +550,12 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string nam
                 const auto fsize = pseg->get_file_size(); // 0x42c/0x0
                 const auto seg_data = pseg->get_data();
                 if (fsize > 0) {
-                    this->write(
-                        typed_addr_t<PHYSICAL>(iss::DEBUG_WRITE, traits<BASE>::MEM, pseg->get_virtual_address()), fsize,
-                        reinterpret_cast<const uint8_t *const>(seg_data));
+                    auto res = this->write(
+                        typed_addr_t<PHYSICAL>(iss::DEBUG_WRITE, traits<BASE>::MEM, pseg->get_physical_address()),
+                        fsize, reinterpret_cast<const uint8_t *const>(seg_data));
+                    if (res != iss::Ok)
+                        LOG(ERROR) << "problem writing " << fsize << "bytes to 0x" << std::hex
+                                   << pseg->get_physical_address();
                 }
             }
             for (const auto sec : reader.sections) {
@@ -596,20 +599,9 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
                 }
             }
             phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
-            if ((paddr.val + length) > mem.size()) return iss::Err;
-            switch (paddr.val) {
-            case 0x0200BFF8: { // CLINT base, mtime reg
-                uint64_t mtime = this->reg.icount >> 12 /*12*/;
-                std::copy((uint8_t *)&mtime, ((uint8_t *)&mtime) + length, data);
-            } break;
-            case 0x10008000: {
-                const mem_type::page_type &p = mem(paddr.val / mem.page_size);
-                uint64_t offs = paddr.val & mem.page_addr_mask;
-                std::copy(p.data() + offs, p.data() + offs + length, data);
-                if (this->reg.icount > 30000) data[3] |= 0x80;
-            } break;
-            default: { return read_mem(paddr, length, data); }
-            }
+            auto res = read_mem(paddr, length, data);
+            if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
+            return res;
         } catch (trap_access &ta) {
             this->reg.trap_state = (1 << 31) | ta.id;
             return iss::Err;
@@ -677,6 +669,33 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
     try {
         switch (addr.space) {
         case traits<BASE>::MEM: {
+            if ((addr.type & (iss::ACCESS_TYPE - iss::DEBUG)) == iss::FETCH && (addr.val & 0x1) == 1) {
+                fault_data = addr.val;
+                if ((addr.type & iss::DEBUG)) throw trap_access(0, addr.val);
+                this->reg.trap_state = (1 << 31); // issue trap 0
+                return iss::Err;
+            }
+            try {
+                if ((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK)) { // we may cross a page boundary
+                    vm_info vm = decode_vm_info<traits<BASE>::XLEN>(this->reg.machine_state, csr[satp]);
+                    if (vm.levels != 0) { // VM is active
+                        auto split_addr = (addr.val + length) & ~PGMASK;
+                        auto len1 = split_addr - addr.val;
+                        auto res = write(addr, len1, data);
+                        if (res == iss::Ok)
+                            res = write(iss::addr_t{addr.type, addr.space, split_addr}, length - len1, data + len1);
+                        return res;
+                    }
+                }
+                phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
+                auto res = write_mem(paddr, length, data);
+                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (7 << 16); // issue trap 7 (load access fault
+                return res;
+            } catch (trap_access &ta) {
+                this->reg.trap_state = (1 << 31) | ta.id;
+                return iss::Err;
+            }
+
             phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
             if ((paddr.val + length) > mem.size()) return iss::Err;
             switch (paddr.val) {
@@ -691,22 +710,22 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                 }
                 return iss::Ok;
             case 0x10008000: { // HFROSC base, hfrosccfg reg
-                mem_type::page_type &p = mem(paddr.val / mem.page_size);
-                size_t offs = paddr.val & mem.page_addr_mask;
+                auto &p = mem(paddr.val / mem.page_size);
+                auto offs = paddr.val & mem.page_addr_mask;
                 std::copy(data, data + length, p.data() + offs);
-                uint8_t &x = *(p.data() + offs + 3);
+                auto &x = *(p.data() + offs + 3);
                 if (x & 0x40) x |= 0x80; // hfroscrdy = 1 if hfroscen==1
                 return iss::Ok;
             }
             case 0x10008008: { // HFROSC base, pllcfg reg
-                mem_type::page_type &p = mem(paddr.val / mem.page_size);
-                size_t offs = paddr.val & mem.page_addr_mask;
+                auto &p = mem(paddr.val / mem.page_size);
+                auto offs = paddr.val & mem.page_addr_mask;
                 std::copy(data, data + length, p.data() + offs);
-                uint8_t &x = *(p.data() + offs + 3);
+                auto &x = *(p.data() + offs + 3);
                 x |= 0x80; // set pll lock upon writing
                 return iss::Ok;
             } break;
-            default: { return write_mem(paddr, length, data); }
+            default: {}
             }
         } break;
         case traits<BASE>::CSR: {
@@ -857,56 +876,102 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_satp(unsigne
 }
 
 template <typename BASE>
-iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
-    const auto &p = mem(addr.val / mem.page_size);
-    auto offs = addr.val & mem.page_addr_mask;
-    std::copy(p.data() + offs, p.data() + offs + length, data);
-    return iss::Ok;
+iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length, uint8_t *const data) {
+    if ((paddr.val + length) > mem.size()) return iss::Err;
+    switch (paddr.val) {
+    case 0x0200BFF8: { // CLINT base, mtime reg
+        uint64_t mtime = this->reg.icount >> 12 /*12*/;
+        std::copy((uint8_t *)&mtime, ((uint8_t *)&mtime) + length, data);
+    } break;
+    case 0x10008000: {
+        const mem_type::page_type &p = mem(paddr.val / mem.page_size);
+        uint64_t offs = paddr.val & mem.page_addr_mask;
+        std::copy(p.data() + offs, p.data() + offs + length, data);
+        if (this->reg.icount > 30000) data[3] |= 0x80;
+    } break;
+    default: {
+        const auto &p = mem(paddr.val / mem.page_size);
+        auto offs = paddr.val & mem.page_addr_mask;
+        std::copy(p.data() + offs, p.data() + offs + length, data);
+        return iss::Ok;
+    }
+    }
 }
 
 template <typename BASE>
-iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
-    mem_type::page_type &p = mem(addr.val / mem.page_size);
-    std::copy(data, data + length, p.data() + (addr.val & mem.page_addr_mask));
-    // tohost handling in case of riscv-test
-    if ((addr.type & iss::DEBUG) == 0) {
-        auto tohost_upper =
-            (traits<BASE>::XLEN == 32 && addr.val == (tohost + 4)) || (traits<BASE>::XLEN == 64 && addr.val == tohost);
-        auto tohost_lower =
-            (traits<BASE>::XLEN == 32 && addr.val == tohost) || (traits<BASE>::XLEN == 64 && addr.val == tohost);
-        if (tohost_lower || tohost_upper) {
-            uint64_t hostvar = *reinterpret_cast<uint64_t *>(p.data() + (tohost & mem.page_addr_mask));
-            if (tohost_upper || (tohost_lower && to_host_wr_cnt > 0)) {
-                switch (hostvar >> 48) {
-                case 0:
-                    if (hostvar != 0x1)
-                        LOG(FATAL) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
-                                   << "), stopping simulation";
-                    else
-                        LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
-                                  << "), stopping simulation";
-                    throw(iss::simulation_stopped(hostvar));
-                case 0x0101: {
-                    char c = static_cast<char>(hostvar & 0xff);
-                    if (c == '\n' || c == 0) {
-                        LOG(INFO) << "tohost send '" << uart_buf.str() << "'";
-                        uart_buf.str("");
-                    } else
-                        uart_buf << c;
-                    to_host_wr_cnt = 0;
-                } break;
-                default:
-                    break;
-                }
-            } else if (tohost_lower)
-                to_host_wr_cnt++;
-        } else if ((traits<BASE>::XLEN == 32 && addr.val == fromhost + 4) ||
-                   (traits<BASE>::XLEN == 64 && addr.val == fromhost)) {
-            uint64_t fhostvar = *reinterpret_cast<uint64_t *>(p.data() + (fromhost & mem.page_addr_mask));
-            *reinterpret_cast<uint64_t *>(p.data() + (tohost & mem.page_addr_mask)) = fhostvar;
+iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned length, const uint8_t *const data) {
+    if ((paddr.val + length) > mem.size()) return iss::Err;
+    switch (paddr.val) {
+    case 0x10013000: // UART0 base, TXFIFO reg
+    case 0x10023000: // UART1 base, TXFIFO reg
+        uart_buf << (char)data[0];
+        if (((char)data[0]) == '\n' || data[0] == 0) {
+            // LOG(INFO)<<"UART"<<((paddr.val>>16)&0x3)<<" send
+            // '"<<uart_buf.str()<<"'";
+            std::cout << uart_buf.str();
+            uart_buf.str("");
         }
+        return iss::Ok;
+    case 0x10008000: { // HFROSC base, hfrosccfg reg
+        mem_type::page_type &p = mem(paddr.val / mem.page_size);
+        size_t offs = paddr.val & mem.page_addr_mask;
+        std::copy(data, data + length, p.data() + offs);
+        uint8_t &x = *(p.data() + offs + 3);
+        if (x & 0x40) x |= 0x80; // hfroscrdy = 1 if hfroscen==1
+        return iss::Ok;
     }
-    return iss::Ok;
+    case 0x10008008: { // HFROSC base, pllcfg reg
+        mem_type::page_type &p = mem(paddr.val / mem.page_size);
+        size_t offs = paddr.val & mem.page_addr_mask;
+        std::copy(data, data + length, p.data() + offs);
+        uint8_t &x = *(p.data() + offs + 3);
+        x |= 0x80; // set pll lock upon writing
+        return iss::Ok;
+    } break;
+    default: {
+        mem_type::page_type &p = mem(paddr.val / mem.page_size);
+        std::copy(data, data + length, p.data() + (paddr.val & mem.page_addr_mask));
+        // tohost handling in case of riscv-test
+        if ((paddr.type & iss::DEBUG) == 0) {
+            auto tohost_upper = (traits<BASE>::XLEN == 32 && paddr.val == (tohost + 4)) ||
+                                (traits<BASE>::XLEN == 64 && paddr.val == tohost);
+            auto tohost_lower =
+                (traits<BASE>::XLEN == 32 && paddr.val == tohost) || (traits<BASE>::XLEN == 64 && paddr.val == tohost);
+            if (tohost_lower || tohost_upper) {
+                uint64_t hostvar = *reinterpret_cast<uint64_t *>(p.data() + (tohost & mem.page_addr_mask));
+                if (tohost_upper || (tohost_lower && to_host_wr_cnt > 0)) {
+                    switch (hostvar >> 48) {
+                    case 0:
+                        if (hostvar != 0x1)
+                            LOG(FATAL) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
+                                       << "), stopping simulation";
+                        else
+                            LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
+                                      << "), stopping simulation";
+                        throw(iss::simulation_stopped(hostvar));
+                    case 0x0101: {
+                        char c = static_cast<char>(hostvar & 0xff);
+                        if (c == '\n' || c == 0) {
+                            LOG(INFO) << "tohost send '" << uart_buf.str() << "'";
+                            uart_buf.str("");
+                        } else
+                            uart_buf << c;
+                        to_host_wr_cnt = 0;
+                    } break;
+                    default:
+                        break;
+                    }
+                } else if (tohost_lower)
+                    to_host_wr_cnt++;
+            } else if ((traits<BASE>::XLEN == 32 && paddr.val == fromhost + 4) ||
+                       (traits<BASE>::XLEN == 64 && paddr.val == fromhost)) {
+                uint64_t fhostvar = *reinterpret_cast<uint64_t *>(p.data() + (fromhost & mem.page_addr_mask));
+                *reinterpret_cast<uint64_t *>(p.data() + (tohost & mem.page_addr_mask)) = fhostvar;
+            }
+        }
+        return iss::Ok;
+    }
+    }
 }
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {

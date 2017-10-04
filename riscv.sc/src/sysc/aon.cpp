@@ -14,18 +14,18 @@
 // the License.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "sysc/SiFive/gpio.h"
-#include "sysc/SiFive/gen/gpio_regs.h"
+#include "sysc/SiFive/aon.h"
+#include "sysc/SiFive/gen/aon_regs.h"
 #include "sysc/utilities.h"
 
 namespace sysc {
 
-gpio::gpio(sc_core::sc_module_name nm)
+aon::aon(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , tlm_target<>(clk)
 , NAMED(clk_i)
 , NAMED(rst_i)
-, NAMEDD(gpio_regs, regs) {
+, NAMEDD(aon_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
@@ -34,11 +34,11 @@ gpio::gpio(sc_core::sc_module_name nm)
     dont_initialize();
 }
 
-void gpio::clock_cb() {}
+void aon::clock_cb() {}
 
-gpio::~gpio() {}
+aon::~aon() {}
 
-void gpio::reset_cb() {
+void aon::reset_cb() {
     if (rst_i.read())
         regs->reset_start();
     else

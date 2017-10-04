@@ -1,5 +1,4 @@
 regfile spi_regs {
-	lsb0;
 	reg {
 		name="sckdiv";
 		desc="Serial clock divisor";

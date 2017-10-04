@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Sep 20 11:47:24 CEST 2017
+// Created on: Wed Oct 04 10:06:35 CEST 2017
 //             *      gpio_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@
 namespace sysc {
 
 class gpio_regs : public sc_core::sc_module, public sysc::resetable {
-protected:
+public:
     // storage declarations
     uint32_t r_value;
 
@@ -99,7 +99,6 @@ protected:
     sysc::sc_register<uint32_t> iof_sel;
     sysc::sc_register<uint32_t> out_xor;
 
-public:
     gpio_regs(sc_core::sc_module_name nm);
 
     template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);

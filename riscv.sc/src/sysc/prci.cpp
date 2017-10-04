@@ -14,35 +14,58 @@
 // the License.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "sysc/SiFive/gpio.h"
-#include "sysc/SiFive/gen/gpio_regs.h"
+#include "sysc/SiFive/prci.h"
+#include "sysc/SiFive/gen/prci_regs.h"
 #include "sysc/utilities.h"
 
 namespace sysc {
 
-gpio::gpio(sc_core::sc_module_name nm)
+prci::prci(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , tlm_target<>(clk)
 , NAMED(clk_i)
 , NAMED(rst_i)
-, NAMEDD(gpio_regs, regs) {
+, NAMEDD(prci_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
     SC_METHOD(reset_cb);
     sensitive << rst_i;
     dont_initialize();
+    SC_METHOD(hfrosc_en_cb);
+    sensitive << hfrosc_en_evt;
+    dont_initialize();
+
+    regs->hfrosccfg.set_write_cb([this](sysc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        reg.put(data);
+        if (this->regs->r_hfrosccfg & (1 << 30)) { // check rosc_en
+            this->hfrosc_en_evt.notify(1, sc_core::SC_US);
+        }
+        return true;
+    });
+    regs->pllcfg.set_write_cb([this](sysc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        reg.put(data);
+        auto &pllcfg = this->regs->r_pllcfg;
+        if (pllcfg.pllbypass == 0 && pllcfg.pllq != 0) { // set pll_lock if pll is selected
+            pllcfg.plllock = 1;
+        }
+        return true;
+    });
 }
 
-void gpio::clock_cb() {}
+void prci::clock_cb() {}
 
-gpio::~gpio() {}
+prci::~prci() {}
 
-void gpio::reset_cb() {
+void prci::reset_cb() {
     if (rst_i.read())
         regs->reset_start();
     else
         regs->reset_stop();
+}
+
+void prci::hfrosc_en_cb() {
+    regs->r_hfrosccfg |= (1 << 31); // set rosc_rdy
 }
 
 } /* namespace sysc */

@@ -1,80 +1,45 @@
 regfile uart_regs {
-	lsb0;
 	reg {
 		name="txdata";
 		desc="Transmit data register";
-		field {
-			name ="data";
-		} data[7:0];
-		field {
-			name ="full";
-		} full[31:31];
+		field {} data[7:0];
+		field {} full[31:31];
 	} txdata @0x00;
 	reg {
 		name="rxdata";
 		desc="Receive data register";
-		field {
-			name ="data";
-		} data[7:0];
-		field {
-			name ="empty";
-		} empty[31:31];
+		field {} data[7:0];
+		field {} empty[31:31];
 	}rxdata @0x04;
 	reg {
 		name="txctrl";
 		desc="Transmit control register";
-		field {
-			name ="txen";
-		} txen[1];
-		field {
-			name ="nstop";
-		} nstop[1];
-		field {
-			name ="reserved";
-		} reserved[14];
-		field {
-			name ="txcnt";
-		} txcnt[3];
+		field {} txen[1];
+		field {} nstop[1];
+		field {} txcnt[18:16];
 	}txctrl @0x08;
 	reg {
 		name="rxctrl";
 		desc="Receive control register";
-		field {
-			name ="rxen";
-		} rxen[1];
-		field {
-			name ="reserved";
-		} reserved[15];
-		field {
-			name ="rxcnt";
-		} rxcnt[3];
+		field {} rxen[1];
+		field {} rxcnt[18:16];
 	}rxctrl @0x0C;
 	reg {
 		name="ie";
 		desc="UART interrupt enable";
-		field{
-			name ="txwm";
-		} txwm[1];
-		field{
-			name ="rxwm";
-		} rxwm[1];
+		field{} txwm[1];
+		field{} rxwm[1];
 	}ie @0x10;
 	reg {
 		name="ip";
 		desc="UART Interrupt pending";
-		field{
-			name ="txwm";
-		} txwm[1];
-		field{
-			name ="rxwm";
-		} rxwm[1];
+		field{} txwm[1];
+		field{} rxwm[1];
 	} ip @0x14;
 	reg {
 		name="div";
 		desc="Baud rate divisor";
-		field{
-			name ="div";
-		} div[16];
+		field{} div[16];
 	} div @0x18;
 };
 

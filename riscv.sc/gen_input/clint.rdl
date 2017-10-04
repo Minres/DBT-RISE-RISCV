@@ -1,0 +1,27 @@
+regfile clint_regs {
+	reg {
+		name = "msip";
+		desc = "Hart 0 software interrupt register";
+		field {
+			name="msip";
+		} msip[0:0];
+	} msip @0;
+	reg {
+		name = "mtimecmp";
+		desc = "Hart 0 time comparator register";
+		regwidth=64;
+		field {
+			name="data";
+			fieldwidth=64;
+		} data = 64'h7FFFFFFFFFFFFFFF;
+	} mtimecmp @0x4000;
+	reg {
+		name = "mtime";
+		desc = "Timer register";
+		regwidth=64;
+		field {
+			fieldwidth=64;
+			name="data";
+		} data[63:0];
+	} mtime @0xBFF8;
+};

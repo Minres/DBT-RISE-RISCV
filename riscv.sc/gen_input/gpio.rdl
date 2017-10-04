@@ -1,5 +1,4 @@
 regfile gpio_regs {
-	lsb0;
 	reg {
 		name="value";
 		desc="pin value";

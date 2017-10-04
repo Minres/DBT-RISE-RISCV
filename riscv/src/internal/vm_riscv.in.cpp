@@ -342,21 +342,8 @@ template <>
 std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(arch::CORE_DEF_NAME *core, unsigned short port, bool dump) {
     std::unique_ptr<CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>> ret =
         std::make_unique<CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>>(*core, dump);
-    debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
+    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
     return ret;
-}
-
-template <> std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(std::string inst_name, unsigned short port, bool dump) {
-    return create<arch::CORE_DEF_NAME>(new arch::riscv_hart_msu_vp<arch::CORE_DEF_NAME>(), port,
-                                       dump); /* FIXME: memory leak!!!!!!! */
-}
-
-template <> std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(arch::CORE_DEF_NAME *core, bool dump) {
-    return std::make_unique<CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>>(*core, dump); /* FIXME: memory leak!!!!!!! */
-}
-
-template <> std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(std::string inst_name, bool dump) {
-    return create<arch::CORE_DEF_NAME>(new arch::riscv_hart_msu_vp<arch::CORE_DEF_NAME>(), dump);
 }
 
 } // namespace iss

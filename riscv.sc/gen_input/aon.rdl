@@ -1,0 +1,158 @@
+regfile aon_regs {
+	// Watchdog Timer Registers
+	reg {
+		name = "wdogcfg";
+		desc = "Watchdog Timer Config Register";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogcfg @0x00;
+	reg {
+		name ="wdogcount";
+		desc = "Watchdog Timer Count Registers";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogcount @0x08; 
+	reg {
+		name ="wdogs";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogs @0x10; 
+	reg {
+		name ="wdogfeed";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogfeed @0x18; 
+	reg {
+		name ="wdogkey";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogkey @0x1C; 
+	reg {
+		name ="wdogcmp";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} wdogcmp @0x20;
+	// Real-Time Clock Registers
+	reg {
+		name ="rtccfg";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} rtccfg @0x40;
+	reg {
+		name ="rtclo";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	}  rtclo @0x48;
+ 	reg {
+		name ="rtchi";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} rtchi @0x4C;
+	reg {
+		name ="rtcs";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	}  rtcs @0x50;
+	reg {
+		name ="rtccmp";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} rtccmp @0x60;
+	// AON Clock Configuration Registers
+	reg {
+		name ="lfrosccfg";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} lfrosccfg @0x70;
+	// Backup Registers
+	reg {
+		name ="lfrosccfg";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} backup[32] @0x80;
+	// Power Management Unit
+	reg {
+		name ="pmuwakeupi";
+		desc = "";
+		field {
+			name="delay";
+		} delay[3:0];
+		field {
+			name="vddpaden";
+		} vddpaden[5:5];
+		field {
+			name="corerst";
+		} corerst[7:7];
+		field {
+			name="hfclkrst";
+		} hfclkrst[8:8];
+	} pmuwakeupi[8] @0x0100;
+	reg {
+		name ="pmusleepi";
+		desc = "";
+		field {
+			name="delay";
+		} delay[3:0];
+		field {
+			name="vddpaden";
+		} vddpaden[5:5];
+		field {
+			name="corerst";
+		} corerst[7:7];
+		field {
+			name="hfclkrst";
+		} hfclkrst[8:8];
+	} pmusleepi[8] @0x0120;
+	reg {
+		name ="pmuie";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} pmuie @0x0140;
+	reg {
+		name ="pmucause";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} pmucause @0x0144;
+	reg {
+		name ="pmusleep";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} pmusleep @0x0148;
+	reg {
+		name ="pmukey";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} pmukey @0x014C;
+};

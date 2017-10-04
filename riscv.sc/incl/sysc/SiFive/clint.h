@@ -14,32 +14,44 @@
  * the License.
  ******************************************************************************/
 
-#ifndef _UART_H_
-#define _UART_H_
+#ifndef _CLINT_H_
+#define _CLINT_H_
 
 #include <sysc/tlm_target.h>
 
+namespace iss {
+namespace arch {
+template <typename BASE> struct riscv_hart_msu_vp;
+}
+}
+
 namespace sysc {
 
-class uart_regs;
+class clint_regs;
+namespace SiFive {
+class core_complex;
+}
 
-class uart : public sc_core::sc_module, public tlm_target<> {
+class clint : public sc_core::sc_module, public tlm_target<> {
 public:
-    SC_HAS_PROCESS(uart);
+    SC_HAS_PROCESS(clint);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
-    uart(sc_core::sc_module_name nm);
-    virtual ~uart() override;
+    sc_core::sc_out<bool> mtime_int_o;
+    sc_core::sc_out<bool> msip_int_o;
+    clint(sc_core::sc_module_name nm);
+    virtual ~clint() override; // need to keep it in source file because of fwd declaration of clint_regs
 
 protected:
     void clock_cb();
     void reset_cb();
-    void transmit_data();
-    sc_core::sc_time clk;
-    std::unique_ptr<uart_regs> regs;
-    std::vector<uint8_t> queue;
+    void update_mtime();
+    sc_core::sc_time clk, last_updt;
+    unsigned cnt_fraction;
+    std::unique_ptr<clint_regs> regs;
+    sc_core::sc_event mtime_evt;
 };
 
 } /* namespace sysc */
 
-#endif /* _UART_H_ */
+#endif /* _CLINT_H_ */

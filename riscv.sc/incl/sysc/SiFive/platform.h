@@ -23,14 +23,19 @@
 #ifndef SIMPLESYSTEM_H_
 #define SIMPLESYSTEM_H_
 
+#include "aon.h"
+#include "clint.h"
 #include "gpio.h"
 #include "plic.h"
+#include "prci.h"
 #include "spi.h"
 #include "uart.h"
 
 #include <array>
 #include <sysc/kernel/sc_module.h>
+#include <sysc/memory.h>
 #include <sysc/router.h>
+#include <sysc/utilities.h>
 
 #include "core_complex.h"
 
@@ -40,14 +45,20 @@ class platform : public sc_core::sc_module {
 public:
     SC_HAS_PROCESS(platform);
 
-    SiFive::core_complex i_master;
+    SiFive::core_complex i_core_complex;
     router<> i_router;
-    uart i_uart;
+    uart i_uart0, i_uart1;
     spi i_spi;
     gpio i_gpio;
     plic i_plic;
+    aon i_aon;
+    prci i_prci;
+    clint i_clint;
+
+    memory<512_MB, 32> i_mem_qspi;
+    memory<128_kB, 32> i_mem_ram;
     sc_core::sc_signal<sc_core::sc_time> s_clk;
-    sc_core::sc_signal<bool> s_rst;
+    sc_core::sc_signal<bool> s_rst, s_mtime_int, s_msie_int;
 
     platform(sc_core::sc_module_name nm);
 

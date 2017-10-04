@@ -26,37 +26,60 @@ namespace sysc {
 
 platform::platform(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
-, NAMED(i_master)
-, NAMED(i_router, 4, 1)
-, NAMED(i_uart)
+, NAMED(i_core_complex)
+, NAMED(i_router, 10, 1)
+, NAMED(i_uart0)
+, NAMED(i_uart1)
 , NAMED(i_spi)
 , NAMED(i_gpio)
 , NAMED(i_plic)
+, NAMED(i_aon)
+, NAMED(i_prci)
+, NAMED(i_clint)
+, NAMED(i_mem_qspi)
+, NAMED(i_mem_ram)
 , NAMED(s_clk)
 , NAMED(s_rst) {
-    i_master.initiator(i_router.target[0]);
+    i_core_complex.initiator(i_router.target[0]);
     size_t i = 0;
     for (const auto &e : e300_plat_map) {
         i_router.initiator.at(i)(e.target->socket);
         i_router.add_target_range(i, e.start, e.size);
         i++;
     }
-    i_uart.clk_i(s_clk);
+    i_router.initiator.at(i)(i_mem_qspi.target);
+    i_router.add_target_range(i, 0x20000000, 512_MB);
+    i_router.initiator.at(++i)(i_mem_ram.target);
+    i_router.add_target_range(i, 0x80000000, 128_kB);
+
+    i_uart0.clk_i(s_clk);
+    i_uart1.clk_i(s_clk);
     i_spi.clk_i(s_clk);
     i_gpio.clk_i(s_clk);
     i_plic.clk_i(s_clk);
-    s_clk.write(10_ns);
+    i_aon.clk_i(s_clk);
+    i_prci.clk_i(s_clk);
+    i_clint.clk_i(s_clk);
+    i_core_complex.clk_i(s_clk);
 
-    i_uart.rst_i(s_rst);
+    i_uart0.rst_i(s_rst);
+    i_uart1.rst_i(s_rst);
     i_spi.rst_i(s_rst);
     i_gpio.rst_i(s_rst);
     i_plic.rst_i(s_rst);
-    i_master.rst_i(s_rst);
+    i_aon.rst_i(s_rst);
+    i_prci.rst_i(s_rst);
+    i_clint.rst_i(s_rst);
+    i_core_complex.rst_i(s_rst);
+
+    i_clint.mtime_int_o(s_mtime_int);
+    i_clint.msip_int_o(s_msie_int);
 
     SC_THREAD(gen_reset);
 }
 
 void platform::gen_reset() {
+    s_clk = 10_ns;
     s_rst = true;
     wait(10_ns);
     s_rst = false;

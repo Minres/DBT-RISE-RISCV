@@ -1,13 +1,9 @@
 # library files
 FILE(GLOB RiscVSCHeaders *.h)
+FILE(GLOB RiscvSCSources sysc/*.cpp)
+
 set(LIB_HEADERS ${RiscVSCHeaders} )
-set(LIB_SOURCES
-    sysc/core_complex.cpp
-    sysc/gpio.cpp
-    sysc/plic.cpp
-    sysc/platform.cpp
-    sysc/spi.cpp
-    sysc/uart.cpp
+set(LIB_SOURCES ${RiscvSCSources}
 )
 
 set(APP_HEADERS )

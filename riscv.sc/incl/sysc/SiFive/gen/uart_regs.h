@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Sep 20 22:30:45 CEST 2017
+// Created on: Wed Oct 04 10:06:35 CEST 2017
 //             *      uart_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@
 namespace sysc {
 
 class uart_regs : public sc_core::sc_module, public sysc::resetable {
-protected:
+public:
     // storage declarations
     BEGIN_BF_DECL(txdata_t, uint32_t);
     BF_FIELD(data, 0, 8);
@@ -59,13 +59,11 @@ protected:
     BEGIN_BF_DECL(txctrl_t, uint32_t);
     BF_FIELD(txen, 0, 1);
     BF_FIELD(nstop, 1, 1);
-    BF_FIELD(reserved, 2, 14);
     BF_FIELD(txcnt, 16, 3);
     END_BF_DECL() r_txctrl;
 
     BEGIN_BF_DECL(rxctrl_t, uint32_t);
     BF_FIELD(rxen, 0, 1);
-    BF_FIELD(reserved, 1, 15);
     BF_FIELD(rxcnt, 16, 3);
     END_BF_DECL() r_rxctrl;
 
@@ -92,7 +90,6 @@ protected:
     sysc::sc_register<ip_t> ip;
     sysc::sc_register<div_t> div;
 
-public:
     uart_regs(sc_core::sc_module_name nm);
 
     template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);

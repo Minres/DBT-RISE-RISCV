@@ -14,32 +14,30 @@
  * the License.
  ******************************************************************************/
 
-#ifndef _UART_H_
-#define _UART_H_
+#ifndef _AON_H_
+#define _AON_H_
 
 #include <sysc/tlm_target.h>
 
 namespace sysc {
 
-class uart_regs;
+class aon_regs;
 
-class uart : public sc_core::sc_module, public tlm_target<> {
+class aon : public sc_core::sc_module, public tlm_target<> {
 public:
-    SC_HAS_PROCESS(uart);
+    SC_HAS_PROCESS(aon);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
-    uart(sc_core::sc_module_name nm);
-    virtual ~uart() override;
+    aon(sc_core::sc_module_name nm);
+    virtual ~aon() override; // need to keep it in source file because of fwd declaration of aon_regs
 
 protected:
     void clock_cb();
     void reset_cb();
-    void transmit_data();
     sc_core::sc_time clk;
-    std::unique_ptr<uart_regs> regs;
-    std::vector<uint8_t> queue;
+    std::unique_ptr<aon_regs> regs;
 };
 
 } /* namespace sysc */
 
-#endif /* _UART_H_ */
+#endif /* _GPIO_H_ */

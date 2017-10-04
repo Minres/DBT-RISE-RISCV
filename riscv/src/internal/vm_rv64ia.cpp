@@ -3101,21 +3101,8 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
 
 template <> std::unique_ptr<vm_if> create<arch::rv64ia>(arch::rv64ia *core, unsigned short port, bool dump) {
     std::unique_ptr<rv64ia::vm_impl<arch::rv64ia>> ret = std::make_unique<rv64ia::vm_impl<arch::rv64ia>>(*core, dump);
-    debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
+    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
     return ret;
-}
-
-template <> std::unique_ptr<vm_if> create<arch::rv64ia>(std::string inst_name, unsigned short port, bool dump) {
-    return create<arch::rv64ia>(new arch::riscv_hart_msu_vp<arch::rv64ia>(), port,
-                                dump); /* FIXME: memory leak!!!!!!! */
-}
-
-template <> std::unique_ptr<vm_if> create<arch::rv64ia>(arch::rv64ia *core, bool dump) {
-    return std::make_unique<rv64ia::vm_impl<arch::rv64ia>>(*core, dump); /* FIXME: memory leak!!!!!!! */
-}
-
-template <> std::unique_ptr<vm_if> create<arch::rv64ia>(std::string inst_name, bool dump) {
-    return create<arch::rv64ia>(new arch::riscv_hart_msu_vp<arch::rv64ia>(), dump);
 }
 
 } // namespace iss

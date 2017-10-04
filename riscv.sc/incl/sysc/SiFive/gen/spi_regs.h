@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Sep 20 22:30:45 CEST 2017
+// Created on: Wed Oct 04 10:06:35 CEST 2017
 //             *      spi_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@
 namespace sysc {
 
 class spi_regs : public sc_core::sc_module, public sysc::resetable {
-protected:
+public:
     // storage declarations
     BEGIN_BF_DECL(sckdiv_t, uint32_t);
     BF_FIELD(div, 0, 12);
@@ -141,7 +141,6 @@ protected:
     sysc::sc_register<ie_t> ie;
     sysc::sc_register<ip_t> ip;
 
-public:
     spi_regs(sc_core::sc_module_name nm);
 
     template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);

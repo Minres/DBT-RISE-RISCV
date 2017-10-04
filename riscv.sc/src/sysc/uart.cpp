@@ -16,6 +16,7 @@
 
 #include "sysc/SiFive/uart.h"
 #include "sysc/SiFive/gen/uart_regs.h"
+#include "sysc/report.h"
 #include "sysc/utilities.h"
 
 namespace sysc {
@@ -31,6 +32,14 @@ uart::uart(sc_core::sc_module_name nm)
     sensitive << clk_i;
     SC_METHOD(reset_cb);
     sensitive << rst_i;
+    dont_initialize();
+    regs->txdata.set_write_cb([this](sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        if (!this->regs->in_reset()) {
+            reg.put(data);
+            this->transmit_data();
+        }
+        return true;
+    });
 }
 
 uart::~uart() {}
@@ -42,6 +51,15 @@ void uart::reset_cb() {
         regs->reset_start();
     else
         regs->reset_stop();
+}
+
+void uart::transmit_data() {
+    if (queue.size() >> 0 && (regs->r_txdata.data == '\n' || regs->r_txdata.data == 0)) {
+        LOG(INFO) << this->name() << " transmit: '" << std::string(queue.begin(), queue.end()) << "'";
+        queue.clear();
+    } else {
+        queue.push_back(regs->r_txdata.data);
+    }
 }
 
 } /* namespace sysc */

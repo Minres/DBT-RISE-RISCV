@@ -1,0 +1,41 @@
+regfile prci_regs {
+	reg {
+		name ="hfrosccfg";
+		desc = "";
+		field {} hfroscdiv[5:0];
+		field {} hfrosctrim[20:16];
+		field {} hfroscen[30:30];
+		field {} hfroscrdy[31:31];
+	} hfrosccfg @0x00;
+	reg {
+		name ="hfxosccfg";
+		desc = "";
+		field {} hfxoscrdy[31:31];
+		field {} hfxoscen[30:30];
+	} hfxosccfg @0x04;
+     reg {
+        name ="pllcfg";
+        desc = "";
+        field {} pllr[2:0];
+        field {} pllf[9:4];
+        field {} pllq[11:10];
+        field {} pllsel[16:16];
+        field {} pllrefsel[17:17];
+        field {} pllbypass[18:18];
+        field {} plllock[31:31];
+    } pllcfg @0x08;
+	reg {
+		name ="plloutdiv";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} plloutdiv  @0x0c;
+	reg {
+		name ="coreclkcfg";
+		desc = "";
+		field {
+			name="data";
+		} data[31:0];
+	} coreclkcfg @0x10;
+};
