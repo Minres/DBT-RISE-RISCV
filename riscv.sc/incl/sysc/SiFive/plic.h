@@ -17,7 +17,8 @@
 #ifndef _PLIC_H_
 #define _PLIC_H_
 
-#include "scc/tlm_target.h"
+#include <scc/register.h>
+#include <scc/tlm_target.h>
 
 namespace sysc {
 
@@ -28,14 +29,27 @@ public:
     SC_HAS_PROCESS(plic);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
+    sc_core::sc_vector<sc_core::sc_in<bool>> global_interrupts_i;
+    sc_core::sc_out<bool> core_interrupt_o;
+    sc_core::sc_event raise_int_ev;
+    sc_core::sc_event clear_int_ev;
     plic(sc_core::sc_module_name nm);
-    virtual ~plic() override;
+    ~plic() override;
 
 protected:
     void clock_cb();
     void reset_cb();
+    void init_callbacks();
+
+    void global_int_port_cb();
+    void handle_pending_int();
+    void reset_pending_int(uint32_t irq);
+
+    void raise_core_interrupt();
+    void clear_core_interrupt();
     sc_core::sc_time clk;
     std::unique_ptr<plic_regs> regs;
+    std::function<bool(scc::sc_register<uint32_t>, uint32_t)> m_claim_complete_write_cb;
 };
 
 } /* namespace sysc */

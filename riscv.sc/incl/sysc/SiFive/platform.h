@@ -59,6 +59,8 @@ public:
     scc::memory<128_kB, 32> i_mem_ram;
     sc_core::sc_signal<sc_core::sc_time> s_clk;
     sc_core::sc_signal<bool> s_rst, s_mtime_int, s_msie_int;
+    sc_core::sc_vector<sc_core::sc_signal<bool>> s_global_int;
+    sc_core::sc_signal<bool> s_core_int;
 
     platform(sc_core::sc_module_name nm);
 

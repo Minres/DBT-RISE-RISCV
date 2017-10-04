@@ -39,7 +39,9 @@ platform::platform(sc_core::sc_module_name nm)
 , NAMED(i_mem_qspi)
 , NAMED(i_mem_ram)
 , NAMED(s_clk)
-, NAMED(s_rst) {
+, NAMED(s_rst)
+, NAMED(s_global_int, 256)
+, NAMED(s_core_int) {
     i_core_complex.initiator(i_router.target[0]);
     size_t i = 0;
     for (const auto &e : e300_plat_map) {
@@ -75,6 +77,8 @@ platform::platform(sc_core::sc_module_name nm)
     i_clint.mtime_int_o(s_mtime_int);
     i_clint.msip_int_o(s_msie_int);
 
+    i_plic.global_interrupts_i(s_global_int);
+    i_plic.core_interrupt_o(s_core_int);
     SC_THREAD(gen_reset);
 }
 

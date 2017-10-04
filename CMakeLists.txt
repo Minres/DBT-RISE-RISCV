@@ -15,7 +15,7 @@ set(GIT_SUBMODULE_BRANCH_sc-components ${GIT_BRANCH})
 set(GIT_SUBMODULE_BRANCH_dbt-core ${GIT_BRANCH})
 
 include(GNUInstallDirs)
-include(cmake/Submodules.cmake)
+include(Submodules)
 
 #enable_testing() 
 
@@ -33,7 +33,7 @@ find_package(Threads)
 find_package(Tcmalloc)
 
 set(PROJECT_3PARTY_DIRS external sr_report sr_signal)
-include(sc-components/cmake/clang-format.cmake)
+include(clang-format)
 
 add_subdirectory(external)
 add_subdirectory(dbt-core)
