@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 2.8.12)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/sc-components/cmake)
+
+include(cmake/GitFunctions.cmake)
+get_branch_from_git()
 
 ### set the directory names of the submodules
-set(GIT_SUBMODULES elfio libGIS sc-components)
+set(GIT_SUBMODULES elfio libGIS sc-components dbt-core)
 set(GIT_SUBMODULE_DIR_sc-components .)
 set(GIT_SUBMODULE_DIR_dbt-core .)
 ### set each submodules's commit or tag that is to be checked out
 ### (leave empty if you want master)
 #set(GIT_SUBMODULE_VERSION_sc-comp 3af6b9836589b082c19d9131c5d0b7afa8ddd7cd)
-set(GIT_SUBMODULE_BRANCH_sc-components "develop")
+set(GIT_SUBMODULE_BRANCH_sc-components ${GIT_BRANCH})
+set(GIT_SUBMODULE_BRANCH_dbt-core ${GIT_BRANCH})
 
 include(GNUInstallDirs)
 include(cmake/Submodules.cmake)
@@ -25,8 +29,8 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(warnings "/W4 /WX /EHsc")
 endif()
 
-FIND_PACKAGE(Threads)
-FIND_PACKAGE(Tcmalloc)
+find_package(Threads)
+find_package(Tcmalloc)
 
 set(PROJECT_3PARTY_DIRS external sr_report sr_signal)
 include(sc-components/cmake/clang-format.cmake)
