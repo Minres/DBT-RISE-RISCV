@@ -17,7 +17,7 @@
 #ifndef _CLINT_H_
 #define _CLINT_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace iss {
 namespace arch {
@@ -32,7 +32,7 @@ namespace SiFive {
 class core_complex;
 }
 
-class clint : public sc_core::sc_module, public tlm_target<> {
+class clint : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(clint);
     sc_core::sc_in<sc_core::sc_time> clk_i;

@@ -15,9 +15,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/uart.h"
+
+#include "scc/report.h"
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/uart_regs.h"
-#include "sysc/report.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 
@@ -33,7 +34,7 @@ uart::uart(sc_core::sc_module_name nm)
     SC_METHOD(reset_cb);
     sensitive << rst_i;
     dont_initialize();
-    regs->txdata.set_write_cb([this](sc_register<uint32_t> &reg, uint32_t data) -> bool {
+    regs->txdata.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         if (!this->regs->in_reset()) {
             reg.put(data);
             this->transmit_data();

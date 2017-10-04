@@ -36,14 +36,14 @@
 #ifndef _GPIO_REGS_H_
 #define _GPIO_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class gpio_regs : public sc_core::sc_module, public sysc::resetable {
+class gpio_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     uint32_t r_value;
@@ -81,27 +81,27 @@ public:
     uint32_t r_out_xor;
 
     // register declarations
-    sysc::sc_register<uint32_t> value;
-    sysc::sc_register<uint32_t> input_en;
-    sysc::sc_register<uint32_t> output_en;
-    sysc::sc_register<uint32_t> port;
-    sysc::sc_register<uint32_t> pue;
-    sysc::sc_register<uint32_t> ds;
-    sysc::sc_register<uint32_t> rise_ie;
-    sysc::sc_register<uint32_t> rise_ip;
-    sysc::sc_register<uint32_t> fall_ie;
-    sysc::sc_register<uint32_t> fall_ip;
-    sysc::sc_register<uint32_t> high_ie;
-    sysc::sc_register<uint32_t> high_ip;
-    sysc::sc_register<uint32_t> low_ie;
-    sysc::sc_register<uint32_t> low_ip;
-    sysc::sc_register<uint32_t> iof_en;
-    sysc::sc_register<uint32_t> iof_sel;
-    sysc::sc_register<uint32_t> out_xor;
+    scc::sc_register<uint32_t> value;
+    scc::sc_register<uint32_t> input_en;
+    scc::sc_register<uint32_t> output_en;
+    scc::sc_register<uint32_t> port;
+    scc::sc_register<uint32_t> pue;
+    scc::sc_register<uint32_t> ds;
+    scc::sc_register<uint32_t> rise_ie;
+    scc::sc_register<uint32_t> rise_ip;
+    scc::sc_register<uint32_t> fall_ie;
+    scc::sc_register<uint32_t> fall_ip;
+    scc::sc_register<uint32_t> high_ie;
+    scc::sc_register<uint32_t> high_ip;
+    scc::sc_register<uint32_t> low_ie;
+    scc::sc_register<uint32_t> low_ip;
+    scc::sc_register<uint32_t> iof_en;
+    scc::sc_register<uint32_t> iof_sel;
+    scc::sc_register<uint32_t> out_xor;
 
     gpio_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -128,7 +128,7 @@ inline sysc::gpio_regs::gpio_regs(sc_core::sc_module_name nm)
 , NAMED(iof_sel, r_iof_sel, 0, *this)
 , NAMED(out_xor, r_out_xor, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::gpio_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::gpio_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(value, 0x0UL);
     target.addResource(input_en, 0x4UL);
     target.addResource(output_en, 0x8UL);

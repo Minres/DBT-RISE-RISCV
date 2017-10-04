@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/aon.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/aon_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 

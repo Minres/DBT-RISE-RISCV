@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/prci.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/prci_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 
@@ -36,14 +37,14 @@ prci::prci(sc_core::sc_module_name nm)
     sensitive << hfrosc_en_evt;
     dont_initialize();
 
-    regs->hfrosccfg.set_write_cb([this](sysc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+    regs->hfrosccfg.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         reg.put(data);
         if (this->regs->r_hfrosccfg & (1 << 30)) { // check rosc_en
             this->hfrosc_en_evt.notify(1, sc_core::SC_US);
         }
         return true;
     });
-    regs->pllcfg.set_write_cb([this](sysc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+    regs->pllcfg.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         reg.put(data);
         auto &pllcfg = this->regs->r_pllcfg;
         if (pllcfg.pllbypass == 0 && pllcfg.pllq != 0) { // set pll_lock if pll is selected

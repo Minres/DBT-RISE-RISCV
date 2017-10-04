@@ -17,13 +17,13 @@
 #ifndef _PRCI_H_
 #define _PRCI_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class prci_regs;
 
-class prci : public sc_core::sc_module, public tlm_target<> {
+class prci : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(prci);
     sc_core::sc_in<sc_core::sc_time> clk_i;

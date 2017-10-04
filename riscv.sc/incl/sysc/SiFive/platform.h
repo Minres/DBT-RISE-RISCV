@@ -33,10 +33,10 @@
 
 #include <array>
 #include <sysc/kernel/sc_module.h>
-#include <sysc/memory.h>
-#include <sysc/router.h>
-#include <sysc/utilities.h>
 
+#include "scc/memory.h"
+#include "scc/router.h"
+#include "scc/utilities.h"
 #include "core_complex.h"
 
 namespace sysc {
@@ -46,7 +46,7 @@ public:
     SC_HAS_PROCESS(platform);
 
     SiFive::core_complex i_core_complex;
-    router<> i_router;
+    scc::router<> i_router;
     uart i_uart0, i_uart1;
     spi i_spi;
     gpio i_gpio;
@@ -55,8 +55,8 @@ public:
     prci i_prci;
     clint i_clint;
 
-    memory<512_MB, 32> i_mem_qspi;
-    memory<128_kB, 32> i_mem_ram;
+    scc::memory<512_MB, 32> i_mem_qspi;
+    scc::memory<128_kB, 32> i_mem_ram;
     sc_core::sc_signal<sc_core::sc_time> s_clk;
     sc_core::sc_signal<bool> s_rst, s_mtime_int, s_msie_int;
 

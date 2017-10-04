@@ -36,14 +36,14 @@
 #ifndef _PLIC_REGS_H_
 #define _PLIC_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class plic_regs : public sc_core::sc_module, public sysc::resetable {
+class plic_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     BEGIN_BF_DECL(priority_t, uint32_t);
@@ -62,15 +62,15 @@ public:
     uint32_t r_claim_complete;
 
     // register declarations
-    sysc::sc_register_indexed<priority_t, 255> priority;
-    sysc::sc_register<uint32_t> pending;
-    sysc::sc_register<uint32_t> enabled;
-    sysc::sc_register<threshold_t> threshold;
-    sysc::sc_register<uint32_t> claim_complete;
+    scc::sc_register_indexed<priority_t, 255> priority;
+    scc::sc_register<uint32_t> pending;
+    scc::sc_register<uint32_t> enabled;
+    scc::sc_register<threshold_t> threshold;
+    scc::sc_register<uint32_t> claim_complete;
 
     plic_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -85,7 +85,7 @@ inline sysc::plic_regs::plic_regs(sc_core::sc_module_name nm)
 , NAMED(threshold, r_threshold, 0, *this)
 , NAMED(claim_complete, r_claim_complete, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::plic_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::plic_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(priority, 0x4UL);
     target.addResource(pending, 0x1000UL);
     target.addResource(enabled, 0x2000UL);

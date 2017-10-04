@@ -17,13 +17,13 @@
 #ifndef _PLIC_H_
 #define _PLIC_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class plic_regs;
 
-class plic : public sc_core::sc_module, public tlm_target<> {
+class plic : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(plic);
     sc_core::sc_in<sc_core::sc_time> clk_i;

@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/clint.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/clint_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 
@@ -37,20 +38,20 @@ clint::clint(sc_core::sc_module_name nm)
     SC_METHOD(reset_cb);
     sensitive << rst_i;
     dont_initialize();
-    regs->mtimecmp.set_write_cb([this](sc_register<uint64_t> &reg, uint64_t data) -> bool {
+    regs->mtimecmp.set_write_cb([this](scc::sc_register<uint64_t> &reg, uint64_t data) -> bool {
         if (!regs->in_reset()) {
             reg.put(data);
             this->update_mtime();
         }
         return true;
     });
-    regs->mtime.set_read_cb([this](const sc_register<uint64_t> &reg, uint64_t &data) -> bool {
+    regs->mtime.set_read_cb([this](const scc::sc_register<uint64_t> &reg, uint64_t &data) -> bool {
         this->update_mtime();
         data = reg.get();
         return true;
     });
-    regs->mtime.set_write_cb([this](sc_register<uint64_t> &reg, uint64_t data) -> bool { return false; });
-    regs->msip.set_write_cb([this](sc_register<uint32_t> &reg, uint32_t data) -> bool {
+    regs->mtime.set_write_cb([this](scc::sc_register<uint64_t> &reg, uint64_t data) -> bool { return false; });
+    regs->msip.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         reg.put(data);
         msip_int_o.write(regs->r_msip.msip);
         return true;

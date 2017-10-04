@@ -893,9 +893,9 @@ iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length
         const auto &p = mem(paddr.val / mem.page_size);
         auto offs = paddr.val & mem.page_addr_mask;
         std::copy(p.data() + offs, p.data() + offs + length, data);
-        return iss::Ok;
     }
     }
+    return iss::Ok;
 }
 
 template <typename BASE>
@@ -911,22 +911,20 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
             std::cout << uart_buf.str();
             uart_buf.str("");
         }
-        return iss::Ok;
+        break;
     case 0x10008000: { // HFROSC base, hfrosccfg reg
         mem_type::page_type &p = mem(paddr.val / mem.page_size);
         size_t offs = paddr.val & mem.page_addr_mask;
         std::copy(data, data + length, p.data() + offs);
         uint8_t &x = *(p.data() + offs + 3);
         if (x & 0x40) x |= 0x80; // hfroscrdy = 1 if hfroscen==1
-        return iss::Ok;
-    }
+    } break;
     case 0x10008008: { // HFROSC base, pllcfg reg
         mem_type::page_type &p = mem(paddr.val / mem.page_size);
         size_t offs = paddr.val & mem.page_addr_mask;
         std::copy(data, data + length, p.data() + offs);
         uint8_t &x = *(p.data() + offs + 3);
         x |= 0x80; // set pll lock upon writing
-        return iss::Ok;
     } break;
     default: {
         mem_type::page_type &p = mem(paddr.val / mem.page_size);
@@ -969,9 +967,9 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
                 *reinterpret_cast<uint64_t *>(p.data() + (tohost & mem.page_addr_mask)) = fhostvar;
             }
         }
-        return iss::Ok;
     }
     }
+    return iss::Ok;
 }
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {

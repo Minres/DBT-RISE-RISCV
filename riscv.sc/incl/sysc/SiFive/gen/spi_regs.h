@@ -36,14 +36,14 @@
 #ifndef _SPI_REGS_H_
 #define _SPI_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class spi_regs : public sc_core::sc_module, public sysc::resetable {
+class spi_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     BEGIN_BF_DECL(sckdiv_t, uint32_t);
@@ -124,26 +124,26 @@ public:
     END_BF_DECL() r_ip;
 
     // register declarations
-    sysc::sc_register<sckdiv_t> sckdiv;
-    sysc::sc_register<sckmode_t> sckmode;
-    sysc::sc_register<uint32_t> csid;
-    sysc::sc_register<uint32_t> csdef;
-    sysc::sc_register<csmode_t> csmode;
-    sysc::sc_register<delay0_t> delay0;
-    sysc::sc_register<delay1_t> delay1;
-    sysc::sc_register<fmt_t> fmt;
-    sysc::sc_register<txdata_t> txdata;
-    sysc::sc_register<rxdata_t> rxdata;
-    sysc::sc_register<txmark_t> txmark;
-    sysc::sc_register<rxmark_t> rxmark;
-    sysc::sc_register<fctrl_t> fctrl;
-    sysc::sc_register<ffmt_t> ffmt;
-    sysc::sc_register<ie_t> ie;
-    sysc::sc_register<ip_t> ip;
+    scc::sc_register<sckdiv_t> sckdiv;
+    scc::sc_register<sckmode_t> sckmode;
+    scc::sc_register<uint32_t> csid;
+    scc::sc_register<uint32_t> csdef;
+    scc::sc_register<csmode_t> csmode;
+    scc::sc_register<delay0_t> delay0;
+    scc::sc_register<delay1_t> delay1;
+    scc::sc_register<fmt_t> fmt;
+    scc::sc_register<txdata_t> txdata;
+    scc::sc_register<rxdata_t> rxdata;
+    scc::sc_register<txmark_t> txmark;
+    scc::sc_register<rxmark_t> rxmark;
+    scc::sc_register<fctrl_t> fctrl;
+    scc::sc_register<ffmt_t> ffmt;
+    scc::sc_register<ie_t> ie;
+    scc::sc_register<ip_t> ip;
 
     spi_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -169,7 +169,7 @@ inline sysc::spi_regs::spi_regs(sc_core::sc_module_name nm)
 , NAMED(ie, r_ie, 0, *this)
 , NAMED(ip, r_ip, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::spi_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::spi_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(sckdiv, 0x0UL);
     target.addResource(sckmode, 0x4UL);
     target.addResource(csid, 0x10UL);

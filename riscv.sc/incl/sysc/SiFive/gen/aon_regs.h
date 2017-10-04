@@ -36,14 +36,14 @@
 #ifndef _AON_REGS_H_
 #define _AON_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class aon_regs : public sc_core::sc_module, public sysc::resetable {
+class aon_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     uint32_t r_wdogcfg;
@@ -97,29 +97,29 @@ public:
     uint32_t r_pmukey;
 
     // register declarations
-    sysc::sc_register<uint32_t> wdogcfg;
-    sysc::sc_register<uint32_t> wdogcount;
-    sysc::sc_register<uint32_t> wdogs;
-    sysc::sc_register<uint32_t> wdogfeed;
-    sysc::sc_register<uint32_t> wdogkey;
-    sysc::sc_register<uint32_t> wdogcmp;
-    sysc::sc_register<uint32_t> rtccfg;
-    sysc::sc_register<uint32_t> rtclo;
-    sysc::sc_register<uint32_t> rtchi;
-    sysc::sc_register<uint32_t> rtcs;
-    sysc::sc_register<uint32_t> rtccmp;
-    sysc::sc_register<uint32_t> lfrosccfg;
-    sysc::sc_register_indexed<uint32_t, 32> backup;
-    sysc::sc_register_indexed<pmuwakeupi_t, 8> pmuwakeupi;
-    sysc::sc_register_indexed<pmusleepi_t, 8> pmusleepi;
-    sysc::sc_register<uint32_t> pmuie;
-    sysc::sc_register<uint32_t> pmucause;
-    sysc::sc_register<uint32_t> pmusleep;
-    sysc::sc_register<uint32_t> pmukey;
+    scc::sc_register<uint32_t> wdogcfg;
+    scc::sc_register<uint32_t> wdogcount;
+    scc::sc_register<uint32_t> wdogs;
+    scc::sc_register<uint32_t> wdogfeed;
+    scc::sc_register<uint32_t> wdogkey;
+    scc::sc_register<uint32_t> wdogcmp;
+    scc::sc_register<uint32_t> rtccfg;
+    scc::sc_register<uint32_t> rtclo;
+    scc::sc_register<uint32_t> rtchi;
+    scc::sc_register<uint32_t> rtcs;
+    scc::sc_register<uint32_t> rtccmp;
+    scc::sc_register<uint32_t> lfrosccfg;
+    scc::sc_register_indexed<uint32_t, 32> backup;
+    scc::sc_register_indexed<pmuwakeupi_t, 8> pmuwakeupi;
+    scc::sc_register_indexed<pmusleepi_t, 8> pmusleepi;
+    scc::sc_register<uint32_t> pmuie;
+    scc::sc_register<uint32_t> pmucause;
+    scc::sc_register<uint32_t> pmusleep;
+    scc::sc_register<uint32_t> pmukey;
 
     aon_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -148,7 +148,7 @@ inline sysc::aon_regs::aon_regs(sc_core::sc_module_name nm)
 , NAMED(pmusleep, r_pmusleep, 0, *this)
 , NAMED(pmukey, r_pmukey, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::aon_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::aon_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(wdogcfg, 0x0UL);
     target.addResource(wdogcount, 0x8UL);
     target.addResource(wdogs, 0x10UL);

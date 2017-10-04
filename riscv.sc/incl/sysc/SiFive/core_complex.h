@@ -37,13 +37,13 @@
 #ifndef _SYSC_SIFIVE_FE310_H_
 #define _SYSC_SIFIVE_FE310_H_
 
-#include <sysc/ext_attribute.h>
-#include <sysc/initiator_mixin.h>
-#include <sysc/traceable.h>
-#include <sysc/utilities.h>
 #include <tlm>
 #include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
+#include "scc/ext_attribute.h"
+#include "scc/initiator_mixin.h"
+#include "scc/traceable.h"
+#include "scc/utilities.h"
 
 namespace iss {
 class vm_if;
@@ -67,25 +67,25 @@ public:
 namespace SiFive {
 class core_wrapper;
 
-class core_complex : public sc_core::sc_module, public sysc::traceable {
+class core_complex : public sc_core::sc_module, public scc::traceable {
 public:
     SC_HAS_PROCESS(core_complex);
 
-    sysc::initiator_mixin<tlm::tlm_initiator_socket<32>> initiator;
+    scc::initiator_mixin<tlm::tlm_initiator_socket<32>> initiator;
 
     sc_core::sc_in<sc_core::sc_time> clk_i;
 
     sc_core::sc_in<bool> rst_i;
 
-    sysc::ext_attribute<std::string> elf_file;
+    scc::ext_attribute<std::string> elf_file;
 
-    sysc::ext_attribute<bool> enable_disass;
+    scc::ext_attribute<bool> enable_disass;
 
-    sysc::ext_attribute<uint64_t> reset_address;
+    scc::ext_attribute<uint64_t> reset_address;
 
-    sysc::ext_attribute<unsigned short> gdb_server_port;
+    scc::ext_attribute<unsigned short> gdb_server_port;
 
-    sysc::ext_attribute<bool> dump_ir;
+    scc::ext_attribute<bool> dump_ir;
 
     core_complex(sc_core::sc_module_name name);
 

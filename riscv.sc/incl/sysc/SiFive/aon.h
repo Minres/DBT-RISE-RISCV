@@ -17,13 +17,13 @@
 #ifndef _AON_H_
 #define _AON_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class aon_regs;
 
-class aon : public sc_core::sc_module, public tlm_target<> {
+class aon : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(aon);
     sc_core::sc_in<sc_core::sc_time> clk_i;

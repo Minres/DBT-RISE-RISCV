@@ -17,13 +17,13 @@
 #ifndef _UART_H_
 #define _UART_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class uart_regs;
 
-class uart : public sc_core::sc_module, public tlm_target<> {
+class uart : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(uart);
     sc_core::sc_in<sc_core::sc_time> clk_i;

@@ -17,13 +17,13 @@
 #ifndef _GPIO_H_
 #define _GPIO_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class gpio_regs;
 
-class gpio : public sc_core::sc_module, public tlm_target<> {
+class gpio : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(gpio);
     sc_core::sc_in<sc_core::sc_time> clk_i;

@@ -36,14 +36,14 @@
 #ifndef _PRCI_REGS_H_
 #define _PRCI_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class prci_regs : public sc_core::sc_module, public sysc::resetable {
+class prci_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     BEGIN_BF_DECL(hfrosccfg_t, uint32_t);
@@ -73,15 +73,15 @@ public:
     uint32_t r_coreclkcfg;
 
     // register declarations
-    sysc::sc_register<hfrosccfg_t> hfrosccfg;
-    sysc::sc_register<hfxosccfg_t> hfxosccfg;
-    sysc::sc_register<pllcfg_t> pllcfg;
-    sysc::sc_register<uint32_t> plloutdiv;
-    sysc::sc_register<uint32_t> coreclkcfg;
+    scc::sc_register<hfrosccfg_t> hfrosccfg;
+    scc::sc_register<hfxosccfg_t> hfxosccfg;
+    scc::sc_register<pllcfg_t> pllcfg;
+    scc::sc_register<uint32_t> plloutdiv;
+    scc::sc_register<uint32_t> coreclkcfg;
 
     prci_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ inline sysc::prci_regs::prci_regs(sc_core::sc_module_name nm)
 , NAMED(plloutdiv, r_plloutdiv, 0, *this)
 , NAMED(coreclkcfg, r_coreclkcfg, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::prci_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::prci_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(hfrosccfg, 0x0UL);
     target.addResource(hfxosccfg, 0x4UL);
     target.addResource(pllcfg, 0x8UL);

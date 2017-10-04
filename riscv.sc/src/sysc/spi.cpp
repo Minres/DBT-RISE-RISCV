@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/spi.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/spi_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 

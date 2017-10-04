@@ -39,7 +39,8 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include <sysc/SiFive/core_complex.h>
-#include <sysc/report.h>
+
+#include "scc/report.h"
 
 namespace sysc {
 namespace SiFive {

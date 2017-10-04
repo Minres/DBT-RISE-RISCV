@@ -17,13 +17,13 @@
 #ifndef _SPI_H_
 #define _SPI_H_
 
-#include <sysc/tlm_target.h>
+#include "scc/tlm_target.h"
 
 namespace sysc {
 
 class spi_regs;
 
-class spi : public sc_core::sc_module, public tlm_target<> {
+class spi : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(spi);
     sc_core::sc_in<sc_core::sc_time> clk_i;

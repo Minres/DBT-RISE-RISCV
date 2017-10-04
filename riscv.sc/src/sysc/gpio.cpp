@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/gpio.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/gpio_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 

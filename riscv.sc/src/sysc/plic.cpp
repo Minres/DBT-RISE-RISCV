@@ -15,8 +15,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/SiFive/plic.h"
+
+#include "scc/utilities.h"
 #include "sysc/SiFive/gen/plic_regs.h"
-#include "sysc/utilities.h"
 
 namespace sysc {
 

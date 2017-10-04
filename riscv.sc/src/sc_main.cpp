@@ -26,10 +26,10 @@
 #include <sr_report/sr_report.h>
 #include <sstream>
 #include <sysc/SiFive/platform.h>
-#include <sysc/configurer.h>
-#include <sysc/report.h>
-#include <sysc/scv_tr_db.h>
-#include <sysc/tracer.h>
+#include "scc/configurer.h"
+#include "scc/report.h"
+#include "scc/scv_tr_db.h"
+#include "scc/tracer.h"
 
 using namespace sysc;
 namespace po = boost::program_options;
@@ -42,7 +42,7 @@ const size_t ERROR_UNHANDLED_EXCEPTION = 2;
 
 int sc_main(int argc, char *argv[]) {
     //    sc_report_handler::set_handler(my_report_handler);
-    sysc::Logger<>::reporting_level() = log::ERROR;
+    scc::Logger<>::reporting_level() = logging::ERROR;
     ///////////////////////////////////////////////////////////////////////////
     // CLI argument parsing
     ///////////////////////////////////////////////////////////////////////////
@@ -84,7 +84,7 @@ int sc_main(int argc, char *argv[]) {
         LOGGER(DEFAULT)::reporting_level() = l;
         LOGGER(connection)::reporting_level() = l;
         LOGGER(SystemC)::reporting_level() = l;
-        sysc::Logger<>::reporting_level() = l;
+        scc::Logger<>::reporting_level() = l;
     }
     if (vm.count("log-file")) {
         // configure the connection logger
@@ -100,12 +100,12 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // set up tracing & transaction recording
     ///////////////////////////////////////////////////////////////////////////
-    sysc::tracer trace("simple_system", static_cast<sysc::tracer::file_type>(vm["trace"].as<uint8_t>() >> 1),
+    scc::tracer trace("simple_system", static_cast<scc::tracer::file_type>(vm["trace"].as<uint8_t>() >> 1),
                        vm["trace"].as<uint8_t>() != 0);
     ///////////////////////////////////////////////////////////////////////////
     // set up configuration
     ///////////////////////////////////////////////////////////////////////////
-    sysc::configurer cfg(vm["config-file"].as<std::string>());
+    scc::configurer cfg(vm["config-file"].as<std::string>());
     ///////////////////////////////////////////////////////////////////////////
     // instantiate top level
     ///////////////////////////////////////////////////////////////////////////

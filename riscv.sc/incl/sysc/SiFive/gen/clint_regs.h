@@ -36,14 +36,14 @@
 #ifndef _CLINT_REGS_H_
 #define _CLINT_REGS_H_
 
-#include <sysc/register.h>
-#include <sysc/tlm_target.h>
-#include <sysc/utilities.h>
 #include <util/bit_field.h>
+#include "scc/register.h"
+#include "scc/tlm_target.h"
+#include "scc/utilities.h"
 
 namespace sysc {
 
-class clint_regs : public sc_core::sc_module, public sysc::resetable {
+class clint_regs : public sc_core::sc_module, public scc::resetable {
 public:
     // storage declarations
     BEGIN_BF_DECL(msip_t, uint32_t);
@@ -55,13 +55,13 @@ public:
     uint64_t r_mtime;
 
     // register declarations
-    sysc::sc_register<msip_t> msip;
-    sysc::sc_register<uint64_t> mtimecmp;
-    sysc::sc_register<uint64_t> mtime;
+    scc::sc_register<msip_t> msip;
+    scc::sc_register<uint64_t> mtimecmp;
+    scc::sc_register<uint64_t> mtime;
 
     clint_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(sysc::tlm_target<BUSWIDTH> &target);
+    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -74,7 +74,7 @@ inline sysc::clint_regs::clint_regs(sc_core::sc_module_name nm)
 , NAMED(mtimecmp, r_mtimecmp, 0, *this)
 , NAMED(mtime, r_mtime, 0, *this) {}
 
-template <unsigned BUSWIDTH> inline void sysc::clint_regs::registerResources(sysc::tlm_target<BUSWIDTH> &target) {
+template <unsigned BUSWIDTH> inline void sysc::clint_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
     target.addResource(msip, 0x0UL);
     target.addResource(mtimecmp, 0x4000UL);
     target.addResource(mtime, 0xbff8UL);
