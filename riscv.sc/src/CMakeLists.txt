@@ -26,9 +26,12 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 # This is a make target, so you can do a "make riscv-sc"
 set(APPLICATION_NAME riscv.sc)
 
+link_directories(${SystemC_LIBRARY_DIR})
+
 add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 
 # Links the target exe against the libraries
+
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
 target_link_libraries(${APPLICATION_NAME} risc-v)
 target_link_libraries(${APPLICATION_NAME} dbt-core)

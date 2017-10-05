@@ -80,17 +80,17 @@ void clint::reset_cb() {
 }
 
 void clint::update_mtime() {
-    auto diff = (sc_time_stamp() - last_updt) / clk;
+    auto diff = (sc_core::sc_time_stamp() - last_updt) / clk;
     auto diffi = (int)diff;
     regs->r_mtime += (diffi + cnt_fraction) / lfclk_mutiplier;
     cnt_fraction = (cnt_fraction + diffi) % lfclk_mutiplier;
     mtime_evt.cancel();
-    if (regs->r_mtimecmp > regs->r_mtime && clk > SC_ZERO_TIME) {
+    if (regs->r_mtimecmp > regs->r_mtime && clk > sc_core::SC_ZERO_TIME) {
         sc_core::sc_time next_trigger = (clk * lfclk_mutiplier) * (regs->r_mtimecmp - regs->mtime) - cnt_fraction * clk;
         mtime_evt.notify(next_trigger);
     } else
         mtime_int_o.write(true);
-    last_updt = sc_time_stamp();
+    last_updt = sc_core::sc_time_stamp();
 }
 
 } /* namespace sysc */
