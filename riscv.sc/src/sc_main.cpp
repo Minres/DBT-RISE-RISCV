@@ -23,7 +23,6 @@
 #include <boost/program_options.hpp>
 #include <iss/jit/MCJIThelper.h>
 #include <iss/log_categories.h>
-#include <sr_report/sr_report.h>
 #include <sstream>
 #include <sysc/SiFive/platform.h>
 #include "scc/configurer.h"
@@ -137,7 +136,7 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // run simulation
     ///////////////////////////////////////////////////////////////////////////
-    sc_start();
-    if (!sc_end_of_simulation_invoked()) sc_stop();
+    sc_core::sc_start();
+    if (!sc_core::sc_end_of_simulation_invoked()) sc_core::sc_stop();
     return 0;
 }

@@ -14,6 +14,6 @@ addrmap e300_plat_t {
     prci_regs  prci  @0x10008000;
     gpio_regs  gpio  @0x10012000;
     uart_regs  uart0 @0x10013000;
-    uart_regs  uart1 @0x10023000;
     spi_regs   spi   @0x10014000;  
+    uart_regs  uart1 @0x10023000;
 } e300_plat;
