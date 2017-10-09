@@ -34,17 +34,24 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <iss/arch/riscv_hart_msu_vp.h>
-#include <iss/arch/rv32imac.h>
-#include <iss/iss.h>
-#include <iss/vm_types.h>
-#include <sysc/SiFive/core_complex.h>
-
 #include "scc/report.h"
+#include "iss/arch/riscv_hart_msu_vp.h"
+#include "iss/arch/rv32imac.h"
+#include "iss/iss.h"
+#include "iss/vm_types.h"
+#include "iss/debugger/server.h"
+#include "iss/debugger/gdb_session.h"
+#include "iss/debugger/target_adapter_if.h"
+#include "iss/debugger/encoderdecoder.h"
+#include "sysc/SiFive/core_complex.h"
+
 
 namespace sysc {
 namespace SiFive {
+namespace {
+iss::debugger::encoder_decoder encdec;
 
+}
 class core_wrapper : public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac> {
 public:
     using core_type = iss::arch::rv32imac;
@@ -73,6 +80,36 @@ private:
     core_complex *const owner;
 };
 
+int cmd_sysc(int argc, char* argv[], iss::debugger::out_func of, iss::debugger::data_func df, iss::debugger::target_adapter_if* tgt_adapter){
+    if(argc>1) {
+        if(strcasecmp(argv[1], "print_time")==0){
+            std::string t = sc_core::sc_time_stamp().to_string();
+            of(t.c_str());
+            char buf[64];
+            encdec.enc_string(t.c_str(), buf, 63);
+            df(buf);
+            return iss::Ok;
+        } else if(strcasecmp(argv[1], "break")==0){
+            sc_core::sc_time t;
+            if(argc==4){
+                 t= scc::parse_from_string(argv[2], argv[3]);
+            } else if(argc==3){
+                t= scc::parse_from_string(argv[2]);
+            } else
+                return iss::Err;
+            // no check needed as it is only called if debug server is active
+            tgt_adapter->add_break_condition([t]()->unsigned{
+                LOG(TRACE)<<"Checking condition at "<<sc_core::sc_time_stamp();
+                return sc_core::sc_time_stamp()>=t?std::numeric_limits<unsigned>::max():0;
+            });
+            return iss::Ok;
+        }
+        return iss::Err;
+    }
+    return iss::Err;
+
+}
+
 void core_wrapper::notify_phase(exec_phase phase) {
     core_type::notify_phase(phase);
     if (phase == ISTART) owner->sync();
@@ -89,7 +126,8 @@ core_complex::core_complex(sc_core::sc_module_name name)
 , NAMED(gdb_server_port, 0, this)
 , NAMED(dump_ir, false, this)
 , read_lut(tlm_dmi_ext())
-, write_lut(tlm_dmi_ext()) {
+, write_lut(tlm_dmi_ext())
+, tgt_adapter(nullptr){
 
     initiator.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
@@ -115,6 +153,15 @@ void core_complex::before_end_of_elaboration() {
     cpu = std::make_unique<core_wrapper>(this);
     vm = iss::create<iss::arch::rv32imac>(cpu.get(), gdb_server_port.value, dump_ir.value);
     vm->setDisassEnabled(enable_disass.value);
+    auto* srv = iss::debugger::server<iss::debugger::gdb_session>::get();
+    if(srv) tgt_adapter = srv->get_target();
+    if(tgt_adapter)
+        tgt_adapter->add_custom_command({
+        "sysc",
+        [this](int argc, char* argv[], iss::debugger::out_func of, iss::debugger::data_func df)-> int {
+            return cmd_sysc(argc, argv, of, df, tgt_adapter);
+        },
+        "SystemC sub-commands: break <time>, print_time"});
 }
 
 void core_complex::start_of_simulation() {

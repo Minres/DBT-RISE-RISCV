@@ -50,6 +50,9 @@ class vm_if;
 namespace arch {
 template <typename BASE> struct riscv_hart_msu_vp;
 }
+namespace debugger {
+struct target_adapter_if;
+}
 }
 
 namespace sysc {
@@ -120,6 +123,7 @@ protected:
     std::unique_ptr<core_wrapper> cpu;
     std::unique_ptr<iss::vm_if> vm;
     sc_core::sc_time curr_clk;
+    iss::debugger::target_adapter_if* tgt_adapter;
 };
 
 } /* namespace SiFive */
