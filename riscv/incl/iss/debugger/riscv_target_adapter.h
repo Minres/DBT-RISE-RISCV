@@ -94,7 +94,9 @@ template <typename ARCH> struct riscv_target_adapter : public target_adapter_bas
 
     status remove_break(int type, uint64_t addr, unsigned int length) override;
 
-    status resume_from_addr(bool step, int sig, uint64_t addr) override;
+    status resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread, std::function<void(unsigned)> stop_callback) override;
+
+    status target_xml_query(std::string& out_buf) override;
 
 protected:
     static inline constexpr addr_t map_addr(const addr_t &i) { return i; }
@@ -157,6 +159,11 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
             data.push_back(*(reg_base + offset + j));
             avail.push_back(0xff);
         }
+//        if(arch::traits<ARCH>::XLEN < 64)
+//            for(unsigned j=0; j<4; ++j){
+//                data.push_back(0);
+//                avail.push_back(0xff);
+//            }
     }
     // work around fill with F type registers
     if (arch::traits<ARCH>::NUM_REGS < 65) {
@@ -166,6 +173,11 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
                 data.push_back(0x0);
                 avail.push_back(0x00);
             }
+//            if(arch::traits<ARCH>::XLEN < 64)
+//                for(unsigned j=0; j<4; ++j){
+//                    data.push_back(0x0);
+//                    avail.push_back(0x00);
+//                }
         }
     }
     return Ok;
@@ -292,10 +304,10 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(int type, 
 template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int type, uint64_t addr, unsigned int length) {
     auto saddr = map_addr({iss::CODE, iss::PHYSICAL, addr});
     unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
-    // TODO: check length of addr range
     if (handle) {
         LOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val
                    << std::dec;
+        // TODO: check length of addr range
         target_adapter_base::bp_lut.removeEntry(handle);
         LOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
         return Ok;
@@ -304,13 +316,102 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int typ
     return Err;
 }
 
-template <typename ARCH> status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr) {
+template <typename ARCH> status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
+        std::function<void(unsigned)> stop_callback) {
     unsigned reg_no = arch::traits<ARCH>::PC;
     std::vector<uint8_t> data(8);
     *(reinterpret_cast<uint64_t *>(&data[0])) = addr;
     core->set_reg(reg_no, data);
-    return resume_from_current(step, sig);
+    return resume_from_current(step, sig, thread, stop_callback);
 }
+template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string& out_buf) {
+    const std::string res{
+        "<?xml version=\"1.0\"?><!DOCTYPE target SYSTEM \"gdb-target.dtd\">"
+"<target><architecture>riscv:rv32</architecture>"
+//"  <feature name=\"org.gnu.gdb.riscv.rv32i\">\n"
+//"    <reg name=\"x0\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x1\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x2\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x3\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x4\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x5\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x6\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x7\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x8\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x9\"  bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x10\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x11\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x12\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x13\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x14\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x15\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x16\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x17\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x18\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x19\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x20\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x21\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x22\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x23\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x24\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x25\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x26\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x27\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x28\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x29\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x30\" bitsize=\"32\" group=\"general\"/>\n"
+//"    <reg name=\"x31\" bitsize=\"32\" group=\"general\"/>\n"
+//"  </feature>\n"
+"</target>"};
+    out_buf=res;
+    return Ok;
+}
+
+/*
+ *
+<?xml version="1.0"?>
+<!DOCTYPE target SYSTEM "gdb-target.dtd">
+<target>
+  <architecture>riscv:rv32</architecture>
+
+  <feature name="org.gnu.gdb.riscv.rv32i">
+    <reg name="x0"  bitsize="32" group="general"/>
+    <reg name="x1"  bitsize="32" group="general"/>
+    <reg name="x2"  bitsize="32" group="general"/>
+    <reg name="x3"  bitsize="32" group="general"/>
+    <reg name="x4"  bitsize="32" group="general"/>
+    <reg name="x5"  bitsize="32" group="general"/>
+    <reg name="x6"  bitsize="32" group="general"/>
+    <reg name="x7"  bitsize="32" group="general"/>
+    <reg name="x8"  bitsize="32" group="general"/>
+    <reg name="x9"  bitsize="32" group="general"/>
+    <reg name="x10" bitsize="32" group="general"/>
+    <reg name="x11" bitsize="32" group="general"/>
+    <reg name="x12" bitsize="32" group="general"/>
+    <reg name="x13" bitsize="32" group="general"/>
+    <reg name="x14" bitsize="32" group="general"/>
+    <reg name="x15" bitsize="32" group="general"/>
+    <reg name="x16" bitsize="32" group="general"/>
+    <reg name="x17" bitsize="32" group="general"/>
+    <reg name="x18" bitsize="32" group="general"/>
+    <reg name="x19" bitsize="32" group="general"/>
+    <reg name="x20" bitsize="32" group="general"/>
+    <reg name="x21" bitsize="32" group="general"/>
+    <reg name="x22" bitsize="32" group="general"/>
+    <reg name="x23" bitsize="32" group="general"/>
+    <reg name="x24" bitsize="32" group="general"/>
+    <reg name="x25" bitsize="32" group="general"/>
+    <reg name="x26" bitsize="32" group="general"/>
+    <reg name="x27" bitsize="32" group="general"/>
+    <reg name="x28" bitsize="32" group="general"/>
+    <reg name="x29" bitsize="32" group="general"/>
+    <reg name="x30" bitsize="32" group="general"/>
+    <reg name="x31" bitsize="32" group="general"/>
+  </feature>
+
+</target>
+
+ */
 }
 }
 

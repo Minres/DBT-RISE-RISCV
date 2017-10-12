@@ -149,7 +149,7 @@ protected:
     // some compile time constants
     enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
-    enum { LUT_SIZE = 1 << bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << bit_count(EXTR_MASK16) };
+    enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
     using this_class = vm_impl<ARCH>;
     using compile_func = std::tuple<vm::continuation_e, llvm::BasicBlock *> (this_class::*)(virt_addr_t &pc,
