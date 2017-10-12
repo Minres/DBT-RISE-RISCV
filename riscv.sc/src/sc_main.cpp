@@ -59,7 +59,7 @@ int sc_main(int argc, char *argv[]) {
             ("cycles,c", po::value<int64_t>()->default_value(-1), "number of cycles to run")
             ("quantum", po::value<unsigned>(), "SystemC quantum time in ns")
             ("reset,r", po::value<std::string>(), "reset address")
-            ("trace,t", po::value<uint8_t>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
+            ("trace,t", po::value<unsigned>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
             ("rv64", "run RV64")
             ("config-file,c", po::value<std::string>()->default_value(""), "configuration file");
     // clang-format on
@@ -99,8 +99,8 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // set up tracing & transaction recording
     ///////////////////////////////////////////////////////////////////////////
-    scc::tracer trace("simple_system", static_cast<scc::tracer::file_type>(vm["trace"].as<uint8_t>() >> 1),
-                       vm["trace"].as<uint8_t>() != 0);
+    auto trace_val = vm["trace"].as<unsigned>();
+    scc::tracer trace("simple_system", static_cast<scc::tracer::file_type>(trace_val >> 1), trace_val != 0);
     ///////////////////////////////////////////////////////////////////////////
     // set up configuration
     ///////////////////////////////////////////////////////////////////////////
