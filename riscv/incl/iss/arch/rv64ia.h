@@ -43,10 +43,10 @@
 namespace iss {
 namespace arch {
 
-struct rv64ia;
+class rv64ia;
 
-template <> struct traits<rv64ia> {
-
+template <> class traits<rv64ia> {
+public:
     enum constants {
         XLEN = 64,
         XLEN2 = 128,
@@ -131,8 +131,8 @@ template <> struct traits<rv64ia> {
     enum mem_type_e { MEM, CSR, FENCE, RES };
 };
 
-struct rv64ia : public arch_if {
-
+class rv64ia : public arch_if {
+public:
     using virt_addr_t = typename traits<rv64ia>::virt_addr_t;
     using phys_addr_t = typename traits<rv64ia>::phys_addr_t;
     using reg_t = typename traits<rv64ia>::reg_t;

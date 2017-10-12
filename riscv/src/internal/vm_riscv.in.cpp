@@ -52,7 +52,8 @@ using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
 
-template <typename ARCH> struct vm_impl : public vm::vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public vm::vm_base<ARCH> {
+public:
     using super = typename vm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;

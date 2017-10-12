@@ -224,23 +224,28 @@ struct vm_info {
     uint64_t ptbase;
 };
 
-struct trap_load_access_fault : public trap_access {
+class trap_load_access_fault : public trap_access {
+public:
     trap_load_access_fault(uint64_t badaddr)
     : trap_access(5 << 16, badaddr) {}
 };
-struct illegal_instruction_fault : public trap_access {
+class illegal_instruction_fault : public trap_access {
+public:
     illegal_instruction_fault(uint64_t badaddr)
     : trap_access(2 << 16, badaddr) {}
 };
-struct trap_instruction_page_fault : public trap_access {
+class trap_instruction_page_fault : public trap_access {
+public:
     trap_instruction_page_fault(uint64_t badaddr)
     : trap_access(12 << 16, badaddr) {}
 };
-struct trap_load_page_fault : public trap_access {
+class trap_load_page_fault : public trap_access {
+public:
     trap_load_page_fault(uint64_t badaddr)
     : trap_access(13 << 16, badaddr) {}
 };
-struct trap_store_page_fault : public trap_access {
+class trap_store_page_fault : public trap_access {
+public:
     trap_store_page_fault(uint64_t badaddr)
     : trap_access(15 << 16, badaddr) {}
 };
@@ -262,7 +267,8 @@ public:
     template<class T, class Enable = void> struct hart_state { };
     // specialization 32bit
     template <typename T>
-    struct hart_state<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
+    class hart_state<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
+    public:
         BEGIN_BF_DECL(mstatus_t, T);
         // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR XS==11)))
         BF_FIELD(SD, 31, 1);
@@ -328,7 +334,8 @@ public:
     };
     // specialization 64bit
     template <typename T>
-    struct hart_state<T, typename std::enable_if<std::is_same<T, uint64_t>::value>::type> {
+    class hart_state<T, typename std::enable_if<std::is_same<T, uint64_t>::value>::type> {
+    public:
         BEGIN_BF_DECL(mstatus_t, T);
         // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR XS==11)))
         BF_FIELD(SD, 63, 1);

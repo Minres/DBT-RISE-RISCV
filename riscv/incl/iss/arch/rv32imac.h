@@ -43,10 +43,10 @@
 namespace iss {
 namespace arch {
 
-struct rv32imac;
+class rv32imac;
 
-template <> struct traits<rv32imac> {
-
+template <> class traits<rv32imac> {
+public:
     enum constants {
         XLEN = 32,
         XLEN2 = 64,
@@ -132,8 +132,8 @@ template <> struct traits<rv32imac> {
     enum mem_type_e { MEM, CSR, FENCE, RES };
 };
 
-struct rv32imac : public arch_if {
-
+class rv32imac : public arch_if {
+public:
     using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
     using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
     using reg_t = typename traits<rv32imac>::reg_t;

@@ -37,21 +37,22 @@
 #ifndef _SYSC_SIFIVE_FE310_H_
 #define _SYSC_SIFIVE_FE310_H_
 
+#include "scc/utilities.h"
 #include <tlm>
 #include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
 #include "scc/ext_attribute.h"
+#include "scv4tlm/tlm_rec_initiator_socket.h"
 #include "scc/initiator_mixin.h"
 #include "scc/traceable.h"
-#include "scc/utilities.h"
 
 namespace iss {
 class vm_if;
 namespace arch {
-template <typename BASE> struct riscv_hart_msu_vp;
+template <typename BASE> class riscv_hart_msu_vp;
 }
 namespace debugger {
-struct target_adapter_if;
+class target_adapter_if;
 }
 }
 
@@ -74,7 +75,7 @@ class core_complex : public sc_core::sc_module, public scc::traceable {
 public:
     SC_HAS_PROCESS(core_complex);
 
-    scc::initiator_mixin<tlm::tlm_initiator_socket<32>> initiator;
+    scc::initiator_mixin<scv4tlm::tlm_rec_initiator_socket<32>> initiator;
 
     sc_core::sc_in<sc_core::sc_time> clk_i;
 

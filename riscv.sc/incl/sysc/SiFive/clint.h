@@ -21,7 +21,7 @@
 
 namespace iss {
 namespace arch {
-template <typename BASE> struct riscv_hart_msu_vp;
+template <typename BASE> class riscv_hart_msu_vp;
 }
 }
 

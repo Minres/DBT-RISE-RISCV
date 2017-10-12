@@ -21,8 +21,8 @@ namespace debugger {
 using namespace iss::arch;
 using namespace iss::debugger;
 
-template <typename ARCH> struct riscv_target_adapter : public target_adapter_base {
-
+template <typename ARCH> class riscv_target_adapter : public target_adapter_base {
+public:
     riscv_target_adapter(server_if *srv, iss::arch_if *core)
     : target_adapter_base(srv)
     , core(core) {}
