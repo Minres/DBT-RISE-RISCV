@@ -55,11 +55,10 @@ void uart::reset_cb() {
 }
 
 void uart::transmit_data() {
+    if(regs->r_txdata.data != '\r') queue.push_back(regs->r_txdata.data);
     if (queue.size() >> 0 && (regs->r_txdata.data == '\n' || regs->r_txdata.data == 0)) {
         LOG(INFO) << this->name() << " transmit: '" << std::string(queue.begin(), queue.end()) << "'";
         queue.clear();
-    } else {
-        queue.push_back(regs->r_txdata.data);
     }
 }
 

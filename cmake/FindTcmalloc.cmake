@@ -7,12 +7,12 @@
 if (USE_TCMALLOC)
   set(Tcmalloc_NAMES tcmalloc)
 else ()
-  set(Tcmalloc_NAMES tcmalloc_minimal tcmalloc)
+  set(Tcmalloc_NAMES tcmalloc_minimal tcmalloc tcmalloc_minimal4 libtcmalloc_minimal.so.4)
 endif ()
 
 find_library(Tcmalloc_LIBRARY NO_DEFAULT_PATH
   NAMES ${Tcmalloc_NAMES}
-  PATHS ${HT_DEPENDENCY_LIB_DIR} /lib /usr/lib /usr/local/lib /opt/local/lib
+  PATHS ${HT_DEPENDENCY_LIB_DIR} /lib /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib /opt/local/lib
 )
 
 if (Tcmalloc_LIBRARY)
