@@ -435,11 +435,11 @@ public:
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
-    virtual std::string get_additional_disass_info() {
+    void disass_output(uint64_t pc, const std::string instr) override {
         std::stringstream s;
         s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
           << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
-        return s.str();
+        CLOG(INFO, disass) << "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<instr<<"\t"<<s.str();
     };
 
 protected:

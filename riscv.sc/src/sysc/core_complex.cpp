@@ -45,6 +45,9 @@
 #include "iss/debugger/encoderdecoder.h"
 #include "sysc/SiFive/core_complex.h"
 
+#ifdef WITH_SCV
+#include <scv.h>
+#endif
 
 namespace sysc {
 namespace SiFive {
@@ -52,21 +55,64 @@ namespace {
 iss::debugger::encoder_decoder encdec;
 
 }
+namespace {
+
+const char lvl[] = {'U', 'S', 'H', 'M'};
+
+const char *trap_str[] = {"Instruction address misaligned",
+                          "Instruction access fault",
+                          "Illegal instruction",
+                          "Breakpoint",
+                          "Load address misaligned",
+                          "Load access fault",
+                          "Store/AMO address misaligned",
+                          "Store/AMO access fault",
+                          "Environment call from U-mode",
+                          "Environment call from S-mode",
+                          "Reserved",
+                          "Environment call from M-mode",
+                          "Instruction page fault",
+                          "Load page fault",
+                          "Reserved",
+                          "Store/AMO page fault"};
+const char *irq_str[] = {
+    "User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
+    "User timer interrupt",    "Supervisor timer interrupt",    "Reserved", "Machine timer interrupt",
+    "User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt"};
+}
+
 class core_wrapper : public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac> {
 public:
     using core_type = iss::arch::rv32imac;
     using base_type = iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>;
     using phys_addr_t = typename iss::arch::traits<iss::arch::rv32imac>::phys_addr_t;
     core_wrapper(core_complex *owner)
-    : owner(owner) {}
+    : owner(owner)
+    {}
+
+    uint32_t get_mode(){ return this->reg.machine_state; }
+
+    base_type::hart_state<base_type::reg_t>& get_state() { return this->state; }
 
     void notify_phase(iss::arch_if::exec_phase phase);
+
+    void disass_output(uint64_t pc, const std::string instr) override {
+#ifndef WITH_SCV
+        std::stringstream s;
+        s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
+          << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
+        CLOG(INFO, disass) << "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<instr<<"\t"<<s.str();
+#else
+        owner->disass_output(pc,instr);
+#endif
+    };
 
     iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
         if (addr.type & iss::DEBUG)
             return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
-        else
-            return owner->read_mem(addr.val, length, data) ? iss::Ok : iss::Err;
+        else {
+            return owner->read_mem(addr.val, length, data,addr.type && iss::FETCH) ? iss::Ok : iss::Err;
+        }
     }
 
     iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
@@ -127,7 +173,14 @@ core_complex::core_complex(sc_core::sc_module_name name)
 , NAMED(dump_ir, false, this)
 , read_lut(tlm_dmi_ext())
 , write_lut(tlm_dmi_ext())
-, tgt_adapter(nullptr){
+, tgt_adapter(nullptr)
+#ifdef WITH_SCV
+, m_db(scv_tr_db::get_default_db())
+, stream_handle(nullptr)
+, instr_tr_handle(nullptr)
+, fetch_tr_handle(nullptr)
+#endif
+{
 
     initiator.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
@@ -167,6 +220,25 @@ void core_complex::before_end_of_elaboration() {
 void core_complex::start_of_simulation() {
     quantum_keeper.reset();
     if (elf_file.value.size() > 0) cpu->load_file(elf_file.value);
+#ifdef WITH_SCV
+        if (stream_handle == NULL) {
+            string basename(this->name());
+            stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", m_db);
+            instr_tr_handle = new scv_tr_generator<>("execute", *stream_handle);
+            fetch_tr_handle = new scv_tr_generator<uint64_t>("fetch", *stream_handle);
+        }
+#endif
+}
+
+void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
+#ifdef WITH_SCV
+    if(tr_handle.is_active()) tr_handle.end_transaction();
+    tr_handle = instr_tr_handle->begin_transaction();
+    tr_handle.record_attribute("PC", pc);
+    tr_handle.record_attribute("INSTR", instr_str);
+    tr_handle.record_attribute("MODE", lvl[cpu->get_mode()]);
+    tr_handle.record_attribute("MSTATUS", cpu->get_state().mstatus.st.value);
+#endif
 }
 
 void core_complex::clk_cb() { curr_clk = clk_i.read(); }
@@ -181,7 +253,7 @@ void core_complex::run() {
     sc_core::sc_stop();
 }
 
-bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data) {
+bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data, bool is_fetch) {
     auto lut_entry = read_lut.getEntry(addr);
     if (lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE &&
         addr + length <= lut_entry.get_end_address() + 1) {
@@ -197,6 +269,13 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data)
         gp.set_data_length(length);
         gp.set_streaming_width(4);
         auto delay{quantum_keeper.get_local_time()};
+#ifdef WITH_SCV
+        if(tr_handle.is_valid()){
+            if(is_fetch && tr_handle.is_active()) tr_handle.end_transaction();
+            auto preExt = new scv4tlm::tlm_recording_extension(tr_handle, this);
+            gp.set_extension(preExt);
+        }
+#endif
         initiator->b_transport(gp, delay);
         LOG(TRACE) << "read_mem(0x" << std::hex << addr << ") : " << data;
         if (gp.get_response_status() != tlm::TLM_OK_RESPONSE) {

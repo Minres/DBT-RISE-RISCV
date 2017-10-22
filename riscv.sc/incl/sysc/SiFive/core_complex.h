@@ -46,6 +46,11 @@
 #include "scc/initiator_mixin.h"
 #include "scc/traceable.h"
 
+class scv_tr_db;
+class scv_tr_stream;
+struct _scv_tr_generator_default_data;
+template < class T_begin, class T_end> class scv_tr_generator;
+
 namespace iss {
 class vm_if;
 namespace arch {
@@ -103,7 +108,7 @@ public:
         }
     }
 
-    bool read_mem(uint64_t addr, unsigned length, uint8_t *const data);
+    bool read_mem(uint64_t addr, unsigned length, uint8_t *const data, bool is_fetch);
 
     bool write_mem(uint64_t addr, unsigned length, const uint8_t *const data);
 
@@ -113,6 +118,7 @@ public:
 
     void trace(sc_core::sc_trace_file *trf) override;
 
+    void disass_output(uint64_t pc, const std::string instr);
 protected:
     void before_end_of_elaboration();
     void start_of_simulation();
@@ -125,6 +131,17 @@ protected:
     std::unique_ptr<iss::vm_if> vm;
     sc_core::sc_time curr_clk;
     iss::debugger::target_adapter_if* tgt_adapter;
+#ifdef WITH_SCV
+    //! transaction recording database
+    scv_tr_db *m_db;
+    //! blocking transaction recording stream handle
+    scv_tr_stream *stream_handle;
+    //! transaction generator handle for blocking transactions
+    scv_tr_generator<_scv_tr_generator_default_data,_scv_tr_generator_default_data> *instr_tr_handle;
+    scv_tr_generator<uint64_t,_scv_tr_generator_default_data> *fetch_tr_handle;
+    scv_tr_handle tr_handle;
+#endif
+
 };
 
 } /* namespace SiFive */
