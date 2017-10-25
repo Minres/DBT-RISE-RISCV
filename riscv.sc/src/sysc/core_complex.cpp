@@ -97,14 +97,14 @@ public:
     void notify_phase(iss::arch_if::exec_phase phase);
 
     void disass_output(uint64_t pc, const std::string instr) override {
-#ifndef WITH_SCV
-        std::stringstream s;
-        s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
-          << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
-        CLOG(INFO, disass) << "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<instr<<"\t"<<s.str();
-#else
+    	if (logging::INFO <= logging::Log<logging::Output2FILE<logging::disass>>::reporting_level() && logging::Output2FILE<logging::disass>::stream()){
+			std::stringstream s;
+			s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
+			  << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
+			scc::Log<logging::Output2FILE<logging::disass>>().get(logging::INFO, "disass")
+					<< "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<std::setw(40)<<std::setfill(' ')<<std::left<<instr<<s.str();
+    	}
         owner->disass_output(pc,instr);
-#endif
     };
 
     iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
@@ -221,7 +221,7 @@ void core_complex::start_of_simulation() {
     quantum_keeper.reset();
     if (elf_file.value.size() > 0) cpu->load_file(elf_file.value);
 #ifdef WITH_SCV
-        if (stream_handle == NULL) {
+        if (m_db!=nullptr && stream_handle == nullptr) {
             string basename(this->name());
             stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", m_db);
             instr_tr_handle = new scv_tr_generator<>("execute", *stream_handle);
@@ -232,6 +232,7 @@ void core_complex::start_of_simulation() {
 
 void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
 #ifdef WITH_SCV
+	if (m_db==nullptr) return;
     if(tr_handle.is_active()) tr_handle.end_transaction();
     tr_handle = instr_tr_handle->begin_transaction();
     tr_handle.record_attribute("PC", pc);
@@ -270,7 +271,7 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data,
         gp.set_streaming_width(4);
         auto delay{quantum_keeper.get_local_time()};
 #ifdef WITH_SCV
-        if(tr_handle.is_valid()){
+        if(m_db!=nullptr && tr_handle.is_valid()){
             if(is_fetch && tr_handle.is_active()) tr_handle.end_transaction();
             auto preExt = new scv4tlm::tlm_recording_extension(tr_handle, this);
             gp.set_extension(preExt);

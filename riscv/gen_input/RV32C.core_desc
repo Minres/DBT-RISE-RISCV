@@ -12,42 +12,37 @@ InsructionSet RV32CI {
 				PC[XLEN](is_pc)
 	}
 	instructions{
-		C.ADDI4SPN { //(RES, nzuimm=0)
-			encoding: b000 | nzuimm[5:4] | nzuimm[9:6] | nzuimm[2:2] | nzuimm[3:3] | rd[2:0] | b00;
-			args_disass: "x%rd$d, 0x%nzuimm$05x";
-			if(nzuimm == 0)
-				raise(0, 2);
+		C.ADDI4SPN { //(RES, imm=0)
+			encoding: b000 | imm[5:4] | imm[9:6] | imm[2:2] | imm[3:3] | rd[2:0] | b00;
+			args_disass: "x%rd$d, 0x%imm$05x";
+			if(imm == 0) raise(0, 2);
 			val rd_idx[5] <= rd+8;
 			val x2_idx[5] <= 2;
-			X[rd_idx] <= X[x2_idx] + nzuimm;
+			X[rd_idx] <= X[x2_idx] + imm;
 		}
 		C.LW { // (RV32)
 			encoding: b010 | uimm[5:3] | rs1[2:0] | uimm[2:2] | uimm[6:6] | rd[2:0] | b00;
 			args_disass: "x(8+%rd$d), x(8+%rs1$d), 0x%uimm$05x";
 			val rs1_idx[5] <= rs1+8;
-			val adr[XLEN] <= X[rs1_idx]+uimm;
 			val rd_idx[5] <= rd+8;
-			X[rd_idx] <= MEM[adr]{32};
+			val offs[XLEN] <= X[rs1_idx]+uimm;
+			X[rd_idx] <= MEM[offs]{32};
 		}
 		C.SW {//(RV32)
 			encoding: b110 | uimm[5:3] | rs1[2:0] | uimm[2:2] | uimm[6:6] | rs2[2:0] | b00;
 			args_disass: "x(8+%rs1$d), x(8+%rs2$d), 0x%uimm$05x";
 			val rs1_idx[5] <= rs1+8;
-			val adr[XLEN] <= X[rs1_idx]+uimm;
 			val rs2_idx[5] <= rs2+8;
-			MEM[adr]{32} <= X[rs2_idx];
-		}
-		C.NOP {//(RV32)
-			encoding: b000 | b0 | b00000 | b00000 | b01; //TODO
-			args_disass: "";
+			val offs[XLEN] <= X[rs1_idx]+uimm;
+			MEM[offs]{32} <= X[rs2_idx];
 		}
 		C.ADDI {//(RV32)
-			encoding:b000 | nzimm[5:5]s | rs1[4:0] | nzimm[4:0]s | b01;
-			args_disass: "x%rs1$d, 0x%nzimm$05x";
-			if(nzimm == 0)
-				raise(0, 2);
-			X[rs1] <= X[rs1] + nzimm;
-			
+			encoding:b000 | imm[5:5]s | rs1[4:0] | imm[4:0]s | b01;
+			args_disass: "x%rs1$d, 0x%imm$05x";
+			X[rs1] <= X[rs1] + imm;
+		}
+		C.NOP {
+			encoding:b000 | b0 | b00000 | b00000 | b01;
 		}
         // C.JAL will be overwritten by C.ADDIW for RV64/128
 		C.JAL(no_cont) {//(RV32)
@@ -60,35 +55,32 @@ InsructionSet RV32CI {
 		C.LI {//(RV32)
 			encoding:b010 | imm[5:5]s | rd[4:0] | imm[4:0]s | b01;
 			args_disass: "x%rd$d, 0x%imm$05x";
-			if(rd == 0)	raise(0, 2);
+			if(rd == 0)	raise(0, 2);   //TODO: should it be handled as trap?
 			X[rd] <= imm;
 		}
 		// order matters here as C.ADDI16SP overwrites C.LUI vor rd==2
 		C.LUI {//(RV32)
-			encoding:b011 | nzimm[17:17]s | rd[4:0] | nzimm[16:12]s | b01;
-			args_disass: "x%rd$d, 0x%nzimm$05x";
-			if(rd == 0) raise(0, 2);
-			if(rd == 2) raise(0, 2);
-			if(nzimm == 0) raise(0, 2);
-			X[rd] <= nzimm;
+			encoding:b011 | imm[17:17]s | rd[4:0] | imm[16:12]s | b01;
+			args_disass: "x%rd$d, 0x%imm$05x";
+			if(rd == 0) raise(0, 2);   //TODO: should it be handled as trap?
+			if(imm == 0) raise(0, 2);   //TODO: should it be handled as trap?
+			X[rd] <= imm;
 		}
 		C.ADDI16SP {//(RV32)
-			encoding:b011 | nzimm[9:9]s | b00010 | nzimm[4:4]s |nzimm[6:6]s | nzimm[8:7]s | nzimm[5:5]s | b01;
-			args_disass: "0x%nzimm$05x";
+			encoding:b011 | imm[9:9]s | b00010 | imm[4:4]s | imm[6:6]s | imm[8:7]s | imm[5:5]s | b01;
+			args_disass: "0x%imm$05x";
 			val x2_idx[5] <= 2;
-			X[x2_idx] <= X[x2_idx]s + nzimm;
+			X[x2_idx] <= X[x2_idx]s + imm;
 		}
 		C.SRLI {//(RV32 nse)
-			encoding:b100 | shamt[5:5] | b00 | rs1[2:0] | shamt[4:0] | b01;
+			encoding:b100 | b0 | b00 | rs1[2:0] | shamt[4:0] | b01;
 			args_disass: "x(8+%rs1$d), %shamt$d";
-            if(shamt > 31) raise(0, 2);
 			val rs1_idx[5] <= rs1+8;
 			X[rs1_idx] <= shrl(X[rs1_idx], shamt);
 		}
 		C.SRAI {//(RV32)
-			encoding:b100 | shamt[5:5] | b01 | rs1[2:0] | shamt[4:0] | b01;
+			encoding:b100 | b0 | b01 | rs1[2:0] | shamt[4:0] | b01;
 			args_disass: "x(8+%rs1$d), %shamt$d";
-			if(shamt > 31) raise(0, 2);
 			val rs1_idx[5] <= rs1+8;
 			X[rs1_idx] <= shra(X[rs1_idx], shamt);
 		}
@@ -132,26 +124,22 @@ InsructionSet RV32CI {
 			PC<=PC+imm;
 		}
 		C.BEQZ(no_cont) {//(RV32)
-			encoding:b110 | imm[8:8]s | imm[4:3]s | rs1d[2:0] | imm[7:6]s |imm[2:1]s | imm[5:5]s | b01;
-			args_disass: "x(8+%rs1d$d), 0x%imm$05x";
-			val rs1[5] <= rs1d+8;
-			PC<=choose(X[rs1]==0, PC+imm, PC+2);
+			encoding:b110 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s |imm[2:1]s | imm[5:5]s | b01;
+			args_disass: "x(8+%rs1$d), 0x%imm$05x";
+			val rs1_idx[5] <= rs1+8;
+			PC<=choose(X[rs1_idx]==0, PC+imm, PC+2);
 		}
 		C.BNEZ(no_cont) {//(RV32)
-			encoding:b111 | imm[8:8] | imm[4:3] | rs1d[2:0] | imm[7:6] | imm[2:1] | imm[5:5] | b01;
-			args_disass: "x(8+%rs1d$d),, 0x%imm$05x";
-            val rs1[5] <= rs1d+8;
-			PC<=choose(X[rs1]!=0, PC+imm, PC+2);
+			encoding:b111 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s | imm[2:1]s | imm[5:5]s | b01;
+			args_disass: "x(8+%rs1$d), 0x%imm$05x";
+            val rs1_idx[5] <= rs1+8;
+			PC<=choose(X[rs1_idx]!=0, PC+imm, PC+2);
 		}
 		C.SLLI {//(RV32)
-			encoding:b000 | shamt[5:5] | rs1[4:0] | shamt[4:0] | b10;
+			encoding:b000 | b0 | rs1[4:0] | shamt[4:0] | b10;
 			args_disass: "x%rs1$d, %shamt$d";
 			if(rs1 == 0) raise(0, 2);
-			if(shamt > 31) raise(0, 2);
 			X[rs1] <= shll(X[rs1], shamt);
-		}
-		C.LQSP {//(RV128)
-			encoding:b001 | uimm[5:5] | rd[4:0] | uimm[4:4] | uimm[9:6] | b10;
 		}
 		C.LWSP {//
 			encoding:b010 | uimm[5:5] | rd[4:0] | uimm[4:2] | uimm[7:6] | b10;
@@ -160,7 +148,7 @@ InsructionSet RV32CI {
 			val offs[XLEN] <= X[x2_idx] + uimm;
 			X[rd] <= MEM[offs]{32};
 		}
-		// order matters as C.JR is a special case of C.JR
+		// order matters as C.JR is a special case of C.MV
         C.MV {//(RV32)
             encoding:b100 | b0 | rd[4:0] | rs2[4:0] | b10;
             args_disass: "x%rd$d, x%rs2$d";
@@ -171,22 +159,22 @@ InsructionSet RV32CI {
 			args_disass: "x%rs1$d";
 			PC <= X[rs1];
 		}
-		C.EBREAK(no_cont) {//(RV32)
-			encoding:b100 | b1 | b00000 | b00000 | b10;
-			raise(0, 3);
-		}
-        // order matters as C.JALR is a special case of C.ADD
+        // order matters as C.EBREAK is a special case of C.JALR which is a special case of C.ADD
         C.ADD {//(RV32)
             encoding:b100 | b1 | rd[4:0] | rs2[4:0] | b10;
             args_disass: "x%rd$d, x%rs2$d";
-            X[rd] <= X[rd] + X[rs2];
+        	X[rd] <= X[rd] + X[rs2];
         }
 		C.JALR(no_cont) {//(RV32)
 			encoding:b100 | b1 | rs1[4:0] | b00000 | b10;
 			args_disass: "x%rs1$d";
-			val rd[5] <= 1;
-			X[rd] <= PC+2;
+			val r_idx[5] <= 1;
+			X[r_idx] <= PC+2;
 			PC<=X[rs1];
+		}
+		C.EBREAK(no_cont) {//(RV32)
+			encoding:b100 | b1 | b00000 | b00000 | b10;
+			raise(0, 3);
 		}
 		C.SWSP {//
 			encoding:b110 | uimm[5:2] | uimm[7:6] | rs2[4:0] | b10;
@@ -194,6 +182,10 @@ InsructionSet RV32CI {
             val x2_idx[5] <= 2;
             val offs[XLEN] <= X[x2_idx] + uimm;
             MEM[offs]{32} <= X[rs2];
+		}
+		DII {
+			encoding:b000 | b0 | b00000 | b00000 | b00;
+			raise(0, 2);
 		}
 	}
 }

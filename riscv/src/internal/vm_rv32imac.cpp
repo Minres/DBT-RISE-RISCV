@@ -148,7 +148,8 @@ protected:
     }
 
     // some compile time constants
-    enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    enum { MASK16 = 0b1111111111111111, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
     enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
@@ -364,10 +365,10 @@ private:
         {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
         /* instruction C.SW */
         {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
-        /* instruction C.NOP */
-        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
         /* instruction C.ADDI */
         {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
+        /* instruction C.NOP */
+        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
         /* instruction C.JAL */
         {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
         /* instruction C.LI */
@@ -377,9 +378,9 @@ private:
         /* instruction C.ADDI16SP */
         {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
         /* instruction C.SRLI */
-        {16, 0b1000000000000001, 0b1110110000000011, &this_class::__c_srli},
+        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
         /* instruction C.SRAI */
-        {16, 0b1000010000000001, 0b1110110000000011, &this_class::__c_srai},
+        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
         /* instruction C.ANDI */
         {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
         /* instruction C.SUB */
@@ -397,23 +398,23 @@ private:
         /* instruction C.BNEZ */
         {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
         /* instruction C.SLLI */
-        {16, 0b0000000000000010, 0b1110000000000011, &this_class::__c_slli},
-        /* instruction C.LQSP */
-        {16, 0b0010000000000010, 0b1110000000000011, &this_class::__c_lqsp},
+        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
         /* instruction C.LWSP */
         {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
         /* instruction C.MV */
         {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
         /* instruction C.JR */
         {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
-        /* instruction C.EBREAK */
-        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
         /* instruction C.ADD */
         {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
         /* instruction C.JALR */
         {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
+        /* instruction C.EBREAK */
+        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
         /* instruction C.SWSP */
         {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
+        /* instruction DII */
+        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
     };
     // instruction LUI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
@@ -3353,11 +3354,11 @@ private:
         this->gen_sync(iss::PRE_SYNC);
     
         uint8_t fld_rd_val = 0 | (bit_sub<2,3>(instr));
-        uint16_t fld_nzuimm_val = 0 | (bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4);
+        uint16_t fld_imm_val = 0 | (bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             boost::format ins_fmter("C.ADDI4SPN x%1$d, 0x%2$05x");
-            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_nzuimm_val;
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_imm_val;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -3367,14 +3368,14 @@ private:
         }
         pc=pc+2;
     
-        if(fld_nzuimm_val == 0){
+        if(fld_imm_val == 0){
             this->gen_raise_trap(0, 2);
         }
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t x2_idx_val = 2;
         Value* X_rd_idx_val = this->builder->CreateAdd(
             this->gen_reg_load(x2_idx_val, 0),
-            this->gen_const(32U, fld_nzuimm_val));
+            this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -3406,11 +3407,11 @@ private:
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
-        Value* adr_val = this->builder->CreateAdd(
+        uint8_t rd_idx_val = (fld_rd_val + 8);
+        Value* offs_val = this->builder->CreateAdd(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
-        uint8_t rd_idx_val = (fld_rd_val + 8);
-        Value* X_rd_idx_val = this->gen_read_mem(traits<ARCH>::MEM, adr_val, 32/8);
+        Value* X_rd_idx_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
         this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -3442,15 +3443,47 @@ private:
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
-        Value* adr_val = this->builder->CreateAdd(
+        uint8_t rs2_idx_val = (fld_rs2_val + 8);
+        Value* offs_val = this->builder->CreateAdd(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
-        uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* MEM_adr_val = this->gen_reg_load(rs2_idx_val, 0);
+        Value* MEM_offs_val = this->gen_reg_load(rs2_idx_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
-            adr_val,
-            this->builder->CreateZExtOrTrunc(MEM_adr_val,this->get_type(32)));
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction C.ADDI
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("C.ADDI");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        int8_t fld_imm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
+        uint8_t fld_rs1_val = 0 | (bit_sub<7,5>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("C.ADDI x%1$d, 0x%2$05x");
+            ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+2;
+    
+        Value* X_rs1_val = this->builder->CreateAdd(
+            this->gen_reg_load(fld_rs1_val, 0),
+            this->gen_const(32U, fld_imm_val));
+        this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3467,53 +3500,16 @@ private:
         ;
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            boost::format ins_fmter("C.NOP ");
-            ins_fmter ;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder->CreateGlobalStringPtr("C.NOP"),
             };
             this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         /* TODO: describe operations for C.NOP ! */
-        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-        this->gen_trap_check(bb);
-        return std::make_tuple(vm::CONT, bb);
-    }
-    
-    // instruction C.ADDI
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("C.ADDI");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        int8_t fld_nzimm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
-        uint8_t fld_rs1_val = 0 | (bit_sub<7,5>(instr));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            boost::format ins_fmter("C.ADDI x%1$d, 0x%2$05x");
-            ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_nzimm_val;
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+2;
-    
-        if(fld_nzimm_val == 0){
-            this->gen_raise_trap(0, 2);
-        }
-        Value* X_rs1_val = this->builder->CreateAdd(
-            this->gen_reg_load(fld_rs1_val, 0),
-            this->gen_const(32U, fld_nzimm_val));
-        this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3594,12 +3590,12 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        int32_t fld_nzimm_val = 0 | (bit_sub<2,5>(instr) << 12) | (signed_bit_sub<12,1>(instr) << 17);
+        int32_t fld_imm_val = 0 | (bit_sub<2,5>(instr) << 12) | (signed_bit_sub<12,1>(instr) << 17);
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             boost::format ins_fmter("C.LUI x%1$d, 0x%2$05x");
-            ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_nzimm_val;
+            ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -3612,13 +3608,10 @@ private:
         if(fld_rd_val == 0){
             this->gen_raise_trap(0, 2);
         }
-        if(fld_rd_val == 2){
+        if(fld_imm_val == 0){
             this->gen_raise_trap(0, 2);
         }
-        if(fld_nzimm_val == 0){
-            this->gen_raise_trap(0, 2);
-        }
-        Value* X_rd_val = this->gen_const(32U, fld_nzimm_val);
+        Value* X_rd_val = this->gen_const(32U, fld_imm_val);
         this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -3633,11 +3626,11 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        int16_t fld_nzimm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (signed_bit_sub<12,1>(instr) << 9);
+        int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (signed_bit_sub<12,1>(instr) << 9);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             boost::format ins_fmter("C.ADDI16SP 0x%1$05x");
-            ins_fmter % (int64_t)fld_nzimm_val;
+            ins_fmter % (int64_t)fld_imm_val;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -3652,7 +3645,7 @@ private:
             this->gen_ext(
                 this->gen_reg_load(x2_idx_val, 0),
                 32, true),
-            this->gen_const(32U, fld_nzimm_val));
+            this->gen_const(32U, fld_imm_val));
         this->builder->CreateStore(X_x2_idx_val, get_reg_ptr(x2_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -3667,7 +3660,7 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
+        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<7,3>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
@@ -3682,9 +3675,6 @@ private:
         }
         pc=pc+2;
     
-        if(fld_shamt_val > 31){
-            this->gen_raise_trap(0, 2);
-        }
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateLShr(
             this->gen_reg_load(rs1_idx_val, 0),
@@ -3703,7 +3693,7 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
+        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<7,3>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
@@ -3718,9 +3708,6 @@ private:
         }
         pc=pc+2;
     
-        if(fld_shamt_val > 31){
-            this->gen_raise_trap(0, 2);
-        }
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* X_rs1_idx_val = this->builder->CreateAShr(
             this->gen_reg_load(rs1_idx_val, 0),
@@ -3938,11 +3925,11 @@ private:
         this->gen_sync(iss::PRE_SYNC);
     
         int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (signed_bit_sub<12,1>(instr) << 8);
-        uint8_t fld_rs1d_val = 0 | (bit_sub<7,3>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<7,3>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             boost::format ins_fmter("C.BEQZ x(8+%1$d), 0x%2$05x");
-            ins_fmter % (uint64_t)fld_rs1d_val % (int64_t)fld_imm_val;
+            ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -3952,11 +3939,11 @@ private:
         }
         pc=pc+2;
     
-        uint8_t rs1_val = (fld_rs1d_val + 8);
+        uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_EQ,
-                this->gen_reg_load(rs1_val, 0),
+                this->gen_reg_load(rs1_idx_val, 0),
                 this->gen_const(32U, 0)),
             this->builder->CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
@@ -3977,12 +3964,12 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        uint16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8);
-        uint8_t fld_rs1d_val = 0 | (bit_sub<7,3>(instr));
+        int16_t fld_imm_val = 0 | (bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (signed_bit_sub<12,1>(instr) << 8);
+        uint8_t fld_rs1_val = 0 | (bit_sub<7,3>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            boost::format ins_fmter("C.BNEZ x(8+%1$d),, 0x%2$05x");
-            ins_fmter % (uint64_t)fld_rs1d_val % (uint64_t)fld_imm_val;
+            boost::format ins_fmter("C.BNEZ x(8+%1$d), 0x%2$05x");
+            ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -3992,11 +3979,11 @@ private:
         }
         pc=pc+2;
     
-        uint8_t rs1_val = (fld_rs1d_val + 8);
+        uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* PC_val = this->gen_choose(
             this->builder->CreateICmp(
                 ICmpInst::ICMP_NE,
-                this->gen_reg_load(rs1_val, 0),
+                this->gen_reg_load(rs1_idx_val, 0),
                 this->gen_const(32U, 0)),
             this->builder->CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
@@ -4017,7 +4004,7 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
+        uint8_t fld_shamt_val = 0 | (bit_sub<2,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<7,5>(instr));
         if(this->disass_enabled){
             /* generate console output when executing the command */
@@ -4035,40 +4022,10 @@ private:
         if(fld_rs1_val == 0){
             this->gen_raise_trap(0, 2);
         }
-        if(fld_shamt_val > 31){
-            this->gen_raise_trap(0, 2);
-        }
         Value* X_rs1_val = this->builder->CreateShl(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_shamt_val));
         this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
-        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-        this->gen_trap_check(bb);
-        return std::make_tuple(vm::CONT, bb);
-    }
-    
-    // instruction C.LQSP
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lqsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("C.LQSP");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        uint16_t fld_uimm_val = 0 | (bit_sub<2,4>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 5);
-        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("C.LQSP"),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+2;
-    
-        /* TODO: describe operations for C.LQSP ! */
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4167,30 +4124,6 @@ private:
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction C.EBREAK
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("C.EBREAK");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        ;
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("C.EBREAK"),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+2;
-    
-        this->gen_raise_trap(0, 3);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        this->gen_trap_check(this->leave_blk);
-        return std::make_tuple(iss::vm::BRANCH, nullptr);
-    }
-    
     // instruction C.ADD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("C.ADD");
@@ -4243,13 +4176,37 @@ private:
         }
         pc=pc+2;
     
-        uint8_t rd_val = 1;
-        Value* X_rd_val = this->builder->CreateAdd(
+        uint8_t r_idx_val = 1;
+        Value* X_r_idx_val = this->builder->CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, 2));
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(rd_val), false);
+        this->builder->CreateStore(X_r_idx_val, get_reg_ptr(r_idx_val), false);
         Value* PC_val = this->gen_reg_load(fld_rs1_val, 0);
         this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_trap_check(this->leave_blk);
+        return std::make_tuple(iss::vm::BRANCH, nullptr);
+    }
+    
+    // instruction C.EBREAK
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("C.EBREAK");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        ;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr("C.EBREAK"),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+2;
+    
+        this->gen_raise_trap(0, 3);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4285,6 +4242,32 @@ private:
             traits<ARCH>::MEM,
             offs_val,
             this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction DII
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __dii(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("DII");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        ;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr("DII"),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+2;
+    
+        this->gen_raise_trap(0, 2);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4358,7 +4341,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     } catch (trap_access &ta) {
         throw trap_access(ta.id, pc.val);
     }
-    if (insn == 0x0000006f) throw simulation_stopped(0);
+    if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
     typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;

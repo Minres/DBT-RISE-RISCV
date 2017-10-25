@@ -435,6 +435,8 @@ public:
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
+    void notify_phase(iss::arch_if::exec_phase phase);
+
     void disass_output(uint64_t pc, const std::string instr) override {
         std::stringstream s;
         s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
@@ -468,6 +470,7 @@ protected:
 
 private:
     iss::status read_cycle(unsigned addr, reg_t &val);
+    iss::status read_time(unsigned addr, reg_t &val);
     iss::status read_status(unsigned addr, reg_t &val);
     iss::status write_status(unsigned addr, reg_t val);
     iss::status read_ie(unsigned addr, reg_t &val);
@@ -489,6 +492,10 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
     for (unsigned addr = mcycle; addr <= hpmcounter31; ++addr) csr_wr_cb[addr] = nullptr;
     for (unsigned addr = mcycleh; addr <= hpmcounter31h; ++addr) csr_wr_cb[addr] = nullptr;
     // special handling
+    csr_rd_cb[time] = &riscv_hart_msu_vp<BASE>::read_time;
+    csr_wr_cb[time] = nullptr;
+    csr_rd_cb[timeh] = &riscv_hart_msu_vp<BASE>::read_time;
+    csr_wr_cb[timeh] = nullptr;
     csr_rd_cb[mcycle] = &riscv_hart_msu_vp<BASE>::read_cycle;
     csr_rd_cb[mcycleh] = &riscv_hart_msu_vp<BASE>::read_cycle;
     csr_rd_cb[minstret] = &riscv_hart_msu_vp<BASE>::read_cycle;
@@ -781,6 +788,17 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigne
     return iss::Ok;
 }
 
+template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned addr, reg_t &val) {
+	uint64_t time_val=this->reg.icount>>12;
+    if (addr == time) {
+        val = static_cast<reg_t>(time_val);
+    } else if (addr == timeh) {
+        if (sizeof(typename traits<BASE>::reg_t) != 4) return iss::Err;
+        val = static_cast<reg_t>(time_val >> 32);
+    }
+    return iss::Ok;
+}
+
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_status(unsigned addr, reg_t &val) {
     auto req_priv_lvl = addr >> 8;
     if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
@@ -862,8 +880,9 @@ iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length
     if ((paddr.val + length) > mem.size()) return iss::Err;
     switch (paddr.val) {
     case 0x0200BFF8: { // CLINT base, mtime reg
-        uint64_t mtime = this->reg.icount >> 12 /*12*/;
-        std::copy((uint8_t *)&mtime, ((uint8_t *)&mtime) + length, data);
+    	if(sizeof(reg_t)<length) return iss::Err;
+    	reg_t time_val=this->csr[time];
+        std::copy((uint8_t *)&time_val, ((uint8_t *)&time_val) + length, data);
     } break;
     case 0x10008000: {
         const mem_type::page_type &p = mem(paddr.val / mem.page_size);
@@ -952,6 +971,11 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
     }
     }
     return iss::Ok;
+}
+
+template<typename BASE>
+inline void riscv_hart_msu_vp<BASE>::notify_phase(iss::arch_if::exec_phase phase) {
+	BASE::notify_phase(phase);
 }
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {

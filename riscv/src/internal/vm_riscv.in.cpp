@@ -148,7 +148,8 @@ protected:
     }
 
     // some compile time constants
-    enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    enum { MASK16 = 0b1111111111111111, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
     enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
@@ -281,7 +282,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     } catch (trap_access &ta) {
         throw trap_access(ta.id, pc.val);
     }
-    if (insn == 0x0000006f) throw simulation_stopped(0);
+    if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
     typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;
