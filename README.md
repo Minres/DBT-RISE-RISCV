@@ -27,18 +27,16 @@ DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 
 * you need to have a decent compiler, make, python, and cmake installed
 * install LLVM 4.0 according to http://apt.llvm.org/ (if it is not already provided by your distribution)
-* install conan.io (see also http://docs.conan.io/en/latest/installation.html)
+* install conan.io (see also http://docs.conan.io/en/latest/installation.html):
 ```
     pip install conan
 ```
-* download and install SystemC from http://accellera.org/downloads/standards/systemc (this is going to be replaced with a conan.io integration)
-  * optionally download and install SystemC Verification Library (SCV) from Accelera into the same location
-* setup conan to use the minres repo
+* setup conan to use the minres repo:
 ```
-    conan add remote minres https://dl.bintray.com/minres/conan-repo
+    conan add remote minres https://api.bintray.com/conan/minres/conan-repo
 ```
 * checkout source from git
-* start an out-of-source build like so (e.g. when using bash)
+* start an out-of-source build:
 ```
     cd DBT-RISE-RiscV
     mkdir build
@@ -46,9 +44,6 @@ DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
     cmake ..
     cmake --build .
 ```
-* if the SystemC installation is not found by cmake you can optionally specify the location by either setting the following environment variables pointing to the installation
-  - SYSTEMC_HOME
-  - SYSTEMC_PREFIX
 * if you encounter issues when linking wrt. c++11 symbols you might have run into GCC ABI incompatibility introduced from GCC 5.0 onwards. You can fix this by adding '-s compiler.libcxx=libstdc++11' to the conan call or changing compiler.libcxx to
 ```
 compiler.libcxx=libstdc++11

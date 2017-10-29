@@ -1,6 +1,8 @@
 [requires]
 Poco/1.7.8p3@pocoproject/stable
-Seasocks/1.3.2@seasocks/stable
+Seasocks/1.3.2@minres/stable
+SystemC/2.3.2@minres/stable
+SystemCVerification/2.0.0a@minres/stable
 
 [generators]
 cmake
@@ -8,3 +10,5 @@ cmake
 [options]
 Poco:shared=True
 Seasocks:shared=False
+SystemC:stdcxx=14
+SystemCVerification:stdcxx=14
