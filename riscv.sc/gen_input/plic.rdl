@@ -3,17 +3,17 @@ regfile plic_regs {
 		name="priority";
 		desc="interrupt source priority";
 		field {} priority[2:0];
-	} priority[255] @0x004;
+	} priority[256] @0x000;
 	reg {
 		name="pending";
 		desc="pending irq";
 		field {} pending[31:0];
-	} pending @0x1000;
+	} pending[8] @0x1000;
 	reg {
 		name="enabled";
 		desc="enabled interrupts";
 		field {} enabled[31:0];
-	} enabled @0x2000;
+	} enabled[8] @0x2000;
 	reg {
 		name="threshold";
 		desc="interrupt priority threshold";

@@ -56,11 +56,11 @@ int sc_main(int argc, char *argv[]) {
             ("elf,l", po::value<std::string>(), "ELF file to load")
             ("gdb-port,g", po::value<unsigned short>()->default_value(0), "enable gdb server and specify port to use")
             ("dump-ir", "dump the intermediate representation")
-            ("cycles,c", po::value<int64_t>()->default_value(-1), "number of cycles to run")
+            ("cycles", po::value<int64_t>()->default_value(-1), "number of cycles to run")
             ("quantum", po::value<unsigned>(), "SystemC quantum time in ns")
             ("reset,r", po::value<std::string>(), "reset address")
             ("trace,t", po::value<unsigned>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
-            ("rv64", "run RV64")
+            ("max_time,m", po::value<std::string>(), "maximum time to run")
             ("config-file,c", po::value<std::string>()->default_value(""), "configuration file");
     // clang-format on
     po::variables_map vm;
@@ -136,7 +136,11 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // run simulation
     ///////////////////////////////////////////////////////////////////////////
-    sc_core::sc_start();
+    if(vm.count("max_time")){
+    	sc_core::sc_time max_time = scc::parse_from_string(vm["max_time"].as<std::string>());
+    	sc_core::sc_start(max_time);
+    } else
+    	sc_core::sc_start();
     if (!sc_core::sc_end_of_simulation_invoked()) sc_core::sc_stop();
     return 0;
 }

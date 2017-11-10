@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Oct 04 10:06:35 CEST 2017
+// Created on: Fri Nov 10 18:01:53 CET 2017
 //             *      aon_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,66 +36,69 @@
 #ifndef _AON_REGS_H_
 #define _AON_REGS_H_
 
+#include <scc/utilities.h>
 #include <util/bit_field.h>
-#include "scc/register.h"
-#include "scc/tlm_target.h"
-#include "scc/utilities.h"
+#include <scc/register.h>
+#include <scc/tlm_target.h>
 
 namespace sysc {
 
-class aon_regs : public sc_core::sc_module, public scc::resetable {
+class aon_regs :
+        public sc_core::sc_module,
+        public scc::resetable
+{
 public:
     // storage declarations
     uint32_t r_wdogcfg;
-
+    
     uint32_t r_wdogcount;
-
+    
     uint32_t r_wdogs;
-
+    
     uint32_t r_wdogfeed;
-
+    
     uint32_t r_wdogkey;
-
+    
     uint32_t r_wdogcmp;
-
+    
     uint32_t r_rtccfg;
-
+    
     uint32_t r_rtclo;
-
+    
     uint32_t r_rtchi;
-
+    
     uint32_t r_rtcs;
-
+    
     uint32_t r_rtccmp;
-
+    
     uint32_t r_lfrosccfg;
-
+    
     std::array<uint32_t, 32> r_backup;
-
+    
     BEGIN_BF_DECL(pmuwakeupi_t, uint32_t);
-    BF_FIELD(delay, 0, 4);
-    BF_FIELD(vddpaden, 5, 1);
-    BF_FIELD(corerst, 7, 1);
-    BF_FIELD(hfclkrst, 8, 1);
-    END_BF_DECL();
+        BF_FIELD(delay, 0, 4);
+        BF_FIELD(vddpaden, 5, 1);
+        BF_FIELD(corerst, 7, 1);
+        BF_FIELD(hfclkrst, 8, 1);
+    END_BF_DECL() ;
     std::array<pmuwakeupi_t, 8> r_pmuwakeupi;
-
+    
     BEGIN_BF_DECL(pmusleepi_t, uint32_t);
-    BF_FIELD(delay, 0, 4);
-    BF_FIELD(vddpaden, 5, 1);
-    BF_FIELD(corerst, 7, 1);
-    BF_FIELD(hfclkrst, 8, 1);
-    END_BF_DECL();
+        BF_FIELD(delay, 0, 4);
+        BF_FIELD(vddpaden, 5, 1);
+        BF_FIELD(corerst, 7, 1);
+        BF_FIELD(hfclkrst, 8, 1);
+    END_BF_DECL() ;
     std::array<pmusleepi_t, 8> r_pmusleepi;
-
+    
     uint32_t r_pmuie;
-
+    
     uint32_t r_pmucause;
-
+    
     uint32_t r_pmusleep;
-
+    
     uint32_t r_pmukey;
-
+    
     // register declarations
     scc::sc_register<uint32_t> wdogcfg;
     scc::sc_register<uint32_t> wdogcount;
@@ -116,10 +119,11 @@ public:
     scc::sc_register<uint32_t> pmucause;
     scc::sc_register<uint32_t> pmusleep;
     scc::sc_register<uint32_t> pmukey;
-
+    
     aon_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
+    template<unsigned BUSWIDTH=32>
+    void registerResources(scc::tlm_target<BUSWIDTH>& target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -146,9 +150,12 @@ inline sysc::aon_regs::aon_regs(sc_core::sc_module_name nm)
 , NAMED(pmuie, r_pmuie, 0, *this)
 , NAMED(pmucause, r_pmucause, 0, *this)
 , NAMED(pmusleep, r_pmusleep, 0, *this)
-, NAMED(pmukey, r_pmukey, 0, *this) {}
+, NAMED(pmukey, r_pmukey, 0, *this)
+{
+}
 
-template <unsigned BUSWIDTH> inline void sysc::aon_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
+template<unsigned BUSWIDTH>
+inline void sysc::aon_regs::registerResources(scc::tlm_target<BUSWIDTH>& target) {
     target.addResource(wdogcfg, 0x0UL);
     target.addResource(wdogcount, 0x8UL);
     target.addResource(wdogs, 0x10UL);

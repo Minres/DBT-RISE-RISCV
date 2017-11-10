@@ -22,6 +22,7 @@
 namespace sysc {
 
 class uart_regs;
+class WsHandler;
 
 class uart : public sc_core::sc_module, public scc::tlm_target<> {
 public:
@@ -38,6 +39,7 @@ protected:
     sc_core::sc_time clk;
     std::unique_ptr<uart_regs> regs;
     std::vector<uint8_t> queue;
+    std::shared_ptr<sysc::WsHandler> handler;
 };
 
 } /* namespace sysc */

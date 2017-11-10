@@ -18,24 +18,34 @@
 #define _GPIO_H_
 
 #include "scc/tlm_target.h"
+#include <sysc/communication/sc_signal_rv_ports.h>
 
 namespace sysc {
 
 class gpio_regs;
+class WsHandler;
 
 class gpio : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(gpio);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
+    sc_core::sc_inout_rv<32> pins_io;
+
     gpio(sc_core::sc_module_name nm);
     virtual ~gpio() override; // need to keep it in source file because of fwd declaration of gpio_regs
 
 protected:
     void clock_cb();
     void reset_cb();
+    void update_pins();
+    void pins_cb();
     sc_core::sc_time clk;
     std::unique_ptr<gpio_regs> regs;
+    std::shared_ptr<sysc::WsHandler> handler;
+
+private:
+	void update_value_reg();
 };
 
 } /* namespace sysc */

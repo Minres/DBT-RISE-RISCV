@@ -54,7 +54,10 @@ prci::prci(sc_core::sc_module_name nm)
     });
 }
 
-void prci::clock_cb() {}
+void prci::clock_cb() {
+	this->clk = clk_i.read();
+
+}
 
 prci::~prci() {}
 

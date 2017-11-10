@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Oct 04 10:06:35 CEST 2017
+// Created on: Fri Nov 10 18:01:53 CET 2017
 //             *      clint_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,32 +36,36 @@
 #ifndef _CLINT_REGS_H_
 #define _CLINT_REGS_H_
 
+#include <scc/utilities.h>
 #include <util/bit_field.h>
-#include "scc/register.h"
-#include "scc/tlm_target.h"
-#include "scc/utilities.h"
+#include <scc/register.h>
+#include <scc/tlm_target.h>
 
 namespace sysc {
 
-class clint_regs : public sc_core::sc_module, public scc::resetable {
+class clint_regs :
+        public sc_core::sc_module,
+        public scc::resetable
+{
 public:
     // storage declarations
     BEGIN_BF_DECL(msip_t, uint32_t);
-    BF_FIELD(msip, 0, 1);
+        BF_FIELD(msip, 0, 1);
     END_BF_DECL() r_msip;
-
+    
     uint64_t r_mtimecmp;
-
+    
     uint64_t r_mtime;
-
+    
     // register declarations
     scc::sc_register<msip_t> msip;
     scc::sc_register<uint64_t> mtimecmp;
     scc::sc_register<uint64_t> mtime;
-
+    
     clint_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
+    template<unsigned BUSWIDTH=32>
+    void registerResources(scc::tlm_target<BUSWIDTH>& target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -72,9 +76,12 @@ inline sysc::clint_regs::clint_regs(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , NAMED(msip, r_msip, 0, *this)
 , NAMED(mtimecmp, r_mtimecmp, 0, *this)
-, NAMED(mtime, r_mtime, 0, *this) {}
+, NAMED(mtime, r_mtime, 0, *this)
+{
+}
 
-template <unsigned BUSWIDTH> inline void sysc::clint_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
+template<unsigned BUSWIDTH>
+inline void sysc::clint_regs::registerResources(scc::tlm_target<BUSWIDTH>& target) {
     target.addResource(msip, 0x0UL);
     target.addResource(mtimecmp, 0x4000UL);
     target.addResource(mtime, 0xbff8UL);

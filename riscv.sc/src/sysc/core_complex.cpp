@@ -108,22 +108,53 @@ public:
     };
 
     iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
-        if (addr.type & iss::DEBUG)
-            return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
-        else {
-            return owner->read_mem(addr.val, length, data,addr.type && iss::FETCH) ? iss::Ok : iss::Err;
-        }
+    	if (addr.type & iss::DEBUG)
+    		return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+    	else {
+    		return owner->read_mem(addr.val, length, data,addr.type && iss::FETCH) ? iss::Ok : iss::Err;
+    	}
     }
 
     iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
-        if (addr.type & iss::DEBUG)
-            return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
-        else
-            return owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
+    	if (addr.type & iss::DEBUG)
+    		return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+    	else{
+    		auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
+    		// TODO: this is an ugly hack (clear MTIP on mtimecmp write), needs to be fixed
+    		if(addr.val==0x2004000)
+    			this->csr[iss::arch::mip] &= ~(1ULL<<7);
+    		return res;
+    	}
     }
 
+    void wait_until(uint64_t flags) {
+    	do{
+    			wait(wfi_evt);
+    			this->check_interrupt();
+    	} while(this->reg.pending_trap==0);
+    	base_type::wait_until(flags);
+    }
+
+    void local_irq(short id){
+    	switch(id){
+    	case 16: // SW
+    		this->csr[iss::arch::mip] |= 1<<3;
+    		break;
+    	case 17: // timer
+    		this->csr[iss::arch::mip] |= 1<<7;
+    		break;
+    	case 18: //external
+    		this->csr[iss::arch::mip] |= 1<<11;
+    		break;
+    	default:
+    		/* do nothing*/
+    		break;
+    	}
+    	wfi_evt.notify();
+    }
 private:
     core_complex *const owner;
+    sc_event wfi_evt;
 };
 
 int cmd_sysc(int argc, char* argv[], iss::debugger::out_func of, iss::debugger::data_func df, iss::debugger::target_adapter_if* tgt_adapter){
@@ -166,6 +197,9 @@ core_complex::core_complex(sc_core::sc_module_name name)
 , NAMED(initiator)
 , NAMED(clk_i)
 , NAMED(rst_i)
+, NAMED(global_irq_i)
+, NAMED(timer_irq_i)
+, NAMED(local_irq_i, 16)
 , NAMED(elf_file, this)
 , NAMED(enable_disass, true, this)
 , NAMED(reset_address, 0ULL, this)
@@ -196,6 +230,12 @@ core_complex::core_complex(sc_core::sc_module_name name)
     SC_THREAD(run);
     SC_METHOD(clk_cb);
     sensitive << clk_i;
+    SC_METHOD(sw_irq_cb);
+    sensitive<<sw_irq_i;
+    SC_METHOD(timer_irq_cb);
+    sensitive<<timer_irq_i;
+    SC_METHOD(global_irq_cb);
+    sensitive<<global_irq_i;
 }
 
 core_complex::~core_complex() = default;
@@ -242,7 +282,21 @@ void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
 #endif
 }
 
-void core_complex::clk_cb() { curr_clk = clk_i.read(); }
+void core_complex::clk_cb() {
+	curr_clk = clk_i.read();
+}
+
+void core_complex::sw_irq_cb(){
+	if(sw_irq_i.read()) cpu->local_irq(16);
+}
+
+void core_complex::timer_irq_cb(){
+	if(timer_irq_i.read()) cpu->local_irq(17);
+}
+
+void core_complex::global_irq_cb(){
+	if(timer_irq_i.read()) cpu->local_irq(18);
+}
 
 void core_complex::run() {
     wait(sc_core::SC_ZERO_TIME);
@@ -268,7 +322,7 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data,
         gp.set_address(addr);
         gp.set_data_ptr(data);
         gp.set_data_length(length);
-        gp.set_streaming_width(4);
+        gp.set_streaming_width(length);
         auto delay{quantum_keeper.get_local_time()};
 #ifdef WITH_SCV
         if(m_db!=nullptr && tr_handle.is_valid()){
@@ -315,7 +369,7 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t *cons
         gp.set_address(addr);
         gp.set_data_ptr(write_buf.data());
         gp.set_data_length(length);
-        gp.set_streaming_width(4);
+        gp.set_streaming_width(length);
         auto delay{quantum_keeper.get_local_time()};
         initiator->b_transport(gp, delay);
         quantum_keeper.set(delay);

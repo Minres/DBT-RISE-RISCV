@@ -27,11 +27,13 @@ namespace sysc {
 platform::platform(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , NAMED(i_core_complex)
-, NAMED(i_router, 10, 1)
+, NAMED(i_router, 12, 1)
 , NAMED(i_uart0)
 , NAMED(i_uart1)
-, NAMED(i_spi)
-, NAMED(i_gpio)
+, NAMED(i_qspi0)
+, NAMED(i_qspi1)
+, NAMED(i_qspi2)
+, NAMED(i_gpio0)
 , NAMED(i_plic)
 , NAMED(i_aon)
 , NAMED(i_prci)
@@ -41,7 +43,9 @@ platform::platform(sc_core::sc_module_name nm)
 , NAMED(s_clk)
 , NAMED(s_rst)
 , NAMED(s_global_int, 256)
-, NAMED(s_core_int) {
+, NAMED(s_local_int, 16)
+, NAMED(s_core_int)
+, NAMED(s_gpio_pins) {
     i_core_complex.initiator(i_router.target[0]);
     size_t i = 0;
     for (const auto &e : e300_plat_map) {
@@ -56,8 +60,10 @@ platform::platform(sc_core::sc_module_name nm)
 
     i_uart0.clk_i(s_clk);
     i_uart1.clk_i(s_clk);
-    i_spi.clk_i(s_clk);
-    i_gpio.clk_i(s_clk);
+    i_qspi0.clk_i(s_clk);
+    i_qspi1.clk_i(s_clk);
+    i_qspi2.clk_i(s_clk);
+    i_gpio0.clk_i(s_clk);
     i_plic.clk_i(s_clk);
     i_aon.clk_i(s_clk);
     i_prci.clk_i(s_clk);
@@ -66,8 +72,10 @@ platform::platform(sc_core::sc_module_name nm)
 
     i_uart0.rst_i(s_rst);
     i_uart1.rst_i(s_rst);
-    i_spi.rst_i(s_rst);
-    i_gpio.rst_i(s_rst);
+    i_qspi0.rst_i(s_rst);
+    i_qspi1.rst_i(s_rst);
+    i_qspi2.rst_i(s_rst);
+    i_gpio0.rst_i(s_rst);
     i_plic.rst_i(s_rst);
     i_aon.rst_i(s_rst);
     i_prci.rst_i(s_rst);
@@ -79,6 +87,14 @@ platform::platform(sc_core::sc_module_name nm)
 
     i_plic.global_interrupts_i(s_global_int);
     i_plic.core_interrupt_o(s_core_int);
+
+    i_core_complex.sw_irq_i(s_msie_int);
+    i_core_complex.timer_irq_i(s_mtime_int);
+    i_core_complex.global_irq_i(s_core_int);
+    i_core_complex.local_irq_i(s_local_int);
+
+    i_gpio0.pins_io(s_gpio_pins);
+
     SC_THREAD(gen_reset);
 }
 

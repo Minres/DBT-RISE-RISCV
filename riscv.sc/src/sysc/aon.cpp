@@ -35,7 +35,9 @@ aon::aon(sc_core::sc_module_name nm)
     dont_initialize();
 }
 
-void aon::clock_cb() {}
+void aon::clock_cb() {
+	this->clk = clk_i.read();
+}
 
 aon::~aon() {}
 

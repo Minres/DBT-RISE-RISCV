@@ -17,6 +17,7 @@
 #include "sysc/SiFive/clint.h"
 
 #include "scc/utilities.h"
+#include "scc/report.h"
 #include "sysc/SiFive/gen/clint_regs.h"
 
 namespace sysc {
@@ -63,7 +64,7 @@ clint::clint(sc_core::sc_module_name nm)
 
 void clint::clock_cb() {
     update_mtime();
-    clk = clk_i.read();
+    this->clk = clk_i.read();
     update_mtime();
 }
 
@@ -85,11 +86,14 @@ void clint::update_mtime() {
     regs->r_mtime += (diffi + cnt_fraction) / lfclk_mutiplier;
     cnt_fraction = (cnt_fraction + diffi) % lfclk_mutiplier;
     mtime_evt.cancel();
-    if (regs->r_mtimecmp > regs->r_mtime && clk > sc_core::SC_ZERO_TIME) {
-        sc_core::sc_time next_trigger = (clk * lfclk_mutiplier) * (regs->r_mtimecmp - regs->mtime) - cnt_fraction * clk;
-        mtime_evt.notify(next_trigger);
-    } else
-        mtime_int_o.write(true);
+    if (regs->r_mtimecmp > 0)
+    	if(regs->r_mtimecmp > regs->r_mtime && clk > sc_core::SC_ZERO_TIME) {
+    		sc_core::sc_time next_trigger = (clk * lfclk_mutiplier) * (regs->r_mtimecmp - regs->mtime) - cnt_fraction * clk;
+    		LOG(DEBUG)<<"Timer fires at "<< sc_time_stamp()+next_trigger;
+    		mtime_evt.notify(next_trigger);
+    		mtime_int_o.write(false);
+    	} else
+    		mtime_int_o.write(true);
     last_updt = sc_core::sc_time_stamp();
 }
 

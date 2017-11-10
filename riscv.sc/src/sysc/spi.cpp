@@ -37,7 +37,9 @@ spi::spi(sc_core::sc_module_name nm)
 
 spi::~spi() {}
 
-void spi::clock_cb() { this->clk = clk_i.read(); }
+void spi::clock_cb() {
+	this->clk = clk_i.read();
+}
 
 void spi::reset_cb() {
     if (rst_i.read())

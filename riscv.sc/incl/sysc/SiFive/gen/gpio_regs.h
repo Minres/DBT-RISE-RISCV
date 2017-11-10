@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Created on: Wed Oct 04 10:06:35 CEST 2017
+// Created on: Fri Nov 10 18:01:53 CET 2017
 //             *      gpio_regs.h Author: <RDL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,50 +36,53 @@
 #ifndef _GPIO_REGS_H_
 #define _GPIO_REGS_H_
 
+#include <scc/utilities.h>
 #include <util/bit_field.h>
-#include "scc/register.h"
-#include "scc/tlm_target.h"
-#include "scc/utilities.h"
+#include <scc/register.h>
+#include <scc/tlm_target.h>
 
 namespace sysc {
 
-class gpio_regs : public sc_core::sc_module, public scc::resetable {
+class gpio_regs :
+        public sc_core::sc_module,
+        public scc::resetable
+{
 public:
     // storage declarations
     uint32_t r_value;
-
+    
     uint32_t r_input_en;
-
+    
     uint32_t r_output_en;
-
+    
     uint32_t r_port;
-
+    
     uint32_t r_pue;
-
+    
     uint32_t r_ds;
-
+    
     uint32_t r_rise_ie;
-
+    
     uint32_t r_rise_ip;
-
+    
     uint32_t r_fall_ie;
-
+    
     uint32_t r_fall_ip;
-
+    
     uint32_t r_high_ie;
-
+    
     uint32_t r_high_ip;
-
+    
     uint32_t r_low_ie;
-
+    
     uint32_t r_low_ip;
-
+    
     uint32_t r_iof_en;
-
+    
     uint32_t r_iof_sel;
-
+    
     uint32_t r_out_xor;
-
+    
     // register declarations
     scc::sc_register<uint32_t> value;
     scc::sc_register<uint32_t> input_en;
@@ -98,10 +101,11 @@ public:
     scc::sc_register<uint32_t> iof_en;
     scc::sc_register<uint32_t> iof_sel;
     scc::sc_register<uint32_t> out_xor;
-
+    
     gpio_regs(sc_core::sc_module_name nm);
 
-    template <unsigned BUSWIDTH = 32> void registerResources(scc::tlm_target<BUSWIDTH> &target);
+    template<unsigned BUSWIDTH=32>
+    void registerResources(scc::tlm_target<BUSWIDTH>& target);
 };
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -126,9 +130,12 @@ inline sysc::gpio_regs::gpio_regs(sc_core::sc_module_name nm)
 , NAMED(low_ip, r_low_ip, 0, *this)
 , NAMED(iof_en, r_iof_en, 0, *this)
 , NAMED(iof_sel, r_iof_sel, 0, *this)
-, NAMED(out_xor, r_out_xor, 0, *this) {}
+, NAMED(out_xor, r_out_xor, 0, *this)
+{
+}
 
-template <unsigned BUSWIDTH> inline void sysc::gpio_regs::registerResources(scc::tlm_target<BUSWIDTH> &target) {
+template<unsigned BUSWIDTH>
+inline void sysc::gpio_regs::registerResources(scc::tlm_target<BUSWIDTH>& target) {
     target.addResource(value, 0x0UL);
     target.addResource(input_en, 0x4UL);
     target.addResource(output_en, 0x8UL);

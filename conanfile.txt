@@ -6,6 +6,7 @@ SystemCVerification/2.0.0a@minres/stable
 
 [generators]
 cmake
+txt
 
 [options]
 Poco:shared=True

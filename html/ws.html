@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang=en>
+	<head>
+		<meta charset=utf-8>
+		<meta name=viewport content="width=device-width, initial-scale=1">
+		<title>system output</title>
+<style>
+h1 { font-family: helvetica, sans-serif; margin: 0; }
+h1+p { margin: 0; }
+li { font-family: Courier; list-style-type: '>';}
+pre { margin-top:0; margin-bottom:0;}
+.term { background-color:black; color:white; font-weight:bold;padding-top:10px; padding-bottom:10px; max-height:400px; overflow: scroll;}
+span.timestamp { font-family: monospace; white-space: pre;width: 50px;}
+span.value_1 { background-color: green;}
+span.value_0 { background-color: blue;}
+span.value_x { background-color: red;}
+</style>
+	</head>
+	<body>
+		<h1>system output</h1>
+		<div id="top">
+		</div>
+		<script>
+		String.format = function() {
+		    // The string containing the format items (e.g. "{0}")
+		    // will and always has to be the first argument.
+		    var theString = arguments[0];
+		    // start with the second argument (i = 1)
+		    for (var i = 1; i < arguments.length; i++) {
+		        // "gm" = RegEx options for Global search (more than one instance)
+		        // and for Multiline search
+		        var regEx = new RegExp("\\{" + (i - 1) + "\\}", "gm");
+		        theString = theString.replace(regEx, arguments[i]);
+		    }
+		    
+		    return theString;
+		}
+		String.prototype.paddingLeft = function (paddingValue) {
+			return String(paddingValue + this).slice(-paddingValue.length);
+		};
+		var log = function (n, m) {
+			console.log(m);
+	        var data = JSON.parse(m);
+	        if( data.hasOwnProperty("message") ) {
+				var ul = document.getElementById(n);
+			    var li = document.createElement('li');
+			    var p = document.createElement('pre');
+		        // i.innerText = new Date().toISOString()+': '+m;
+		        p.innerText = '['+data.time.paddingLeft('                    ')+'] '+ data.message;
+		        li.appendChild(p);
+			    ul.appendChild(li);
+			    var objDiv = document.getElementById(n + '_container');
+			    objDiv.scrollTop = objDiv.scrollHeight;
+			} else if(data.hasOwnProperty("data")){
+				var ul = document.getElementById(n);
+			    var li = document.createElement('li');
+			    var span = document.createElement('span');
+			    span.className="timestamp";
+			    span.innerText='['+data.time.paddingLeft('                    ')+']'
+			    li.appendChild(span);
+			    var s = data.data;
+			    for ( var i = 0; i < s.length; i++ ){
+				    var spani = document.createElement('span');
+				    if(s.charAt(i) == 'Z')
+				    	spani.className="value_z";
+				    else if(s.charAt(i) == '1')
+				    	spani.className="value_1";
+				    else if(s.charAt(i) == '0')
+				    	spani.className="value_0";
+				    else if(s.charAt(i) == 'X')
+				    	spani.className="value_x";
+				    spani.appendChild(document.createTextNode('\u00A0'));
+				    li.appendChild(spani);			    	
+			    }
+			    ul.appendChild(li);
+			    var objDiv = document.getElementById(n + '_container');
+			    objDiv.scrollTop = objDiv.scrollHeight;
+			}
+		}
+		var open_connection = function(name){
+			var s = new WebSocket('ws://'+window.location.host+'/ws/i_simple_system.i_'+name);
+			s.addEventListener('error',   function (m) { log(name, new Date().toISOString()+': ===connection error ==='); });
+			s.addEventListener('open',    function (m) { log(name, new Date().toISOString()+': ===connection opened==='); });
+			s.addEventListener('message', function (m) { log(name, m.data); });
+			s.addEventListener('close',   function (m) { log(name, new Date().toISOString()+': ===connection closed==='); });
+		}
+		var createElem = function(n){
+			var top = document.getElementById('top');
+			var p = document.createElement('p');
+			p.innerText="Component " + n;
+			var div = document.createElement('div');
+			div.className = "term";
+			div.id= n + '_container';
+			var ul = document.createElement('ul');
+			ul.id= n;
+			div.appendChild(ul);
+			top.appendChild(p);
+			top.appendChild(div);
+			open_connection(n);
+		}
+		createElem("uart0");
+		createElem("gpio0");
+		</script>
+	</body>
+</html>

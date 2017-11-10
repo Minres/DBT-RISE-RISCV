@@ -86,6 +86,14 @@ public:
 
     sc_core::sc_in<bool> rst_i;
 
+    sc_core::sc_in<bool> global_irq_i;
+
+    sc_core::sc_in<bool> timer_irq_i;
+
+    sc_core::sc_in<bool> sw_irq_i;
+
+    sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i;
+
     scc::ext_attribute<std::string> elf_file;
 
     scc::ext_attribute<bool> enable_disass;
@@ -124,6 +132,9 @@ protected:
     void start_of_simulation();
     void run();
     void clk_cb();
+    void sw_irq_cb();
+    void timer_irq_cb();
+    void global_irq_cb();
     util::range_lut<tlm_dmi_ext> read_lut, write_lut;
     tlm_utils::tlm_quantumkeeper quantum_keeper;
     std::vector<uint8_t> write_buf;

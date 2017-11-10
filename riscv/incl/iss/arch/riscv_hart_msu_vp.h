@@ -161,22 +161,22 @@ namespace {
 
 const char lvl[] = {'U', 'S', 'H', 'M'};
 
-const char *trap_str[] = {"Instruction address misaligned",
-                          "Instruction access fault",
-                          "Illegal instruction",
-                          "Breakpoint",
-                          "Load address misaligned",
-                          "Load access fault",
-                          "Store/AMO address misaligned",
-                          "Store/AMO access fault",
-                          "Environment call from U-mode",
-                          "Environment call from S-mode",
-                          "Reserved",
-                          "Environment call from M-mode",
-                          "Instruction page fault",
-                          "Load page fault",
-                          "Reserved",
-                          "Store/AMO page fault"};
+const char *trap_str[] = {"Instruction address misaligned", //0
+                          "Instruction access fault", //1
+                          "Illegal instruction", //2
+                          "Breakpoint", //3
+                          "Load address misaligned", //4
+                          "Load access fault", //5
+                          "Store/AMO address misaligned", //6
+                          "Store/AMO access fault", //7
+                          "Environment call from U-mode", //8
+                          "Environment call from S-mode", //9
+                          "Reserved", //a
+                          "Environment call from M-mode", //b
+                          "Instruction page fault", //c
+                          "Load page fault", //d
+                          "Reserved", //e
+                          "Store/AMO page fault"}; //f
 const char *irq_str[] = {
     "User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
     "User timer interrupt",    "Supervisor timer interrupt",    "Reserved", "Machine timer interrupt",
@@ -479,6 +479,7 @@ private:
     iss::status write_ip(unsigned addr, reg_t val);
     iss::status read_satp(unsigned addr, reg_t &val);
     iss::status write_satp(unsigned addr, reg_t val);
+protected:
     void check_interrupt();
 };
 
@@ -682,7 +683,7 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                 }
                 phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
                 auto res = write_mem(paddr, length, data);
-                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (7 << 16); // issue trap 7 (load access fault
+                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
                 return res;
             } catch (trap_access &ta) {
                 this->reg.trap_state = (1 << 31) | ta.id;
@@ -848,6 +849,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_ip(unsigned 
     auto req_priv_lvl = addr >> 8;
     if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask = get_irq_mask(req_priv_lvl);
+    mask &= ~(1<<7); // MTIP is read only
     csr[mip] = (csr[mip] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -1142,7 +1144,8 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
         csr[uepc | (new_priv << 8)] = this->reg.NEXT_PC; // store next address if interrupt
         this->reg.pending_trap = 0;
     }
-    csr[ucause | (new_priv << 8)] = cause;
+    size_t adr=ucause | (new_priv << 8);
+    csr[adr] = (trap_id<<31)+cause;
     // update mstatus
     // xPP field of mstatus is written with the active privilege mode at the time
     // of the trap; the x PIE field of mstatus
@@ -1177,8 +1180,8 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     this->reg.trap_state = 0;
     char buffer[32];
     sprintf(buffer, "0x%016lx", addr);
-    CLOG(INFO, disass) << (trap_id ? "Interrupt " : "Trap ") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause])
-                       << "' at address " << buffer << " occurred, changing privilege level from " << lvl[cur_priv]
+    CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause])<<"' ("<<trap_id<<")"
+                       << " at address " << buffer << " occurred, changing privilege level from " << lvl[cur_priv]
                        << " to " << lvl[new_priv];
     return this->reg.NEXT_PC;
 }

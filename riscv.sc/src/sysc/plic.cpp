@@ -64,7 +64,9 @@ void plic::init_callbacks() {
     };
 }
 
-void plic::clock_cb() { this->clk = clk_i.read(); }
+void plic::clock_cb() {
+	this->clk = clk_i.read();
+}
 
 void plic::reset_cb() {
     if (rst_i.read())
@@ -92,14 +94,13 @@ void plic::reset_cb() {
 void plic::global_int_port_cb() {
 
     // set related pending bit if enable is set for incoming global_interrupt
-
-    // todo: extend up to 255 bits (limited to 32 right now)
-    for (uint32_t i = 1; i < 32; i++) {
-        uint32_t enable_bits = regs->r_enabled;
-        bool enable = enable_bits & (0x1 << i); // read enable bit
+    for (uint32_t i = 1; i < 256; i++) {
+    	auto reg_idx = i>>5;
+    	auto bit_ofs = i & 0x1F;
+        bool enable = regs->r_enabled[reg_idx] & (0x1 << bit_ofs); // read enable bit
 
         if (enable && global_interrupts_i[i].read() == 1) {
-            regs->r_pending = regs->r_pending | (0x1 << i);
+            regs->r_pending[reg_idx] = regs->r_pending[reg_idx] | (0x1 << bit_ofs);
             LOG(DEBUG) << "pending interrupt identified: " << i;
         }
     }
@@ -114,14 +115,14 @@ void plic::handle_pending_int() {
     bool raise_int = 0;
     uint32_t thold = regs->r_threshold.threshold; // threshold value
 
-    // todo: extend up to 255 bits (limited to 32 right now)
-    for (uint32_t i = 1; i < 32; i++) {
-        uint32_t pending_bits = regs->r_pending;
-        bool pending = (pending_bits & (0x1 << i)) ? true : false;
+    for (uint32_t i = 1; i < 255; i++) {
+    	auto reg_idx = i>>5;
+    	auto bit_ofs = i & 0x1F;
+        bool pending = (regs->r_pending[reg_idx] & (0x1 << bit_ofs)) ? true : false;
         uint32_t prio = regs->r_priority[i - 1].priority; // read priority value
 
         if (pending && thold < prio) {
-            regs->r_pending = regs->r_pending | (0x1 << i);
+            regs->r_pending[reg_idx] = regs->r_pending[reg_idx] | (0x1 << bit_ofs);
             // below condition ensures implicitly that lowest id is selected in case of multiple identical
             // priority-interrupts
             if (prio > claim_prio) {
@@ -148,7 +149,9 @@ void plic::reset_pending_int(uint32_t irq) {
     // todo: make sure that pending is set, otherwise don't reset irq ... read spec.
     LOG(INFO) << "reset pending interrupt: " << irq;
     // reset related pending bit
-    regs->r_pending &= ~(0x1 << irq);
+	auto reg_idx = irq>>5;
+	auto bit_ofs = irq & 0x1F;
+    regs->r_pending[reg_idx] &= ~(0x1 << bit_ofs);
     core_interrupt_o.write(0);
 
     // evaluate next pending interrupt
