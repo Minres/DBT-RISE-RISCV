@@ -15,6 +15,7 @@
 #include <memory>
 #include <thread>
 #include <cstring>
+#include <functional>
 
 namespace sysc {
 

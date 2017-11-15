@@ -23,14 +23,15 @@ macro(setup_conan)
 
   set(conanfile ${CMAKE_SOURCE_DIR}/conanfile.txt)
   set(conanfile_cmake ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+  set(compiler_libcxx libstdc++11)
 
   if(${CMAKE_BUILD_TYPE} STREQUAL RelWithDebInfo)
   	execute_process(COMMAND ${conan} install --build=missing
-                   -s build_type=Release
+                   -s build_type=Release -s compiler.libcxx=${compiler_libcxx}
                    ${CMAKE_SOURCE_DIR} RESULT_VARIABLE return_code)
   else()
    	execute_process(COMMAND ${conan} install --build=missing
-                   -s build_type=${CMAKE_BUILD_TYPE}
+                   -s build_type=${CMAKE_BUILD_TYPE} -s compiler.libcxx=${compiler_libcxx}
                    ${CMAKE_SOURCE_DIR} RESULT_VARIABLE return_code)
   endif()
   if(NOT ${return_code} EQUAL 0)
@@ -38,5 +39,5 @@ macro(setup_conan)
   endif()
 
   include(${conanfile_cmake})
-  conan_basic_setup(TARGETS)   
+  conan_basic_setup(TARGETS)
 endmacro()
