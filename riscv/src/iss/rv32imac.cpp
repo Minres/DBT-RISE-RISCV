@@ -52,7 +52,9 @@ extern "C" {
 
 using namespace iss::arch;
 
-rv32imac::rv32imac() { reg.icount = 0; }
+rv32imac::rv32imac() { reg.icount = 0; reg.machine_state = 0x3;}
+
+rv32imac::~rv32imac(){}
 
 void rv32imac::reset(uint64_t address) {
     for (size_t i = 0; i < traits<rv32imac>::NUM_REGS; ++i)

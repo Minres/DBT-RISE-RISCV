@@ -148,7 +148,8 @@ protected:
     }
 
     // some compile time constants
-    enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
+    enum { MASK16 = 0b1111111111111111, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
     enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
@@ -217,7 +218,7 @@ private:
     const InstructionDesriptor instr_descr[75] = {
         /* entries are: valid value, valid mask, function ptr */
         /* instruction LWU */
-        {32, 0b00000000000000000010000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
+        {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
         /* instruction LD */
         {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
         /* instruction SD */
@@ -451,7 +452,7 @@ private:
     
         this->gen_sync(iss::PRE_SYNC);
     
-        uint16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
+        int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
         uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
         if(this->disass_enabled){
@@ -469,10 +470,7 @@ private:
     
         Value* offs_val = this->builder->CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
-            this->gen_ext(
-                this->gen_const(64U, fld_imm_val),
-                64,
-                true));
+            this->gen_const(64U, fld_imm_val));
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
@@ -613,18 +611,16 @@ private:
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
-                this->gen_ext(
-                    this->builder->CreateTrunc(
-                        this->gen_reg_load(fld_rs1_val, 0),
-                        this-> get_type(32) 
-                    ),
-                    64,
-                    true),
-                this->gen_ext(
-                    this->gen_const(64U, fld_imm_val),
-                    64,
-                    true));
+            Value* res_val = this->builder->CreateAdd(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                this->gen_const(32U, fld_imm_val));
+            Value* X_rd_val = this->gen_ext(
+                res_val,
+                64,
+                true);
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -700,7 +696,10 @@ private:
     
         if(fld_rd_val != 0){
             Value* sh_val_val = this->builder->CreateLShr(
-                this->gen_reg_load(fld_rs1_val, 0),
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
                 this->gen_const(32U, fld_shamt_val));
             Value* X_rd_val = this->gen_ext(
                 sh_val_val,
@@ -739,7 +738,10 @@ private:
     
         if(fld_rd_val != 0){
             Value* sh_val_val = this->builder->CreateAShr(
-                this->gen_reg_load(fld_rs1_val, 0),
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
                 this->gen_const(32U, fld_shamt_val));
             Value* X_rd_val = this->gen_ext(
                 sh_val_val,
@@ -774,7 +776,22 @@ private:
         }
         pc=pc+4;
     
-        /* TODO: describe operations for ADDW ! */
+        if(fld_rd_val != 0){
+            Value* res_val = this->builder->CreateAdd(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs2_val, 0),
+                    this-> get_type(32) 
+                ));
+            Value* X_rd_val = this->gen_ext(
+                res_val,
+                64,
+                true);
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -802,7 +819,22 @@ private:
         }
         pc=pc+4;
     
-        /* TODO: describe operations for SUBW ! */
+        if(fld_rd_val != 0){
+            Value* res_val = this->builder->CreateSub(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs2_val, 0),
+                    this-> get_type(32) 
+                ));
+            Value* X_rd_val = this->gen_ext(
+                res_val,
+                64,
+                true);
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -833,11 +865,19 @@ private:
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* sh_val_val = this->builder->CreateShl(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+            Value* mask_val = this->gen_const(32U, 31);
+            Value* count_val = this->builder->CreateAnd(
+                this->builder->CreateTrunc(
                     this->gen_reg_load(fld_rs2_val, 0),
-                    this->gen_const(32U, 31)));
+                    this-> get_type(32) 
+                ),
+                mask_val);
+            Value* sh_val_val = this->builder->CreateShl(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                count_val);
             Value* X_rd_val = this->gen_ext(
                 sh_val_val,
                 64,
@@ -874,11 +914,19 @@ private:
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* sh_val_val = this->builder->CreateLShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+            Value* mask_val = this->gen_const(32U, 31);
+            Value* count_val = this->builder->CreateAnd(
+                this->builder->CreateTrunc(
                     this->gen_reg_load(fld_rs2_val, 0),
-                    this->gen_const(32U, 31)));
+                    this-> get_type(32) 
+                ),
+                mask_val);
+            Value* sh_val_val = this->builder->CreateLShr(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                count_val);
             Value* X_rd_val = this->gen_ext(
                 sh_val_val,
                 64,
@@ -915,11 +963,19 @@ private:
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* sh_val_val = this->builder->CreateAShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+            Value* mask_val = this->gen_const(32U, 31);
+            Value* count_val = this->builder->CreateAnd(
+                this->builder->CreateTrunc(
                     this->gen_reg_load(fld_rs2_val, 0),
-                    this->gen_const(32U, 31)));
+                    this-> get_type(32) 
+                ),
+                mask_val);
+            Value* sh_val_val = this->builder->CreateAShr(
+                this->builder->CreateTrunc(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this-> get_type(32) 
+                ),
+                count_val);
             Value* X_rd_val = this->gen_ext(
                 sh_val_val,
                 64,
@@ -3384,7 +3440,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     } catch (trap_access &ta) {
         throw trap_access(ta.id, pc.val);
     }
-    if (insn == 0x0000006f) throw simulation_stopped(0);
+    if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
     typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;

@@ -308,6 +308,14 @@ public:
 
         mstatus_t mstatus;
 
+        static const reg_t mstatus_reset_val = 0;
+
+        void write_mstatus(T val, unsigned priv_lvl){
+            auto mask = get_mask(priv_lvl);
+            auto new_val = (mstatus & ~mask) | (val & mask);
+            mstatus=new_val;
+        }
+
         T satp;
 
         static constexpr T get_misa() { return (1UL << 30) | ISA_I | ISA_M | ISA_A | ISA_U | ISA_S | ISA_M; }
@@ -379,14 +387,29 @@ public:
 
         mstatus_t mstatus;
 
+        static const reg_t mstatus_reset_val = 0xa00000000;
+
+        void write_mstatus(T val, unsigned priv_lvl){
+            T old_val = mstatus;
+            auto mask = get_mask(priv_lvl);
+            auto new_val = (old_val & ~mask) | (val & mask);
+            if((new_val&mstatus.SXL.Mask)==0){
+                new_val |= old_val&mstatus.SXL.Mask;
+            }
+            if((new_val&mstatus.UXL.Mask)==0){
+                new_val |= old_val&mstatus.UXL.Mask;
+            }
+            mstatus=new_val;
+        }
+
         T satp;
 
         static constexpr T get_misa() { return (2ULL << 62) | ISA_I | ISA_M | ISA_A | ISA_U | ISA_S | ISA_M; }
 
         static constexpr T get_mask(unsigned priv_lvl) {
             switch (priv_lvl) {
-            case PRIV_U: return 0x8000000000000011ULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
-            case PRIV_S: return 0x80000003000de133ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0001 0011 0011
+            case PRIV_U: return 0x8000000f00000011ULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
+            case PRIV_S: return 0x8000000f000de133ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0001 0011 0011
             default:     return 0x8000000f007ff9ddULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
             }
         }
@@ -422,6 +445,8 @@ public:
 
     riscv_hart_msu_vp();
     virtual ~riscv_hart_msu_vp() = default;
+
+    void reset(uint64_t address) override;
 
     void load_file(std::string name, int type = -1) override;
 
@@ -573,66 +598,71 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
         LOG(DEBUG) << "read of " << length << " bytes  @addr " << addr;
     }
 #endif
-    switch (addr.space) {
-    case traits<BASE>::MEM: {
-        if ((addr.type & (iss::ACCESS_TYPE - iss::DEBUG)) == iss::FETCH && (addr.val & 0x1) == 1) {
-            fault_data = addr.val;
-            if ((addr.type & iss::DEBUG)) throw trap_access(0, addr.val);
-            this->reg.trap_state = (1 << 31); // issue trap 0
-            return iss::Err;
-        }
-        try {
-            if ((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK)) { // we may cross a page boundary
-                vm_info vm = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
-                if (vm.levels != 0) { // VM is active
-                    auto split_addr = (addr.val + length) & ~PGMASK;
-                    auto len1 = split_addr - addr.val;
-                    auto res = read(addr, len1, data);
-                    if (res == iss::Ok)
-                        res = read(iss::addr_t{addr.type, addr.space, split_addr}, length - len1, data + len1);
-                    return res;
-                }
-            }
-            phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
-            auto res = read_mem(paddr, length, data);
-            if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
-            return res;
-        } catch (trap_access &ta) {
-            this->reg.trap_state = (1 << 31) | ta.id;
-            return iss::Err;
-        }
-    } break;
-    case traits<BASE>::CSR: {
-        if (length != sizeof(reg_t)) return iss::Err;
-        return read_csr(addr.val, *reinterpret_cast<reg_t *const>(data));
-    } break;
-    case traits<BASE>::FENCE: {
-        if ((addr.val + length) > mem.size()) return iss::Err;
-        switch (addr.val) {
-        case 2:   // SFENCE:VMA lower
-        case 3: { // SFENCE:VMA upper
-            auto tvm = state.mstatus.TVM;
-            if (this->reg.machine_state == PRIV_S & tvm != 0) {
-                this->reg.trap_state = (1 << 31) | (2 << 16);
-                this->fault_data = this->reg.PC;
+    try {
+        switch (addr.space) {
+        case traits<BASE>::MEM: {
+            if ((addr.type & (iss::ACCESS_TYPE - iss::DEBUG)) == iss::FETCH && (addr.val & 0x1) == 1) {
+                fault_data = addr.val;
+                if ((addr.type & iss::DEBUG)) throw trap_access(0, addr.val);
+                this->reg.trap_state = (1 << 31); // issue trap 0
                 return iss::Err;
             }
-            return iss::Ok;
+            try {
+                if ((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK)) { // we may cross a page boundary
+                    vm_info vm = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
+                    if (vm.levels != 0) { // VM is active
+                        auto split_addr = (addr.val + length) & ~PGMASK;
+                        auto len1 = split_addr - addr.val;
+                        auto res = read(addr, len1, data);
+                        if (res == iss::Ok)
+                            res = read(iss::addr_t{addr.type, addr.space, split_addr}, length - len1, data + len1);
+                        return res;
+                    }
+                }
+                phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
+                auto res = read_mem(paddr, length, data);
+                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
+                return res;
+            } catch (trap_access &ta) {
+                this->reg.trap_state = (1 << 31) | ta.id;
+                return iss::Err;
+            }
+        } break;
+        case traits<BASE>::CSR: {
+            if (length != sizeof(reg_t)) return iss::Err;
+            return read_csr(addr.val, *reinterpret_cast<reg_t *const>(data));
+        } break;
+        case traits<BASE>::FENCE: {
+            if ((addr.val + length) > mem.size()) return iss::Err;
+            switch (addr.val) {
+            case 2:   // SFENCE:VMA lower
+            case 3: { // SFENCE:VMA upper
+                auto tvm = state.mstatus.TVM;
+                if (this->reg.machine_state == PRIV_S & tvm != 0) {
+                    this->reg.trap_state = (1 << 31) | (2 << 16);
+                    this->fault_data = this->reg.PC;
+                    return iss::Err;
+                }
+                return iss::Ok;
+            }
+            }
+        } break;
+        case traits<BASE>::RES: {
+            auto it = atomic_reservation.find(addr.val);
+            if (it != atomic_reservation.end() && (*it).second != 0) {
+                memset(data, 0xff, length);
+                atomic_reservation.erase(addr.val);
+            } else
+                memset(data, 0, length);
+        } break;
+        default:
+            return iss::Err; // assert("Not supported");
         }
-        }
-    } break;
-    case traits<BASE>::RES: {
-        auto it = atomic_reservation.find(addr.val);
-        if (it != atomic_reservation.end() && (*it).second != 0) {
-            memset(data, 0xff, length);
-            atomic_reservation.erase(addr.val);
-        } else
-            memset(data, 0, length);
-    } break;
-    default:
-        return iss::Err; // assert("Not supported");
+        return iss::Ok;
+    } catch (trap_access &ta) {
+        this->reg.trap_state = (1 << 31) | ta.id;
+        return iss::Err;
     }
-    return iss::Ok;
 }
 
 template <typename BASE>
@@ -810,10 +840,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_status(unsign
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_status(unsigned addr, reg_t val) {
     auto req_priv_lvl = addr >> 8;
     if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
-    auto mask = hart_state<reg_t>::get_mask(req_priv_lvl);
-    auto old_val = state.mstatus;
-    auto new_val = (old_val & ~mask) | (val & mask);
-    state.mstatus = new_val;
+    state.write_mstatus(val, req_priv_lvl);
     check_interrupt();
     return iss::Ok;
 }
@@ -978,6 +1005,12 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
 template<typename BASE>
 inline void riscv_hart_msu_vp<BASE>::notify_phase(iss::arch_if::exec_phase phase) {
 	BASE::notify_phase(phase);
+}
+
+template<typename BASE>
+inline void riscv_hart_msu_vp<BASE>::reset(uint64_t address) {
+    BASE::reset(address);
+    state.mstatus = hart_state<reg_t>::mstatus_reset_val;
 }
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {

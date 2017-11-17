@@ -17,9 +17,9 @@ DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 
 **Planned features**
 
-* add platform peripherals to resemble E300 platform
-  * PLIC
-  * gpio
+* add platform peripherals beyond programmers view to resemble E300 platform
+  * QSPI
+  * PWM
   * ...
 * and more
 

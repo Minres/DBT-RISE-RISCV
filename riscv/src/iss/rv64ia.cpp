@@ -52,9 +52,9 @@ extern "C" {
 
 using namespace iss::arch;
 
-rv64ia::rv64ia() { reg.icount = 0; }
+rv64ia::rv64ia() { reg.icount = 0; reg.machine_state = 0x3;}
 
-rv64ia::~rv64ia() {}
+rv64ia::~rv64ia(){}
 
 void rv64ia::reset(uint64_t address) {
     for (size_t i = 0; i < traits<rv64ia>::NUM_REGS; ++i)
@@ -62,7 +62,7 @@ void rv64ia::reset(uint64_t address) {
     reg.PC = address;
     reg.NEXT_PC = reg.PC;
     reg.trap_state = 0;
-    reg.machine_state = 0x0;
+    reg.machine_state = 0x3;
 }
 
 uint8_t *rv64ia::get_regs_base_ptr() { return reinterpret_cast<uint8_t *>(&reg); }

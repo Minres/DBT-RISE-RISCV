@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Wed Oct 18 11:42:36 CEST 2017
+// Created on: Fri Nov 17 20:34:49 CET 2017
 //             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +126,7 @@ struct rv32imac: public arch_if {
     using addr_t = typename traits<rv32imac>::addr_t;
 
     rv32imac();
-    ~rv32imac() = default;
+    ~rv32imac();
 
     void reset(uint64_t address=0) override;
 
