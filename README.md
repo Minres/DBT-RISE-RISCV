@@ -33,7 +33,7 @@ DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 ```
 * setup conan to use the minres repo:
 ```
-    conan add remote minres https://api.bintray.com/conan/minres/conan-repo
+    conan remote add minres https://api.bintray.com/conan/minres/conan-repo
 ```
 * checkout source from git
 * start an out-of-source build:
