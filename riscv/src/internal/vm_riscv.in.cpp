@@ -222,16 +222,24 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        // this->gen_sync(iss::PRE_SYNC);
-        this->builder->CreateStore(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
-                                   get_reg_ptr(traits<ARCH>::PC), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
-                                     this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), true);
-        if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
+        bb->setName("illegal_instruction");
+
+        this->gen_sync(iss::PRE_SYNC);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            /* generate console output when executing the command */
+            boost::format ins_fmter("DB x%1$d");
+            ins_fmter % (uint64_t)instr;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        this->gen_raise_trap(0, 2);     // illegal instruction trap
+
+        this->gen_raise_trap(0, 2);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);

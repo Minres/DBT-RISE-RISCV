@@ -12,8 +12,8 @@ DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 
 **What's missing**
 
-* RV64I is only preliminary verified
-* F & D standard extensions to be implemented
+* F & D standard extensions for 32bit to be implemented
+* MACF &D standard extensions for 64bit to be implemented and verified
 
 **Planned features**
 

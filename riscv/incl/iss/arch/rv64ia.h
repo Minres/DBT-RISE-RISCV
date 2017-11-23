@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Fri Nov 17 20:34:49 CET 2017
+// Created on: Sun Nov 19 14:05:47 CET 2017
 //             *      rv64ia.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +48,7 @@ struct rv64ia;
 template<>
 struct traits<rv64ia> {
 
-    enum constants {XLEN=64,XLEN2=128,XLEN_BIT_MASK=63,PCLEN=64,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=2147750144,PGSIZE=4096,PGMASK=4095};
+    enum constants {XLEN=64,XLEN2=128,XLEN_BIT_MASK=63,PCLEN=64,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=2147746049,PGSIZE=4096,PGMASK=4095};
 
     enum reg_e {
         X0,

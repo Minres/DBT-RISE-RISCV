@@ -38,9 +38,14 @@ InsructionSet RV32IBase {
 	    JALR(no_cont){
 	    	encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
 		    args_disass: "x%rd$d, x%rs1$d, 0x%imm$x";
-    		if(rd!=0) X[rd] <= PC+4;
-    		val ret[XLEN] <= X[rs1]+ imm;
-    		PC<=ret& ~0x1;
+            val new_pc[XLEN] <= X[rs1]+ imm;
+            val align[XLEN] <= new_pc & 0x2;
+		    if(align != 0){
+		        raise(0, 0)
+		    } else {
+        		if(rd!=0) X[rd] <= PC+4;
+        		PC<=new_pc & ~0x1;
+    		}
 	    }
 		BEQ(no_cont){
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b000 | imm[4:1]s | imm[11:11]s | b1100011;
@@ -154,17 +159,29 @@ InsructionSet RV32IBase {
 		SLLI {
 		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b001 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
-		    if(rd != 0) X[rd] <= shll(X[rs1], shamt);
+		    if(shamt > 31){
+		        raise(0,0)
+		    } else {
+		        if(rd != 0) X[rd] <= shll(X[rs1], shamt);
+		    }
 		}
 		SRLI {
 		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
-		    if(rd != 0) X[rd] <= shrl(X[rs1], shamt);
+            if(shamt > 31){
+                raise(0,0)
+            } else {
+		        if(rd != 0) X[rd] <= shrl(X[rs1], shamt);
+		    }
 		}
 		SRAI {
 		    encoding: b0100000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
-		    if(rd != 0) X[rd] <= shra(X[rs1], shamt);
+		    if(shamt > 31){
+                raise(0,0)
+            } else {
+		        if(rd != 0) X[rd] <= shra(X[rs1], shamt);
+		    }
 		}
 		ADD {
 		    encoding: b0000000 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
