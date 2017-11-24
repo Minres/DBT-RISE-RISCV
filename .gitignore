@@ -29,3 +29,4 @@ language.settings.xml
 /*.log
 /.gdbinit
 /*.out
+/dump.json

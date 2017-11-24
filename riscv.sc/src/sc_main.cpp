@@ -61,7 +61,8 @@ int sc_main(int argc, char *argv[]) {
             ("reset,r", po::value<std::string>(), "reset address")
             ("trace,t", po::value<unsigned>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
             ("max_time,m", po::value<std::string>(), "maximum time to run")
-            ("config-file,c", po::value<std::string>()->default_value(""), "configuration file");
+            ("config-file,c", po::value<std::string>()->default_value(""), "read configuration from file")
+			("dump-config", po::value<std::string>()->default_value(""), "dump configuration to file file");
     // clang-format on
     po::variables_map vm;
     try {
@@ -111,8 +112,12 @@ int sc_main(int argc, char *argv[]) {
     platform i_simple_system("i_simple_system");
     // sr_report_handler::add_sc_object_to_filter(&i_simple_system.i_master,
     // sc_core::SC_WARNING, sc_core::SC_MEDIUM);
-    // cfg.dump_hierarchy();
-    cfg.configure();
+    if (vm.count("dump-config")){
+    	std::ofstream of{vm["dump-config"].as<std::string>()};
+    	if(of.is_open())
+    	    cfg.dump_configuration(of);
+    }
+	cfg.configure();
     // overwrite with command line settings
     if (vm.count("gdb-port"))
     	cfg.set_value("i_simple_system.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
