@@ -1,6 +1,7 @@
 import "RV64IBase.core_desc"
+import "RV32A.core_desc"
 
-InsructionSet RV64A extends RV64IBase{
+InsructionSet RV64A extends RV64IBase {
 	 
 	address_spaces { 
 		RES[8]

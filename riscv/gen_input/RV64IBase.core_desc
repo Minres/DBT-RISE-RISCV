@@ -39,7 +39,7 @@ InsructionSet RV64IBase extends RV32IBase {
 			encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b0011011;
 			args_disass:"x%rd$d, x%rs1$d, %imm%";
 			if(rd != 0){
-				val res[32] <= X[rs1]{32} + imm{32};
+				val res[32] <= X[rs1]{32} + imm;
 				X[rd] <= sext(res);
 			} 
 		}

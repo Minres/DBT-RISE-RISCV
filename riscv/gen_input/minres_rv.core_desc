@@ -6,7 +6,7 @@ import "RV64IBase.core_desc"
 //import "RV64M.core_desc"
 import "RV64A.core_desc"
 
-Core RV32IMAC provides RV32IBase,RV32M,RV32A, RV32CI  {
+Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32CI {
     template:"vm_riscv.in.cpp";
     constants {
         XLEN:=32;
@@ -25,8 +25,8 @@ Core RV32IMAC provides RV32IBase,RV32M,RV32A, RV32CI  {
 }
 
 
-Core RV64IA provides RV64IBase,RV64A {
-   template:"vm_riscv.in.cpp";
+Core RV64IA provides RV64IBase, RV64A, RV32A {
+    template:"vm_riscv.in.cpp";
     constants {
         XLEN:=64;
         XLEN2:=128;
@@ -37,7 +37,7 @@ Core RV64IA provides RV64IBase,RV64A {
         fencevmal:=2;
         fencevmau:=3;
         //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        MISA_VAL:=0b10000000000001000001000100000000;
+        MISA_VAL:=0b10000000000001000000000100000001;
         PGSIZE := 4096; //1 << 12;
         PGMASK := 4095; //PGSIZE-1
     }
