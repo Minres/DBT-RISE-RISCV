@@ -36,7 +36,8 @@ uart::uart(sc_core::sc_module_name nm)
 , tlm_target<>(clk)
 , NAMED(clk_i)
 , NAMED(rst_i)
-, NAMEDD(uart_regs, regs) {
+, NAMEDD(uart_regs, regs)
+, NAMED(write_to_ws, false, this) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
@@ -50,12 +51,17 @@ uart::uart(sc_core::sc_module_name nm)
         }
         return true;
     });
-    LOG(TRACE)<<"Adding WS handler for "<<(std::string{"/ws/"}+name());
-    handler=std::make_shared<WsHandler>();
-    sc_comm_singleton::inst().registerWebSocketHandler((std::string{"/ws/"}+name()).c_str(), handler);
 }
 
 uart::~uart() {}
+
+void uart::before_end_of_elaboration() {
+	if(write_to_ws.value) {
+	    LOG(TRACE)<<"Adding WS handler for "<<(std::string{"/ws/"}+name());
+	    handler=std::make_shared<WsHandler>();
+	    sc_comm_singleton::inst().registerWebSocketHandler((std::string{"/ws/"}+name()).c_str(), handler);
+	}
+}
 
 void uart::clock_cb() {
 	this->clk = clk_i.read();
@@ -74,11 +80,12 @@ void uart::transmit_data() {
     	std::string msg(queue.begin(), queue.end()-1);
         LOG(INFO) << this->name() << " transmit: '" << msg << "'";
         sc_core::sc_time now = sc_core::sc_time_stamp();
-		sc_comm_singleton::inst().execute([this, msg, now](){
-			std::stringstream os;
-			os << "{\"time\":\"" << now << "\",\"message\":\""<<msg<<"\"}";
-			this->handler->send(os.str());
-		});
+		if(handler)
+			sc_comm_singleton::inst().execute([this, msg, now](){
+				std::stringstream os;
+				os << "{\"time\":\"" << now << "\",\"message\":\""<<msg<<"\"}";
+				this->handler->send(os.str());
+			});
         queue.clear();
     }
 }

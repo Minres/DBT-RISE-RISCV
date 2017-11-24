@@ -17,6 +17,7 @@
 #ifndef _UART_H_
 #define _UART_H_
 
+#include "scc/ext_attribute.h"
 #include "scc/tlm_target.h"
 
 namespace sysc {
@@ -32,10 +33,12 @@ public:
     uart(sc_core::sc_module_name nm);
     virtual ~uart() override;
 
+    scc::ext_attribute<bool> write_to_ws;
 protected:
     void clock_cb();
     void reset_cb();
     void transmit_data();
+    void before_end_of_elaboration();
     sc_core::sc_time clk;
     std::unique_ptr<uart_regs> regs;
     std::vector<uint8_t> queue;

@@ -35,6 +35,7 @@ inline void die(){perror(nullptr);exit(errno);}
 sc_comm_singleton::sc_comm_singleton(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , m_serv(new Server(std::make_shared<PrintfLogger>(Logger::Level::WARNING)))
+, needs_client(false)
 , client_started(false){
 	m_serv->addPageHandler(std::make_shared<DefaultPageHandler>(*this));
 }
@@ -47,7 +48,7 @@ sc_comm_singleton::~sc_comm_singleton() {
 void sc_comm_singleton::start_of_simulation() {
 	//Launch a thread
 	t=std::thread(&sc_comm_singleton::thread_func, this);
-	start_client();
+	if(needs_client) start_client();
 }
 
 void sc_comm_singleton::end_of_simulation() {
@@ -112,6 +113,8 @@ void sc_comm_singleton::registerWebSocketHandler(const char* endpoint,
 		std::shared_ptr<WebSocket::Handler> handler,
 		bool allowCrossOriginRequests) {
 	get_server().addWebSocketHandler(endpoint, handler, allowCrossOriginRequests);
+	endpoints.push_back(endpoint);
+	needs_client=true;
 }
 
 void sc_comm_singleton::execute(std::function<void()> f) {
@@ -136,7 +139,6 @@ std::shared_ptr<Response> sc_comm_singleton::DefaultPageHandler::handle(const Re
 
 void WsHandler::onConnect(WebSocket* connection) {
 	_connections.insert(connection);
-	//connection->send("Connection established");;
 }
 
 void WsHandler::onData(WebSocket* connection, const char* data) {

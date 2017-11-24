@@ -75,7 +75,8 @@ private:
 	std::unique_ptr<seasocks::Server> m_serv;
 	std::thread t;
 	void thread_func();
-	bool client_started;
+	bool needs_client, client_started;
+	std::vector<std::string> endpoints;
 };
 
 } /* namespace sysc */

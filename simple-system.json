@@ -1,0 +1,10 @@
+{
+	"i_simple_system":{
+		"i_uart0":{
+			"write_to_ws": true
+		},
+		"i_gpio0":{
+			"write_to_ws": true
+		}
+	}
+}

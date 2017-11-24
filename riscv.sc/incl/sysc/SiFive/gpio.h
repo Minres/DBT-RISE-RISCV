@@ -18,6 +18,7 @@
 #define _GPIO_H_
 
 #include "scc/tlm_target.h"
+#include "scc/ext_attribute.h"
 #include <sysc/communication/sc_signal_rv_ports.h>
 
 namespace sysc {
@@ -35,11 +36,13 @@ public:
     gpio(sc_core::sc_module_name nm);
     virtual ~gpio() override; // need to keep it in source file because of fwd declaration of gpio_regs
 
+    scc::ext_attribute<bool> write_to_ws;
 protected:
     void clock_cb();
     void reset_cb();
     void update_pins();
     void pins_cb();
+    void before_end_of_elaboration();
     sc_core::sc_time clk;
     std::unique_ptr<gpio_regs> regs;
     std::shared_ptr<sysc::WsHandler> handler;
