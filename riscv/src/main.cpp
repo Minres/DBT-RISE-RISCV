@@ -29,7 +29,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 // Contributors:
-//       eyck@minres.com - initial API and implementation
+//       eyck@minres.com - initial implementation
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
@@ -54,23 +54,24 @@ int main(int argc, char *argv[]) {
     // clang-format off
     desc.add_options()
         ("help,h", "Print help message")
-        ("verbose,v", po::value<int>()->implicit_value(0), "Sets logging verbosity")
-        ("log-file", po::value<std::string>(), "Sets default log file.")
+        ("loglevel,l", po::value<int>()->implicit_value(2), "Sets logging verbosity")
+        ("logfile,f", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
-        ("elf,l", po::value<std::vector<std::string>>(), "ELF file(s) to load")
+        ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("gdb-port,g", po::value<unsigned>()->default_value(0), "enable gdb server and specify port to use")
         ("input,i", po::value<std::string>(), "the elf file to load (instead of hex files)")
         ("dump-ir", "dump the intermediate representation")
         ("cycles,c", po::value<int64_t>()->default_value(-1), "number of cycles to run")
         ("systemc,s", "Run as SystemC simulation")
-        ("time", po::value<int>(), "SystemC siimulation time in ms")
+        ("time", po::value<int>(), "SystemC simulation time in ms")
         ("reset,r", po::value<std::string>(), "reset address")
         ("trace", po::value<uint8_t>(), "enable tracing, or cmbintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
         ("mem,m", po::value<std::string>(), "the memory input file")
-        ("rv64", "run RV64");
+        ("isa", po::value<std::string>()->default_value("rv32imac"), "isa to use for simulation");
     // clang-format on
+    auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
-        po::store(po::parse_command_line(argc, argv, desc), clim); // can throw
+        po::store(parsed, clim); // can throw
         // --help option
         if (clim.count("help")) {
             std::cout << "DBT-RISE-RiscV simulator for RISC-V" << std::endl << desc << std::endl;
@@ -83,14 +84,16 @@ int main(int argc, char *argv[]) {
         std::cerr << desc << std::endl;
         return 1;
     }
-    if (clim.count("verbose")) {
-        auto l = logging::as_log_level(clim["verbose"].as<int>());
+    std::vector<std::string> args = collect_unrecognized(parsed.options, po::include_positional);
+
+    if (clim.count("loglevel")) {
+        auto l = logging::as_log_level(clim["loglevel"].as<int>());
         LOGGER(DEFAULT)::reporting_level() = l;
         LOGGER(connection)::reporting_level() = l;
     }
-    if (clim.count("log-file")) {
+    if (clim.count("logfile")) {
         // configure the connection logger
-        auto f = fopen(clim["log-file"].as<std::string>().c_str(), "w");
+        auto f = fopen(clim["logfile"].as<std::string>().c_str(), "w");
         LOG_OUTPUT(DEFAULT)::stream() = f;
         LOG_OUTPUT(connection)::stream() = f;
     }
@@ -101,19 +104,21 @@ int main(int argc, char *argv[]) {
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
-        if (clim.count("rv64") == 1) {
-            auto cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
-            vm = iss::create<iss::arch::rv64ia>(cpu, clim["gdb-port"].as<unsigned>(), dump);
+        if (clim["isa"].as<std::string>().substr(0, 4)=="rv64") {
+            iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
+            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>(), dump);
+        } else if (clim["isa"].as<std::string>().substr(0, 4)=="rv32") {
+            iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
+            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>(), dump);
         } else {
-            auto cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
-            vm = iss::create<iss::arch::rv32imac>(cpu, clim["gdb-port"].as<unsigned>(), dump);
+            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
+            return 127;
         }
-        if (clim.count("elf")) {
+        if (clim.count("elf"))
             for (std::string input : clim["elf"].as<std::vector<std::string>>()) vm->get_arch()->load_file(input);
-        } else if (clim.count("mem")) {
+        if (clim.count("mem"))
             vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
-        }
-
+        for (std::string input : args) vm->get_arch()->load_file(input);// treat remaining arguments as elf files
         if (clim.count("disass")) {
             vm->setDisassEnabled(true);
             LOGGER(disass)::reporting_level() = logging::INFO;

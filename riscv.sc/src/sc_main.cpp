@@ -1,24 +1,38 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Copyright 2017 eyck@minres.com
+// Copyright (C) 2017, MINRES Technologies GmbH
+// All rights reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License.  You may obtain a copy
-// of the License at
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-// License for the specific language governing permissions and limitations under
-// the License.
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// Contributors:
+//       eyck@minres.com - initial implementation
+//
+//
 ////////////////////////////////////////////////////////////////////////////////
-/*
- * sc_main.cpp
- *
- *  Created on: 17.09.2017
- *      Author: eyck@minres.com
- */
 
 #include <boost/program_options.hpp>
 #include <iss/jit/MCJIThelper.h>
@@ -61,7 +75,8 @@ int sc_main(int argc, char *argv[]) {
             ("reset,r", po::value<std::string>(), "reset address")
             ("trace,t", po::value<unsigned>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
             ("max_time,m", po::value<std::string>(), "maximum time to run")
-            ("config-file,c", po::value<std::string>()->default_value(""), "configuration file");
+            ("config-file,c", po::value<std::string>()->default_value(""), "read configuration from file")
+			("dump-config", po::value<std::string>()->default_value(""), "dump configuration to file file");
     // clang-format on
     po::variables_map vm;
     try {
@@ -111,8 +126,21 @@ int sc_main(int argc, char *argv[]) {
     platform i_simple_system("i_simple_system");
     // sr_report_handler::add_sc_object_to_filter(&i_simple_system.i_master,
     // sc_core::SC_WARNING, sc_core::SC_MEDIUM);
-    // cfg.dump_hierarchy();
-    if (vm.count("elf")) cfg.set_value("i_simple_system.i_core_complex.elf_file", vm["elf"].as<std::string>());
+    if (vm.count("dump-config")){
+    	std::ofstream of{vm["dump-config"].as<std::string>()};
+    	if(of.is_open())
+    	    cfg.dump_configuration(of);
+    }
+	cfg.configure();
+    // overwrite with command line settings
+    if (vm.count("gdb-port"))
+    	cfg.set_value("i_simple_system.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
+    if (vm.count("dump-ir"))
+    	cfg.set_value("i_simple_system.i_core_complex.dump_ir", vm.count("dump-ir") != 0);
+    if (vm.count("elf"))
+    	cfg.set_value("i_simple_system.i_core_complex.elf_file", vm["elf"].as<std::string>());
+    if (vm.count("quantum"))
+        tlm::tlm_global_quantum::instance().set(sc_core::sc_time(vm["quantum"].as<unsigned>(), sc_core::SC_NS));
     if (vm.count("reset")) {
         auto str = vm["reset"].as<std::string>();
         uint64_t start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
@@ -127,11 +155,6 @@ int sc_main(int argc, char *argv[]) {
             LOGGER(disass)::print_time() = false;
             LOGGER(disass)::print_severity() = false;
         }
-    }
-    cfg.set_value("i_simple_system.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
-    cfg.set_value("i_simple_system.i_core_complex.dump_ir", vm.count("dump-ir") != 0);
-    if (vm.count("quantum")) {
-        tlm::tlm_global_quantum::instance().set(sc_core::sc_time(vm["quantum"].as<unsigned>(), sc_core::SC_NS));
     }
     ///////////////////////////////////////////////////////////////////////////
     // run simulation

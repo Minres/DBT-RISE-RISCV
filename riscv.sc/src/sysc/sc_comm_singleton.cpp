@@ -1,9 +1,38 @@
-/*
- * sc_singleton.cpp
- *
- *  Created on: 09.10.2017
- *      Author: eyck
- */
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2017, MINRES Technologies GmbH
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// Contributors:
+//       eyck@minres.com - initial implementation
+//
+//
+////////////////////////////////////////////////////////////////////////////////
 
 #include "sysc/sc_comm_singleton.h"
 
@@ -35,6 +64,7 @@ inline void die(){perror(nullptr);exit(errno);}
 sc_comm_singleton::sc_comm_singleton(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , m_serv(new Server(std::make_shared<PrintfLogger>(Logger::Level::WARNING)))
+, needs_client(false)
 , client_started(false){
 	m_serv->addPageHandler(std::make_shared<DefaultPageHandler>(*this));
 }
@@ -47,7 +77,7 @@ sc_comm_singleton::~sc_comm_singleton() {
 void sc_comm_singleton::start_of_simulation() {
 	//Launch a thread
 	t=std::thread(&sc_comm_singleton::thread_func, this);
-	start_client();
+	if(needs_client) start_client();
 }
 
 void sc_comm_singleton::end_of_simulation() {
@@ -112,6 +142,8 @@ void sc_comm_singleton::registerWebSocketHandler(const char* endpoint,
 		std::shared_ptr<WebSocket::Handler> handler,
 		bool allowCrossOriginRequests) {
 	get_server().addWebSocketHandler(endpoint, handler, allowCrossOriginRequests);
+	endpoints.push_back(endpoint);
+	needs_client=true;
 }
 
 void sc_comm_singleton::execute(std::function<void()> f) {
@@ -136,7 +168,6 @@ std::shared_ptr<Response> sc_comm_singleton::DefaultPageHandler::handle(const Re
 
 void WsHandler::onConnect(WebSocket* connection) {
 	_connections.insert(connection);
-	//connection->send("Connection established");;
 }
 
 void WsHandler::onData(WebSocket* connection, const char* data) {

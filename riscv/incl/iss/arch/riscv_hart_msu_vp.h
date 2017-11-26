@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * Contributors:
- *       eyck@minres.com - initial API and implementation
+ *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
 #ifndef _RISCV_CORE_H_
@@ -970,12 +970,13 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
                 if (tohost_upper || (tohost_lower && to_host_wr_cnt > 0)) {
                     switch (hostvar >> 48) {
                     case 0:
-                        if (hostvar != 0x1)
+                        if (hostvar != 0x1){
                             LOG(FATAL) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                        << "), stopping simulation";
-                        else
+                        }else{
                             LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                       << "), stopping simulation";
+                        }
                         throw(iss::simulation_stopped(hostvar));
                     case 0x0101: {
                         char c = static_cast<char>(hostvar & 0xff);

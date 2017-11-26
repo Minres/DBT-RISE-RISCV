@@ -215,7 +215,7 @@ private:
     };
 
     /* start generated code */
-    const InstructionDesriptor instr_descr[75] = {
+    const InstructionDesriptor instr_descr[86] = {
         /* entries are: valid value, valid mask, function ptr */
         /* instruction LWU */
         {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
@@ -223,12 +223,6 @@ private:
         {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
         /* instruction SD */
         {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
-        /* instruction SLLI */
-        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
-        /* instruction SRLI */
-        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
-        /* instruction SRAI */
-        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
         /* instruction ADDIW */
         {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
         /* instruction SLLIW */
@@ -295,6 +289,12 @@ private:
         {32, 0b00000000000000000110000000010011, 0b00000000000000000111000001111111, &this_class::__ori},
         /* instruction ANDI */
         {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
+        /* instruction SLLI */
+        {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
+        /* instruction SRLI */
+        {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
+        /* instruction SRAI */
+        {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
         /* instruction ADD */
         {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
         /* instruction SUB */
@@ -367,6 +367,28 @@ private:
         {32, 0b11000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_d},
         /* instruction AMOMAXU.D */
         {32, 0b11100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_d},
+        /* instruction LR.W */
+        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
+        /* instruction SC.W */
+        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
+        /* instruction AMOSWAP.W */
+        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
+        /* instruction AMOADD.W */
+        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
+        /* instruction AMOXOR.W */
+        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
+        /* instruction AMOAND.W */
+        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
+        /* instruction AMOOR.W */
+        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
+        /* instruction AMOMIN.W */
+        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
+        /* instruction AMOMAX.W */
+        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
+        /* instruction AMOMINU.W */
+        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
+        /* instruction AMOMAXU.W */
+        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
     };
     // instruction LWU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lwu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
@@ -476,111 +498,6 @@ private:
             traits<ARCH>::MEM,
             offs_val,
             this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
-        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-        this->gen_trap_check(bb);
-        return std::make_tuple(vm::CONT, bb);
-    }
-    
-    // instruction SLLI
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("SLLI");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-        uint8_t fld_shamt_val = 0 | (bit_sub<20,6>(instr));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            boost::format ins_fmter("SLLI x%1$d, x%2$d, %3%");
-            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+4;
-    
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateShl(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(64U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
-        }
-        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-        this->gen_trap_check(bb);
-        return std::make_tuple(vm::CONT, bb);
-    }
-    
-    // instruction SRLI
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("SRLI");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-        uint8_t fld_shamt_val = 0 | (bit_sub<20,6>(instr));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            boost::format ins_fmter("SRLI x%1$d, x%2$d, %3%");
-            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+4;
-    
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateLShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(64U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
-        }
-        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-        this->gen_trap_check(bb);
-        return std::make_tuple(vm::CONT, bb);
-    }
-    
-    // instruction SRAI
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
-        bb->setName("SRAI");
-    
-        this->gen_sync(iss::PRE_SYNC);
-    
-        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-        uint8_t fld_shamt_val = 0 | (bit_sub<20,6>(instr));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            boost::format ins_fmter("SRAI x%1$d, x%2$d, %3%");
-            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        pc=pc+4;
-    
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(64U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
-        }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1113,19 +1030,43 @@ private:
         }
         pc=pc+4;
     
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
-                this->gen_const(64U, 4));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
-        }
-        Value* ret_val = this->builder->CreateAdd(
+        Value* new_pc_val = this->builder->CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(64U, fld_imm_val));
-        Value* PC_val = this->builder->CreateAnd(
-            ret_val,
-            this->builder->CreateNot(this->gen_const(64U, 1)));
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        Value* align_val = this->builder->CreateAnd(
+            new_pc_val,
+            this->gen_const(64U, 2));
+        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+        // this->builder->SetInsertPoint(bb);
+        this->gen_cond_branch(this->builder->CreateICmp(
+            ICmpInst::ICMP_NE,
+            align_val,
+            this->gen_const(64U, 0)),
+            bb_then,
+            bb_else);
+        this->builder->SetInsertPoint(bb_then);
+        {
+            this->gen_raise_trap(0, 0);
+        }
+        this->builder->CreateBr(bbnext);
+        this->builder->SetInsertPoint(bb_else);
+        {
+            if(fld_rd_val != 0){
+                Value* X_rd_val = this->builder->CreateAdd(
+                    this->gen_reg_load(traits<ARCH>::PC, 1),
+                    this->gen_const(64U, 4));
+                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            }
+            Value* PC_val = this->builder->CreateAnd(
+                new_pc_val,
+                this->builder->CreateNot(this->gen_const(64U, 1)));
+            this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        }
+        this->builder->CreateBr(bbnext);
+        bb=bbnext;
+        this->builder->SetInsertPoint(bb);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1905,6 +1846,111 @@ private:
             Value* X_rd_val = this->builder->CreateAnd(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(64U, fld_imm_val));
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction SLLI
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("SLLI");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("SLLI x%1$d, x%2$d, %3%");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        if(fld_rd_val != 0){
+            Value* X_rd_val = this->builder->CreateShl(
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_const(64U, fld_shamt_val));
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction SRLI
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("SRLI");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("SRLI x%1$d, x%2$d, %3%");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        if(fld_rd_val != 0){
+            Value* X_rd_val = this->builder->CreateLShr(
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_const(64U, fld_shamt_val));
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction SRAI
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("SRAI");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("SRAI x%1$d, x%2$d, %3%");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        if(fld_rd_val != 0){
+            Value* X_rd_val = this->builder->CreateAShr(
+                this->gen_reg_load(fld_rs1_val, 0),
+                this->gen_const(64U, fld_shamt_val));
             this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -3374,22 +3420,600 @@ private:
         return std::make_tuple(vm::CONT, bb);
     }
     
+    // instruction LR.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("LR.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("LR.W x%1$d, x%2$d");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        if(fld_rd_val != 0){
+            Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+            Value* X_rd_val = this->gen_ext(
+                this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+                64,
+                true);
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            Value* RES_offs_val = this->gen_ext(
+                this->builder->CreateNeg(this->gen_const(8U, 1)),
+                32,
+                true);
+            this->gen_write_mem(
+                traits<ARCH>::RES,
+                offs_val,
+                this->builder->CreateZExtOrTrunc(RES_offs_val,this->get_type(32)));
+        }
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction SC.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("SC.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("SC.W x%1$d, x%2$d, x%3$d");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
+        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+        // this->builder->SetInsertPoint(bb);
+        this->gen_cond_branch(this->builder->CreateICmp(
+            ICmpInst::ICMP_NE,
+            res1_val,
+            this->gen_const(32U, 0)),
+            bb_then,
+            bbnext);
+        this->builder->SetInsertPoint(bb_then);
+        {
+            Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 1);
+            this->gen_write_mem(
+                traits<ARCH>::MEM,
+                offs_val,
+                this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        }
+        this->builder->CreateBr(bbnext);
+        bb=bbnext;
+        this->builder->SetInsertPoint(bb);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = this->gen_choose(
+                this->builder->CreateICmp(
+                    ICmpInst::ICMP_NE,
+                    res1_val,
+                    this->gen_const(64U, 0)),
+                this->gen_const(64U, 0),
+                this->gen_const(64U, 1),
+                64);
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOSWAP.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOSWAP.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOSWAP.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = this->gen_ext(
+                this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+                64,
+                true);
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOADD.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOADD.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOADD.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->builder->CreateAdd(
+            res1_val,
+            this->gen_reg_load(fld_rs2_val, 0));
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOXOR.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOXOR.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOXOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->builder->CreateXor(
+            res1_val,
+            this->gen_reg_load(fld_rs2_val, 0));
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOAND.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOAND.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOAND.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->builder->CreateAnd(
+            res1_val,
+            this->gen_reg_load(fld_rs2_val, 0));
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOOR.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOOR.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->builder->CreateOr(
+            res1_val,
+            this->gen_reg_load(fld_rs2_val, 0));
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOMIN.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOMIN.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOMIN.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->gen_choose(
+            this->builder->CreateICmp(
+                ICmpInst::ICMP_SGT,
+                this->gen_ext(
+                    res1_val,
+                    64, true),
+                this->gen_ext(
+                    this->gen_reg_load(fld_rs2_val, 0),
+                    64, true)),
+            this->gen_reg_load(fld_rs2_val, 0),
+            res1_val,
+            64);
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOMAX.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOMAX.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOMAX.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            true);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->gen_choose(
+            this->builder->CreateICmp(
+                ICmpInst::ICMP_SLT,
+                this->gen_ext(
+                    res1_val,
+                    64, true),
+                this->gen_ext(
+                    this->gen_reg_load(fld_rs2_val, 0),
+                    64, true)),
+            this->gen_reg_load(fld_rs2_val, 0),
+            res1_val,
+            64);
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOMINU.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOMINU.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOMINU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            false);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->gen_choose(
+            this->builder->CreateICmp(
+                ICmpInst::ICMP_UGT,
+                res1_val,
+                this->gen_reg_load(fld_rs2_val, 0)),
+            this->gen_reg_load(fld_rs2_val, 0),
+            res1_val,
+            64);
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
+    // instruction AMOMAXU.W
+    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+        bb->setName("AMOMAXU.W");
+    
+        this->gen_sync(iss::PRE_SYNC);
+    
+        uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
+        uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
+        uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+        uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
+        uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            boost::format ins_fmter("AMOMAXU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
+            ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        pc=pc+4;
+    
+        Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
+        Value* res1_val = this->gen_ext(
+            this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            64,
+            false);
+        if(fld_rd_val != 0){
+            Value* X_rd_val = res1_val;
+            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        }
+        Value* res2_val = this->gen_choose(
+            this->builder->CreateICmp(
+                ICmpInst::ICMP_ULT,
+                this->gen_ext(
+                    res1_val,
+                    64, false),
+                this->gen_ext(
+                    this->gen_reg_load(fld_rs2_val, 0),
+                    64, false)),
+            this->gen_reg_load(fld_rs2_val, 0),
+            res1_val,
+            64);
+        Value* MEM_offs_val = res2_val;
+        this->gen_write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+        this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+        this->gen_trap_check(bb);
+        return std::make_tuple(vm::CONT, bb);
+    }
+    
 /* end generated code  */
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        // this->gen_sync(iss::PRE_SYNC);
-        this->builder->CreateStore(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
-                                   get_reg_ptr(traits<ARCH>::PC), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
-                                     this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), true);
-        if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
+        bb->setName("illegal_instruction");
+
+        this->gen_sync(iss::PRE_SYNC);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            /* generate console output when executing the command */
+            boost::format ins_fmter("DB 0x%1$x");
+            ins_fmter % (uint64_t)instr;
+            std::vector<llvm::Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+            };
+            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+        }
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        this->gen_raise_trap(0, 2);     // illegal instruction trap
+
+        this->gen_raise_trap(0, 2);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);

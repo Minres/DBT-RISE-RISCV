@@ -12,6 +12,13 @@ InsructionSet RV32CI {
 				PC[XLEN](is_pc)
 	}
 	instructions{
+        JALR(no_cont){ // overwriting the implementation if rv32i, alignment does not need to be word
+            encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
+            args_disass: "x%rd$d, x%rs1$d, 0x%imm$x";
+            if(rd!=0) X[rd] <= PC+4;
+            val ret[XLEN] <= X[rs1]+ imm;
+            PC<=ret& ~0x1;
+        }
 		C.ADDI4SPN { //(RES, imm=0)
 			encoding: b000 | imm[5:4] | imm[9:6] | imm[2:2] | imm[3:3] | rd[2:0] | b00;
 			args_disass: "x%rd$d, 0x%imm$05x";
