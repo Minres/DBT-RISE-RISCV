@@ -29,7 +29,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 // Contributors:
-//       eyck@minres.com - initial API and implementation
+//       eyck@minres.com - initial implementation
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
