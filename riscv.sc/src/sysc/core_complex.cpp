@@ -29,7 +29,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 // Contributors:
-//       eyck@minres.com - initial API and implementation
+//       eyck@minres.com - initial implementation
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -279,6 +279,7 @@ void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
     tr_handle.record_attribute("INSTR", instr_str);
     tr_handle.record_attribute("MODE", lvl[cpu->get_mode()]);
     tr_handle.record_attribute("MSTATUS", cpu->get_state().mstatus.st.value);
+    tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value()/1000);
 #endif
 }
 
@@ -326,7 +327,9 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data,
         auto delay{quantum_keeper.get_local_time()};
 #ifdef WITH_SCV
         if(m_db!=nullptr && tr_handle.is_valid()){
-            if(is_fetch && tr_handle.is_active()) tr_handle.end_transaction();
+            if(is_fetch && tr_handle.is_active()){
+                tr_handle.end_transaction();
+            }
             auto preExt = new scv4tlm::tlm_recording_extension(tr_handle, this);
             gp.set_extension(preExt);
         }
@@ -371,6 +374,12 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t *cons
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         auto delay{quantum_keeper.get_local_time()};
+#ifdef WITH_SCV
+        if(m_db!=nullptr && tr_handle.is_valid()){
+            auto preExt = new scv4tlm::tlm_recording_extension(tr_handle, this);
+            gp.set_extension(preExt);
+        }
+#endif
         initiator->b_transport(gp, delay);
         quantum_keeper.set(delay);
         LOG(TRACE) << "write_mem(0x" << std::hex << addr << ") : " << data;
