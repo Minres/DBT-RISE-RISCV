@@ -8,7 +8,7 @@ The RISC-V ISS reaches about 20MIPS at an Intel Core i7-2600K.
 
 The implementation is based on LLVM 4.0. Eclipse CDT 4.7 (Oxygen) is recommended as IDE.
 
-DBT-RISE-RiscV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO (http://elfio.sourceforge.net/), both under MIT license 
+DBT-RISE-RISCV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO (http://elfio.sourceforge.net/), both under MIT license 
 
 **What's missing**
 
