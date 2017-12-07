@@ -74,13 +74,15 @@ public:
     }
 
 protected:
+    using vm::vm_base<ARCH>::get_reg_ptr;
+
     template <typename T> inline llvm::ConstantInt *size(T type) {
         return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
     inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
                                    unsigned size) const {
-        return this->gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
+        return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
     std::tuple<vm::continuation_e, llvm::BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &,
@@ -98,53 +100,15 @@ protected:
 
     void gen_trap_check(llvm::BasicBlock *bb);
 
+
+    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
+        return this->builder->CreateLoad(get_reg_ptr(i), false);
+    }
+
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
         llvm::Value *next_pc_v = this->builder->CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
                                                                   this->get_type(traits<ARCH>::XLEN));
         this->builder->CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
-    }
-
-    inline llvm::Value *get_reg_ptr(unsigned i) {
-        void *ptr = this->core.get_regs_base_ptr() + traits<ARCH>::reg_byte_offset(i);
-        llvm::PointerType *ptrType = nullptr;
-        switch (traits<ARCH>::reg_bit_width(i) >> 3) {
-        case 8:
-            ptrType = llvm::Type::getInt64PtrTy(this->mod->getContext());
-            break;
-        case 4:
-            ptrType = llvm::Type::getInt32PtrTy(this->mod->getContext());
-            break;
-        case 2:
-            ptrType = llvm::Type::getInt16PtrTy(this->mod->getContext());
-            break;
-        case 1:
-            ptrType = llvm::Type::getInt8PtrTy(this->mod->getContext());
-            break;
-        default:
-            throw std::runtime_error("unsupported access with");
-            break;
-        }
-        return llvm::ConstantExpr::getIntToPtr(
-            llvm::ConstantInt::get(this->mod->getContext(),
-                                   llvm::APInt(8 /*bits*/ * sizeof(uint8_t *), reinterpret_cast<uint64_t>(ptr))),
-            ptrType);
-    }
-
-    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        //        if(level){
-        return this->builder->CreateLoad(get_reg_ptr(i), false);
-        //        } else {
-        //            if(!this->loaded_regs[i])
-        //                this->loaded_regs[i]=this->builder->CreateLoad(get_reg_ptr(i),
-        //                false);
-        //            return this->loaded_regs[i];
-        //        }
-    }
-
-    inline void gen_set_pc(virt_addr_t pc) {
-        llvm::Value *pc_l = this->builder->CreateSExt(this->gen_const(traits<ARCH>::caddr_bit_width, (unsigned)pc),
-                                                      this->get_type(traits<ARCH>::caddr_bit_width));
-        super::gen_set_reg(traits<ARCH>::PC, pc_l);
     }
 
     // some compile time constants
@@ -224,22 +188,33 @@ private:
                                                                           llvm::BasicBlock *bb) {
         bb->setName("illegal_instruction");
 
-        this->gen_sync(iss::PRE_SYNC);
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            /* generate console output when executing the command */
-            boost::format ins_fmter("DB x%1$d");
-            ins_fmter % (uint64_t)instr;
-            std::vector<llvm::Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-            };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-        }
+//        this->gen_sync(iss::PRE_SYNC);
+//        if(this->disass_enabled){
+//            /* generate console output when executing the command */
+//            boost::format ins_fmter("DB x%1$d");
+//            ins_fmter % (uint64_t)instr;
+//            std::vector<llvm::Value*> args {
+//                this->core_ptr,
+//                this->gen_const(64, pc.val),
+//                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+//            };
+//            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+//        }
+//        pc = pc + ((instr & 3) == 3 ? 4 : 2);
+//        this->gen_raise_trap(0, 2);     // illegal instruction trap
+//        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+//        this->gen_trap_check(this->leave_blk);
+//        return std::make_tuple(iss::vm::BRANCH, nullptr);
+        // this->gen_sync(iss::PRE_SYNC);
+        this->builder->CreateStore(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
+                                   get_reg_ptr(traits<ARCH>::PC), true);
+        this->builder->CreateStore(
+            this->builder->CreateAdd(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
+                                     this->gen_const(64U, 1)),
+            get_reg_ptr(traits<ARCH>::ICOUNT), true);
+        if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-
-        this->gen_raise_trap(0, 2);
+        this->gen_raise_trap(0, 2);     // illegal instruction trap
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);

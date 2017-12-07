@@ -74,13 +74,15 @@ public:
     }
 
 protected:
+    using vm::vm_base<ARCH>::get_reg_ptr;
+
     template <typename T> inline llvm::ConstantInt *size(T type) {
         return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
     inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
                                    unsigned size) const {
-        return this->gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
+        return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
     std::tuple<vm::continuation_e, llvm::BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &,
@@ -98,53 +100,15 @@ protected:
 
     void gen_trap_check(llvm::BasicBlock *bb);
 
+
+    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
+        return this->builder->CreateLoad(get_reg_ptr(i), false);
+    }
+
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
         llvm::Value *next_pc_v = this->builder->CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
                                                                   this->get_type(traits<ARCH>::XLEN));
         this->builder->CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
-    }
-
-    inline llvm::Value *get_reg_ptr(unsigned i) {
-        void *ptr = this->core.get_regs_base_ptr() + traits<ARCH>::reg_byte_offset(i);
-        llvm::PointerType *ptrType = nullptr;
-        switch (traits<ARCH>::reg_bit_width(i) >> 3) {
-        case 8:
-            ptrType = llvm::Type::getInt64PtrTy(this->mod->getContext());
-            break;
-        case 4:
-            ptrType = llvm::Type::getInt32PtrTy(this->mod->getContext());
-            break;
-        case 2:
-            ptrType = llvm::Type::getInt16PtrTy(this->mod->getContext());
-            break;
-        case 1:
-            ptrType = llvm::Type::getInt8PtrTy(this->mod->getContext());
-            break;
-        default:
-            throw std::runtime_error("unsupported access with");
-            break;
-        }
-        return llvm::ConstantExpr::getIntToPtr(
-            llvm::ConstantInt::get(this->mod->getContext(),
-                                   llvm::APInt(8 /*bits*/ * sizeof(uint8_t *), reinterpret_cast<uint64_t>(ptr))),
-            ptrType);
-    }
-
-    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        //        if(level){
-        return this->builder->CreateLoad(get_reg_ptr(i), false);
-        //        } else {
-        //            if(!this->loaded_regs[i])
-        //                this->loaded_regs[i]=this->builder->CreateLoad(get_reg_ptr(i),
-        //                false);
-        //            return this->loaded_regs[i];
-        //        }
-    }
-
-    inline void gen_set_pc(virt_addr_t pc) {
-        llvm::Value *pc_l = this->builder->CreateSExt(this->gen_const(traits<ARCH>::caddr_bit_width, (unsigned)pc),
-                                                      this->get_type(traits<ARCH>::caddr_bit_width));
-        super::gen_set_reg(traits<ARCH>::PC, pc_l);
     }
 
     // some compile time constants
