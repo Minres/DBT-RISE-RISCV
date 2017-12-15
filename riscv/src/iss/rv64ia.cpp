@@ -67,6 +67,6 @@ void rv64ia::reset(uint64_t address) {
 
 uint8_t *rv64ia::get_regs_base_ptr() { return reinterpret_cast<uint8_t *>(&reg); }
 
-rv64ia::phys_addr_t rv64ia::v2p(const iss::addr_t &pc) {
+rv64ia::phys_addr_t rv64ia::virt2phys(const iss::addr_t &pc) {
     return phys_addr_t(pc); // change logical address to physical address
 }

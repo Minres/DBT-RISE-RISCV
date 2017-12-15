@@ -4,7 +4,7 @@ Am instruction set simulator based on DBT-RISE implementing the RISC-V ISA
 **DBT-RISE-RISCV README**
 
 This is work in progress, so use at your own risk. Goal is to implement an open-source ISS which can easily embedded e.g. into SystemC Virtual Prototypes. It used code generation to allow easy extension and adaptation of the used instruction.
-The RISC-V ISS reaches about 20MIPS at an Intel Core i7-2600K.
+The RISC-V ISS reaches about 30MIPS running on Intel Core i7-2600K.
 
 The implementation is based on LLVM 4.0. Eclipse CDT 4.7 (Oxygen) is recommended as IDE.
 

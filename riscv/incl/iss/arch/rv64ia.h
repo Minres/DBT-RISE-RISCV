@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Sun Nov 19 14:05:47 CET 2017
+// Created on: Fri Dec 15 14:41:58 CET 2017
 //             *      rv64ia.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,9 +98,9 @@ struct traits<rv64ia> {
 
     using code_word_t = uint64_t; //TODO: check removal
 
-    using virt_addr_t = iss::typed_addr_t<iss::VIRTUAL>;
+    using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
-    using phys_addr_t = iss::typed_addr_t<iss::PHYSICAL>;
+    using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
         const uint32_t RV64IA_reg_size[] = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,64};
@@ -111,6 +111,8 @@ struct traits<rv64ia> {
         const uint32_t RV64IA_reg_byte_offset[] = {0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,288,296};
         return RV64IA_reg_byte_offset[r];
     }
+
+    static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 
     enum sreg_flag_e {FLAGS};
 
@@ -140,19 +142,20 @@ struct rv64ia: public arch_if {
     /// deprecated
     void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
 
-    void notify_phase(exec_phase phase){
-        if(phase==ISTART){
-            ++reg.icount;
-            reg.PC=reg.NEXT_PC;
-            reg.trap_state=reg.pending_trap;
-        }
-    }
-
     uint64_t get_icount() { return reg.icount;}
 
-    virtual phys_addr_t v2p(const iss::addr_t& pc);
+    inline phys_addr_t v2p(const iss::addr_t& addr){
+        if(addr.space != traits<rv64ia>::MEM ||
+                addr.type == iss::address_type::PHYSICAL ||
+                addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL){
+            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv64ia>::addr_mask);
+        } else
+            return virt2phys(addr);
+    }
 
-    virtual iss::sync_type needed_sync() const { return iss::PRE_SYNC; }
+    virtual phys_addr_t virt2phys(const iss::addr_t& addr);
+
+    virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
 protected:
     struct RV64IA_regs {
@@ -193,6 +196,8 @@ protected:
         uint32_t trap_state, pending_trap, machine_state;
         uint64_t icount;
     } reg;
+
+    address_type addr_mode[4];
 };
 
 }

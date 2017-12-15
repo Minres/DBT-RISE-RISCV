@@ -211,7 +211,7 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
         std::copy(reg_base + offset, reg_base + offset + reg_width, data.begin());
         std::fill(avail.begin(), avail.end(), 0xff);
     } else {
-        typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_READ, traits<ARCH>::CSR, reg_no - 65);
+        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, reg_no - 65);
         data.resize(sizeof(typename traits<ARCH>::reg_t));
         avail.resize(sizeof(typename traits<ARCH>::reg_t));
         std::fill(avail.begin(), avail.end(), 0xff);
@@ -228,20 +228,20 @@ status riscv_target_adapter<ARCH>::write_single_register(unsigned int reg_no, co
         auto offset = traits<ARCH>::reg_byte_offset(reg_no);
         std::copy(data.begin(), data.begin() + reg_width, reg_base + offset);
     } else {
-        typed_addr_t<iss::PHYSICAL> a(iss::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
+        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
         core->write(a, data.size(), data.data());
     }
     return Ok;
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::read_mem(uint64_t addr, std::vector<uint8_t> &data) {
-    auto a = map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
+    auto a = map_addr({iss::access_type::DEBUG_READ, iss::address_type::VIRTUAL, 0, addr});
     auto f = [&]() -> status { return core->read(a, data.size(), data.data()); };
     return srv->execute_syncronized(f);
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t> &data) {
-    auto a = map_addr({iss::DEBUG_READ, iss::VIRTUAL, 0, addr});
+    auto a = map_addr({iss::access_type::DEBUG_READ, iss::address_type::VIRTUAL, 0, addr});
     return srv->execute_syncronized(&arch_if::write, core, a, data.size(), data.data());
 }
 
@@ -292,8 +292,8 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::packetsize_query(std
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(int type, uint64_t addr, unsigned int length) {
-    auto saddr = map_addr({iss::CODE, iss::PHYSICAL, addr});
-    auto eaddr = map_addr({iss::CODE, iss::PHYSICAL, addr + length});
+    auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
+    auto eaddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr + length});
     target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val - saddr.val);
     LOG(TRACE) << "Adding breakpoint with handle " << target_adapter_base::bp_count << " for addr 0x" << std::hex
                << saddr.val << std::dec;
@@ -302,7 +302,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(int type, 
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int type, uint64_t addr, unsigned int length) {
-    auto saddr = map_addr({iss::CODE, iss::PHYSICAL, addr});
+    auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
     unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
     if (handle) {
         LOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val

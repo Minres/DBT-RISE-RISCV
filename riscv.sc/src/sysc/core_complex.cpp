@@ -94,7 +94,9 @@ public:
 
     base_type::hart_state<base_type::reg_t>& get_state() { return this->state; }
 
-    void notify_phase(iss::arch_if::exec_phase phase);
+    void notify_phase(exec_phase) override;
+
+    iss::sync_type needed_sync() const override { return iss::PRE_SYNC; }
 
     void disass_output(uint64_t pc, const std::string instr) override {
     	if (logging::INFO <= logging::Log<logging::Output2FILE<logging::disass>>::reporting_level() && logging::Output2FILE<logging::disass>::stream()){
@@ -108,15 +110,15 @@ public:
     };
 
     iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
-    	if (addr.type & iss::DEBUG)
+    	if (addr.access && iss::access_type::DEBUG)
     		return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
     	else {
-    		return owner->read_mem(addr.val, length, data,addr.type && iss::FETCH) ? iss::Ok : iss::Err;
+    		return owner->read_mem(addr.val, length, data,addr.access && iss::access_type::FETCH) ? iss::Ok : iss::Err;
     	}
     }
 
     iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
-    	if (addr.type & iss::DEBUG)
+    	if (addr.access && iss::access_type::DEBUG)
     		return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
     	else{
     		auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
@@ -187,9 +189,9 @@ int cmd_sysc(int argc, char* argv[], iss::debugger::out_func of, iss::debugger::
 
 }
 
-void core_wrapper::notify_phase(exec_phase phase) {
-    core_type::notify_phase(phase);
-    if (phase == ISTART) owner->sync();
+void core_wrapper::notify_phase(exec_phase p) {
+    if(p == ISTART)
+        owner->sync();
 }
 
 core_complex::core_complex(sc_core::sc_module_name name)

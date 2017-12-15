@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     // clang-format off
     desc.add_options()
         ("help,h", "Print help message")
-        ("loglevel,l", po::value<int>()->implicit_value(2), "Sets logging verbosity")
+        ("verbose,v", po::value<int>()->implicit_value(0), "Sets logging verbosity")
         ("logfile,f", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
         ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
@@ -62,10 +62,8 @@ int main(int argc, char *argv[]) {
         ("input,i", po::value<std::string>(), "the elf file to load (instead of hex files)")
         ("dump-ir", "dump the intermediate representation")
         ("cycles,c", po::value<int64_t>()->default_value(-1), "number of cycles to run")
-        ("systemc,s", "Run as SystemC simulation")
         ("time", po::value<int>(), "SystemC simulation time in ms")
         ("reset,r", po::value<std::string>(), "reset address")
-        ("trace", po::value<uint8_t>(), "enable tracing, or cmbintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("isa", po::value<std::string>()->default_value("rv32imac"), "isa to use for simulation");
     // clang-format on
@@ -86,8 +84,8 @@ int main(int argc, char *argv[]) {
     }
     std::vector<std::string> args = collect_unrecognized(parsed.options, po::include_positional);
 
-    if (clim.count("loglevel")) {
-        auto l = logging::as_log_level(clim["loglevel"].as<int>());
+    if (clim.count("verbose")) {
+        auto l = logging::as_log_level(clim["verbose"].as<int>());
         LOGGER(DEFAULT)::reporting_level() = l;
         LOGGER(connection)::reporting_level() = l;
     }
@@ -104,18 +102,20 @@ int main(int argc, char *argv[]) {
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
-        if (clim["isa"].as<std::string>().substr(0, 4)=="rv64") {
+        std::string isa_opt(clim["isa"].as<std::string>());
+        if (isa_opt.substr(0, 4)=="rv64") {
             iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
-            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>(), dump);
-        } else if (clim["isa"].as<std::string>().substr(0, 4)=="rv32") {
+            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
+        } else if (isa_opt.substr(0, 4)=="rv32") {
             iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
-            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>(), dump);
+            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;
         }
         if (clim.count("elf"))
-            for (std::string input : clim["elf"].as<std::vector<std::string>>()) vm->get_arch()->load_file(input);
+            for (std::string input : clim["elf"].as<std::vector<std::string>>())
+                vm->get_arch()->load_file(input);
         if (clim.count("mem"))
             vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
         for (std::string input : args) vm->get_arch()->load_file(input);// treat remaining arguments as elf files
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
         }
         int64_t cycles = -1;
         cycles = clim["cycles"].as<int64_t>();
-        return vm->start(cycles);
+        return vm->start(cycles, dump);
     } catch (std::exception &e) {
         LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
                    << std::endl;

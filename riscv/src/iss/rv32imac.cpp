@@ -67,6 +67,6 @@ void rv32imac::reset(uint64_t address) {
 
 uint8_t *rv32imac::get_regs_base_ptr() { return reinterpret_cast<uint8_t *>(&reg); }
 
-rv32imac::phys_addr_t rv32imac::v2p(const iss::addr_t &pc) {
+rv32imac::phys_addr_t rv32imac::virt2phys(const iss::addr_t &pc) {
     return phys_addr_t(pc); // change logical address to physical address
 }

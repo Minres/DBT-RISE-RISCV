@@ -62,7 +62,7 @@ public:
 
     vm_impl();
 
-    vm_impl(ARCH &core, bool dump = false);
+    vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
 
     void enableDebug(bool enable) { super::sync_exec = super::ALL_SYNC; }
 
@@ -102,13 +102,13 @@ protected:
 
 
     inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        return this->builder->CreateLoad(get_reg_ptr(i), false);
+        return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        llvm::Value *next_pc_v = this->builder->CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
+        llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
                                                                   this->get_type(traits<ARCH>::XLEN));
-        this->builder->CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
     }
 
     // some compile time constants
@@ -395,15 +395,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -427,17 +427,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
+            Value* X_rd_val = this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -461,22 +461,22 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
+            Value* X_rd_val = this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* PC_val = this->builder->CreateAdd(
+        Value* PC_val = this->builder.CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -498,25 +498,25 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
+            Value* X_rd_val = this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* ret_val = this->builder->CreateAdd(
+        Value* ret_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
-        Value* PC_val = this->builder->CreateAnd(
+        Value* PC_val = this->builder.CreateAnd(
             ret_val,
-            this->builder->CreateNot(this->gen_const(32U, 1)));
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+            this->builder.CreateNot(this->gen_const(32U, 1)));
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -538,25 +538,25 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_EQ,
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -578,25 +578,25 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -618,14 +618,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_SLT,
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
@@ -633,14 +633,14 @@ private:
                 this->gen_ext(
                     this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -662,14 +662,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_SGE,
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
@@ -677,14 +677,14 @@ private:
                 this->gen_ext(
                     this->gen_reg_load(fld_rs2_val, 0),
                     32, true)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -706,25 +706,25 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_ULT,
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -746,25 +746,25 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_UGE,
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 4)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -786,13 +786,13 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
@@ -800,7 +800,7 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
                 32,
                 true);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -825,13 +825,13 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
@@ -839,7 +839,7 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
                 32,
                 true);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -864,13 +864,13 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
@@ -878,7 +878,7 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
                 32,
                 true);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -903,13 +903,13 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
@@ -917,7 +917,7 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -942,13 +942,13 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         if(fld_rd_val != 0){
@@ -956,7 +956,7 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -981,20 +981,20 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(8)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(8)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1018,20 +1018,20 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(16)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(16)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1055,20 +1055,20 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1092,17 +1092,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
+            Value* X_rd_val = this->builder.CreateAdd(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1127,15 +1127,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
-                this->builder->CreateICmp(
+                this->builder.CreateICmp(
                     ICmpInst::ICMP_SLT,
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 0),
@@ -1146,7 +1146,7 @@ private:
                 this->gen_const(32U, 1),
                 this->gen_const(32U, 0),
                 32);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1171,16 +1171,16 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         int32_t full_imm_val = fld_imm_val;
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
-                this->builder->CreateICmp(
+                this->builder.CreateICmp(
                     ICmpInst::ICMP_ULT,
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 0),
@@ -1191,7 +1191,7 @@ private:
                 this->gen_const(32U, 1),
                 this->gen_const(32U, 0),
                 32);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1216,17 +1216,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateXor(
+            Value* X_rd_val = this->builder.CreateXor(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1251,17 +1251,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateOr(
+            Value* X_rd_val = this->builder.CreateOr(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1286,17 +1286,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAnd(
+            Value* X_rd_val = this->builder.CreateAnd(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_const(32U, fld_imm_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1321,17 +1321,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateShl(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(32U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        if(fld_shamt_val > 31){
+            this->gen_raise_trap(0, 0);
+        } else {
+            if(fld_rd_val != 0){
+                Value* X_rd_val = this->builder.CreateShl(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this->gen_const(32U, fld_shamt_val));
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1356,17 +1360,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateLShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(32U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        if(fld_shamt_val > 31){
+            this->gen_raise_trap(0, 0);
+        } else {
+            if(fld_rd_val != 0){
+                Value* X_rd_val = this->builder.CreateLShr(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this->gen_const(32U, fld_shamt_val));
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1391,17 +1399,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAShr(
-                this->gen_reg_load(fld_rs1_val, 0),
-                this->gen_const(32U, fld_shamt_val));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        if(fld_shamt_val > 31){
+            this->gen_raise_trap(0, 0);
+        } else {
+            if(fld_rd_val != 0){
+                Value* X_rd_val = this->builder.CreateAShr(
+                    this->gen_reg_load(fld_rs1_val, 0),
+                    this->gen_const(32U, fld_shamt_val));
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1426,17 +1438,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAdd(
+            Value* X_rd_val = this->builder.CreateAdd(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1461,17 +1473,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateSub(
+            Value* X_rd_val = this->builder.CreateSub(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1496,19 +1508,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateShl(
+            Value* X_rd_val = this->builder.CreateShl(
                 this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+                this->builder.CreateAnd(
                     this->gen_reg_load(fld_rs2_val, 0),
                     31));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1533,15 +1545,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
-                this->builder->CreateICmp(
+                this->builder.CreateICmp(
                     ICmpInst::ICMP_SLT,
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 0),
@@ -1552,7 +1564,7 @@ private:
                 this->gen_const(32U, 1),
                 this->gen_const(32U, 0),
                 32);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1577,15 +1589,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
-                this->builder->CreateICmp(
+                this->builder.CreateICmp(
                     ICmpInst::ICMP_ULT,
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 0),
@@ -1598,7 +1610,7 @@ private:
                 this->gen_const(32U, 1),
                 this->gen_const(32U, 0),
                 32);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1623,17 +1635,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateXor(
+            Value* X_rd_val = this->builder.CreateXor(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1658,19 +1670,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateLShr(
+            Value* X_rd_val = this->builder.CreateLShr(
                 this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+                this->builder.CreateAnd(
                     this->gen_reg_load(fld_rs2_val, 0),
                     31));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1695,19 +1707,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAShr(
+            Value* X_rd_val = this->builder.CreateAShr(
                 this->gen_reg_load(fld_rs1_val, 0),
-                this->builder->CreateAnd(
+                this->builder.CreateAnd(
                     this->gen_reg_load(fld_rs2_val, 0),
                     31));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1732,17 +1744,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateOr(
+            Value* X_rd_val = this->builder.CreateOr(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1767,17 +1779,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* X_rd_val = this->builder->CreateAnd(
+            Value* X_rd_val = this->builder.CreateAnd(
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0));
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -1801,21 +1813,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("FENCE"),
+                this->builder.CreateGlobalStringPtr("FENCE"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
-        Value* FENCE_fence_val = this->builder->CreateOr(
-            this->builder->CreateShl(
+        Value* FENCE_fence_val = this->builder.CreateOr(
+            this->builder.CreateShl(
                 this->gen_const(32U, fld_pred_val),
                 this->gen_const(32U, 4)),
             this->gen_const(32U, fld_succ_val));
         this->gen_write_mem(
             traits<ARCH>::FENCE,
             (uint64_t)0,
-            this->builder->CreateZExtOrTrunc(FENCE_fence_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(FENCE_fence_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1837,9 +1849,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("FENCE_I"),
+                this->builder.CreateGlobalStringPtr("FENCE_I"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1847,7 +1859,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::FENCE,
             (uint64_t)1,
-            this->builder->CreateZExtOrTrunc(FENCE_fencei_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(FENCE_fencei_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
@@ -1866,9 +1878,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("ECALL"),
+                this->builder.CreateGlobalStringPtr("ECALL"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1890,9 +1902,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("EBREAK"),
+                this->builder.CreateGlobalStringPtr("EBREAK"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1914,9 +1926,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("URET"),
+                this->builder.CreateGlobalStringPtr("URET"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1938,9 +1950,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("SRET"),
+                this->builder.CreateGlobalStringPtr("SRET"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1962,9 +1974,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("MRET"),
+                this->builder.CreateGlobalStringPtr("MRET"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -1986,9 +1998,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("WFI"),
+                this->builder.CreateGlobalStringPtr("WFI"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2013,9 +2025,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("SFENCE.VMA"),
+                this->builder.CreateGlobalStringPtr("SFENCE.VMA"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2023,12 +2035,12 @@ private:
         this->gen_write_mem(
             traits<ARCH>::FENCE,
             (uint64_t)2,
-            this->builder->CreateZExtOrTrunc(FENCE_fencevmal_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(FENCE_fencevmal_val,this->get_type(32)));
         Value* FENCE_fencevmau_val = this->gen_const(32U, fld_rs2_val);
         this->gen_write_mem(
             traits<ARCH>::FENCE,
             (uint64_t)3,
-            this->builder->CreateZExtOrTrunc(FENCE_fencevmau_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(FENCE_fencevmau_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2052,9 +2064,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2065,15 +2077,15 @@ private:
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
             Value* X_rd_val = csr_val_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         } else {
             Value* CSR_csr_val = rs_val_val;
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2098,9 +2110,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2108,16 +2120,16 @@ private:
         Value* xrs1_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* X_rd_val = xrd_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         if(fld_rs1_val != 0){
-            Value* CSR_csr_val = this->builder->CreateOr(
+            Value* CSR_csr_val = this->builder.CreateOr(
                 xrd_val,
                 xrs1_val);
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2142,9 +2154,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2152,16 +2164,16 @@ private:
         Value* xrs1_val = this->gen_reg_load(fld_rs1_val, 0);
         if(fld_rd_val != 0){
             Value* X_rd_val = xrd_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         if(fld_rs1_val != 0){
-            Value* CSR_csr_val = this->builder->CreateAnd(
+            Value* CSR_csr_val = this->builder.CreateAnd(
                 xrd_val,
-                this->builder->CreateNot(xrs1_val));
+                this->builder.CreateNot(xrs1_val));
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2186,15 +2198,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* CSR_csr_val = this->gen_ext(
             this->gen_const(32U, fld_zimm_val),
@@ -2203,7 +2215,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::CSR,
             fld_csr_val,
-            this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2227,15 +2239,15 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         if(fld_zimm_val != 0){
-            Value* CSR_csr_val = this->builder->CreateOr(
+            Value* CSR_csr_val = this->builder.CreateOr(
                 res_val,
                 this->gen_ext(
                     this->gen_const(32U, fld_zimm_val),
@@ -2244,11 +2256,11 @@ private:
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         }
         if(fld_rd_val != 0){
             Value* X_rd_val = res_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2273,28 +2285,28 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
         if(fld_rd_val != 0){
             Value* X_rd_val = res_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         if(fld_zimm_val != 0){
-            Value* CSR_csr_val = this->builder->CreateAnd(
+            Value* CSR_csr_val = this->builder.CreateAnd(
                 res_val,
-                this->builder->CreateNot(this->gen_ext(
+                this->builder.CreateNot(this->gen_ext(
                     this->gen_const(32U, fld_zimm_val),
                     32,
                     false)));
             this->gen_write_mem(
                 traits<ARCH>::CSR,
                 fld_csr_val,
-                this->builder->CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2319,14 +2331,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* res_val = this->builder->CreateMul(
+            Value* res_val = this->builder.CreateMul(
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
                     64,
@@ -2339,7 +2351,7 @@ private:
                 res_val,
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2364,14 +2376,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* res_val = this->builder->CreateMul(
+            Value* res_val = this->builder.CreateMul(
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
                     64,
@@ -2381,12 +2393,12 @@ private:
                     64,
                     true));
             Value* X_rd_val = this->gen_ext(
-                this->builder->CreateLShr(
+                this->builder.CreateLShr(
                     res_val,
                     32),
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2411,14 +2423,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* res_val = this->builder->CreateMul(
+            Value* res_val = this->builder.CreateMul(
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
                     64,
@@ -2428,12 +2440,12 @@ private:
                     64,
                     false));
             Value* X_rd_val = this->gen_ext(
-                this->builder->CreateLShr(
+                this->builder.CreateLShr(
                     res_val,
                     32),
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2458,14 +2470,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
         if(fld_rd_val != 0){
-            Value* res_val = this->builder->CreateMul(
+            Value* res_val = this->builder.CreateMul(
                 this->gen_ext(
                     this->gen_reg_load(fld_rs1_val, 0),
                     64,
@@ -2475,12 +2487,12 @@ private:
                     64,
                     false));
             Value* X_rd_val = this->gen_ext(
-                this->builder->CreateLShr(
+                this->builder.CreateLShr(
                     res_val,
                     32),
                 32,
                 false);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2505,9 +2517,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2515,16 +2527,16 @@ private:
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
             llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-            // this->builder->SetInsertPoint(bb);
-            this->gen_cond_branch(this->builder->CreateICmp(
+            // this->builder.SetInsertPoint(bb);
+            this->gen_cond_branch(this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
-            this->builder->SetInsertPoint(bb_then);
+            this->builder.SetInsertPoint(bb_then);
             {
-                Value* X_rd_val = this->builder->CreateSDiv(
+                Value* X_rd_val = this->builder.CreateSDiv(
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 1),
                         32,
@@ -2533,17 +2545,17 @@ private:
                         this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         true));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
-            this->builder->SetInsertPoint(bb_else);
+            this->builder.CreateBr(bbnext);
+            this->builder.SetInsertPoint(bb_else);
             {
-                Value* X_rd_val = this->builder->CreateNeg(this->gen_const(32U, 1));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                Value* X_rd_val = this->builder.CreateNeg(this->gen_const(32U, 1));
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
+            this->builder.CreateBr(bbnext);
             bb=bbnext;
-            this->builder->SetInsertPoint(bb);
+            this->builder.SetInsertPoint(bb);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2568,9 +2580,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2578,16 +2590,16 @@ private:
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
             llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-            // this->builder->SetInsertPoint(bb);
-            this->gen_cond_branch(this->builder->CreateICmp(
+            // this->builder.SetInsertPoint(bb);
+            this->gen_cond_branch(this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
-            this->builder->SetInsertPoint(bb_then);
+            this->builder.SetInsertPoint(bb_then);
             {
-                Value* X_rd_val = this->builder->CreateUDiv(
+                Value* X_rd_val = this->builder.CreateUDiv(
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 1),
                         32,
@@ -2596,17 +2608,17 @@ private:
                         this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         false));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
-            this->builder->SetInsertPoint(bb_else);
+            this->builder.CreateBr(bbnext);
+            this->builder.SetInsertPoint(bb_else);
             {
-                Value* X_rd_val = this->builder->CreateNeg(this->gen_const(32U, 1));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                Value* X_rd_val = this->builder.CreateNeg(this->gen_const(32U, 1));
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
+            this->builder.CreateBr(bbnext);
             bb=bbnext;
-            this->builder->SetInsertPoint(bb);
+            this->builder.SetInsertPoint(bb);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2631,9 +2643,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2641,16 +2653,16 @@ private:
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
             llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-            // this->builder->SetInsertPoint(bb);
-            this->gen_cond_branch(this->builder->CreateICmp(
+            // this->builder.SetInsertPoint(bb);
+            this->gen_cond_branch(this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
-            this->builder->SetInsertPoint(bb_then);
+            this->builder.SetInsertPoint(bb_then);
             {
-                Value* X_rd_val = this->builder->CreateSRem(
+                Value* X_rd_val = this->builder.CreateSRem(
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 1),
                         32,
@@ -2659,17 +2671,17 @@ private:
                         this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         true));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
-            this->builder->SetInsertPoint(bb_else);
+            this->builder.CreateBr(bbnext);
+            this->builder.SetInsertPoint(bb_else);
             {
                 Value* X_rd_val = this->gen_reg_load(fld_rs1_val, 1);
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
+            this->builder.CreateBr(bbnext);
             bb=bbnext;
-            this->builder->SetInsertPoint(bb);
+            this->builder.SetInsertPoint(bb);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2694,9 +2706,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2704,16 +2716,16 @@ private:
             llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
             llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
             llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-            // this->builder->SetInsertPoint(bb);
-            this->gen_cond_branch(this->builder->CreateICmp(
+            // this->builder.SetInsertPoint(bb);
+            this->gen_cond_branch(this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(fld_rs2_val, 0),
                 this->gen_const(32U, 0)),
                 bb_then,
                 bb_else);
-            this->builder->SetInsertPoint(bb_then);
+            this->builder.SetInsertPoint(bb_then);
             {
-                Value* X_rd_val = this->builder->CreateURem(
+                Value* X_rd_val = this->builder.CreateURem(
                     this->gen_ext(
                         this->gen_reg_load(fld_rs1_val, 1),
                         32,
@@ -2722,17 +2734,17 @@ private:
                         this->gen_reg_load(fld_rs2_val, 1),
                         32,
                         false));
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
-            this->builder->SetInsertPoint(bb_else);
+            this->builder.CreateBr(bbnext);
+            this->builder.SetInsertPoint(bb_else);
             {
                 Value* X_rd_val = this->gen_reg_load(fld_rs1_val, 1);
-                this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
-            this->builder->CreateBr(bbnext);
+            this->builder.CreateBr(bbnext);
             bb=bbnext;
-            this->builder->SetInsertPoint(bb);
+            this->builder.SetInsertPoint(bb);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2758,9 +2770,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2770,15 +2782,15 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
                 32,
                 true);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             Value* RES_offs_val = this->gen_ext(
-                this->builder->CreateNeg(this->gen_const(8U, 1)),
+                this->builder.CreateNeg(this->gen_const(8U, 1)),
                 32,
                 true);
             this->gen_write_mem(
                 traits<ARCH>::RES,
                 offs_val,
-                this->builder->CreateZExtOrTrunc(RES_offs_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(RES_offs_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2805,9 +2817,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2815,34 +2827,34 @@ private:
         Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
         llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
         llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-        // this->builder->SetInsertPoint(bb);
-        this->gen_cond_branch(this->builder->CreateICmp(
+        // this->builder.SetInsertPoint(bb);
+        this->gen_cond_branch(this->builder.CreateICmp(
             ICmpInst::ICMP_NE,
             res1_val,
             this->gen_const(32U, 0)),
             bb_then,
             bbnext);
-        this->builder->SetInsertPoint(bb_then);
+        this->builder.SetInsertPoint(bb_then);
         {
             Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 1);
             this->gen_write_mem(
                 traits<ARCH>::MEM,
                 offs_val,
-                this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+                this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         }
-        this->builder->CreateBr(bbnext);
+        this->builder.CreateBr(bbnext);
         bb=bbnext;
-        this->builder->SetInsertPoint(bb);
+        this->builder.SetInsertPoint(bb);
         if(fld_rd_val != 0){
             Value* X_rd_val = this->gen_choose(
-                this->builder->CreateICmp(
+                this->builder.CreateICmp(
                     ICmpInst::ICMP_NE,
                     res1_val,
                     this->gen_const(32U, 0)),
                 this->gen_const(32U, 0),
                 this->gen_const(32U, 1),
                 32);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
@@ -2869,9 +2881,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2881,13 +2893,13 @@ private:
                 this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
                 32,
                 true);
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2913,9 +2925,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2926,16 +2938,16 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* res2_val = this->builder->CreateAdd(
+        Value* res2_val = this->builder.CreateAdd(
             res1_val,
             this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2961,9 +2973,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -2974,16 +2986,16 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* res2_val = this->builder->CreateXor(
+        Value* res2_val = this->builder.CreateXor(
             res1_val,
             this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3009,9 +3021,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3022,16 +3034,16 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* res2_val = this->builder->CreateAnd(
+        Value* res2_val = this->builder.CreateAnd(
             res1_val,
             this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3057,9 +3069,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3070,16 +3082,16 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
-        Value* res2_val = this->builder->CreateOr(
+        Value* res2_val = this->builder.CreateOr(
             res1_val,
             this->gen_reg_load(fld_rs2_val, 0));
         Value* MEM_offs_val = res2_val;
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3105,9 +3117,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3118,10 +3130,10 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* res2_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_SGT,
                 this->gen_ext(
                     res1_val,
@@ -3136,7 +3148,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3162,9 +3174,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3175,10 +3187,10 @@ private:
             true);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* res2_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_SLT,
                 this->gen_ext(
                     res1_val,
@@ -3193,7 +3205,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3219,9 +3231,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3232,10 +3244,10 @@ private:
             false);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* res2_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_UGT,
                 res1_val,
                 this->gen_reg_load(fld_rs2_val, 0)),
@@ -3246,7 +3258,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3272,9 +3284,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+4;
     
@@ -3285,10 +3297,10 @@ private:
             false);
         if(fld_rd_val != 0){
             Value* X_rd_val = res1_val;
-            this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* res2_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_ULT,
                 this->gen_ext(
                     res1_val,
@@ -3303,7 +3315,7 @@ private:
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3326,9 +3338,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -3337,10 +3349,10 @@ private:
         }
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t x2_idx_val = 2;
-        Value* X_rd_idx_val = this->builder->CreateAdd(
+        Value* X_rd_idx_val = this->builder.CreateAdd(
             this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3364,19 +3376,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         uint8_t rd_idx_val = (fld_rd_val + 8);
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         Value* X_rd_idx_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3400,22 +3412,22 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         Value* MEM_offs_val = this->gen_reg_load(rs2_idx_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3438,16 +3450,16 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
-        Value* X_rs1_val = this->builder->CreateAdd(
+        Value* X_rs1_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
+        this->builder.CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3467,9 +3479,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("C.NOP"),
+                this->builder.CreateGlobalStringPtr("C.NOP"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -3495,21 +3507,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rd_val = 1;
-        Value* X_rd_val = this->builder->CreateAdd(
+        Value* X_rd_val = this->builder.CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, 2));
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(rd_val), false);
-        Value* PC_val = this->builder->CreateAdd(
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(rd_val), false);
+        Value* PC_val = this->builder.CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -3530,9 +3542,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -3540,7 +3552,7 @@ private:
             this->gen_raise_trap(0, 2);
         }
         Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3563,9 +3575,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -3576,7 +3588,7 @@ private:
             this->gen_raise_trap(0, 2);
         }
         Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3598,19 +3610,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t x2_idx_val = 2;
-        Value* X_x2_idx_val = this->builder->CreateAdd(
+        Value* X_x2_idx_val = this->builder.CreateAdd(
             this->gen_ext(
                 this->gen_reg_load(x2_idx_val, 0),
                 32, true),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(X_x2_idx_val, get_reg_ptr(x2_idx_val), false);
+        this->builder.CreateStore(X_x2_idx_val, get_reg_ptr(x2_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3633,17 +3645,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
-        Value* X_rs1_idx_val = this->builder->CreateLShr(
+        Value* X_rs1_idx_val = this->builder.CreateLShr(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_shamt_val));
-        this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
+        this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3666,17 +3678,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
-        Value* X_rs1_idx_val = this->builder->CreateAShr(
+        Value* X_rs1_idx_val = this->builder.CreateAShr(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_shamt_val));
-        this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
+        this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3699,17 +3711,17 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
-        Value* X_rs1_idx_val = this->builder->CreateAnd(
+        Value* X_rs1_idx_val = this->builder.CreateAnd(
             this->gen_reg_load(rs1_idx_val, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
+        this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3732,18 +3744,18 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* X_rd_idx_val = this->builder->CreateSub(
+        Value* X_rd_idx_val = this->builder.CreateSub(
             this->gen_reg_load(rd_idx_val, 0),
             this->gen_reg_load(rs2_idx_val, 0));
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3766,18 +3778,18 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* X_rd_idx_val = this->builder->CreateXor(
+        Value* X_rd_idx_val = this->builder.CreateXor(
             this->gen_reg_load(rd_idx_val, 0),
             this->gen_reg_load(rs2_idx_val, 0));
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3800,18 +3812,18 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* X_rd_idx_val = this->builder->CreateOr(
+        Value* X_rd_idx_val = this->builder.CreateOr(
             this->gen_reg_load(rd_idx_val, 0),
             this->gen_reg_load(rs2_idx_val, 0));
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3834,18 +3846,18 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rd_idx_val = (fld_rd_val + 8);
         uint8_t rs2_idx_val = (fld_rs2_val + 8);
-        Value* X_rd_idx_val = this->builder->CreateAnd(
+        Value* X_rd_idx_val = this->builder.CreateAnd(
             this->gen_reg_load(rd_idx_val, 0),
             this->gen_reg_load(rs2_idx_val, 0));
-        this->builder->CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
+        this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3867,16 +3879,16 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
-        Value* PC_val = this->builder->CreateAdd(
+        Value* PC_val = this->builder.CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, fld_imm_val));
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -3897,26 +3909,26 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_EQ,
                 this->gen_reg_load(rs1_idx_val, 0),
                 this->gen_const(32U, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 2)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -3937,26 +3949,26 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t rs1_idx_val = (fld_rs1_val + 8);
         Value* PC_val = this->gen_choose(
-            this->builder->CreateICmp(
+            this->builder.CreateICmp(
                 ICmpInst::ICMP_NE,
                 this->gen_reg_load(rs1_idx_val, 0),
                 this->gen_const(32U, 0)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, fld_imm_val)),
-            this->builder->CreateAdd(
+            this->builder.CreateAdd(
                 this->gen_reg_load(traits<ARCH>::PC, 0),
                 this->gen_const(32U, 2)),
             32);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -3977,19 +3989,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         if(fld_rs1_val == 0){
             this->gen_raise_trap(0, 2);
         }
-        Value* X_rs1_val = this->builder->CreateShl(
+        Value* X_rs1_val = this->builder.CreateShl(
             this->gen_reg_load(fld_rs1_val, 0),
             this->gen_const(32U, fld_shamt_val));
-        this->builder->CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
+        this->builder.CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4012,18 +4024,18 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t x2_idx_val = 2;
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         Value* X_rd_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4046,14 +4058,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         Value* X_rd_val = this->gen_reg_load(fld_rs2_val, 0);
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4075,14 +4087,14 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         Value* PC_val = this->gen_reg_load(fld_rs1_val, 0);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4103,16 +4115,16 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
-        Value* X_rd_val = this->builder->CreateAdd(
+        Value* X_rd_val = this->builder.CreateAdd(
             this->gen_reg_load(fld_rd_val, 0),
             this->gen_reg_load(fld_rs2_val, 0));
-        this->builder->CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
+        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4134,19 +4146,19 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t r_idx_val = 1;
-        Value* X_r_idx_val = this->builder->CreateAdd(
+        Value* X_r_idx_val = this->builder.CreateAdd(
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(32U, 2));
-        this->builder->CreateStore(X_r_idx_val, get_reg_ptr(r_idx_val), false);
+        this->builder.CreateStore(X_r_idx_val, get_reg_ptr(r_idx_val), false);
         Value* PC_val = this->gen_reg_load(fld_rs1_val, 0);
-        this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4164,9 +4176,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("C.EBREAK"),
+                this->builder.CreateGlobalStringPtr("C.EBREAK"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -4191,21 +4203,21 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
+                this->builder.CreateGlobalStringPtr(ins_fmter.str()),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
         uint8_t x2_idx_val = 2;
-        Value* offs_val = this->builder->CreateAdd(
+        Value* offs_val = this->builder.CreateAdd(
             this->gen_reg_load(x2_idx_val, 0),
             this->gen_const(32U, fld_uimm_val));
         Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val, 0);
         this->gen_write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            this->builder->CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+            this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
         this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4225,9 +4237,9 @@ private:
             std::vector<llvm::Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
-                this->builder->CreateGlobalStringPtr("DII"),
+                this->builder.CreateGlobalStringPtr("DII"),
             };
-            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         pc=pc+2;
     
@@ -4245,11 +4257,11 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        // this->gen_sync(iss::PRE_SYNC);
-        this->builder->CreateStore(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
+        this->gen_sync(iss::PRE_SYNC);
+        this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
+        this->builder.CreateStore(
+            this->builder.CreateAdd(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
                                      this->gen_const(64U, 1)),
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
         if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
@@ -4269,8 +4281,8 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
 template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
-vm_impl<ARCH>::vm_impl(ARCH &core, bool dump)
-: vm::vm_base<ARCH>(core, dump) {
+vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
+: vm::vm_base<ARCH>(core, core_id, cluster_id) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -4279,7 +4291,6 @@ vm_impl<ARCH>::vm_impl(ARCH &core, bool dump)
         auto quantrant = instr.value & 0x3;
         expand_bit_mask(29, lutmasks[quantrant], instr.value >> 2, instr.mask >> 2, 0, qlut[quantrant], instr.op);
     }
-    this->sync_exec = static_cast<sync_type>(this->sync_exec | core.needed_sync());
 }
 
 template <typename ARCH>
@@ -4287,8 +4298,8 @@ std::tuple<vm::continuation_e, llvm::BasicBlock *>
 vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, llvm::BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     code_word_t insn = 0;
-    iss::addr_t paddr;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
+    phys_addr_t paddr(pc);
     try {
         uint8_t *const data = (uint8_t *)&insn;
         paddr = this->core.v2p(pc);
@@ -4318,44 +4329,44 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock *leave_blk) {
-    this->builder->SetInsertPoint(leave_blk);
-    this->builder->CreateRet(this->builder->CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
+    this->builder.SetInsertPoint(leave_blk);
+    this->builder.CreateRet(this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
-    this->builder->CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     std::vector<llvm::Value *> args{
         this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, lvl)),
     };
-    this->builder->CreateCall(this->mod->getFunction("leave_trap"), args);
+    this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
-    this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
     std::vector<llvm::Value *> args{
         this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, type)),
     };
-    this->builder->CreateCall(this->mod->getFunction("wait"), args);
+    this->builder.CreateCall(this->mod->getFunction("wait"), args);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
-    this->builder->SetInsertPoint(trap_blk);
-    auto *trap_state_val = this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.SetInsertPoint(trap_blk);
+    auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
     std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                                    this->adj_to64(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
-    this->builder->CreateCall(this->mod->getFunction("enter_trap"), args);
-    auto *trap_addr_val = this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder->CreateRet(trap_addr_val);
+                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
+    auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateRet(trap_addr_val);
 }
 
 template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBlock *bb) {
-    auto *v = this->builder->CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
-    this->gen_cond_branch(this->builder->CreateICmp(
+    auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
+    this->gen_cond_branch(this->builder.CreateICmp(
                               ICmpInst::ICMP_EQ, v,
                               llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);

@@ -62,7 +62,7 @@ public:
 
     vm_impl();
 
-    vm_impl(ARCH &core, bool dump = false);
+    vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
 
     void enableDebug(bool enable) { super::sync_exec = super::ALL_SYNC; }
 
@@ -102,13 +102,13 @@ protected:
 
 
     inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        return this->builder->CreateLoad(get_reg_ptr(i), false);
+        return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        llvm::Value *next_pc_v = this->builder->CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
+        llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
                                                                   this->get_type(traits<ARCH>::XLEN));
-        this->builder->CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
     }
 
     // some compile time constants
@@ -186,30 +186,11 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        bb->setName("illegal_instruction");
-
-//        this->gen_sync(iss::PRE_SYNC);
-//        if(this->disass_enabled){
-//            /* generate console output when executing the command */
-//            boost::format ins_fmter("DB x%1$d");
-//            ins_fmter % (uint64_t)instr;
-//            std::vector<llvm::Value*> args {
-//                this->core_ptr,
-//                this->gen_const(64, pc.val),
-//                this->builder->CreateGlobalStringPtr(ins_fmter.str()),
-//            };
-//            this->builder->CreateCall(this->mod->getFunction("print_disass"), args);
-//        }
-//        pc = pc + ((instr & 3) == 3 ? 4 : 2);
-//        this->gen_raise_trap(0, 2);     // illegal instruction trap
-//        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
-//        this->gen_trap_check(this->leave_blk);
-//        return std::make_tuple(iss::vm::BRANCH, nullptr);
-        // this->gen_sync(iss::PRE_SYNC);
-        this->builder->CreateStore(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
+        this->gen_sync(iss::PRE_SYNC);
+        this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
-        this->builder->CreateStore(
-            this->builder->CreateAdd(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
+        this->builder.CreateStore(
+            this->builder.CreateAdd(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
                                      this->gen_const(64U, 1)),
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
         if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
@@ -229,8 +210,8 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
 template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
-vm_impl<ARCH>::vm_impl(ARCH &core, bool dump)
-: vm::vm_base<ARCH>(core, dump) {
+vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
+: vm::vm_base<ARCH>(core, core_id, cluster_id) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -239,7 +220,6 @@ vm_impl<ARCH>::vm_impl(ARCH &core, bool dump)
         auto quantrant = instr.value & 0x3;
         expand_bit_mask(29, lutmasks[quantrant], instr.value >> 2, instr.mask >> 2, 0, qlut[quantrant], instr.op);
     }
-    this->sync_exec = static_cast<sync_type>(this->sync_exec | core.needed_sync());
 }
 
 template <typename ARCH>
@@ -278,44 +258,44 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock *leave_blk) {
-    this->builder->SetInsertPoint(leave_blk);
-    this->builder->CreateRet(this->builder->CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
+    this->builder.SetInsertPoint(leave_blk);
+    this->builder.CreateRet(this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
-    this->builder->CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     std::vector<llvm::Value *> args{
         this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, lvl)),
     };
-    this->builder->CreateCall(this->mod->getFunction("leave_trap"), args);
+    this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
-    this->builder->CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
     std::vector<llvm::Value *> args{
         this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, type)),
     };
-    this->builder->CreateCall(this->mod->getFunction("wait"), args);
+    this->builder.CreateCall(this->mod->getFunction("wait"), args);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
-    this->builder->SetInsertPoint(trap_blk);
-    auto *trap_state_val = this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.SetInsertPoint(trap_blk);
+    auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
     std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                                    this->adj_to64(this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
-    this->builder->CreateCall(this->mod->getFunction("enter_trap"), args);
-    auto *trap_addr_val = this->builder->CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder->CreateRet(trap_addr_val);
+                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
+    auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateRet(trap_addr_val);
 }
 
 template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBlock *bb) {
-    auto *v = this->builder->CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
-    this->gen_cond_branch(this->builder->CreateICmp(
+    auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
+    this->gen_cond_branch(this->builder.CreateICmp(
                               ICmpInst::ICMP_EQ, v,
                               llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);

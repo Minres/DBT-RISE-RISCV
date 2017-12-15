@@ -222,6 +222,7 @@ struct vm_info {
     int idxbits;
     int ptesize;
     uint64_t ptbase;
+    bool is_active() { return levels;}
 };
 
 class trap_load_access_fault : public trap_access {
@@ -450,7 +451,7 @@ public:
 
     void load_file(std::string name, int type = -1) override;
 
-    virtual phys_addr_t v2p(const iss::addr_t &addr);
+    virtual phys_addr_t virt2phys(const iss::addr_t &addr) override;
 
     iss::status read(const iss::addr_t &addr, unsigned length, uint8_t *const data) override;
     iss::status write(const iss::addr_t &addr, unsigned length, const uint8_t *const data) override;
@@ -459,8 +460,6 @@ public:
     virtual uint64_t enter_trap(uint64_t flags, uint64_t addr) override;
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
-
-    void notify_phase(iss::arch_if::exec_phase phase);
 
     void disass_output(uint64_t pc, const std::string instr) override {
         std::stringstream s;
@@ -486,6 +485,8 @@ protected:
     mem_type mem;
     csr_type csr;
     hart_state<reg_t> state;
+    vm_info vm[2];
+    void update_vm_info();
     unsigned to_host_wr_cnt = 0;
     std::stringstream uart_buf;
     std::unordered_map<reg_t, uint64_t> ptw;
@@ -571,7 +572,7 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string nam
                 const auto seg_data = pseg->get_data();
                 if (fsize > 0) {
                     auto res = this->write(
-                        typed_addr_t<PHYSICAL>(iss::DEBUG_WRITE, traits<BASE>::MEM, pseg->get_physical_address()),
+                        phys_addr_t(iss::access_type::DEBUG_WRITE, traits<BASE>::MEM, pseg->get_physical_address()),
                         fsize, reinterpret_cast<const uint8_t *const>(seg_data));
                     if (res != iss::Ok)
                         LOG(ERROR) << "problem writing " << fsize << "bytes to 0x" << std::hex
@@ -586,13 +587,15 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string nam
             }
             return;
         }
+        throw std::runtime_error("memory load file is not a valid elf file");
     }
+    throw std::runtime_error("memory load file not found");
 }
 
 template <typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned length, uint8_t *const data) {
 #ifndef NDEBUG
-    if (addr.type & iss::DEBUG) {
+    if (addr.access && iss::access_type::DEBUG) {
         LOG(DEBUG) << "debug read of " << length << " bytes @addr " << addr;
     } else {
         LOG(DEBUG) << "read of " << length << " bytes  @addr " << addr;
@@ -601,9 +604,9 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
     try {
         switch (addr.space) {
         case traits<BASE>::MEM: {
-            if ((addr.type & (iss::ACCESS_TYPE - iss::DEBUG)) == iss::FETCH && (addr.val & 0x1) == 1) {
+            if ((addr.access == iss::access_type::FETCH || addr.access == iss::access_type::DEBUG_FETCH) && (addr.val & 0x1) == 1) {
                 fault_data = addr.val;
-                if ((addr.type & iss::DEBUG)) throw trap_access(0, addr.val);
+                if (addr.access && iss::access_type::DEBUG) throw trap_access(0, addr.val);
                 this->reg.trap_state = (1 << 31); // issue trap 0
                 return iss::Err;
             }
@@ -615,12 +618,11 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
                         auto len1 = split_addr - addr.val;
                         auto res = read(addr, len1, data);
                         if (res == iss::Ok)
-                            res = read(iss::addr_t{addr.type, addr.space, split_addr}, length - len1, data + len1);
+                            res = read(iss::addr_t{addr.access, addr.type, addr.space, split_addr}, length - len1, data + len1);
                         return res;
                     }
                 }
-                phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
-                auto res = read_mem(paddr, length, data);
+                auto res = read_mem( BASE::v2p(addr), length, data);
                 if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
                 return res;
             } catch (trap_access &ta) {
@@ -668,7 +670,7 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
 template <typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned length, const uint8_t *const data) {
 #ifndef NDEBUG
-    const char *prefix = addr.type & iss::DEBUG ? "debug " : "";
+    const char *prefix = (addr.access && iss::access_type::DEBUG)? "debug " : "";
     switch (length) {
     case 8:
         LOG(DEBUG) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t *)&data[0] << std::dec
@@ -693,9 +695,9 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
     try {
         switch (addr.space) {
         case traits<BASE>::MEM: {
-            if ((addr.type & (iss::ACCESS_TYPE - iss::DEBUG)) == iss::FETCH && (addr.val & 0x1) == 1) {
+            if ((addr.access && iss::access_type::FETCH) && (addr.val & 0x1) == 1) {
                 fault_data = addr.val;
-                if ((addr.type & iss::DEBUG)) throw trap_access(0, addr.val);
+                if (addr.access && iss::access_type::DEBUG) throw trap_access(0, addr.val);
                 this->reg.trap_state = (1 << 31); // issue trap 0
                 return iss::Err;
             }
@@ -707,12 +709,11 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                         auto len1 = split_addr - addr.val;
                         auto res = write(addr, len1, data);
                         if (res == iss::Ok)
-                            res = write(iss::addr_t{addr.type, addr.space, split_addr}, length - len1, data + len1);
+                            res = write(iss::addr_t{addr.access, addr.type, addr.space, split_addr}, length - len1, data + len1);
                         return res;
                     }
                 }
-                phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
-                auto res = write_mem(paddr, length, data);
+                auto res = write_mem(BASE::v2p(addr), length, data);
                 if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
                 return res;
             } catch (trap_access &ta) {
@@ -720,7 +721,7 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                 return iss::Err;
             }
 
-            phys_addr_t paddr = (addr.type & iss::ADDRESS_TYPE) == iss::PHYSICAL ? addr : v2p(addr);
+            phys_addr_t paddr = BASE::v2p(addr);
             if ((paddr.val + length) > mem.size()) return iss::Err;
             switch (paddr.val) {
             case 0x10013000: // UART0 base, TXFIFO reg
@@ -842,6 +843,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_status(unsig
     if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     state.write_mstatus(val, req_priv_lvl);
     check_interrupt();
+    update_vm_info();
     return iss::Ok;
 }
 
@@ -901,6 +903,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_satp(unsigne
         return iss::Err;
     }
     state.satp = val;
+    update_vm_info();
     return iss::Ok;
 }
 
@@ -909,8 +912,9 @@ iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length
     if ((paddr.val + length) > mem.size()) return iss::Err;
     switch (paddr.val) {
     case 0x0200BFF8: { // CLINT base, mtime reg
-    	if(sizeof(reg_t)<length) return iss::Err;
-    	reg_t time_val=this->csr[time];
+        if(sizeof(reg_t)<length) return iss::Err;
+        reg_t time_val;
+        this->read_csr(time, time_val);
         std::copy((uint8_t *)&time_val, ((uint8_t *)&time_val) + length, data);
     } break;
     case 0x10008000: {
@@ -960,7 +964,7 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
         mem_type::page_type &p = mem(paddr.val / mem.page_size);
         std::copy(data, data + length, p.data() + (paddr.val & mem.page_addr_mask));
         // tohost handling in case of riscv-test
-        if ((paddr.type & iss::DEBUG) == 0) {
+        if (paddr.access && iss::access_type::FUNC) {
             auto tohost_upper = (traits<BASE>::XLEN == 32 && paddr.val == (tohost + 4)) ||
                                 (traits<BASE>::XLEN == 64 && paddr.val == tohost);
             auto tohost_lower =
@@ -1004,14 +1008,22 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
 }
 
 template<typename BASE>
-inline void riscv_hart_msu_vp<BASE>::notify_phase(iss::arch_if::exec_phase phase) {
-	BASE::notify_phase(phase);
-}
-
-template<typename BASE>
 inline void riscv_hart_msu_vp<BASE>::reset(uint64_t address) {
     BASE::reset(address);
     state.mstatus = hart_state<reg_t>::mstatus_reset_val;
+    update_vm_info();
+}
+
+template<typename BASE>
+inline void riscv_hart_msu_vp<BASE>::update_vm_info() {
+    vm[1] = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
+    BASE::addr_mode[3]=BASE::addr_mode[2]=vm[1].is_active()?iss::address_type::VIRTUAL:iss::address_type::PHYSICAL;
+    if(state.mstatus.MPRV)
+        vm[0] = hart_state<reg_t>::decode_vm_info(state.mstatus.MPP, state.satp);
+    else
+        vm[0] = vm[1];
+    BASE::addr_mode[1]=BASE::addr_mode[0]=vm[0].is_active()?iss::address_type::VIRTUAL:iss::address_type::PHYSICAL;
+    ptw.clear();
 }
 
 template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {
@@ -1042,37 +1054,12 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {
 }
 
 template <typename BASE>
-typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const iss::addr_t &addr) {
-    const uint64_t tmp = reg_t(1) << (traits<BASE>::XLEN - 1);
-    const uint64_t msk = tmp | (tmp - 1);
-
-    if (addr.space != traits<BASE>::MEM) { // non-memory access
-        phys_addr_t ret(addr);
-        ret.val &= msk;
-        return ret;
-    }
-
-    const auto type = (access_type)(addr.getAccessType() & ~iss::DEBUG);
-    uint32_t mode = type != iss::FETCH && state.mstatus.MPRV ? // MPRV
-                        mode = state.mstatus.MPP:
-                        this->reg.machine_state;
-
-    const vm_info vm = hart_state<reg_t>::decode_vm_info(mode, state.satp);
-
-    if (vm.levels == 0) {
-        phys_addr_t ret(addr);
-        ret.val &= msk;
-        return ret;
-    }
-
-    const bool s_mode = mode == PRIV_S;
-    const bool sum = state.mstatus.SUM;
-    const bool mxr = state.mstatus.MXR;
-
+typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::virt2phys(const iss::addr_t &addr) {
+    const auto type = addr.access & iss::access_type::FUNC;
     auto it = ptw.find(addr.val >> PGSHIFT);
     if (it != ptw.end()) {
         const reg_t pte = it->second;
-        const reg_t ad = PTE_A | ((type == iss::WRITE) * PTE_D);
+        const reg_t ad = PTE_A | (type == iss::access_type::WRITE) * PTE_D;
 #ifdef RISCV_ENABLE_DIRTY
         // set accessed and possibly dirty bits.
         *(uint32_t *)ppte |= ad;
@@ -1080,11 +1067,21 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const
 #else
         // take exception if access or possibly dirty bit is not set.
         if ((pte & ad) == ad)
-            return {addr.getAccessType(), addr.space, (pte & (~PGMASK)) | (addr.val & PGMASK)};
+            return {addr.access, addr.space, (pte & (~PGMASK)) | (addr.val & PGMASK)};
         else
-            ptw.erase(it);
+            ptw.erase(it); // throw an exception
 #endif
     } else {
+        uint32_t mode = type != iss::access_type::FETCH && state.mstatus.MPRV ? // MPRV
+                            state.mstatus.MPP:
+                            this->reg.machine_state;
+
+        const vm_info& vm = this->vm[static_cast<uint16_t>(type)/2];
+
+        const bool s_mode = mode == PRIV_S;
+        const bool sum = state.mstatus.SUM;
+        const bool mxr = state.mstatus.MXR;
+
         // verify bits xlen-1:va_bits-1 are all equal
         const int va_bits = PGSHIFT + vm.levels * vm.idxbits;
         const reg_t mask = (reg_t(1) << (traits<BASE>::XLEN > -(va_bits - 1))) - 1;
@@ -1099,25 +1096,24 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const
             // check that physical address of PTE is legal
             reg_t pte = 0;
             const uint8_t res =
-                this->read(phys_addr_t(addr.getAccessType(), traits<BASE>::MEM, base + idx * vm.ptesize), vm.ptesize,
-                           (uint8_t *)&pte);
+                this->read(phys_addr_t{addr.access, traits<BASE>::MEM, base + idx * vm.ptesize}, vm.ptesize, (uint8_t *)&pte);
             if (res != 0) throw trap_load_access_fault(addr.val);
             const reg_t ppn = pte >> PTE_PPN_SHIFT;
 
             if (PTE_TABLE(pte)) { // next level of page table
                 base = ppn << PGSHIFT;
-            } else if ((pte & PTE_U) ? s_mode && (type == iss::FETCH || !sum) : !s_mode) {
+            } else if ((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
                 break;
             } else if (!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
                 break;
-            } else if (type == iss::FETCH ? !(pte & PTE_X)
-                                          : type == iss::READ ? !(pte & PTE_R) && !(mxr && (pte & PTE_X))
+            } else if (type == iss::access_type::FETCH ? !(pte & PTE_X)
+                                          : type == iss::access_type::READ ? !(pte & PTE_R) && !(mxr && (pte & PTE_X))
                                                               : !((pte & PTE_R) && (pte & PTE_W))) {
                 break;
             } else if ((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
                 break;
             } else {
-                const reg_t ad = PTE_A | ((type == iss::WRITE) * PTE_D);
+                const reg_t ad = PTE_A | ((type == iss::access_type::WRITE) * PTE_D);
 #ifdef RISCV_ENABLE_DIRTY
                 // set accessed and possibly dirty bits.
                 *(uint32_t *)ppte |= ad;
@@ -1130,18 +1126,18 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::v2p(const
                 const reg_t value = (ppn | (vpn & ((reg_t(1) << ptshift) - 1))) << PGSHIFT;
                 const reg_t offset = addr.val & PGMASK;
                 ptw[vpn] = value | (pte & 0xff);
-                return {addr.getAccessType(), addr.space, value | offset};
+                return {addr.access, addr.space, value | offset};
             }
         }
     }
     switch (type) {
-    case FETCH:
+    case access_type::FETCH:
         this->fault_data = addr.val;
         throw trap_instruction_page_fault(addr.val);
-    case READ:
+    case access_type::READ:
         this->fault_data = addr.val;
         throw trap_load_page_fault(addr.val);
-    case WRITE:
+    case access_type::WRITE:
         this->fault_data = addr.val;
         throw trap_store_page_fault(addr.val);
     default:
@@ -1217,6 +1213,7 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause])<<"' ("<<trap_id<<")"
                        << " at address " << buffer << " occurred, changing privilege level from " << lvl[cur_priv]
                        << " to " << lvl[new_priv];
+    update_vm_info();
     return this->reg.NEXT_PC;
 }
 
@@ -1253,6 +1250,7 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::leave_trap(uint64_t f
     // sets the pc to the value stored in the x epc register.
     this->reg.NEXT_PC = csr[uepc | inst_priv << 8];
     CLOG(INFO, disass) << "Executing xRET , changing privilege level from " << lvl[cur_priv] << " to " << lvl[this->reg.machine_state];
+    update_vm_info();
     return this->reg.NEXT_PC;
 }
 
