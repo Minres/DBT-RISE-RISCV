@@ -25,15 +25,17 @@ macro(setup_conan)
   set(conanfile_cmake ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
   set(compiler_libcxx libstdc++11)
 
-  if(${CMAKE_BUILD_TYPE} STREQUAL RelWithDebInfo)
-  	execute_process(COMMAND ${conan} install --build=missing
-                   -s build_type=Release -s compiler.libcxx=${compiler_libcxx}
-                   ${CMAKE_SOURCE_DIR} RESULT_VARIABLE return_code)
+  if("${CMAKE_BUILD_TYPE}" STREQUAL "")
+	set(CONAN_BUILD_TYPE Debug)
+  elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+	set(CONAN_BUILD_TYPE Release)
   else()
-   	execute_process(COMMAND ${conan} install --build=missing
-                   -s build_type=${CMAKE_BUILD_TYPE} -s compiler.libcxx=${compiler_libcxx}
-                   ${CMAKE_SOURCE_DIR} RESULT_VARIABLE return_code)
+	set(CONAN_BUILD_TYPE ${CMAKE_BUILD_TYPE})
   endif()
+
+  execute_process(COMMAND ${conan} install --build=missing
+	  -s build_type=${CONAN_BUILD_TYPE} -s compiler.libcxx=${compiler_libcxx}
+	           ${CMAKE_SOURCE_DIR} RESULT_VARIABLE return_code)
   if(NOT ${return_code} EQUAL 0)
     message(FATAL_ERROR "conan install command failed.")
   endif()
