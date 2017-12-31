@@ -30,3 +30,4 @@ language.settings.xml
 /.gdbinit
 /*.out
 /dump.json
+/etc/

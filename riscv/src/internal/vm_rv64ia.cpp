@@ -354,11 +354,11 @@ private:
         /* instruction AMOMAXU.W */
         {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
     };
-    // instruction LWU
+    //0: instruction LWU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lwu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LWU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 0);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -387,17 +387,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 0);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LD
+    //1: instruction LD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ld(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LD");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 1);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -426,17 +426,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 1);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SD
+    //2: instruction SD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sd(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SD");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 2);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -463,17 +463,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 2);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLLI
+    //3: instruction SLLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLLI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 3);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -502,17 +502,17 @@ private:
             }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 3);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRLI
+    //4: instruction SRLI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRLI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 4);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -541,17 +541,17 @@ private:
             }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 4);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRAI
+    //5: instruction SRAI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRAI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 5);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -580,17 +580,17 @@ private:
             }
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 5);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ADDIW
+    //6: instruction ADDIW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __addiw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADDIW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 6);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -622,17 +622,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 6);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLLIW
+    //7: instruction SLLIW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slliw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLLIW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 7);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -664,17 +664,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 7);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRLIW
+    //8: instruction SRLIW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srliw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRLIW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 8);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -706,17 +706,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 8);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRAIW
+    //9: instruction SRAIW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sraiw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRAIW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 9);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -748,17 +748,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 9);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ADDW
+    //10: instruction ADDW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __addw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADDW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 10);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -791,17 +791,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 10);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SUBW
+    //11: instruction SUBW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __subw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SUBW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 11);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -834,17 +834,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 11);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLLW
+    //12: instruction SLLW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sllw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLLW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 12);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -883,17 +883,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 12);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRLW
+    //13: instruction SRLW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srlw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRLW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 13);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -932,17 +932,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 13);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRAW
+    //14: instruction SRAW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sraw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRAW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 14);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -981,17 +981,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 14);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LUI
+    //15: instruction LUI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LUI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 15);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         int32_t fld_imm_val = 0 | (signed_bit_sub<12,20>(instr) << 12);
@@ -1013,17 +1013,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 15);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AUIPC
+    //16: instruction AUIPC
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AUIPC");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 16);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         int32_t fld_imm_val = 0 | (signed_bit_sub<12,20>(instr) << 12);
@@ -1047,17 +1047,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 16);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction JAL
+    //17: instruction JAL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JAL");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 17);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         int32_t fld_imm_val = 0 | (bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (signed_bit_sub<31,1>(instr) << 20);
@@ -1084,16 +1084,16 @@ private:
             this->gen_reg_load(traits<ARCH>::PC, 0),
             this->gen_const(64U, fld_imm_val));
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 17);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction JALR
+    //18: instruction JALR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("JALR");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 18);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1148,16 +1148,16 @@ private:
         this->builder.CreateBr(bbnext);
         bb=bbnext;
         this->builder.SetInsertPoint(bb);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 18);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BEQ
+    //19: instruction BEQ
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BEQ");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 19);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1188,16 +1188,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 19);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BNE
+    //20: instruction BNE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BNE");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 20);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1228,16 +1228,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 20);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BLT
+    //21: instruction BLT
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLT");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 21);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1272,16 +1272,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 21);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BGE
+    //22: instruction BGE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGE");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 22);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1316,16 +1316,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 22);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BLTU
+    //23: instruction BLTU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BLTU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 23);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1356,16 +1356,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 23);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction BGEU
+    //24: instruction BGEU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("BGEU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 24);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1396,16 +1396,16 @@ private:
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 24);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction LB
+    //25: instruction LB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LB");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 25);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1434,17 +1434,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 25);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LH
+    //26: instruction LH
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LH");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 26);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1473,17 +1473,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 26);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LW
+    //27: instruction LW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 27);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1512,17 +1512,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 27);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LBU
+    //28: instruction LBU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LBU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 28);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1551,17 +1551,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 28);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LHU
+    //29: instruction LHU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LHU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 29);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1590,17 +1590,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 29);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SB
+    //30: instruction SB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SB");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 30);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1627,17 +1627,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(8)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 30);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SH
+    //31: instruction SH
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SH");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 31);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1664,17 +1664,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(16)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 31);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SW
+    //32: instruction SW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 32);
     
         int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1701,17 +1701,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 32);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ADDI
+    //33: instruction ADDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADDI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 33);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1736,17 +1736,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 33);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLTI
+    //34: instruction SLTI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 34);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1780,17 +1780,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 34);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLTIU
+    //35: instruction SLTIU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTIU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 35);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1825,17 +1825,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 35);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction XORI
+    //36: instruction XORI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XORI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 36);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1860,17 +1860,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 36);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ORI
+    //37: instruction ORI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ORI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 37);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1895,17 +1895,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 37);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ANDI
+    //38: instruction ANDI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ANDI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 38);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1930,17 +1930,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 38);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction ADD
+    //39: instruction ADD
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ADD");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 39);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -1965,17 +1965,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 39);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SUB
+    //40: instruction SUB
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SUB");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 40);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2000,17 +2000,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 40);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLL
+    //41: instruction SLL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLL");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 41);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2037,17 +2037,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 41);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLT
+    //42: instruction SLT
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLT");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 42);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2081,17 +2081,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 42);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SLTU
+    //43: instruction SLTU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SLTU");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 43);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2127,17 +2127,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 43);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction XOR
+    //44: instruction XOR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("XOR");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 44);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2162,17 +2162,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 44);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRL
+    //45: instruction SRL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRL");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 45);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2199,17 +2199,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 45);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SRA
+    //46: instruction SRA
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRA");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 46);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2236,17 +2236,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 46);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction OR
+    //47: instruction OR
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("OR");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 47);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2271,17 +2271,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 47);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AND
+    //48: instruction AND
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AND");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 48);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2306,17 +2306,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 48);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction FENCE
+    //49: instruction FENCE
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 49);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2343,17 +2343,17 @@ private:
             (uint64_t)0,
             this->builder.CreateZExtOrTrunc(FENCE_fence_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 49);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction FENCE_I
+    //50: instruction FENCE_I
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("FENCE_I");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 50);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2375,16 +2375,16 @@ private:
             (uint64_t)1,
             this->builder.CreateZExtOrTrunc(FENCE_fencei_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 50);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::FLUSH, nullptr);
     }
     
-    // instruction ECALL
+    //51: instruction ECALL
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("ECALL");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 51);
     
         ;
         if(this->disass_enabled){
@@ -2399,16 +2399,16 @@ private:
         pc=pc+4;
     
         this->gen_raise_trap(0, 11);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 51);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction EBREAK
+    //52: instruction EBREAK
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("EBREAK");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 52);
     
         ;
         if(this->disass_enabled){
@@ -2423,16 +2423,16 @@ private:
         pc=pc+4;
     
         this->gen_raise_trap(0, 3);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 52);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction URET
+    //53: instruction URET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("URET");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 53);
     
         ;
         if(this->disass_enabled){
@@ -2447,16 +2447,16 @@ private:
         pc=pc+4;
     
         this->gen_leave_trap(0);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 53);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction SRET
+    //54: instruction SRET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SRET");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 54);
     
         ;
         if(this->disass_enabled){
@@ -2471,16 +2471,16 @@ private:
         pc=pc+4;
     
         this->gen_leave_trap(1);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 54);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction MRET
+    //55: instruction MRET
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("MRET");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 55);
     
         ;
         if(this->disass_enabled){
@@ -2495,16 +2495,16 @@ private:
         pc=pc+4;
     
         this->gen_leave_trap(3);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 55);
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
     
-    // instruction WFI
+    //56: instruction WFI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("WFI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 56);
     
         ;
         if(this->disass_enabled){
@@ -2520,17 +2520,17 @@ private:
     
         this->gen_wait(1);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 56);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SFENCE.VMA
+    //57: instruction SFENCE.VMA
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SFENCE.VMA");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 57);
     
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
         uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
@@ -2556,17 +2556,17 @@ private:
             (uint64_t)3,
             this->builder.CreateZExtOrTrunc(FENCE_fencevmau_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 57);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRW
+    //58: instruction CSRRW
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRW");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 58);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2602,17 +2602,17 @@ private:
                 this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(64)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 58);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRS
+    //59: instruction CSRRS
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRS");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 59);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2646,17 +2646,17 @@ private:
                 this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(64)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 59);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRC
+    //60: instruction CSRRC
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRC");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 60);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2690,17 +2690,17 @@ private:
                 this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(64)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 60);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRWI
+    //61: instruction CSRRWI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRWI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 61);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
@@ -2731,17 +2731,17 @@ private:
             fld_csr_val,
             this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 61);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRSI
+    //62: instruction CSRRSI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRSI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 62);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
@@ -2777,17 +2777,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 62);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction CSRRCI
+    //63: instruction CSRRCI
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("CSRRCI");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 63);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
@@ -2823,17 +2823,17 @@ private:
                 this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(64)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 63);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LR.D
+    //64: instruction LR.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LR.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 64);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2869,17 +2869,17 @@ private:
                 this->builder.CreateZExtOrTrunc(RES_offs_val,this->get_type(64)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 64);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SC.D
+    //65: instruction SC.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SC.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 65);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2934,17 +2934,17 @@ private:
         bb=bbnext;
         this->builder.SetInsertPoint(bb);
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 65);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOSWAP.D
+    //66: instruction AMOSWAP.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOSWAP.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 66);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -2978,17 +2978,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 66);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOADD.D
+    //67: instruction AMOADD.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOADD.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 67);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3026,17 +3026,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 67);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOXOR.D
+    //68: instruction AMOXOR.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOXOR.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 68);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3074,17 +3074,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 68);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOAND.D
+    //69: instruction AMOAND.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOAND.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 69);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3122,17 +3122,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 69);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOOR.D
+    //70: instruction AMOOR.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOOR.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 70);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3170,17 +3170,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 70);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMIN.D
+    //71: instruction AMOMIN.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMIN.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 71);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3227,17 +3227,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 71);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMAX.D
+    //72: instruction AMOMAX.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAX.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 72);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3284,17 +3284,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 72);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMINU.D
+    //73: instruction AMOMINU.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMINU.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 73);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3337,17 +3337,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 73);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMAXU.D
+    //74: instruction AMOMAXU.D
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAXU.D");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 74);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3390,17 +3390,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(64)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 74);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction LR.W
+    //75: instruction LR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LR.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 75);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3436,17 +3436,17 @@ private:
                 this->builder.CreateZExtOrTrunc(RES_offs_val,this->get_type(32)));
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 75);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction SC.W
+    //76: instruction SC.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("SC.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 76);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3500,17 +3500,17 @@ private:
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 76);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOSWAP.W
+    //77: instruction AMOSWAP.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOSWAP.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 77);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3544,17 +3544,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 77);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOADD.W
+    //78: instruction AMOADD.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOADD.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 78);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3592,17 +3592,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 78);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOXOR.W
+    //79: instruction AMOXOR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOXOR.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 79);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3640,17 +3640,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 79);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOAND.W
+    //80: instruction AMOAND.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOAND.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 80);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3688,17 +3688,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 80);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOOR.W
+    //81: instruction AMOOR.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOOR.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 81);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3736,17 +3736,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 81);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMIN.W
+    //82: instruction AMOMIN.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMIN.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 82);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3793,17 +3793,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 82);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMAX.W
+    //83: instruction AMOMAX.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAX.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 83);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3850,17 +3850,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 83);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMINU.W
+    //84: instruction AMOMINU.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMINU.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 84);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3903,17 +3903,17 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 84);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
     }
     
-    // instruction AMOMAXU.W
+    //85: instruction AMOMAXU.W
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("AMOMAXU.W");
     
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, 85);
     
         uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
         uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
@@ -3960,7 +3960,7 @@ private:
             offs_val,
             this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
         this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, 85);
         bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
         this->gen_trap_check(bb);
         return std::make_tuple(vm::CONT, bb);
@@ -3972,17 +3972,16 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
         this->builder.CreateStore(
             this->builder.CreateAdd(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
                                      this->gen_const(64U, 1)),
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
-        if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         this->gen_raise_trap(0, 2);     // illegal instruction trap
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
@@ -4013,8 +4012,8 @@ std::tuple<vm::continuation_e, llvm::BasicBlock *>
 vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, llvm::BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     code_word_t insn = 0;
-    iss::addr_t paddr(pc);
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
+    phys_addr_t paddr(pc);
     try {
         uint8_t *const data = (uint8_t *)&insn;
         paddr = this->core.v2p(pc);

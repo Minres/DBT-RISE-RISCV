@@ -57,13 +57,11 @@ int main(int argc, char *argv[]) {
         ("verbose,v", po::value<int>()->implicit_value(0), "Sets logging verbosity")
         ("logfile,f", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
-        ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("gdb-port,g", po::value<unsigned>()->default_value(0), "enable gdb server and specify port to use")
-        ("input,i", po::value<std::string>(), "the elf file to load (instead of hex files)")
-        ("dump-ir", "dump the intermediate representation")
-        ("cycles,c", po::value<int64_t>()->default_value(-1), "number of cycles to run")
-        ("time", po::value<int>(), "SystemC simulation time in ms")
+        ("instructions,i", po::value<int64_t>()->default_value(-1), "max. number of instructions to simulate")
         ("reset,r", po::value<std::string>(), "reset address")
+        ("dump-ir", "dump the intermediate representation")
+        ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("isa", po::value<std::string>()->default_value("rv32imac"), "isa to use for simulation");
     // clang-format on
@@ -137,7 +135,7 @@ int main(int argc, char *argv[]) {
             vm->reset();
         }
         int64_t cycles = -1;
-        cycles = clim["cycles"].as<int64_t>();
+        cycles = clim["instructions"].as<int64_t>();
         return vm->start(cycles, dump);
     } catch (std::exception &e) {
         LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"

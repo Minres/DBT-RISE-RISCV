@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Fri Dec 15 14:41:58 CET 2017
+// Created on: Sat Dec 30 12:50:15 CET 2017
 //             *      rv64ia.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,45 +159,48 @@ struct rv64ia: public arch_if {
 
 protected:
     struct RV64IA_regs {
-        uint64_t X0;
-        uint64_t X1;
-        uint64_t X2;
-        uint64_t X3;
-        uint64_t X4;
-        uint64_t X5;
-        uint64_t X6;
-        uint64_t X7;
-        uint64_t X8;
-        uint64_t X9;
-        uint64_t X10;
-        uint64_t X11;
-        uint64_t X12;
-        uint64_t X13;
-        uint64_t X14;
-        uint64_t X15;
-        uint64_t X16;
-        uint64_t X17;
-        uint64_t X18;
-        uint64_t X19;
-        uint64_t X20;
-        uint64_t X21;
-        uint64_t X22;
-        uint64_t X23;
-        uint64_t X24;
-        uint64_t X25;
-        uint64_t X26;
-        uint64_t X27;
-        uint64_t X28;
-        uint64_t X29;
-        uint64_t X30;
-        uint64_t X31;
-        uint64_t PC;
-        uint64_t NEXT_PC;
-        uint32_t trap_state, pending_trap, machine_state;
-        uint64_t icount;
+        uint64_t X0 = 0;
+        uint64_t X1 = 0;
+        uint64_t X2 = 0;
+        uint64_t X3 = 0;
+        uint64_t X4 = 0;
+        uint64_t X5 = 0;
+        uint64_t X6 = 0;
+        uint64_t X7 = 0;
+        uint64_t X8 = 0;
+        uint64_t X9 = 0;
+        uint64_t X10 = 0;
+        uint64_t X11 = 0;
+        uint64_t X12 = 0;
+        uint64_t X13 = 0;
+        uint64_t X14 = 0;
+        uint64_t X15 = 0;
+        uint64_t X16 = 0;
+        uint64_t X17 = 0;
+        uint64_t X18 = 0;
+        uint64_t X19 = 0;
+        uint64_t X20 = 0;
+        uint64_t X21 = 0;
+        uint64_t X22 = 0;
+        uint64_t X23 = 0;
+        uint64_t X24 = 0;
+        uint64_t X25 = 0;
+        uint64_t X26 = 0;
+        uint64_t X27 = 0;
+        uint64_t X28 = 0;
+        uint64_t X29 = 0;
+        uint64_t X30 = 0;
+        uint64_t X31 = 0;
+        uint64_t PC = 0;
+        uint64_t NEXT_PC = 0;
+        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;
+        uint64_t icount = 0;
     } reg;
 
     address_type addr_mode[4];
+
+    uint64_t cycles = 0;
+    
 };
 
 }

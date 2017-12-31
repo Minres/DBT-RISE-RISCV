@@ -186,17 +186,16 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        this->gen_sync(iss::PRE_SYNC);
+        this->gen_sync(iss::PRE_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
         this->builder.CreateStore(
             this->builder.CreateAdd(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
                                      this->gen_const(64U, 1)),
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
-        if (this->debugging_enabled()) this->gen_sync(iss::PRE_SYNC);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         this->gen_raise_trap(0, 2);     // illegal instruction trap
-        this->gen_sync(iss::POST_SYNC); /* call post-sync if needed */
+        this->gen_sync(iss::POST_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
@@ -227,8 +226,8 @@ std::tuple<vm::continuation_e, llvm::BasicBlock *>
 vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, llvm::BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     code_word_t insn = 0;
-    iss::addr_t paddr;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
+    phys_addr_t paddr(pc);
     try {
         uint8_t *const data = (uint8_t *)&insn;
         paddr = this->core.v2p(pc);

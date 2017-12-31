@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Fri Dec 15 14:41:57 CET 2017
+// Created on: Sat Dec 30 12:50:15 CET 2017
 //             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,45 +159,48 @@ struct rv32imac: public arch_if {
 
 protected:
     struct RV32IMAC_regs {
-        uint32_t X0;
-        uint32_t X1;
-        uint32_t X2;
-        uint32_t X3;
-        uint32_t X4;
-        uint32_t X5;
-        uint32_t X6;
-        uint32_t X7;
-        uint32_t X8;
-        uint32_t X9;
-        uint32_t X10;
-        uint32_t X11;
-        uint32_t X12;
-        uint32_t X13;
-        uint32_t X14;
-        uint32_t X15;
-        uint32_t X16;
-        uint32_t X17;
-        uint32_t X18;
-        uint32_t X19;
-        uint32_t X20;
-        uint32_t X21;
-        uint32_t X22;
-        uint32_t X23;
-        uint32_t X24;
-        uint32_t X25;
-        uint32_t X26;
-        uint32_t X27;
-        uint32_t X28;
-        uint32_t X29;
-        uint32_t X30;
-        uint32_t X31;
-        uint32_t PC;
-        uint32_t NEXT_PC;
-        uint32_t trap_state, pending_trap, machine_state;
-        uint64_t icount;
+        uint32_t X0 = 0;
+        uint32_t X1 = 0;
+        uint32_t X2 = 0;
+        uint32_t X3 = 0;
+        uint32_t X4 = 0;
+        uint32_t X5 = 0;
+        uint32_t X6 = 0;
+        uint32_t X7 = 0;
+        uint32_t X8 = 0;
+        uint32_t X9 = 0;
+        uint32_t X10 = 0;
+        uint32_t X11 = 0;
+        uint32_t X12 = 0;
+        uint32_t X13 = 0;
+        uint32_t X14 = 0;
+        uint32_t X15 = 0;
+        uint32_t X16 = 0;
+        uint32_t X17 = 0;
+        uint32_t X18 = 0;
+        uint32_t X19 = 0;
+        uint32_t X20 = 0;
+        uint32_t X21 = 0;
+        uint32_t X22 = 0;
+        uint32_t X23 = 0;
+        uint32_t X24 = 0;
+        uint32_t X25 = 0;
+        uint32_t X26 = 0;
+        uint32_t X27 = 0;
+        uint32_t X28 = 0;
+        uint32_t X29 = 0;
+        uint32_t X30 = 0;
+        uint32_t X31 = 0;
+        uint32_t PC = 0;
+        uint32_t NEXT_PC = 0;
+        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;
+        uint64_t icount = 0;
     } reg;
 
     address_type addr_mode[4];
+
+    uint64_t cycles = 0;
+
 };
 
 }

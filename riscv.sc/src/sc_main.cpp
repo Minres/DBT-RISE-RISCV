@@ -70,7 +70,6 @@ int sc_main(int argc, char *argv[]) {
             ("elf,l", po::value<std::string>(), "ELF file to load")
             ("gdb-port,g", po::value<unsigned short>()->default_value(0), "enable gdb server and specify port to use")
             ("dump-ir", "dump the intermediate representation")
-            ("cycles", po::value<int64_t>()->default_value(-1), "number of cycles to run")
             ("quantum", po::value<unsigned>(), "SystemC quantum time in ns")
             ("reset,r", po::value<std::string>(), "reset address")
             ("trace,t", po::value<unsigned>()->default_value(0), "enable tracing, or combintation of 1=signals and 2=TX text, 4=TX compressed text, 6=TX in SQLite")

@@ -811,17 +811,18 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_csr(unsigned
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigned addr, reg_t &val) {
+    auto cycle_val=this->cycles ? this->cycles : this->reg.icount;
     if (addr == mcycle) {
-        val = static_cast<reg_t>(this->reg.icount);
+        val = static_cast<reg_t>(cycle_val);
     } else if (addr == mcycleh) {
         if (sizeof(typename traits<BASE>::reg_t) != 4) return iss::Err;
-        val = static_cast<reg_t>((this->reg.icount) >> 32);
+        val = static_cast<reg_t>(cycle_val >> 32);
     }
     return iss::Ok;
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned addr, reg_t &val) {
-	uint64_t time_val=this->reg.icount>>12;
+	uint64_t time_val=(this->cycles?this->cycles:this->reg.icount) / (100000000/32768-1); //-> ~3052;
     if (addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if (addr == timeh) {
