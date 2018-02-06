@@ -46,6 +46,7 @@
 #include <util/ities.h>
 #include <util/sparse_array.h>
 #include <util/bit_field.h>
+#include <array>
 
 namespace iss {
 namespace arch {
@@ -159,28 +160,29 @@ enum csr_name {
 
 namespace {
 
-const char lvl[] = {'U', 'S', 'H', 'M'};
+std::array<const char, 4> lvl = { { 'U', 'S', 'H', 'M' } };
 
-const char *trap_str[] = {"Instruction address misaligned", //0
-                          "Instruction access fault", //1
-                          "Illegal instruction", //2
-                          "Breakpoint", //3
-                          "Load address misaligned", //4
-                          "Load access fault", //5
-                          "Store/AMO address misaligned", //6
-                          "Store/AMO access fault", //7
-                          "Environment call from U-mode", //8
-                          "Environment call from S-mode", //9
-                          "Reserved", //a
-                          "Environment call from M-mode", //b
-                          "Instruction page fault", //c
-                          "Load page fault", //d
-                          "Reserved", //e
-                          "Store/AMO page fault"}; //f
-const char *irq_str[] = {
-    "User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
-    "User timer interrupt",    "Supervisor timer interrupt",    "Reserved", "Machine timer interrupt",
-    "User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt"};
+std::array<const char*, 16> trap_str = { { ""
+		"Instruction address misaligned", //0
+		"Instruction access fault", //1
+		"Illegal instruction", //2
+		"Breakpoint", //3
+		"Load address misaligned", //4
+		"Load access fault", //5
+		"Store/AMO address misaligned", //6
+		"Store/AMO access fault", //7
+		"Environment call from U-mode", //8
+		"Environment call from S-mode", //9
+		"Reserved", //a
+		"Environment call from M-mode", //b
+		"Instruction page fault", //c
+		"Load page fault", //d
+		"Reserved", //e
+		"Store/AMO page fault" } };
+std::array<const char*, 12> irq_str = { {
+		"User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
+		"User timer interrupt", "Supervisor timer interrupt", "Reserved", "Machine timer interrupt", "User external interrupt",
+		"Supervisor external interrupt", "Reserved", "Machine external interrupt" } };
 
 enum {
     PGSHIFT = 12,
@@ -313,7 +315,7 @@ public:
 
         void write_mstatus(T val, unsigned priv_lvl){
             auto mask = get_mask(priv_lvl);
-            auto new_val = (mstatus & ~mask) | (val & mask);
+            auto new_val = (mstatus.st.value & ~mask) | (val & mask);
             mstatus=new_val;
         }
 
@@ -435,12 +437,12 @@ public:
     const typename super::reg_t PGMASK = PGSIZE - 1;
 
     constexpr reg_t get_irq_mask(size_t mode) {
-        const reg_t m[4] = {
-            0b000100010001, // U mode
-            0b001100110011, // S-mode
-            0,
-            0b101110111011 // M-mode
-        };
+			std::array<const reg_t,4> m = { {
+					0b000100010001,// U mode
+					0b001100110011,// S mode
+					0,
+					0b101110111011 // M mode
+					}};
         return m[mode];
     }
 
@@ -485,7 +487,7 @@ protected:
     mem_type mem;
     csr_type csr;
     hart_state<reg_t> state;
-    vm_info vm[2];
+    std::array<vm_info,2> vm;
     void update_vm_info();
     unsigned to_host_wr_cnt = 0;
     std::stringstream uart_buf;
@@ -552,11 +554,11 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
 template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
     FILE *fp = fopen(name.c_str(), "r");
     if (fp) {
-        char buf[5];
-        auto n = fread(buf, 1, 4, fp);
+		std::array<char, 5> buf;
+		auto n = fread(buf.data(), 1, 4, fp);
         if (n != 4) throw std::runtime_error("input file has insufficient size");
         buf[4] = 0;
-        if (strcmp(buf + 1, "ELF") == 0) {
+		if (strcmp(buf.data() + 1, "ELF") == 0) {
             fclose(fp);
             // Create elfio reader
             ELFIO::elfio reader;
@@ -1209,10 +1211,10 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     // reset trap state
     this->reg.machine_state = new_priv;
     this->reg.trap_state = 0;
-    char buffer[32];
-    sprintf(buffer, "0x%016lx", addr);
+	std::array<char, 32> buffer;
+	sprintf(buffer.data(), "0x%016lx", addr);
     CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause])<<"' ("<<trap_id<<")"
-                       << " at address " << buffer << " occurred, changing privilege level from " << lvl[cur_priv]
+                       << " at address " << buffer.data() << " occurred, changing privilege level from " << lvl[cur_priv]
                        << " to " << lvl[new_priv];
     update_vm_info();
     return this->reg.NEXT_PC;

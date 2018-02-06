@@ -6,6 +6,7 @@ import "RV64IBase.core_desc"
 //import "RV64M.core_desc"
 import "RV64A.core_desc"
 
+
 Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32CI {
     template:"vm_riscv.in.cpp";
     constants {

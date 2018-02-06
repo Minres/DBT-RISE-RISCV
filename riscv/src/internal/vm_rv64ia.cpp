@@ -45,6 +45,7 @@
 #include <boost/format.hpp>
 
 #include <iss/debugger/riscv_target_adapter.h>
+#include <array>
 
 namespace iss {
 namespace rv64ia {
@@ -121,14 +122,14 @@ protected:
     using compile_func = std::tuple<vm::continuation_e, llvm::BasicBlock *> (this_class::*)(virt_addr_t &pc,
                                                                                             code_word_t instr,
                                                                                             llvm::BasicBlock *bb);
-    compile_func lut[LUT_SIZE];
+    std::array<compile_func, LUT_SIZE> lut;
 
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-    compile_func *qlut[4]; // = {lut_00, lut_01, lut_10, lut_11};
+	std::array<compile_func*, 4> qlut;
 
-    const uint32_t lutmasks[4] = {EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32};
+	std::array<const uint32_t, 4> lutmasks = { { EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32 } };
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -179,7 +180,7 @@ private:
     };
 
     /* start generated code */
-    const InstructionDesriptor instr_descr[86] = {
+    const std::array<InstructionDesriptor, 86> instr_descr = {{
         /* entries are: valid value, valid mask, function ptr */
         /* instruction LWU */
         {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
@@ -353,7 +354,7 @@ private:
         {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
         /* instruction AMOMAXU.W */
         {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
-    };
+    }};
     //0: instruction LWU
     std::tuple<vm::continuation_e, llvm::BasicBlock*> __lwu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
         bb->setName("LWU");
@@ -374,6 +375,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -413,6 +416,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -452,6 +457,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -489,6 +496,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_shamt_val > 31){
@@ -528,6 +537,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_shamt_val > 31){
@@ -567,6 +578,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_shamt_val > 31){
@@ -606,6 +619,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -648,6 +663,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -690,6 +707,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -732,6 +751,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -772,6 +793,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -815,6 +838,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -860,6 +885,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -909,6 +936,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -958,6 +987,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1006,6 +1037,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1038,11 +1071,13 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val));
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
@@ -1072,16 +1107,18 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
             Value* X_rd_val = this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4));
             this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
         }
         Value* PC_val = this->builder.CreateAdd(
-            this->gen_reg_load(traits<ARCH>::PC, 0),
+            cur_pc_val,
             this->gen_const(64U, fld_imm_val));
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
         this->gen_sync(iss::POST_SYNC, 17);
@@ -1109,6 +1146,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* new_pc_val = this->builder.CreateAdd(
@@ -1136,7 +1175,7 @@ private:
         {
             if(fld_rd_val != 0){
                 Value* X_rd_val = this->builder.CreateAdd(
-                    this->gen_reg_load(traits<ARCH>::PC, 1),
+                    cur_pc_val,
                     this->gen_const(64U, 4));
                 this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val), false);
             }
@@ -1173,6 +1212,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1181,10 +1222,10 @@ private:
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1213,6 +1254,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1221,10 +1264,10 @@ private:
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1253,6 +1296,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1265,10 +1310,10 @@ private:
                     this->gen_reg_load(fld_rs2_val, 0),
                     64, true)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1297,6 +1342,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1309,10 +1356,10 @@ private:
                     this->gen_reg_load(fld_rs2_val, 0),
                     64, true)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1341,6 +1388,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1349,10 +1398,10 @@ private:
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1381,6 +1430,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* PC_val = this->gen_choose(
@@ -1389,10 +1440,10 @@ private:
                 this->gen_reg_load(fld_rs1_val, 0),
                 this->gen_reg_load(fld_rs2_val, 0)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, fld_imm_val)),
             this->builder.CreateAdd(
-                this->gen_reg_load(traits<ARCH>::PC, 0),
+                cur_pc_val,
                 this->gen_const(64U, 4)),
             64);
         this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
@@ -1421,6 +1472,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1460,6 +1513,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1499,6 +1554,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1538,6 +1595,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1577,6 +1636,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1616,6 +1677,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1653,6 +1716,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1690,6 +1755,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->builder.CreateAdd(
@@ -1727,6 +1794,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1762,6 +1831,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1806,6 +1877,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         int64_t full_imm_val = fld_imm_val;
@@ -1851,6 +1924,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1886,6 +1961,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1921,6 +1998,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1956,6 +2035,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -1991,6 +2072,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2026,6 +2109,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2063,6 +2148,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2107,6 +2194,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2153,6 +2242,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2188,6 +2279,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2225,6 +2318,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2262,6 +2357,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2297,6 +2394,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2331,6 +2430,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* FENCE_fence_val = this->builder.CreateOr(
@@ -2367,6 +2468,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* FENCE_fencei_val = this->gen_const(64U, fld_imm_val);
@@ -2396,6 +2499,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_raise_trap(0, 11);
@@ -2420,6 +2525,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_raise_trap(0, 3);
@@ -2444,6 +2551,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_leave_trap(0);
@@ -2468,6 +2577,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_leave_trap(1);
@@ -2492,6 +2603,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_leave_trap(3);
@@ -2516,6 +2629,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         this->gen_wait(1);
@@ -2543,6 +2658,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* FENCE_fencevmal_val = this->gen_const(64U, fld_rs1_val);
@@ -2582,6 +2699,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* rs_val_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -2628,6 +2747,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 64/8);
@@ -2672,6 +2793,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 64/8);
@@ -2716,6 +2839,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2757,6 +2882,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 64/8);
@@ -2803,6 +2930,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 64/8);
@@ -2850,6 +2979,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -2897,6 +3028,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -2962,6 +3095,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3006,6 +3141,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3054,6 +3191,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3102,6 +3241,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3150,6 +3291,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3198,6 +3341,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3255,6 +3400,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3312,6 +3459,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3365,6 +3514,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3417,6 +3568,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         if(fld_rd_val != 0){
@@ -3464,6 +3617,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3528,6 +3683,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3572,6 +3729,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3620,6 +3779,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3668,6 +3829,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3716,6 +3879,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3764,6 +3929,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3821,6 +3988,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3878,6 +4047,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3931,6 +4102,8 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
+        
+        Value* cur_pc_val = this->gen_const(64, pc.val);
         pc=pc+4;
     
         Value* offs_val = this->gen_reg_load(fld_rs1_val, 0);
@@ -3972,7 +4145,7 @@ private:
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        this->gen_sync(iss::PRE_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
+		this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
         this->builder.CreateStore(
@@ -3981,7 +4154,7 @@ private:
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         this->gen_raise_trap(0, 2);     // illegal instruction trap
-        this->gen_sync(iss::POST_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
+		this->gen_sync(iss::POST_SYNC, instr_descr.size());
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }

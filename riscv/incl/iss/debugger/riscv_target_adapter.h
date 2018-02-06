@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <util/logging.h>
+#include <array>
 
 namespace iss {
 namespace debugger {
@@ -279,10 +280,10 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::threadinfo_query(int
 
 template <typename ARCH>
 status riscv_target_adapter<ARCH>::threadextrainfo_query(const rp_thread_ref &thread, std::string &out_buf) {
-    char buf[20];
-    memset(buf, 0, 20);
-    sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x", 'R', 'u', 'n', 'n', 'a', 'b', 'l', 'e', 0);
-    out_buf = buf;
+	std::array<char, 20> buf;
+	memset(buf.data(), 0, 20);
+	sprintf(buf.data(), "%02x%02x%02x%02x%02x%02x%02x%02x%02x", 'R', 'u', 'n', 'n', 'a', 'b', 'l', 'e', 0);
+	out_buf = buf.data();
     return Ok;
 }
 

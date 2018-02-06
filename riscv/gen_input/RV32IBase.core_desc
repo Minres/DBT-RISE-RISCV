@@ -41,7 +41,7 @@ InsructionSet RV32IBase {
             val new_pc[XLEN] <= X[rs1]+ imm;
             val align[XLEN] <= new_pc & 0x2;
 		    if(align != 0){
-		        raise(0, 0)
+		        raise(0, 0);
 		    } else {
         		if(rd!=0) X[rd] <= PC+4;
         		PC<=new_pc & ~0x1;
@@ -160,7 +160,7 @@ InsructionSet RV32IBase {
 		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b001 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
 		    if(shamt > 31){
-		        raise(0,0)
+		        raise(0,0);
 		    } else {
 		        if(rd != 0) X[rd] <= shll(X[rs1], shamt);
 		    }
@@ -169,7 +169,7 @@ InsructionSet RV32IBase {
 		    encoding: b0000000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
             if(shamt > 31){
-                raise(0,0)
+                raise(0,0);
             } else {
 		        if(rd != 0) X[rd] <= shrl(X[rs1], shamt);
 		    }
@@ -178,7 +178,7 @@ InsructionSet RV32IBase {
 		    encoding: b0100000 | shamt[4:0] | rs1[4:0] | b101 | rd[4:0] | b0010011;
 		    args_disass:"x%rd$d, x%rs1$d, %shamt%";
 		    if(shamt > 31){
-                raise(0,0)
+                raise(0,0);
             } else {
 		        if(rd != 0) X[rd] <= shra(X[rs1], shamt);
 		    }

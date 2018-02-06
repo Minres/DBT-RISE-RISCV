@@ -47,45 +47,54 @@
 
 #ifdef WITH_SCV
 #include <scv.h>
+#include <array>
 #endif
+
 
 namespace sysc {
 namespace SiFive {
+using namespace std;
+using namespace iss;
+
 namespace {
 iss::debugger::encoder_decoder encdec;
 
 }
+
+
 namespace {
 
-const char lvl[] = {'U', 'S', 'H', 'M'};
+std::array<const char, 4> lvl = { { 'U', 'S', 'H', 'M' } };
 
-const char *trap_str[] = {"Instruction address misaligned",
-                          "Instruction access fault",
-                          "Illegal instruction",
-                          "Breakpoint",
-                          "Load address misaligned",
-                          "Load access fault",
-                          "Store/AMO address misaligned",
-                          "Store/AMO access fault",
-                          "Environment call from U-mode",
-                          "Environment call from S-mode",
-                          "Reserved",
-                          "Environment call from M-mode",
-                          "Instruction page fault",
-                          "Load page fault",
-                          "Reserved",
-                          "Store/AMO page fault"};
-const char *irq_str[] = {
-    "User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
-    "User timer interrupt",    "Supervisor timer interrupt",    "Reserved", "Machine timer interrupt",
-    "User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt"};
+std::array<const char*, 16> trap_str = { {
+		"Instruction address misaligned",
+		"Instruction access fault",
+		"Illegal instruction",
+		"Breakpoint",
+		"Load address misaligned",
+		"Load access fault",
+		"Store/AMO address misaligned",
+		"Store/AMO access fault",
+		"Environment call from U-mode",
+		"Environment call from S-mode",
+		"Reserved",
+		"Environment call from M-mode",
+		"Instruction page fault",
+		"Load page fault",
+		"Reserved",
+		"Store/AMO page fault"
+} };
+std::array<const char*, 12> irq_str = { {
+		"User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
+		"User timer interrupt",    "Supervisor timer interrupt",    "Reserved", "Machine timer interrupt",
+		"User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt" } };
 }
 
 class core_wrapper : public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac> {
 public:
-    using core_type = iss::arch::rv32imac;
-    using base_type = iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>;
-    using phys_addr_t = typename iss::arch::traits<iss::arch::rv32imac>::phys_addr_t;
+    using core_type = arch::rv32imac;
+    using base_type = arch::riscv_hart_msu_vp<arch::rv32imac>;
+    using phys_addr_t = typename arch::traits<arch::rv32imac>::phys_addr_t;
     core_wrapper(core_complex *owner)
     : owner(owner)
     {}
@@ -96,7 +105,7 @@ public:
 
     void notify_phase(exec_phase) override;
 
-    iss::sync_type needed_sync() const override { return iss::PRE_SYNC; }
+    sync_type needed_sync() const override { return PRE_SYNC; }
 
     void disass_output(uint64_t pc, const std::string instr) override {
     	if (logging::INFO <= logging::Log<logging::Output2FILE<logging::disass>>::reporting_level() && logging::Output2FILE<logging::disass>::stream()){
@@ -109,22 +118,22 @@ public:
         owner->disass_output(pc,instr);
     };
 
-    iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
-    	if (addr.access && iss::access_type::DEBUG)
-    		return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+    status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data) {
+    	if (addr.access && access_type::DEBUG)
+    		return owner->read_mem_dbg(addr.val, length, data) ? Ok : Err;
     	else {
-    		return owner->read_mem(addr.val, length, data,addr.access && iss::access_type::FETCH) ? iss::Ok : iss::Err;
+    		return owner->read_mem(addr.val, length, data,addr.access && access_type::FETCH) ? Ok : Err;
     	}
     }
 
-    iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
-    	if (addr.access && iss::access_type::DEBUG)
-    		return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+    status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data) {
+    	if (addr.access && access_type::DEBUG)
+    		return owner->write_mem_dbg(addr.val, length, data) ? Ok : Err;
     	else{
-    		auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
+    		auto res = owner->write_mem(addr.val, length, data) ? Ok : Err;
     		// TODO: this is an ugly hack (clear MTIP on mtimecmp write), needs to be fixed
     		if(addr.val==0x2004000)
-    			this->csr[iss::arch::mip] &= ~(1ULL<<7);
+    			this->csr[arch::mip] &= ~(1ULL<<7);
     		return res;
     	}
     }
@@ -140,13 +149,13 @@ public:
     void local_irq(short id){
     	switch(id){
     	case 16: // SW
-    		this->csr[iss::arch::mip] |= 1<<3;
+    		this->csr[arch::mip] |= 1<<3;
     		break;
     	case 17: // timer
-    		this->csr[iss::arch::mip] |= 1<<7;
+    		this->csr[arch::mip] |= 1<<7;
     		break;
     	case 18: //external
-    		this->csr[iss::arch::mip] |= 1<<11;
+    		this->csr[arch::mip] |= 1<<11;
     		break;
     	default:
     		/* do nothing*/
@@ -159,15 +168,15 @@ private:
     sc_event wfi_evt;
 };
 
-int cmd_sysc(int argc, char* argv[], iss::debugger::out_func of, iss::debugger::data_func df, iss::debugger::target_adapter_if* tgt_adapter){
+int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func df, debugger::target_adapter_if* tgt_adapter){
     if(argc>1) {
         if(strcasecmp(argv[1], "print_time")==0){
             std::string t = sc_core::sc_time_stamp().to_string();
             of(t.c_str());
-            char buf[64];
-            encdec.enc_string(t.c_str(), buf, 63);
-            df(buf);
-            return iss::Ok;
+			std::array<char, 64> buf;
+			encdec.enc_string(t.c_str(), buf.data(), 63);
+			df(buf.data());
+            return Ok;
         } else if(strcasecmp(argv[1], "break")==0){
             sc_core::sc_time t;
             if(argc==4){
@@ -175,17 +184,17 @@ int cmd_sysc(int argc, char* argv[], iss::debugger::out_func of, iss::debugger::
             } else if(argc==3){
                 t= scc::parse_from_string(argv[2]);
             } else
-                return iss::Err;
+                return Err;
             // no check needed as it is only called if debug server is active
             tgt_adapter->add_break_condition([t]()->unsigned{
                 LOG(TRACE)<<"Checking condition at "<<sc_core::sc_time_stamp();
                 return sc_core::sc_time_stamp()>=t?std::numeric_limits<unsigned>::max():0;
             });
-            return iss::Ok;
+            return Ok;
         }
-        return iss::Err;
+        return Err;
     }
-    return iss::Err;
+    return Err;
 
 }
 
@@ -245,15 +254,15 @@ core_complex::~core_complex() = default;
 void core_complex::trace(sc_core::sc_trace_file *trf) {}
 
 void core_complex::before_end_of_elaboration() {
-    cpu = std::make_unique<core_wrapper>(this);
-    vm = iss::create<iss::arch::rv32imac>(cpu.get(), gdb_server_port.value, dump_ir.value);
+    cpu = make_unique<core_wrapper>(this);
+    vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.value, dump_ir.value);
     vm->setDisassEnabled(enable_disass.value);
-    auto* srv = iss::debugger::server<iss::debugger::gdb_session>::get();
+    auto* srv = debugger::server<debugger::gdb_session>::get();
     if(srv) tgt_adapter = srv->get_target();
     if(tgt_adapter)
         tgt_adapter->add_custom_command({
         "sysc",
-        [this](int argc, char* argv[], iss::debugger::out_func of, iss::debugger::data_func df)-> int {
+        [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df)-> int {
             return cmd_sysc(argc, argv, of, df, tgt_adapter);
         },
         "SystemC sub-commands: break <time>, print_time"});
@@ -306,7 +315,7 @@ void core_complex::run() {
     cpu->reset(reset_address.value);
     try {
         vm->start(-1);
-    } catch (iss::simulation_stopped &e) {
+    } catch (simulation_stopped &e) {
     }
     sc_core::sc_stop();
 }

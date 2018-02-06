@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Sat Dec 30 12:50:15 CET 2017
+// Created on: Tue Feb 06 17:18:50 UTC 2018
 //             *      rv64ia.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,6 +39,7 @@
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
 #include <iss/arch/traits.h>
+#include <array>
 
 namespace iss {
 namespace arch {
@@ -103,12 +104,12 @@ struct traits<rv64ia> {
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        const uint32_t RV64IA_reg_size[] = {64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,64};
+        constexpr std::array<const uint32_t, 38> RV64IA_reg_size{{64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,64}};
         return RV64IA_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-        const uint32_t RV64IA_reg_byte_offset[] = {0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,288,296};
+    	constexpr std::array<const uint32_t, 39> RV64IA_reg_byte_offset{{0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,288,296}};
         return RV64IA_reg_byte_offset[r];
     }
 
@@ -197,10 +198,10 @@ protected:
         uint64_t icount = 0;
     } reg;
 
-    address_type addr_mode[4];
+    std::array<address_type, 4> addr_mode;
 
     uint64_t cycles = 0;
-    
+
 };
 
 }

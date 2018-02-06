@@ -28,7 +28,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Sat Dec 30 12:50:15 CET 2017
+// Created on: Tue Feb 06 17:18:49 UTC 2018
 //             *      rv32imac.h Author: <CoreDSL Generator>
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,6 +39,7 @@
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
 #include <iss/arch/traits.h>
+#include <array>
 
 namespace iss {
 namespace arch {
@@ -103,12 +104,12 @@ struct traits<rv32imac> {
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        const uint32_t RV32IMAC_reg_size[] = {32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64};
+        constexpr std::array<const uint32_t, 38> RV32IMAC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64}};
         return RV32IMAC_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-        const uint32_t RV32IMAC_reg_byte_offset[] = {0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160};
+    	constexpr std::array<const uint32_t, 39> RV32IMAC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160}};
         return RV32IMAC_reg_byte_offset[r];
     }
 
@@ -197,7 +198,7 @@ protected:
         uint64_t icount = 0;
     } reg;
 
-    address_type addr_mode[4];
+    std::array<address_type, 4> addr_mode;
 
     uint64_t cycles = 0;
 

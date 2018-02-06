@@ -45,6 +45,7 @@
 #include <boost/format.hpp>
 
 #include <iss/debugger/riscv_target_adapter.h>
+#include <array>
 
 namespace iss {
 namespace CORE_DEF_NAME {
@@ -121,14 +122,14 @@ protected:
     using compile_func = std::tuple<vm::continuation_e, llvm::BasicBlock *> (this_class::*)(virt_addr_t &pc,
                                                                                             code_word_t instr,
                                                                                             llvm::BasicBlock *bb);
-    compile_func lut[LUT_SIZE];
+    std::array<compile_func, LUT_SIZE> lut;
 
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-    compile_func *qlut[4]; // = {lut_00, lut_01, lut_10, lut_11};
+	std::array<compile_func*, 4> qlut;
 
-    const uint32_t lutmasks[4] = {EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32};
+	std::array<const uint32_t, 4> lutmasks = { { EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32 } };
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -179,14 +180,14 @@ private:
     };
 
     /* «start generated code» */
-    InstructionDesriptor instr_descr[0] = {};
+	std::array<InstructionDesriptor, 0> instr_descr = { { } };
     /* «end generated code»  */
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
     std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
                                                                           llvm::BasicBlock *bb) {
-        this->gen_sync(iss::PRE_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
+		this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
         this->builder.CreateStore(
@@ -195,7 +196,7 @@ private:
             get_reg_ptr(traits<ARCH>::ICOUNT), true);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         this->gen_raise_trap(0, 2);     // illegal instruction trap
-        this->gen_sync(iss::POST_SYNC, sizeof(instr_descr)/sizeof(InstructionDesriptor));
+		this->gen_sync(iss::POST_SYNC, instr_descr.size());
         this->gen_trap_check(this->leave_blk);
         return std::make_tuple(iss::vm::BRANCH, nullptr);
     }
