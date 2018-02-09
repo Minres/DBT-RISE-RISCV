@@ -28,9 +28,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 // 
-// Created on: Tue Feb 06 17:18:50 UTC 2018
-//             *      rv64ia.h Author: <CoreDSL Generator>
-//
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _RV64IA_H_
@@ -49,7 +46,7 @@ struct rv64ia;
 template<>
 struct traits<rv64ia> {
 
-    enum constants {XLEN=64,XLEN2=128,XLEN_BIT_MASK=63,PCLEN=64,fence=0,fencei=1,fencevmal=2,fencevmau=3,MISA_VAL=2147746049,PGSIZE=4096,PGMASK=4095};
+    enum constants {XLEN=64, XLEN2=128, XLEN_BIT_MASK=63, PCLEN=64, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
 
     enum reg_e {
         X0,
@@ -117,7 +114,7 @@ struct traits<rv64ia> {
 
     enum sreg_flag_e {FLAGS};
 
-    enum mem_type_e {MEM,CSR,FENCE,RES};
+    enum mem_type_e {MEM, CSR, FENCE, RES};
 
 };
 

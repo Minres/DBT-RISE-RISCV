@@ -130,13 +130,13 @@ InsructionSet RV32CI {
 			args_disass: "0x%imm$05x";
 			PC<=PC+imm;
 		}
-		C.BEQZ(no_cont) {//(RV32)
+		C.BEQZ(no_cont,cond) {//(RV32)
 			encoding:b110 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s |imm[2:1]s | imm[5:5]s | b01;
 			args_disass: "x(8+%rs1$d), 0x%imm$05x";
 			val rs1_idx[5] <= rs1+8;
 			PC<=choose(X[rs1_idx]==0, PC+imm, PC+2);
 		}
-		C.BNEZ(no_cont) {//(RV32)
+		C.BNEZ(no_cont,cond) {//(RV32)
 			encoding:b111 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s | imm[2:1]s | imm[5:5]s | b01;
 			args_disass: "x(8+%rs1$d), 0x%imm$05x";
             val rs1_idx[5] <= rs1+8;

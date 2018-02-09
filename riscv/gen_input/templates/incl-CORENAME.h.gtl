@@ -29,9 +29,15 @@
 // POSSIBILITY OF SUCH DAMAGE.
 // 
 ////////////////////////////////////////////////////////////////////////////////
-
-#ifndef _RV32IMAC_H_
-#define _RV32IMAC_H_
+<% 
+import com.minres.coredsl.coreDsl.Register
+import com.minres.coredsl.coreDsl.RegisterFile
+def getTypeSize(size){
+	if(size > 32) 64 else if(size > 16) 32 else if(size > 8) 16 else 8
+}
+%>
+#ifndef _${coreDef.name.toUpperCase()}_H_
+#define _${coreDef.name.toUpperCase()}_H_
 
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
@@ -41,92 +47,68 @@
 namespace iss {
 namespace arch {
 
-struct rv32imac;
+struct ${coreDef.name.toLowerCase()};
 
 template<>
-struct traits<rv32imac> {
+struct traits<${coreDef.name.toLowerCase()}> {
 
-    enum constants {XLEN=32, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095};
+    enum constants {${coreDef.constants.collect{c -> c.name+"="+c.value}.join(', ')}};
 
-    enum reg_e {
-        X0,
-        X1,
-        X2,
-        X3,
-        X4,
-        X5,
-        X6,
-        X7,
-        X8,
-        X9,
-        X10,
-        X11,
-        X12,
-        X13,
-        X14,
-        X15,
-        X16,
-        X17,
-        X18,
-        X19,
-        X20,
-        X21,
-        X22,
-        X23,
-        X24,
-        X25,
-        X26,
-        X27,
-        X28,
-        X29,
-        X30,
-        X31,
-        PC,
+    enum reg_e {<%
+     	allRegs.each { reg -> 
+    		if( reg instanceof RegisterFile) {
+    			(reg.range.right..reg.range.left).each{%>
+        ${reg.name}${it},<%
+                }
+            } else if(reg instanceof Register){ %>
+        ${reg.name},<%
+            }
+        }%>
         NUM_REGS,
-        NEXT_PC=NUM_REGS,
+        NEXT_${pc.name}=NUM_REGS,
         TRAP_STATE,
         PENDING_TRAP,
         MACHINE_STATE,
         ICOUNT
     };
 
-    using reg_t = uint32_t;
+    using reg_t = uint${regDataWidth}_t;
 
-    using addr_t = uint32_t;
+    using addr_t = uint${addrDataWidth}_t;
 
-    using code_word_t = uint32_t; //TODO: check removal
+    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
 
     using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, 38> RV32IMAC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64}};
-        return RV32IMAC_reg_size[r];
+        constexpr std::array<const uint32_t, ${regSizes.size}> ${coreDef.name}_reg_size{{${regSizes.join(",")}}};
+        return ${coreDef.name}_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, 39> RV32IMAC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,152,160}};
-        return RV32IMAC_reg_byte_offset[r];
+    	constexpr std::array<const uint32_t, ${regOffsets.size}> ${coreDef.name}_reg_byte_offset{{${regOffsets.join(",")}}};
+        return ${coreDef.name}_reg_byte_offset[r];
     }
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 
     enum sreg_flag_e {FLAGS};
 
-    enum mem_type_e {MEM, CSR, FENCE, RES};
+    enum mem_type_e {${allSpaces.collect{s -> s.name}.join(', ')}};
 
 };
 
-struct rv32imac: public arch_if {
+struct ${coreDef.name.toLowerCase()}: public arch_if {
 
-    using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
-    using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
-    using reg_t =  typename traits<rv32imac>::reg_t;
-    using addr_t = typename traits<rv32imac>::addr_t;
+    using virt_addr_t = typename traits<${coreDef.name.toLowerCase()}>::virt_addr_t;
+    using phys_addr_t = typename traits<${coreDef.name.toLowerCase()}>::phys_addr_t;
+    using reg_t =  typename traits<${coreDef.name.toLowerCase()}>::reg_t;
+    using addr_t = typename traits<${coreDef.name.toLowerCase()}>::addr_t;
 
-    rv32imac();
-    ~rv32imac();
+    ${coreDef.name.toLowerCase()}();
+    ~${coreDef.name.toLowerCase()}();
 
     void reset(uint64_t address=0) override;
 
@@ -143,10 +125,10 @@ struct rv32imac: public arch_if {
     uint64_t get_icount() { return reg.icount;}
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
-        if(addr.space != traits<rv32imac>::MEM ||
+        if(addr.space != traits<${coreDef.name.toLowerCase()}>::MEM ||
                 addr.type == iss::address_type::PHYSICAL ||
                 addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL){
-            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv32imac>::addr_mask);
+            return phys_addr_t(addr.access, addr.space, addr.val&traits<${coreDef.name.toLowerCase()}>::addr_mask);
         } else
             return virt2phys(addr);
     }
@@ -156,41 +138,17 @@ struct rv32imac: public arch_if {
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
 protected:
-    struct RV32IMAC_regs {
-        uint32_t X0 = 0;
-        uint32_t X1 = 0;
-        uint32_t X2 = 0;
-        uint32_t X3 = 0;
-        uint32_t X4 = 0;
-        uint32_t X5 = 0;
-        uint32_t X6 = 0;
-        uint32_t X7 = 0;
-        uint32_t X8 = 0;
-        uint32_t X9 = 0;
-        uint32_t X10 = 0;
-        uint32_t X11 = 0;
-        uint32_t X12 = 0;
-        uint32_t X13 = 0;
-        uint32_t X14 = 0;
-        uint32_t X15 = 0;
-        uint32_t X16 = 0;
-        uint32_t X17 = 0;
-        uint32_t X18 = 0;
-        uint32_t X19 = 0;
-        uint32_t X20 = 0;
-        uint32_t X21 = 0;
-        uint32_t X22 = 0;
-        uint32_t X23 = 0;
-        uint32_t X24 = 0;
-        uint32_t X25 = 0;
-        uint32_t X26 = 0;
-        uint32_t X27 = 0;
-        uint32_t X28 = 0;
-        uint32_t X29 = 0;
-        uint32_t X30 = 0;
-        uint32_t X31 = 0;
-        uint32_t PC = 0;
-        uint32_t NEXT_PC = 0;
+    struct ${coreDef.name}_regs {<%
+     	allRegs.each { reg -> 
+    		if( reg instanceof RegisterFile) {
+    			(reg.range.right..reg.range.left).each{%>
+        uint${generator.getSize(reg)}_t ${reg.name}${it} = 0;<%
+                }
+            } else if(reg instanceof Register){ %>
+        uint${generator.getSize(reg)}_t ${reg.name} = 0;<%
+            }
+        }%>
+        uint${generator.getSize(pc)}_t NEXT_${pc.name} = 0;
         uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;
         uint64_t icount = 0;
     } reg;
@@ -203,4 +161,4 @@ protected:
 
 }
 }            
-#endif /* _RV32IMAC_H_ */
+#endif /* _${coreDef.name.toUpperCase()}_H_ */

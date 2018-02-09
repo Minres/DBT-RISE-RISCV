@@ -47,32 +47,32 @@ InsructionSet RV32IBase {
         		PC<=new_pc & ~0x1;
     		}
 	    }
-		BEQ(no_cont){
+		BEQ(no_cont,cond){
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b000 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 		    PC<=choose(X[rs1]==X[rs2], PC+imm, PC+4);
 		}
-		BNE(no_cont){
+		BNE(no_cont,cond){
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b001 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 	    	PC<=choose(X[rs1]!=X[rs2], PC+imm, PC+4);
 		}
-		BLT(no_cont){
+		BLT(no_cont,cond){
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b100 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 	    	PC<=choose(X[rs1]s<X[rs2]s, PC+imm, PC+4);
 		}
-		BGE(no_cont) {
+		BGE(no_cont,cond) {
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b101 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 	    	PC<=choose(X[rs1]s>=X[rs2]s, PC+imm, PC+4);
 		}
-		BLTU(no_cont) {
+		BLTU(no_cont,cond) {
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b110 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 	    	PC<=choose(X[rs1]<X[rs2],PC+imm, PC+4);
 		}
-		BGEU(no_cont) {
+		BGEU(no_cont,cond) {
 		    encoding: imm[12:12]s |imm[10:5]s | rs2[4:0] | rs1[4:0] | b111 | imm[4:1]s | imm[11:11]s | b1100011;
 		    args_disass:"x%rs1$d, x%rs2$d, 0x%imm$x";
 	    	PC<=choose(X[rs1]>=X[rs2], PC+imm, PC+4);
