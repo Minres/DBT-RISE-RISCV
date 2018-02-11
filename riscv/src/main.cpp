@@ -42,6 +42,7 @@
 #include <iss/arch/rv64ia.h>
 #include <iss/jit/MCJIThelper.h>
 #include <iss/log_categories.h>
+#include <iss/plugin/instruction_count.h>
 
 namespace po = boost::program_options;
 
@@ -101,12 +102,14 @@ int main(int argc, char *argv[]) {
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
+        iss::plugin::instruction_count cc_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
         if (isa_opt.substr(0, 4)=="rv64") {
             iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
         } else if (isa_opt.substr(0, 4)=="rv32") {
             iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
+            vm->register_plugin(cc_plugin);
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;

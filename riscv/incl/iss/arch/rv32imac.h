@@ -46,6 +46,8 @@ struct rv32imac;
 template<>
 struct traits<rv32imac> {
 
+	constexpr static char const* const core_type = "RV32IMAC";
+    
     enum constants {XLEN=32, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095};
 
     enum reg_e {
@@ -128,6 +130,8 @@ struct rv32imac: public arch_if {
     rv32imac();
     ~rv32imac();
 
+	const std::string core_type_name() const override {return traits<rv32imac>::core_type;}
+	
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;

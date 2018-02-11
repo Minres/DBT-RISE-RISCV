@@ -46,6 +46,8 @@ struct rv64ia;
 template<>
 struct traits<rv64ia> {
 
+	constexpr static char const* const core_type = "RV64IA";
+    
     enum constants {XLEN=64, XLEN2=128, XLEN_BIT_MASK=63, PCLEN=64, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
 
     enum reg_e {
@@ -128,6 +130,8 @@ struct rv64ia: public arch_if {
     rv64ia();
     ~rv64ia();
 
+	const std::string core_type_name() const override {return traits<rv64ia>::core_type;}
+	
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;

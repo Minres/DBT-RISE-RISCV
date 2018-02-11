@@ -6,6 +6,7 @@ set(LIB_SOURCES
     iss/rv64ia.cpp
     internal/vm_rv32imac.cpp
     internal/vm_rv64ia.cpp
+    plugin/instruction_count.cpp
 )
 
 set(APP_HEADERS )

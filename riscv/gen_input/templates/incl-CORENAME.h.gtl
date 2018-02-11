@@ -52,6 +52,8 @@ struct ${coreDef.name.toLowerCase()};
 template<>
 struct traits<${coreDef.name.toLowerCase()}> {
 
+	constexpr static char const* const core_type = "${coreDef.name}";
+    
     enum constants {${coreDef.constants.collect{c -> c.name+"="+c.value}.join(', ')}};
 
     enum reg_e {<%
@@ -110,6 +112,8 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
     ${coreDef.name.toLowerCase()}();
     ~${coreDef.name.toLowerCase()}();
 
+	const std::string core_type_name() const override {return traits<${coreDef.name.toLowerCase()}>::core_type;}
+	
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;
