@@ -50,7 +50,7 @@ gpio::gpio(sc_core::sc_module_name nm)
 , NAMED(rst_i)
 , NAMED(pins_io)
 , NAMEDD(gpio_regs, regs)
-, NAMED(write_to_ws, false, this){
+, NAMED(write_to_ws, false){
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
@@ -82,7 +82,7 @@ gpio::gpio(sc_core::sc_module_name nm)
 gpio::~gpio() {}
 
 void gpio::before_end_of_elaboration() {
-	if(write_to_ws.value) {
+	if(write_to_ws.get_value()) {
 		LOG(TRACE)<<"Adding WS handler for "<<(std::string{"/ws/"}+name());
 		handler=std::make_shared<WsHandler>();
 		sc_comm_singleton::inst().registerWebSocketHandler((std::string{"/ws/"}+name()).c_str(), handler);

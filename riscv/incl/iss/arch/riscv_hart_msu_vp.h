@@ -451,7 +451,7 @@ public:
 
     void reset(uint64_t address) override;
 
-    void load_file(std::string name, int type = -1) override;
+    std::pair<uint64_t,bool> load_file(std::string name, int type = -1) override;
 
     virtual phys_addr_t virt2phys(const iss::addr_t &addr) override;
 
@@ -551,7 +551,7 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
     csr_wr_cb[satp] = &riscv_hart_msu_vp<BASE>::write_satp;
 }
 
-template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
+template <typename BASE> std::pair<uint64_t,bool> riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
     FILE *fp = fopen(name.c_str(), "r");
     if (fp) {
 		std::array<char, 5> buf;
@@ -587,7 +587,8 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::load_file(std::string nam
                     fromhost = tohost + 0x40;
                 }
             }
-            return;
+
+            return std::make_pair(reader.get_entry(), true);
         }
         throw std::runtime_error("memory load file is not a valid elf file");
     }

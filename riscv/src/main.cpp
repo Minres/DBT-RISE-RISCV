@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
         } else if (isa_opt.substr(0, 4)=="rv32") {
             iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-            vm->register_plugin(cc_plugin);
+//            vm->register_plugin(cc_plugin);
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;

@@ -28,8 +28,10 @@ set(APPLICATION_NAME riscv.sc)
 
 include_directories(${CONAN_INCLUDE_DIRS_SEASOCKS})
 include_directories(${SystemC_INCLUDE_DIRS})
+include_directories(${CCI_INCLUDE_DIRS})
 
 link_directories(${SystemC_LIBRARY_DIR})
+link_directories(${CCI_LIBRARY_DIR})
 link_directories(${CONAN_LIB_DIRS_SEASOCKS})
 
 add_executable(${APPLICATION_NAME} ${APP_SOURCES})
@@ -43,6 +45,7 @@ target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} ${CONAN_LIBS_SEASOCKS})
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
+target_link_libraries(${APPLICATION_NAME} ${CCI_LIBRARIES} )
 target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
 if(SCV_FOUND)
     add_definitions(-DWITH_SCV)

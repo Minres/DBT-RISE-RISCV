@@ -40,8 +40,8 @@
 #include "scc/utilities.h"
 #include <tlm>
 #include <tlm_utils/tlm_quantumkeeper.h>
+#include <cci_configuration>
 #include <util/range_lut.h>
-#include "scc/ext_attribute.h"
 #include "scv4tlm/tlm_rec_initiator_socket.h"
 #include "scc/initiator_mixin.h"
 #include "scc/traceable.h"
@@ -94,15 +94,15 @@ public:
 
     sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i;
 
-    scc::ext_attribute<std::string> elf_file;
+    cci::cci_param<std::string> elf_file;
 
-    scc::ext_attribute<bool> enable_disass;
+    cci::cci_param<bool> enable_disass;
 
-    scc::ext_attribute<uint64_t> reset_address;
+    cci::cci_param<uint64_t> reset_address;
 
-    scc::ext_attribute<unsigned short> gdb_server_port;
+    cci::cci_param<unsigned short> gdb_server_port;
 
-    scc::ext_attribute<bool> dump_ir;
+    cci::cci_param<bool> dump_ir;
 
     core_complex(sc_core::sc_module_name name);
 

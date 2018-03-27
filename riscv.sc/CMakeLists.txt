@@ -49,6 +49,13 @@ else(SystemC_FOUND)
     message( FATAL_ERROR "SystemC library not found." )
 endif(SystemC_FOUND)
 
+if(CCI_FOUND)
+    include_directories(${CCI_INCLUDE_DIRS})
+    link_directories(${CCI_LIBRARY_DIRS})
+else()
+    message( FATAL_ERROR "SystemC CCI library not found." )
+endif()
+
 if(SCV_FOUND)   
     add_definitions(-DWITH_SCV)
     link_directories(${SCV_LIBRARY_DIRS})

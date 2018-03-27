@@ -211,11 +211,11 @@ core_complex::core_complex(sc_core::sc_module_name name)
 , NAMED(global_irq_i)
 , NAMED(timer_irq_i)
 , NAMED(local_irq_i, 16)
-, NAMED(elf_file, this)
-, NAMED(enable_disass, true, this)
-, NAMED(reset_address, 0ULL, this)
-, NAMED(gdb_server_port, 0, this)
-, NAMED(dump_ir, false, this)
+, NAMED(elf_file, "")
+, NAMED(enable_disass, true)
+, NAMED(reset_address, 0ULL)
+, NAMED(gdb_server_port, 0)
+, NAMED(dump_ir, false)
 , read_lut(tlm_dmi_ext())
 , write_lut(tlm_dmi_ext())
 , tgt_adapter(nullptr)
@@ -255,8 +255,8 @@ void core_complex::trace(sc_core::sc_trace_file *trf) {}
 
 void core_complex::before_end_of_elaboration() {
     cpu = make_unique<core_wrapper>(this);
-    vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.value, dump_ir.value);
-    vm->setDisassEnabled(enable_disass.value);
+    vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
+    vm->setDisassEnabled(enable_disass.get_value());
     auto* srv = debugger::server<debugger::gdb_session>::get();
     if(srv) tgt_adapter = srv->get_target();
     if(tgt_adapter)
@@ -270,7 +270,10 @@ void core_complex::before_end_of_elaboration() {
 
 void core_complex::start_of_simulation() {
     quantum_keeper.reset();
-    if (elf_file.value.size() > 0) cpu->load_file(elf_file.value);
+    if (elf_file.get_value().size() > 0){
+    	std::pair<uint64_t,bool> start_addr=cpu->load_file(elf_file.get_value());
+    	if(reset_address.is_default_value() && start_addr.second==true) reset_address.set_value(start_addr.first);
+    }
 #ifdef WITH_SCV
         if (m_db!=nullptr && stream_handle == nullptr) {
             string basename(this->name());
@@ -312,7 +315,7 @@ void core_complex::global_irq_cb(){
 
 void core_complex::run() {
     wait(sc_core::SC_ZERO_TIME);
-    cpu->reset(reset_address.value);
+    cpu->reset(reset_address.get_value());
     try {
         vm->start(-1);
     } catch (simulation_stopped &e) {

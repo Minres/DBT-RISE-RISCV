@@ -37,7 +37,7 @@
 #ifndef _UART_H_
 #define _UART_H_
 
-#include "scc/ext_attribute.h"
+#include "cci_configuration"
 #include "scc/tlm_target.h"
 
 namespace sysc {
@@ -53,7 +53,7 @@ public:
     uart(sc_core::sc_module_name nm);
     virtual ~uart() override;
 
-    scc::ext_attribute<bool> write_to_ws;
+    cci::cci_param<bool> write_to_ws;
 protected:
     void clock_cb();
     void reset_cb();

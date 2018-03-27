@@ -43,6 +43,7 @@
 #include "scc/report.h"
 #include "scc/scv_tr_db.h"
 #include "scc/tracer.h"
+#include <cci_utils/broker.h>
 
 using namespace sysc;
 namespace po = boost::program_options;
@@ -56,6 +57,7 @@ const size_t ERROR_UNHANDLED_EXCEPTION = 2;
 int sc_main(int argc, char *argv[]) {
     //    sc_report_handler::set_handler(my_report_handler);
     scc::Logger<>::reporting_level() = logging::ERROR;
+    cci::cci_register_broker(new cci_utils::broker("Global Broker"));
     ///////////////////////////////////////////////////////////////////////////
     // CLI argument parsing
     ///////////////////////////////////////////////////////////////////////////
@@ -63,10 +65,9 @@ int sc_main(int argc, char *argv[]) {
     // clang-format off
     desc.add_options()
             ("help,h", "Print help message")
-            ("verbose,v", po::value<int>()->implicit_value(0), "Sets logging verbosity")
+            ("verbose,v", po::value<int>()->implicit_value(3), "Sets logging verbosity")
             ("log-file", po::value<std::string>(), "Sets default log file.")
             ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
-//            ("elf,l", po::value<std::vector<std::string>>(), "ELF file(s) to load")
             ("elf,l", po::value<std::string>(), "ELF file to load")
             ("gdb-port,g", po::value<unsigned short>()->default_value(0), "enable gdb server and specify port to use")
             ("dump-ir", "dump the intermediate representation")
@@ -125,14 +126,14 @@ int sc_main(int argc, char *argv[]) {
     platform i_simple_system("i_simple_system");
     // sr_report_handler::add_sc_object_to_filter(&i_simple_system.i_master,
     // sc_core::SC_WARNING, sc_core::SC_MEDIUM);
-    if (vm.count("dump-config")){
+    if(vm["dump-config"].as<std::string>().size()>0){
     	std::ofstream of{vm["dump-config"].as<std::string>()};
     	if(of.is_open())
     	    cfg.dump_configuration(of);
     }
 	cfg.configure();
     // overwrite with command line settings
-    if (vm.count("gdb-port"))
+    if (vm["gdb-port"].as<unsigned short>())
     	cfg.set_value("i_simple_system.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
     if (vm.count("dump-ir"))
     	cfg.set_value("i_simple_system.i_core_complex.dump_ir", vm.count("dump-ir") != 0);
