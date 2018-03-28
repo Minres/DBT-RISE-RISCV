@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.3)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/sc-components/cmake)
 
-include(cmake/GitFunctions.cmake)
+include(GitFunctions)
 get_branch_from_git()
 
 ### set the directory names of the submodules
@@ -45,7 +45,7 @@ setup_conan()
 find_package(Threads)
 find_package(Tcmalloc)
 
-set(PROJECT_3PARTY_DIRS external sr_report sr_signal)
+set(PROJECT_3PARTY_DIRS external)
 include(clang-format)
 
 add_subdirectory(external)

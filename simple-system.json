@@ -6,8 +6,6 @@
 		"i_uart1":{
 			"write_to_ws": false
 		},
-		"i_gpio0":{
-			"write_to_ws": true
-		}
+		"i_gpio0.write_to_ws": true
 	}
 }
