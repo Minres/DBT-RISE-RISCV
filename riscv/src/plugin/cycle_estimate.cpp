@@ -32,14 +32,15 @@
  *       eyck@minres.com - initial API and implementation
  ******************************************************************************/
 
-#include "iss/plugin/instruction_count.h"
-#include "iss/instrumentation_if.h"
+#include "iss/plugin/cycle_estimate.h"
 
 #include <iss/arch_if.h>
 #include <util/logging.h>
 #include <fstream>
 
-iss::plugin::instruction_count::instruction_count(std::string config_file_name) {
+iss::plugin::cycle_estimate::cycle_estimate(std::string config_file_name)
+: arch_instr(nullptr)
+{
     if (config_file_name.length() > 0) {
         std::ifstream is(config_file_name);
         if (is.is_open()) {
@@ -54,17 +55,12 @@ iss::plugin::instruction_count::instruction_count(std::string config_file_name) 
     }
 }
 
-iss::plugin::instruction_count::~instruction_count() {
-	size_t idx=0;
-	for(auto it:delays){
-		if(rep_counts[idx]>0)
-			LOG(INFO)<<it.instr_name<<";"<<rep_counts[idx];
-		idx++;
-	}
+iss::plugin::cycle_estimate::~cycle_estimate() {
 }
 
-bool iss::plugin::instruction_count::registration(const char* const version, vm_if& vm) {
-	const std::string  core_name = vm.get_arch()->get_instrumentation_if()->core_type_name();
+bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if& vm) {
+	arch_instr = vm.get_arch()->get_instrumentation_if();
+	const std::string  core_name = arch_instr->core_type_name();
     Json::Value &val = root[core_name];
     if(val.isArray()){
     	delays.reserve(val.size());
@@ -74,18 +70,20 @@ bool iss::plugin::instruction_count::registration(const char* const version, vm_
     		auto delay = it["delay"];
     		if(!name.isString() || !size.isUInt() || !(delay.isUInt() || delay.isArray())) throw std::runtime_error("JSON parse error");
     		if(delay.isUInt()){
-				const instr_delay entry{name.asCString(), size.asUInt(), delay.asUInt(), 0};
-				delays.push_back(entry);
+				delays.push_back(instr_desc{size.asUInt(), delay.asUInt(), 0});
     		} else {
-				const instr_delay entry{name.asCString(), size.asUInt(), delay[0].asUInt(), delay[1].asUInt()};
-				delays.push_back(entry);
+				delays.push_back(instr_desc{size.asUInt(), delay[0].asUInt(), delay[1].asUInt()});
     		}
     	}
-    	rep_counts.resize(delays.size());
     }
 	return true;
 }
 
-void iss::plugin::instruction_count::callback(instr_info_t instr_info) {
-	rep_counts[instr_info.instr_id]++;
+void iss::plugin::cycle_estimate::callback(instr_info_t instr_info) {
+	auto entry = delays[instr_info.instr_id];
+	bool taken = (arch_instr->get_next_pc()-arch_instr->get_pc()) != (entry.size/8);
+	if(taken && entry.taken > 1 ) // 1 is the default increment per instruction
+		arch_instr->set_curr_instr_cycles(entry.taken);
+	if(!taken && entry.not_taken > 1) // 1 is the default increment per instruction
+		arch_instr->set_curr_instr_cycles(entry.not_taken);
 }

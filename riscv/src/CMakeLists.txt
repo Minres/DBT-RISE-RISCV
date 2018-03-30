@@ -7,6 +7,7 @@ set(LIB_SOURCES
     internal/vm_rv32imac.cpp
     internal/vm_rv64ia.cpp
     plugin/instruction_count.cpp
+    plugin/cycle_estimate.cpp
 )
 
 set(APP_HEADERS )

@@ -43,6 +43,7 @@
 #include <iss/jit/MCJIThelper.h>
 #include <iss/log_categories.h>
 #include <iss/plugin/instruction_count.h>
+#include <iss/plugin/cycle_estimate.h>
 
 namespace po = boost::program_options;
 
@@ -102,24 +103,19 @@ int main(int argc, char *argv[]) {
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-        iss::plugin::instruction_count cc_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
+        iss::plugin::instruction_count ic_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
+        iss::plugin::cycle_estimate ce_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
         if (isa_opt.substr(0, 4)=="rv64") {
             iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
         } else if (isa_opt.substr(0, 4)=="rv32") {
             iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-//            vm->register_plugin(cc_plugin);
+            //vm->register_plugin(ce_plugin);
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;
         }
-        if (clim.count("elf"))
-            for (std::string input : clim["elf"].as<std::vector<std::string>>())
-                vm->get_arch()->load_file(input);
-        if (clim.count("mem"))
-            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
-        for (std::string input : args) vm->get_arch()->load_file(input);// treat remaining arguments as elf files
         if (clim.count("disass")) {
             vm->setDisassEnabled(true);
             LOGGER(disass)::reporting_level() = logging::INFO;
@@ -130,19 +126,29 @@ int main(int argc, char *argv[]) {
                 LOGGER(disass)::print_severity() = false;
             }
         }
+        uint64_t start_address=0;
+        if (clim.count("mem"))
+             vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
+        if (clim.count("elf"))
+            for (std::string input : clim["elf"].as<std::vector<std::string>>()){
+            	auto start_addr = vm->get_arch()->load_file(input);
+            	if(start_addr.second)
+            		start_address=start_addr.first;
+            }
+        for (std::string input : args){
+        	auto start_addr = vm->get_arch()->load_file(input);// treat remaining arguments as elf files
+        	if(start_addr.second)
+        		start_address=start_addr.first;
+        }
         if (clim.count("reset")) {
             auto str = clim["reset"].as<std::string>();
-            auto start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
-            vm->reset(start_address);
-        } else {
-            vm->reset();
+            start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
         }
-        int64_t cycles = -1;
-        cycles = clim["instructions"].as<int64_t>();
+		vm->reset(start_address);
+        auto cycles = clim["instructions"].as<int64_t>();
         return vm->start(cycles, dump);
     } catch (std::exception &e) {
-        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
-                   << std::endl;
+        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit" << std::endl;
         return 2;
     }
 }

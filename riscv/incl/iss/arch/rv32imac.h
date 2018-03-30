@@ -130,8 +130,6 @@ struct rv32imac: public arch_if {
     rv32imac();
     ~rv32imac();
 
-	const std::string core_type_name() const override {return traits<rv32imac>::core_type;}
-	
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;
@@ -200,8 +198,6 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
-
-    uint64_t cycles = 0;
 
 };
 

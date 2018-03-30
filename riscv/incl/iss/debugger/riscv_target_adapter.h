@@ -205,7 +205,7 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
         // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
         // arch::traits<ARCH>::reg_e>(reg_no))/8;
         auto *reg_base = core->get_regs_base_ptr();
-        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)) / 8;
+        auto reg_width = arch::traits<ARCH>::reg_bit_width(reg_no) / 8;
         data.resize(reg_width);
         avail.resize(reg_width);
         auto offset = traits<ARCH>::reg_byte_offset(reg_no);
@@ -319,12 +319,14 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int typ
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
         std::function<void(unsigned)> stop_callback) {
-    unsigned reg_no = arch::traits<ARCH>::PC;
-    std::vector<uint8_t> data(8);
-    *(reinterpret_cast<uint64_t *>(&data[0])) = addr;
-    core->set_reg(reg_no, data);
+    auto* reg_base = core->get_regs_base_ptr();
+    auto reg_width = arch::traits<ARCH>::reg_bit_width(arch::traits<ARCH>::PC) / 8;
+    auto offset = traits<ARCH>::reg_byte_offset(arch::traits<ARCH>::PC);
+    const uint8_t* iter = reinterpret_cast<const uint8_t*>(&addr);
+    std::copy(iter, iter + reg_width, reg_base);
     return resume_from_current(step, sig, thread, stop_callback);
 }
+
 template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string& out_buf) {
     const std::string res{
         "<?xml version=\"1.0\"?><!DOCTYPE target SYSTEM \"gdb-target.dtd\">"

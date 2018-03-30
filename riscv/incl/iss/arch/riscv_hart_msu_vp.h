@@ -35,12 +35,13 @@
 #ifndef _RISCV_CORE_H_
 #define _RISCV_CORE_H_
 
+#include "iss/arch/traits.h"
+#include "iss/arch_if.h"
+#include "iss/log_categories.h"
+#include "iss/vm_if.h"
+#include "iss/instrumentation_if.h"
 #include <elfio/elfio.hpp>
 #include <iomanip>
-#include <iss/arch/traits.h>
-#include <iss/arch_if.h>
-#include <iss/log_categories.h>
-#include <iss/vm_if.h>
 #include <sstream>
 #include <unordered_map>
 #include <util/ities.h>
@@ -463,6 +464,7 @@ public:
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
+
     void disass_output(uint64_t pc, const std::string instr) override {
         std::stringstream s;
         s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
@@ -470,26 +472,54 @@ public:
         CLOG(INFO, disass) << "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<instr<<"\t"<<s.str();
     };
 
+    iss::instrumentation_if* get_instrumentation_if() override {return &instr_if;}
+
 protected:
+    struct riscv_instrumentation_if : public iss::instrumentation_if{
+
+    	riscv_instrumentation_if(riscv_hart_msu_vp<BASE>& arch):arch(arch){}
+        /**
+         * get the name of this architecture
+         *
+         * @return the name of this architecture
+         */
+    	const std::string core_type_name() const override {return traits<BASE>::core_type;}
+
+        virtual uint64_t get_pc(){ return arch.get_pc(); };
+
+    	virtual uint64_t get_next_pc(){ return arch.get_next_pc(); };
+
+    	virtual void set_curr_instr_cycles(unsigned cycles){ arch.cycle_offset+=cycles-1; };
+
+    	riscv_hart_msu_vp<BASE>& arch;
+    };
+
+    friend struct riscv_instrumentation_if;
+    addr_t get_pc(){return this->reg.PC;}
+    addr_t get_next_pc(){return this->reg.NEXT_PC;}
+
+
     virtual iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data);
     virtual iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data);
 
     virtual iss::status read_csr(unsigned addr, reg_t &val);
     virtual iss::status write_csr(unsigned addr, reg_t val);
 
+    hart_state<reg_t> state;
+    uint64_t cycle_offset;
+    reg_t fault_data;
+    std::array<vm_info,2> vm;
     uint64_t tohost = tohost_dflt;
     uint64_t fromhost = fromhost_dflt;
+    unsigned to_host_wr_cnt = 0;
+    riscv_instrumentation_if instr_if;
 
-    reg_t fault_data;
     using mem_type = util::sparse_array<uint8_t, 1ULL << 32>;
     using csr_type = util::sparse_array<typename traits<BASE>::reg_t, 1ULL << 12, 12>;
     using csr_page_type = typename csr_type::page_type;
     mem_type mem;
     csr_type csr;
-    hart_state<reg_t> state;
-    std::array<vm_info,2> vm;
     void update_vm_info();
-    unsigned to_host_wr_cnt = 0;
     std::stringstream uart_buf;
     std::unordered_map<reg_t, uint64_t> ptw;
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
@@ -513,7 +543,7 @@ protected:
 
 template <typename BASE>
 riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
-: state() {
+: state(), cycle_offset(0), instr_if(*this) {
     csr[misa] = hart_state<reg_t>::get_misa();
     uart_buf.str("");
     // read-only registers
@@ -814,7 +844,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_csr(unsigned
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigned addr, reg_t &val) {
-    auto cycle_val=this->cycles ? this->cycles : this->reg.icount;
+    auto cycle_val= this->reg.icount + cycle_offset;
     if (addr == mcycle) {
         val = static_cast<reg_t>(cycle_val);
     } else if (addr == mcycleh) {
@@ -825,7 +855,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigne
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned addr, reg_t &val) {
-	uint64_t time_val=(this->cycles?this->cycles:this->reg.icount) / (100000000/32768-1); //-> ~3052;
+	uint64_t time_val=(this->reg.icount + cycle_offset) / (100000000/32768-1); //-> ~3052;
     if (addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if (addr == timeh) {

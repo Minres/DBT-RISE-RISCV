@@ -200,7 +200,7 @@ int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func 
 
 void core_wrapper::notify_phase(exec_phase p) {
     if(p == ISTART)
-        owner->sync();
+        owner->sync(this->reg.icount+cycle_offset);
 }
 
 core_complex::core_complex(sc_core::sc_module_name name)

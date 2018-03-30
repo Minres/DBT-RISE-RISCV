@@ -108,12 +108,13 @@ public:
 
     ~core_complex();
 
-    inline void sync() {
-        quantum_keeper.inc(curr_clk);
+    inline void sync(uint64_t cycle) {
+        quantum_keeper.inc(curr_clk*(cycle-last_sync_cycle));
         if (quantum_keeper.need_sync()) {
             wait(quantum_keeper.get_local_time());
             quantum_keeper.reset();
         }
+        last_sync_cycle=cycle;
     }
 
     bool read_mem(uint64_t addr, unsigned length, uint8_t *const data, bool is_fetch);
@@ -135,6 +136,7 @@ protected:
     void sw_irq_cb();
     void timer_irq_cb();
     void global_irq_cb();
+    uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> read_lut, write_lut;
     tlm_utils::tlm_quantumkeeper quantum_keeper;
     std::vector<uint8_t> write_buf;
