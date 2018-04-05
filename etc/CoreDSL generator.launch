@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.ui.externaltools.ProgramLaunchConfigurationType">
+<stringAttribute key="org.eclipse.debug.core.ATTR_REFRESH_SCOPE" value="${working_set:&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&lt;resources&gt;&#10;&lt;item path=&quot;/dbt-riscv/riscv&quot; type=&quot;2&quot;/&gt;&#10;&lt;/resources&gt;}"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_LAUNCH_CONFIGURATION_BUILD_SCOPE" value="${none}"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_LOCATION" value="/usr/lib/jvm/java-8-oracle/bin/java"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS" value="-jar ${env_var:HOME}/git/JIT-ISS-CoreDsl/com.minres.coredsl.standalone/target/com.minres.coredsl.standalone-1.0.0-SNAPSHOT.jar&#10;-i=${project_loc:dbt-riscv}/riscv/incl/iss/arch&#10;-s=${project_loc:dbt-riscv}/riscv/src/iss&#10;-v=${project_loc:dbt-riscv}/riscv/src/internal&#10;-t=${project_loc:dbt-riscv}/riscv/gen_input/templates&#10;${project_loc:dbt-riscv}/riscv/gen_input/minres_rv.core_desc"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_WORKING_DIRECTORY" value="${workspace_loc:/dbt-riscv}/riscv/gen_input"/>
+</launchConfiguration>
