@@ -60,6 +60,7 @@ iss::plugin::cycle_estimate::~cycle_estimate() {
 
 bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if& vm) {
 	arch_instr = vm.get_arch()->get_instrumentation_if();
+	if(!arch_instr) return false;
 	const std::string  core_name = arch_instr->core_type_name();
     Json::Value &val = root[core_name];
     if(val.isArray()){
@@ -77,9 +78,11 @@ bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if&
     	}
     }
 	return true;
+
 }
 
 void iss::plugin::cycle_estimate::callback(instr_info_t instr_info) {
+    assert(arch_instr && "No instrumentation interface available but callback executed");
 	auto entry = delays[instr_info.instr_id];
 	bool taken = (arch_instr->get_next_pc()-arch_instr->get_pc()) != (entry.size/8);
 	if(taken && entry.taken > 1 ) // 1 is the default increment per instruction

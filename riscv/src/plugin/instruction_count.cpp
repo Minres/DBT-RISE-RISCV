@@ -64,7 +64,9 @@ iss::plugin::instruction_count::~instruction_count() {
 }
 
 bool iss::plugin::instruction_count::registration(const char* const version, vm_if& vm) {
-	const std::string  core_name = vm.get_arch()->get_instrumentation_if()->core_type_name();
+    auto instr_if = vm.get_arch()->get_instrumentation_if();
+    if(!instr_if) return false;
+	const std::string  core_name = instr_if->core_type_name();
     Json::Value &val = root[core_name];
     if(val.isArray()){
     	delays.reserve(val.size());

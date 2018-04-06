@@ -9,7 +9,6 @@
 
 [generators]
     cmake
-    txt
 
 [options]
     Poco:shared=True
