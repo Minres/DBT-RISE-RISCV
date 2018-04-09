@@ -19,7 +19,7 @@
 <booleanAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN" value="true"/>
 <stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN_SYMBOL" value="main"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_ARGUMENTS" value="-v4&#10;-g10000&#10;${project_loc:hello}/hello"/>
-<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="/home/eyck/git/DBT-RISE-RISCV/build/Debug/bin/riscv"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="build/Debug/riscv/bin/riscv"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="DBT-RISE-RISCV"/>
 <booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="false"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value=""/>
