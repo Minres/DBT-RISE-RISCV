@@ -13,15 +13,10 @@ Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
     template:"vm_riscv.in.cpp";
     constants {
         XLEN:=32;
-        XLEN2:=64;
-        XLEN_BIT_MASK:=0x1f;
         PCLEN:=32;
-        fence:=0;
-        fencei:=1;
-        fencevmal:=2;
-        fencevmau:=3;
+        // definitions for the architecture wrapper
         //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        MISA_VAL:=0b01000000000101000001000100000001;
+        MISA_VAL:=0b01000000000101000001000100000101;
         PGSIZE := 4096; //1 << 12;
         PGMASK := 4095; //PGSIZE-1
     }
@@ -31,18 +26,12 @@ Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32
     constants {
         XLEN:=32;
         FLEN:=64;
-        XLEN2:=64;
-        XLEN_BIT_MASK:=0x1f;
         PCLEN:=32;
-        fence:=0;
-        fencei:=1;
-        fencevmal:=2;
-        fencevmau:=3;
+        // definitions for the architecture wrapper
         //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        MISA_VAL:=0b01000000000101000001000100000001;
+        MISA_VAL:=0b01000000000101000001000100101101;
         PGSIZE := 4096; //1 << 12;
         PGMASK := 4095; //PGSIZE-1
-        FFLAG_MASK:=0x1f;
     }
 }
 
@@ -51,13 +40,8 @@ Core RV64IA provides RV64IBase, RV64A, RV32A {
     template:"vm_riscv.in.cpp";
     constants {
         XLEN:=64;
-        XLEN2:=128;
-        XLEN_BIT_MASK:=0x3f;
         PCLEN:=64;
-        fence:=0;
-        fencei:=1;
-        fencevmal:=2;
-        fencevmau:=3;
+        // definitions for the architecture wrapper
         //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
         MISA_VAL:=0b10000000000001000000000100000001;
         PGSIZE := 4096; //1 << 12;

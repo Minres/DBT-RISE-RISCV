@@ -2128,7 +2128,7 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 63)));
+    	            this->gen_const(64U, 31)));
     	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2298,7 +2298,7 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 63)));
+    	            this->gen_const(64U, 31)));
     	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2337,7 +2337,7 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 63)));
+    	            this->gen_const(64U, 31)));
     	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);

@@ -2,14 +2,14 @@ import "RV32IBase.core_desc"
 
 InsructionSet RV32M extends RV32IBase {
 	constants {
-		XLEN2
+		MAXLEN:=128
 	}
 	instructions{       
 		MUL{
 			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
 		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
 		    if(rd != 0){
-		        val res[XLEN2] <= zext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+		        val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
 		    	X[rd]<= zext(res , XLEN);
 		    }
 		}
@@ -17,7 +17,7 @@ InsructionSet RV32M extends RV32IBase {
 			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
 		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
 		    if(rd != 0){
-		        val res[XLEN2] <= sext(X[rs1], XLEN2) * sext(X[rs2], XLEN2);
+		        val res[MAXLEN] <= sext(X[rs1], MAXLEN) * sext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
 		    }
 		}
@@ -25,7 +25,7 @@ InsructionSet RV32M extends RV32IBase {
 			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
 		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
 		    if(rd != 0){
-                val res[XLEN2] <= sext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+                val res[MAXLEN] <= sext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
 		    }
 		}
@@ -33,7 +33,7 @@ InsructionSet RV32M extends RV32IBase {
 			encoding: b0000001 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
 		    args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
 		    if(rd != 0){
-                val res[XLEN2] <= zext(X[rs1], XLEN2) * zext(X[rs2], XLEN2);
+                val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
 		    }
 		}

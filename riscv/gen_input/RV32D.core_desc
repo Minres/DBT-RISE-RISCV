@@ -2,7 +2,7 @@ import "RV32IBase.core_desc"
 
 InsructionSet RV32D extends RV32IBase{
 	constants {
-		FLEN, FFLAG_MASK
+		FLEN, FFLAG_MASK := 0x1f
 	} 
 	registers {
 		[31:0]    F[FLEN],  FCSR[32]

@@ -1,12 +1,12 @@
 InsructionSet RV32IBase {
 	constants {
 		XLEN,
-		XLEN_BIT_MASK,
 		PCLEN,
-		fence,
-		fencei,
-		fencevmal,
-		fencevmau
+		XLEN_BIT_MASK:=0x1f,
+        fence:=0,
+        fencei:=1,
+        fencevmal:=2,
+        fencevmau:=3
 	}
 	
 	address_spaces { 

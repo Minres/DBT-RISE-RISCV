@@ -2458,11 +2458,11 @@ private:
     	    Value* res_val = this->builder.CreateMul(
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            false),
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            false));
     	    Value* X_rd_val = this->gen_ext(
     	        res_val,
@@ -2505,11 +2505,11 @@ private:
     	    Value* res_val = this->builder.CreateMul(
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            true),
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            true));
     	    Value* X_rd_val = this->gen_ext(
     	        this->builder.CreateLShr(
@@ -2554,11 +2554,11 @@ private:
     	    Value* res_val = this->builder.CreateMul(
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            true),
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            false));
     	    Value* X_rd_val = this->gen_ext(
     	        this->builder.CreateLShr(
@@ -2603,11 +2603,11 @@ private:
     	    Value* res_val = this->builder.CreateMul(
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            false),
     	        this->gen_ext(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            64,
+    	            128,
     	            false));
     	    Value* X_rd_val = this->gen_ext(
     	        this->builder.CreateLShr(

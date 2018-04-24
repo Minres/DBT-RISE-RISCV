@@ -48,7 +48,7 @@ struct traits<rv32gc> {
 
 	constexpr static char const* const core_type = "RV32GC";
     
-    enum constants {XLEN=32, FLEN=64, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095, FFLAG_MASK=31};
+    enum constants {XLEN=32, FLEN=64, PCLEN=32, MISA_VAL=1075056941, PGSIZE=4096, PGMASK=4095};
 
     constexpr static unsigned FP_REGS_SIZE = 64;
 
