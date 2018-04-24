@@ -27,7 +27,7 @@ Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
     }
 }
 
-Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D {
+Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32DC {
     constants {
         XLEN:=32;
         FLEN:=64;
