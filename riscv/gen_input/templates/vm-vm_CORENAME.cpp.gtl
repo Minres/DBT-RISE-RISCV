@@ -112,14 +112,9 @@ protected:
 
     void gen_trap_check(llvm::BasicBlock *bb);
 
-
     inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
-
-    llvm::Value* gen_fdispatch(std::string fname, const std::vector<llvm::Value*>& args);
-
-    llvm::Value* gen_dispatch(std::string name, llvm::Value*, llvm::Value*, llvm::Value*);
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
         llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
@@ -324,17 +319,6 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
                               llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);
 }
-
-template<typename ARCH>
-inline llvm::Value* vm_impl<ARCH>::gen_fdispatch(std::string fname, const std::vector<llvm::Value*>& args) {
-        return this->builder.CreateCall(this->mod->getFunction(fname), args);
-}
-
-template<typename ARCH>
-inline llvm::Value* vm_impl<ARCH>::gen_dispatch(std::string name, llvm::Value* val1, llvm::Value* val2, llvm::Value* val3) {
-}
-
-} // namespace rv32imacf
 
 template <>
 std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreDef.name.toLowerCase()} *core, unsigned short port, bool dump) {
