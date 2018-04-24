@@ -63,7 +63,7 @@ bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if&
 	if(!arch_instr) return false;
 	const std::string  core_name = arch_instr->core_type_name();
     Json::Value &val = root[core_name];
-    if(val.isArray()){
+    if(!val.isNull() && val.isArray()){
     	delays.reserve(val.size());
     	for(auto it:val){
     		auto name = it["name"];
@@ -76,6 +76,8 @@ bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if&
 				delays.push_back(instr_desc{size.asUInt(), delay[0].asUInt(), delay[1].asUInt()});
     		}
     	}
+    } else {
+        LOG(ERROR)<<"plugin cycle_estimate: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
     }
 	return true;
 
@@ -85,8 +87,6 @@ void iss::plugin::cycle_estimate::callback(instr_info_t instr_info) {
     assert(arch_instr && "No instrumentation interface available but callback executed");
 	auto entry = delays[instr_info.instr_id];
 	bool taken = (arch_instr->get_next_pc()-arch_instr->get_pc()) != (entry.size/8);
-	if(taken && entry.taken > 1 ) // 1 is the default increment per instruction
-		arch_instr->set_curr_instr_cycles(entry.taken);
-	if(!taken && entry.not_taken > 1) // 1 is the default increment per instruction
-		arch_instr->set_curr_instr_cycles(entry.not_taken);
+    uint32_t delay = taken ? entry.taken : entry.not_taken;
+    if(delay>1) arch_instr->set_curr_instr_cycles(delay);
 }

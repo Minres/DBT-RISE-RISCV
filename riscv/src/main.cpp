@@ -66,7 +66,8 @@ int main(int argc, char *argv[]) {
         ("dump-ir", "dump the intermediate representation")
         ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
-        ("isa", po::value<std::string>()->default_value("rv32imac"), "isa to use for simulation");
+        ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
+        ("isa", po::value<std::string>()->default_value("rv32gc"), "isa to use for simulation");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
@@ -97,29 +98,54 @@ int main(int argc, char *argv[]) {
         LOG_OUTPUT(connection)::stream() = f;
     }
 
+    std::vector<iss::vm_plugin*> plugin_list;
+    auto res=0;
     try {
         // application code comes here //
         iss::init_jit(argc, argv);
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
+        std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-//        iss::plugin::instruction_count ic_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
-//        iss::plugin::cycle_estimate ce_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
-        if (isa_opt.substr(0, 4)=="rv64") {
-            iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
-            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt.substr(0, 5)=="rv32i") {
-            iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
-            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-            //vm->register_plugin(ce_plugin);
-        } else if (isa_opt.substr(0, 5)=="rv32g") {
-            iss::arch::rv32gc* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
-            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-            //vm->register_plugin(ce_plugin);
+        if (isa_opt=="rv64ia") {
+            iss::arch::rv64ia* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
+            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
+            cpu.reset(lcpu);
+        } else if (isa_opt=="rv32imac") {
+            iss::arch::rv32imac* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
+            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
+            cpu.reset(lcpu);
+        } else if (isa_opt=="rv32gc") {
+            iss::arch::rv32gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
+            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
+            cpu.reset(lcpu);
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;
+        }
+        if (clim.count("plugin")) {
+           for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()){
+               auto plugin_name{opt_val};
+               std::string filename{"cycles.txt"};
+               std::size_t found = opt_val.find('=');
+               if (found!=std::string::npos){
+                   plugin_name=opt_val.substr(0, found);
+                   filename=opt_val.substr(found+1, opt_val.size());
+               }
+                if(plugin_name=="ic"){
+                    auto* ic_plugin= new iss::plugin::instruction_count(filename);
+                    vm->register_plugin(*ic_plugin);
+                    plugin_list.push_back(ic_plugin);
+                } else if(plugin_name=="ce"){
+                    auto* ce_plugin= new iss::plugin::cycle_estimate(filename);
+                    vm->register_plugin(*ce_plugin);
+                    plugin_list.push_back(ce_plugin);
+                } else {
+                    LOG(ERROR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'"<<std::endl;
+                    return 127;
+                }
+            }
         }
         if (clim.count("disass")) {
             vm->setDisassEnabled(true);
@@ -151,9 +177,14 @@ int main(int argc, char *argv[]) {
         }
 		vm->reset(start_address);
         auto cycles = clim["instructions"].as<int64_t>();
-        return vm->start(cycles, dump);
+        res = vm->start(cycles, dump);
     } catch (std::exception &e) {
         LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit" << std::endl;
-        return 2;
+        res=2;
     }
+    // cleanup to let plugins report of needed
+    for(auto* p:plugin_list){
+        delete p;
+    }
+    return res;
 }

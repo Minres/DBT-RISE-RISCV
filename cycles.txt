@@ -1,0 +1,1728 @@
+{ 
+	"RV32GC" : [
+		{
+			"name"  : "LUI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AUIPC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JAL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JALR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "BEQ",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BNE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLT",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLTU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGEU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "LB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LBU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LHU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTIU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ANDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRAI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SUB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLT",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XOR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "OR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AND",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE_I",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ECALL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "EBREAK",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "URET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "MRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "WFI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SFENCE.VMA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRS",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRWI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRSI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRCI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "MUL",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULH",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULHSU",
+			"size"  : 320,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULHU",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "DIV",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "DIVU",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "REM",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "REMU",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "LR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SC.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOSWAP.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOADD.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOXOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOAND.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMIN.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAX.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMINU.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAXU.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI4SPN",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.NOP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JAL",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LUI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI16SP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SRLI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SRAI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ANDI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SUB",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.XOR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.OR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.AND",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.J",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.BEQZ",
+			"size"  : 16,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "C.BNEZ",
+			"size"  : 16,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "C.SLLI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.MV",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADD",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JALR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.EBREAK",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "DII",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMADD.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMSUB.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FNMADD.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FNMSUB.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FADD.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSUB.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMUL.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FDIV.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSQRT.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJ.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJN.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJX.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMIN.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMAX.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.W.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.WU.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FEQ.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLT.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLE.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCLASS.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.S.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.S.WU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMV.X.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMV.W.X",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FLW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FSW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FLWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FSWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMADD.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMSUB.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FNMADD.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FNMSUB.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FADD.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSUB.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMUL.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FDIV.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSQRT.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJ.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJN.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FSGNJX.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMIN.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FMAX.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.S.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.D.S",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FEQ.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLT.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FLE.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCLASS.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.W.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.WU.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.D.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FCVT.D.WU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FLD",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FSD",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FLDSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.FSDSP",
+			"size"  : 16,
+			"delay" : 1
+		}
+	],
+	"RV32IMAC" : [
+		{
+			"name"  : "LUI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AUIPC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JAL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JALR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "BEQ",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BNE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLT",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLTU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGEU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "LB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LBU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LHU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTIU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ANDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRAI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SUB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLT",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XOR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "OR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AND",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE_I",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ECALL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "EBREAK",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "URET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "MRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "WFI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SFENCE.VMA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRS",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRWI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRSI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRCI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "MUL",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULH",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULHSU",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "MULHU",
+			"size"  : 32,
+			"delay" : 5
+		},
+		{
+			"name"  : "DIV",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "DIVU",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "REM",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "REMU",
+			"size"  : 32,
+			"delay" : 10
+		},
+		{
+			"name"  : "LR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SC.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOSWAP.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOADD.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOXOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOAND.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMIN.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAX.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMINU.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAXU.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI4SPN",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SW",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.NOP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JAL",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LUI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADDI16SP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SRLI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SRAI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ANDI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SUB",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.XOR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.OR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.AND",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.J",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.BEQZ",
+			"size"  : 16,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "C.BNEZ",
+			"size"  : 16,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "C.SLLI",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.LWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.MV",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.ADD",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.JALR",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.EBREAK",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "C.SWSP",
+			"size"  : 16,
+			"delay" : 1
+		},
+		{
+			"name"  : "DII",
+			"size"  : 16,
+			"delay" : 1
+		}
+	],
+	"RV64IA" : [
+		{
+			"name"  : "LWU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRLI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRAI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADDIW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLLIW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRLIW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRAIW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADDW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SUBW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLLW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRLW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRAW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LUI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AUIPC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JAL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "JALR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "BEQ",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BNE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLT",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGE",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BLTU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "BGEU",
+			"size"  : 32,
+			"delay" : [1, 3]
+		},
+		{
+			"name"  : "LB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LBU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LHU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SH",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTIU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ORI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ANDI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ADD",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SUB",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLT",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SLTU",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "XOR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "OR",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AND",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "FENCE_I",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "ECALL",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "EBREAK",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "URET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "MRET",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "WFI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SFENCE.VMA",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRW",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRS",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRC",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRWI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRSI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "CSRRCI",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LR.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SC.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOSWAP.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOADD.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOXOR.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOAND.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOOR.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMIN.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAX.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMINU.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAXU.D",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "LR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "SC.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOSWAP.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOADD.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOXOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOAND.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOOR.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMIN.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAX.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMINU.W",
+			"size"  : 32,
+			"delay" : 1
+		},
+		{
+			"name"  : "AMOMAXU.W",
+			"size"  : 32,
+			"delay" : 1
+		}
+	]
+}

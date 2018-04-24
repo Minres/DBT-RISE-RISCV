@@ -55,7 +55,7 @@ namespace arch {
 
 enum { tohost_dflt = 0xF0001000, fromhost_dflt = 0xF0001040 };
 
-enum csr_name {
+enum riscv_csr {
     /* user-level CSR */
     // User Trap Setup
     ustatus = 0x000,
