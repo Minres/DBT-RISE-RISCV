@@ -51,6 +51,8 @@ include(clang-format)
 add_subdirectory(external)
 add_subdirectory(dbt-core)
 add_subdirectory(sc-components)
+add_subdirectory(softfloat)
+GET_DIRECTORY_PROPERTY(SOFTFLOAT_INCLUDE_DIRS DIRECTORY softfloat DEFINITION SOFTFLOAT_INCLUDE_DIRS)
 add_subdirectory(riscv)
 add_subdirectory(riscv.sc)
 
