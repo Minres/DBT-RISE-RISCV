@@ -3,6 +3,7 @@ import "RV32M.core_desc"
 import "RV32A.core_desc"
 import "RV32C.core_desc"
 import "RV32F.core_desc"
+import "RV32D.core_desc"
 import "RV64IBase.core_desc"
 //import "RV64M.core_desc"
 import "RV64A.core_desc"
@@ -26,10 +27,10 @@ Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
     }
 }
 
-Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC {
+Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D {
     constants {
         XLEN:=32;
-        FLEN:=32;
+        FLEN:=64;
         XLEN2:=64;
         XLEN_BIT_MASK:=0x1f;
         PCLEN:=32;

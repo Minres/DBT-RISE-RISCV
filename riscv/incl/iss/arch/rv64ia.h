@@ -50,6 +50,8 @@ struct traits<rv64ia> {
     
     enum constants {XLEN=64, XLEN2=128, XLEN_BIT_MASK=63, PCLEN=64, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
 
+    constexpr static unsigned FP_REGS_SIZE = 0;
+
     enum reg_e {
         X0,
         X1,
@@ -117,9 +119,6 @@ struct traits<rv64ia> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
-
-	constexpr static bool has_fp_regs = false;
-    
 };
 
 struct rv64ia: public arch_if {

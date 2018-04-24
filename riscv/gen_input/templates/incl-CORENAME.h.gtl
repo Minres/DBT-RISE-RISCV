@@ -56,6 +56,8 @@ struct traits<${coreDef.name.toLowerCase()}> {
     
     enum constants {${coreDef.constants.collect{c -> c.name+"="+c.value}.join(', ')}};
 
+    constexpr static unsigned FP_REGS_SIZE = ${coreDef.constants.find {it.name=='FLEN'}?.value?:0};
+
     enum reg_e {<%
      	allRegs.each { reg -> 
     		if( reg instanceof RegisterFile) {
@@ -99,9 +101,6 @@ struct traits<${coreDef.name.toLowerCase()}> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {${allSpaces.collect{s -> s.name}.join(', ')}};
-
-	constexpr static bool has_fp_regs = ${allRegs.find {it.name=='FCSR'}!= null ?'true':'false'};
-    
 };
 
 struct ${coreDef.name.toLowerCase()}: public arch_if {

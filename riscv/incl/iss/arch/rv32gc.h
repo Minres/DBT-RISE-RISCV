@@ -48,7 +48,9 @@ struct traits<rv32gc> {
 
 	constexpr static char const* const core_type = "RV32GC";
     
-    enum constants {XLEN=32, FLEN=32, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095, FFLAG_MASK=31};
+    enum constants {XLEN=32, FLEN=64, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095, FFLAG_MASK=31};
+
+    constexpr static unsigned FP_REGS_SIZE = 64;
 
     enum reg_e {
         X0,
@@ -136,12 +138,12 @@ struct traits<rv32gc> {
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, 71> RV32GC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64}};
+        constexpr std::array<const uint32_t, 71> RV32GC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,32,32,64}};
         return RV32GC_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, 72> RV32GC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152,156,160,164,168,172,176,180,184,188,192,196,200,204,208,212,216,220,224,228,232,236,240,244,248,252,256,260,264,268,272,276,280,288}};
+    	constexpr std::array<const uint32_t, 72> RV32GC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,280,288,296,304,312,320,328,336,344,352,360,368,376,384,392,396,400,404,408,416,424}};
         return RV32GC_reg_byte_offset[r];
     }
 
@@ -150,9 +152,6 @@ struct traits<rv32gc> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
-
-	constexpr static bool has_fp_regs = true;
-    
 };
 
 struct rv32gc: public arch_if {
@@ -227,38 +226,38 @@ protected:
         uint32_t X30 = 0;
         uint32_t X31 = 0;
         uint32_t PC = 0;
-        uint32_t F0 = 0;
-        uint32_t F1 = 0;
-        uint32_t F2 = 0;
-        uint32_t F3 = 0;
-        uint32_t F4 = 0;
-        uint32_t F5 = 0;
-        uint32_t F6 = 0;
-        uint32_t F7 = 0;
-        uint32_t F8 = 0;
-        uint32_t F9 = 0;
-        uint32_t F10 = 0;
-        uint32_t F11 = 0;
-        uint32_t F12 = 0;
-        uint32_t F13 = 0;
-        uint32_t F14 = 0;
-        uint32_t F15 = 0;
-        uint32_t F16 = 0;
-        uint32_t F17 = 0;
-        uint32_t F18 = 0;
-        uint32_t F19 = 0;
-        uint32_t F20 = 0;
-        uint32_t F21 = 0;
-        uint32_t F22 = 0;
-        uint32_t F23 = 0;
-        uint32_t F24 = 0;
-        uint32_t F25 = 0;
-        uint32_t F26 = 0;
-        uint32_t F27 = 0;
-        uint32_t F28 = 0;
-        uint32_t F29 = 0;
-        uint32_t F30 = 0;
-        uint32_t F31 = 0;
+        uint64_t F0 = 0;
+        uint64_t F1 = 0;
+        uint64_t F2 = 0;
+        uint64_t F3 = 0;
+        uint64_t F4 = 0;
+        uint64_t F5 = 0;
+        uint64_t F6 = 0;
+        uint64_t F7 = 0;
+        uint64_t F8 = 0;
+        uint64_t F9 = 0;
+        uint64_t F10 = 0;
+        uint64_t F11 = 0;
+        uint64_t F12 = 0;
+        uint64_t F13 = 0;
+        uint64_t F14 = 0;
+        uint64_t F15 = 0;
+        uint64_t F16 = 0;
+        uint64_t F17 = 0;
+        uint64_t F18 = 0;
+        uint64_t F19 = 0;
+        uint64_t F20 = 0;
+        uint64_t F21 = 0;
+        uint64_t F22 = 0;
+        uint64_t F23 = 0;
+        uint64_t F24 = 0;
+        uint64_t F25 = 0;
+        uint64_t F26 = 0;
+        uint64_t F27 = 0;
+        uint64_t F28 = 0;
+        uint64_t F29 = 0;
+        uint64_t F30 = 0;
+        uint64_t F31 = 0;
         uint32_t FCSR = 0;
         uint32_t NEXT_PC = 0;
         uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;

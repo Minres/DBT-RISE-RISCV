@@ -50,7 +50,7 @@
 namespace iss {
 namespace vm {
 namespace fp_impl{
-void add_fp_functions_2_module(llvm::Module *mod);
+void add_fp_functions_2_module(llvm::Module *, unsigned);
 }
 }
 
@@ -89,7 +89,7 @@ protected:
 
     void setup_module(llvm::Module* m) override {
         super::setup_module(m);
-        vm::fp_impl::add_fp_functions_2_module(m);
+        vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
 
     inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,

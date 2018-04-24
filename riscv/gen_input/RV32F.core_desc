@@ -15,9 +15,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= MEM[offs]{32};
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FSW {
@@ -33,9 +33,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fmadd_s(F[rs1]{32}, F[rs2]{32}, F[rs3]{32}, zext(0, 32), choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
@@ -47,9 +47,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fmadd_s(F[rs1]{32}, F[rs2]{32}, F[rs3]{32}, zext(1, 32), choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};	
@@ -61,9 +61,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fmadd_s(F[rs1]{32}, F[rs2]{32}, F[rs3]{32}, zext(2, 32), choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
@@ -75,79 +75,79 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fmadd_s(F[rs1]{32}, F[rs2]{32}, F[rs3]{32}, zext(3, 32), choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
 		}
 		FADD.S {
 			encoding: b0000000 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
 			// F[rd]f <= F[rs1]f + F[rs2]f;
 			val res[32] <= fdispatch_fadd_s(F[rs1]{32}, F[rs2]{32}, choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= (-1<<31);
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
 		}
 		FSUB.S {
 			encoding: b0000100 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
 			// F[rd]f <= F[rs1]f - F[rs2]f;
 			val res[32] <= fdispatch_fsub_s(F[rs1]{32}, F[rs2]{32}, choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
 		}
 		FMUL.S {
 			encoding: b0001000 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
 			// F[rd]f <= F[rs1]f * F[rs2]f;
 			val res[32] <= fdispatch_fmul_s(F[rs1]{32}, F[rs2]{32}, choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
 		}
 		FDIV.S {
 			encoding: b0001100 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
 			// F[rd]f <= F[rs1]f / F[rs2]f;
 			val res[32] <= fdispatch_fdiv_s(F[rs1]{32}, F[rs2]{32}, choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
 		}
 		FSQRT.S {
 			encoding: b0101100 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d";
+			args_disass:"f%rd$d, f%rs1$d";
 			//F[rd]f<=sqrt(F[rs1]f);
 			val res[32] <= fdispatch_fsqrt_s(F[rs1]{32}, choose(rm<7, rm{8}, FCSR{8}));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
@@ -158,9 +158,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= (F[rs1]{32} & 0x7fffffff) | (F[rs2]{32} & 0x80000000);
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FSGNJN.S {
@@ -169,9 +169,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= (F[rs1]{32} & 0x7fffffff) | (~F[rs2]{32} & 0x80000000);
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FSGNJX.S {
@@ -180,9 +180,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= F[rs1]{32} ^ (F[rs2]{32} & 0x80000000);
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FMIN.S  {
@@ -192,9 +192,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fsel_s(F[rs1]{32}, F[rs2]{32}, zext(0, 32));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
@@ -206,9 +206,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fsel_s(F[rs1]{32}, F[rs2]{32}, zext(1, 32));
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 			val flags[32] <= fdispatch_fget_flags();
 			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
@@ -259,9 +259,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <= fdispatch_fcvt_s(X[rs1]{32}, zext(2, 32), rm{8});
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FCVT.S.WU {
@@ -270,9 +270,9 @@ InsructionSet RV32F extends RV32IBase{
 			val res[32] <=fdispatch_fcvt_s(X[rs1]{32}, zext(3,32), rm{8});
 			if(FLEN==32)
 				F[rd] <= res;
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | res;
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(res, FLEN);
 			}
 		}
 		FMV.X.W {
@@ -285,9 +285,9 @@ InsructionSet RV32F extends RV32IBase{
 			args_disass:"f%rd$d, x%rs1$d";
 			if(FLEN==32)
 				F[rd] <= X[rs1];
-			else {
-				val upper[FLEN] <= -1<<31;
-				F[rd] <= upper*2 | X[rs1];
+			else { // NaN boxing
+				val upper[FLEN] <= -1;
+				F[rd] <= (upper<<32) | zext(X[rs1], FLEN);
 			}
 		}
 	}

@@ -50,6 +50,8 @@ struct traits<rv32imac> {
     
     enum constants {XLEN=32, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095};
 
+    constexpr static unsigned FP_REGS_SIZE = 0;
+
     enum reg_e {
         X0,
         X1,
@@ -117,9 +119,6 @@ struct traits<rv32imac> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
-
-	constexpr static bool has_fp_regs = false;
-    
 };
 
 struct rv32imac: public arch_if {
