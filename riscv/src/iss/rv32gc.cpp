@@ -34,7 +34,7 @@
 #include <util/logging.h>
 
 #include <elfio/elfio.hpp>
-#include <iss/arch/${coreDef.name.toLowerCase()}.h>
+#include <iss/arch/rv32gc.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,26 +49,26 @@ extern "C" {
 
 using namespace iss::arch;
 
-${coreDef.name.toLowerCase()}::${coreDef.name.toLowerCase()}() {
+rv32gc::rv32gc() {
     reg.icount=0;
 }
 
-${coreDef.name.toLowerCase()}::~${coreDef.name.toLowerCase()}(){
+rv32gc::~rv32gc(){
 }
 
-void ${coreDef.name.toLowerCase()}::reset(uint64_t address) {
-    for(size_t i=0; i<traits<${coreDef.name.toLowerCase()}>::NUM_REGS; ++i) set_reg(i, std::vector<uint8_t>(sizeof(traits<${coreDef.name.toLowerCase()}>::reg_t),0));
+void rv32gc::reset(uint64_t address) {
+    for(size_t i=0; i<traits<rv32gc>::NUM_REGS; ++i) set_reg(i, std::vector<uint8_t>(sizeof(traits<rv32gc>::reg_t),0));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.trap_state=0;
     reg.machine_state=0x0;
 }
 
-uint8_t* ${coreDef.name.toLowerCase()}::get_regs_base_ptr(){
+uint8_t* rv32gc::get_regs_base_ptr(){
     return reinterpret_cast<uint8_t*>(&reg);
 }
 
-${coreDef.name.toLowerCase()}::phys_addr_t ${coreDef.name.toLowerCase()}::virt2phys(const iss::addr_t &pc) {
+rv32gc::phys_addr_t rv32gc::virt2phys(const iss::addr_t &pc) {
     return phys_addr_t(pc); // change logical address to physical address
 }
 

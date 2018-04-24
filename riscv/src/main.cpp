@@ -39,6 +39,7 @@
 #include <boost/program_options.hpp>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/rv32imac.h>
+#include <iss/arch/rv32gc.h>
 #include <iss/arch/rv64ia.h>
 #include <iss/jit/MCJIThelper.h>
 #include <iss/log_categories.h>
@@ -103,13 +104,17 @@ int main(int argc, char *argv[]) {
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-        iss::plugin::instruction_count ic_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
-        iss::plugin::cycle_estimate ce_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
+//        iss::plugin::instruction_count ic_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
+//        iss::plugin::cycle_estimate ce_plugin("riscv/gen_input/src-gen/rv32imac_cyles.txt");
         if (isa_opt.substr(0, 4)=="rv64") {
             iss::arch::rv64ia* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt.substr(0, 4)=="rv32") {
+        } else if (isa_opt.substr(0, 5)=="rv32i") {
             iss::arch::rv32imac* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
+            vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
+            //vm->register_plugin(ce_plugin);
+        } else if (isa_opt.substr(0, 5)=="rv32g") {
+            iss::arch::rv32gc* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
             vm = iss::create(cpu, clim["gdb-port"].as<unsigned>());
             //vm->register_plugin(ce_plugin);
         } else {

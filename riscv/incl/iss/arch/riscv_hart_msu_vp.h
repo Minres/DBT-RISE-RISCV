@@ -48,6 +48,7 @@
 #include <util/sparse_array.h>
 #include <util/bit_field.h>
 #include <array>
+#include <type_traits>
 
 namespace iss {
 namespace arch {
@@ -537,6 +538,8 @@ private:
     iss::status write_ip(unsigned addr, reg_t val);
     iss::status read_satp(unsigned addr, reg_t &val);
     iss::status write_satp(unsigned addr, reg_t val);
+    iss::status read_fcsr(unsigned addr, reg_t& val);
+    iss::status write_fcsr(unsigned addr, reg_t val);
 protected:
     void check_interrupt();
 };
@@ -579,6 +582,13 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
     csr_wr_cb[uie] = &riscv_hart_msu_vp<BASE>::write_ie;
     csr_rd_cb[satp] = &riscv_hart_msu_vp<BASE>::read_satp;
     csr_wr_cb[satp] = &riscv_hart_msu_vp<BASE>::write_satp;
+    csr_rd_cb[fcsr] = &riscv_hart_msu_vp<BASE>::read_fcsr;
+    csr_wr_cb[fcsr] = &riscv_hart_msu_vp<BASE>::write_fcsr;
+    csr_rd_cb[fflags] = &riscv_hart_msu_vp<BASE>::read_fcsr;
+    csr_wr_cb[fflags] = &riscv_hart_msu_vp<BASE>::write_fcsr;
+    csr_rd_cb[frm] = &riscv_hart_msu_vp<BASE>::read_fcsr;
+    csr_wr_cb[frm] = &riscv_hart_msu_vp<BASE>::write_fcsr;
+
 }
 
 template <typename BASE> std::pair<uint64_t,bool> riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
@@ -940,6 +950,39 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_satp(unsigne
     update_vm_info();
     return iss::Ok;
 }
+template<typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_fcsr(unsigned addr, reg_t& val) {
+    switch(addr){
+    case 1: //fflags, 4:0
+        val = bit_sub<0, 5>(this->get_fcsr());
+        break;
+    case 2: // frm, 7:5
+        val = bit_sub<5, 3>(this->get_fcsr());
+       break;
+    case 3: // fcsr
+        val=this->get_fcsr();
+        break;
+    default:
+        return iss::Err;
+    }
+    return iss::Ok;
+}
+
+template<typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_fcsr(unsigned addr, reg_t val) {
+    switch(addr){
+    case 1: //fflags, 4:0
+        this->set_fcsr( (this->get_fcsr() & 0xffffffe0) | (val&0x1f));
+        break;
+    case 2: // frm, 7:5
+        this->set_fcsr( (this->get_fcsr() & 0xffffff1f) | ((val&0x7)<<5));
+       break;
+    case 3: // fcsr
+        this->set_fcsr(val&0xff);
+        break;
+    default:
+        return iss::Err;
+    }
+    return iss::Ok;
+}
 
 template <typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length, uint8_t *const data) {
@@ -1298,5 +1341,6 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::wait_until(uint64_t flags
 }
 }
 }
+
 
 #endif /* _RISCV_CORE_H_ */

@@ -118,6 +118,8 @@ struct traits<rv64ia> {
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
 
+	constexpr static bool has_fp_regs = false;
+    
 };
 
 struct rv64ia: public arch_if {
@@ -198,6 +200,10 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
+    
+
+	uint32_t get_fcsr(){return 0;}
+	void set_fcsr(uint32_t val){}
 
 };
 
