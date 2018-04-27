@@ -1,7 +1,4 @@
 eclipse.preferences.version=1
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/LLVM_HOME/delimiter=\:
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/LLVM_HOME/operation=replace
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/LLVM_HOME/value=/usr/lib/llvm-4.0
 environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/append=true
 environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/appendContributed=true
 environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/LLVM_HOME/delimiter=\:
