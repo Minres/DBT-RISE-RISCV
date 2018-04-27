@@ -48,6 +48,12 @@
 #include <array>
 
 namespace iss {
+namespace vm {
+namespace fp_impl{
+void add_fp_functions_2_module(llvm::Module *, unsigned);
+}
+}
+
 namespace ${coreDef.name.toLowerCase()} {
 using namespace iss::arch;
 using namespace llvm;
@@ -81,6 +87,11 @@ protected:
         return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
+    void setup_module(llvm::Module* m) override {
+        super::setup_module(m);
+        vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
+    }
+
     inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
                                    unsigned size) const {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
@@ -100,7 +111,6 @@ protected:
     void gen_trap_behavior(llvm::BasicBlock *) override;
 
     void gen_trap_check(llvm::BasicBlock *bb);
-
 
     inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
@@ -309,8 +319,6 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
                               llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);
 }
-
-} // namespace ${coreDef.name.toLowerCase()}
 
 template <>
 std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreDef.name.toLowerCase()} *core, unsigned short port, bool dump) {

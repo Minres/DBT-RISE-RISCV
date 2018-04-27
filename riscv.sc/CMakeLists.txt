@@ -68,7 +68,7 @@ include_directories(
 
 add_dependent_subproject(dbt-core)
 add_dependent_subproject(sc-components)
-add_dependent_header(util)
+add_dependent_subproject(riscv)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl

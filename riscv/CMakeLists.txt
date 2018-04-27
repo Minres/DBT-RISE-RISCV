@@ -41,30 +41,14 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 llvm_map_components_to_libnames(llvm_libs support core mcjit x86codegen x86asmparser)
 
-find_package(SystemC)
-if(SystemC_FOUND)
-    add_definitions(-DWITH_SYSTEMC)
-    include_directories(${SystemC_INCLUDE_DIRS})
-    link_directories(${SystemC_LIBRARY_DIRS})
-else(SystemC_FOUND)
-    message( FATAL_ERROR "SystemC library not found." )
-endif(SystemC_FOUND)
-
-if(SCV_FOUND)   
-    add_definitions(-DWITH_SCV)
-    link_directories(${SCV_LIBRARY_DIRS})
-endif(SCV_FOUND)
-
 # This sets the include directory for the reference project. This is the -I flag in gcc.
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
+	${SOFTFLOAT_INCLUDE_DIRS}
     ${LLVM_INCLUDE_DIRS}
 )
-
 add_dependent_subproject(dbt-core)
 add_dependent_subproject(sc-components)
-add_dependent_header(util)
-
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
     ${PROJECT_SOURCE_DIR}/../external/elfio

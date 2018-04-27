@@ -103,7 +103,9 @@ public:
 
     base_type::hart_state<base_type::reg_t>& get_state() { return this->state; }
 
-    void notify_phase(exec_phase) override;
+    void notify_phase(exec_phase p) override {
+        if(p == ISTART) owner->sync(this->reg.icount+cycle_offset);
+    }
 
     sync_type needed_sync() const override { return PRE_SYNC; }
 
@@ -131,9 +133,12 @@ public:
     		return owner->write_mem_dbg(addr.val, length, data) ? Ok : Err;
     	else{
     		auto res = owner->write_mem(addr.val, length, data) ? Ok : Err;
-    		// TODO: this is an ugly hack (clear MTIP on mtimecmp write), needs to be fixed
-    		if(addr.val==0x2004000)
-    			this->csr[arch::mip] &= ~(1ULL<<7);
+    		// clear MTIP on mtimecmp write
+    		if(addr.val==0x2004000){
+    		    reg_t val;
+    		    this->read_csr(arch::mip, val);
+    			this->write_csr(arch::mip, val & ~(1ULL<<7));
+    		}
     		return res;
     	}
     }
@@ -196,11 +201,6 @@ int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func 
     }
     return Err;
 
-}
-
-void core_wrapper::notify_phase(exec_phase p) {
-    if(p == ISTART)
-        owner->sync(this->reg.icount+cycle_offset);
 }
 
 core_complex::core_complex(sc_core::sc_module_name name)

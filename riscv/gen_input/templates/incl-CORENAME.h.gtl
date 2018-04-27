@@ -56,6 +56,8 @@ struct traits<${coreDef.name.toLowerCase()}> {
     
     enum constants {${coreDef.constants.collect{c -> c.name+"="+c.value}.join(', ')}};
 
+    constexpr static unsigned FP_REGS_SIZE = ${coreDef.constants.find {it.name=='FLEN'}?.value?:0};
+
     enum reg_e {<%
      	allRegs.each { reg -> 
     		if( reg instanceof RegisterFile) {
@@ -78,8 +80,6 @@ struct traits<${coreDef.name.toLowerCase()}> {
 
     using addr_t = uint${addrDataWidth}_t;
 
-    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
-
     using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
@@ -99,7 +99,6 @@ struct traits<${coreDef.name.toLowerCase()}> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {${allSpaces.collect{s -> s.name}.join(', ')}};
-
 };
 
 struct ${coreDef.name.toLowerCase()}: public arch_if {
@@ -112,8 +111,6 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
     ${coreDef.name.toLowerCase()}();
     ~${coreDef.name.toLowerCase()}();
 
-	const std::string core_type_name() const override {return traits<${coreDef.name.toLowerCase()}>::core_type;}
-	
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;
@@ -158,9 +155,16 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
-
-    uint64_t cycles = 0;
-
+    
+<%
+def fcsr = allRegs.find {it.name=='FCSR'}
+if(fcsr != null) {%>
+	uint${generator.getSize(fcsr)}_t get_fcsr(){return reg.FCSR;}
+	void set_fcsr(uint${generator.getSize(fcsr)}_t val){reg.FCSR = val;}		
+<%} else { %>
+	uint32_t get_fcsr(){return 0;}
+	void set_fcsr(uint32_t val){}
+<%}%>
 };
 
 }

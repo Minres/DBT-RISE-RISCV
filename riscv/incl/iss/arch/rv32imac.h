@@ -48,7 +48,9 @@ struct traits<rv32imac> {
 
 	constexpr static char const* const core_type = "RV32IMAC";
     
-    enum constants {XLEN=32, XLEN2=64, XLEN_BIT_MASK=31, PCLEN=32, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=1075056897, PGSIZE=4096, PGMASK=4095};
+    enum constants {XLEN=32, PCLEN=32, MISA_VAL=1075056901, PGSIZE=4096, PGMASK=4095};
+
+    constexpr static unsigned FP_REGS_SIZE = 0;
 
     enum reg_e {
         X0,
@@ -117,7 +119,6 @@ struct traits<rv32imac> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
-
 };
 
 struct rv32imac: public arch_if {
@@ -198,6 +199,10 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
+    
+
+	uint32_t get_fcsr(){return 0;}
+	void set_fcsr(uint32_t val){}
 
 };
 

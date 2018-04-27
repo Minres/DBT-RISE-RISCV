@@ -68,7 +68,7 @@ bool iss::plugin::instruction_count::registration(const char* const version, vm_
     if(!instr_if) return false;
 	const std::string  core_name = instr_if->core_type_name();
     Json::Value &val = root[core_name];
-    if(val.isArray()){
+    if(!val.isNull() && val.isArray()){
     	delays.reserve(val.size());
     	for(auto it:val){
     		auto name = it["name"];
@@ -84,6 +84,8 @@ bool iss::plugin::instruction_count::registration(const char* const version, vm_
     		}
     	}
     	rep_counts.resize(delays.size());
+    } else {
+        LOG(ERROR)<<"plugin instruction_count: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
     }
 	return true;
 }

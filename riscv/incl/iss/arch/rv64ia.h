@@ -48,7 +48,9 @@ struct traits<rv64ia> {
 
 	constexpr static char const* const core_type = "RV64IA";
     
-    enum constants {XLEN=64, XLEN2=128, XLEN_BIT_MASK=63, PCLEN=64, fence=0, fencei=1, fencevmal=2, fencevmau=3, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
+    enum constants {XLEN=64, PCLEN=64, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
+
+    constexpr static unsigned FP_REGS_SIZE = 0;
 
     enum reg_e {
         X0,
@@ -117,7 +119,6 @@ struct traits<rv64ia> {
     enum sreg_flag_e {FLAGS};
 
     enum mem_type_e {MEM, CSR, FENCE, RES};
-
 };
 
 struct rv64ia: public arch_if {
@@ -198,6 +199,10 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
+    
+
+	uint32_t get_fcsr(){return 0;}
+	void set_fcsr(uint32_t val){}
 
 };
 

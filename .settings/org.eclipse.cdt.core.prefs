@@ -1,0 +1,8 @@
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/append=true
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1751741082/appendContributed=true
+environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/LLVM_HOME/delimiter=\:
+environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/LLVM_HOME/operation=append
+environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/LLVM_HOME/value=/usr/lib/llvm-6.0
+environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/append=true
+environment/project/cdt.managedbuild.config.gnu.exe.release.1745230171/appendContributed=true

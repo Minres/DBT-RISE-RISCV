@@ -1,11 +1,11 @@
 # library files
 FILE(GLOB RiscVHeaders *.h)
+FILE(GLOB IssSources iss/*.cpp internal/*.cpp) 
+
+
 set(LIB_HEADERS ${RiscVHeaders} )
 set(LIB_SOURCES
-    iss/rv32imac.cpp
-    iss/rv64ia.cpp
-    internal/vm_rv32imac.cpp
-    internal/vm_rv64ia.cpp
+    ${IssSources}
     plugin/instruction_count.cpp
     plugin/cycle_estimate.cpp
 )
@@ -35,6 +35,7 @@ add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 # Links the target exe against the libraries
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
 target_link_libraries(${APPLICATION_NAME} dbt-core)
+target_link_libraries(${APPLICATION_NAME} softfloat)
 target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
