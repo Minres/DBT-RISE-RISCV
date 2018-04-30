@@ -80,6 +80,8 @@ struct traits<${coreDef.name.toLowerCase()}> {
 
     using addr_t = uint${addrDataWidth}_t;
 
+    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
+
     using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;

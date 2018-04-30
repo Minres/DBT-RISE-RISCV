@@ -112,14 +112,9 @@ protected:
 
     void gen_trap_check(llvm::BasicBlock *bb);
 
-
     inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
-
-    llvm::Value* gen_fdispatch(std::string fname, const std::vector<llvm::Value*>& args);
-
-    llvm::Value* gen_dispatch(std::string name, llvm::Value*, llvm::Value*, llvm::Value*);
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
         llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
@@ -421,8 +416,8 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = this->gen_const(32U, fld_imm_val);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 0);
@@ -455,10 +450,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAdd(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        cur_pc_val,
     	        this->gen_const(32U, fld_imm_val));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 1);
@@ -491,10 +486,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAdd(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        cur_pc_val,
     	        this->gen_const(32U, 4));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* PC_val = this->builder.CreateAdd(
     	    cur_pc_val,
@@ -530,17 +525,17 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAdd(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        cur_pc_val,
     	        this->gen_const(32U, 4));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* ret_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	Value* PC_val = this->builder.CreateAnd(
     	    ret_val,
-    	    this->builder.CreateNot(this->gen_const(32U, 1)));
+    	    this->builder.CreateNot(this->gen_const(32U, 0x1)));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	this->gen_sync(iss::POST_SYNC, 3);
     	this->gen_trap_check(this->leave_blk);
@@ -835,11 +830,11 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
     	        32,
     	        true);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 10);
@@ -876,11 +871,11 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
     	        32,
     	        true);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 11);
@@ -917,11 +912,11 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
     	        32,
     	        true);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 12);
@@ -958,11 +953,11 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 13);
@@ -999,11 +994,11 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 14);
@@ -1039,11 +1034,11 @@ private:
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(8)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(8)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 15);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1078,11 +1073,11 @@ private:
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(16)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(16)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 16);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1117,11 +1112,11 @@ private:
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 17);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1154,10 +1149,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAdd(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, fld_imm_val));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 18);
@@ -1191,7 +1186,7 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_choose(
+    	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_SLT,
     	            this->gen_ext(
@@ -1201,7 +1196,7 @@ private:
     	        this->gen_const(32U, 1),
     	        this->gen_const(32U, 0),
     	        32);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 19);
@@ -1236,7 +1231,7 @@ private:
     	
     	int32_t full_imm_val = fld_imm_val;
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_choose(
+    	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
@@ -1244,7 +1239,7 @@ private:
     	        this->gen_const(32U, 1),
     	        this->gen_const(32U, 0),
     	        32);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 20);
@@ -1278,10 +1273,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateXor(
+    	    Value* Xtmp0_val = this->builder.CreateXor(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, fld_imm_val));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 21);
@@ -1315,10 +1310,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateOr(
+    	    Value* Xtmp0_val = this->builder.CreateOr(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, fld_imm_val));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 22);
@@ -1352,10 +1347,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAnd(
+    	    Value* Xtmp0_val = this->builder.CreateAnd(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, fld_imm_val));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 23);
@@ -1392,10 +1387,10 @@ private:
     	    this->gen_raise_trap(0, 0);
     	} else {
     	    if(fld_rd_val != 0){
-    	        Value* X_rd_val = this->builder.CreateShl(
+    	        Value* Xtmp0_val = this->builder.CreateShl(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	            this->gen_const(32U, fld_shamt_val));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1433,10 +1428,10 @@ private:
     	    this->gen_raise_trap(0, 0);
     	} else {
     	    if(fld_rd_val != 0){
-    	        Value* X_rd_val = this->builder.CreateLShr(
+    	        Value* Xtmp0_val = this->builder.CreateLShr(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	            this->gen_const(32U, fld_shamt_val));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1474,10 +1469,10 @@ private:
     	    this->gen_raise_trap(0, 0);
     	} else {
     	    if(fld_rd_val != 0){
-    	        Value* X_rd_val = this->builder.CreateAShr(
+    	        Value* Xtmp0_val = this->builder.CreateAShr(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	            this->gen_const(32U, fld_shamt_val));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1512,10 +1507,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAdd(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 27);
@@ -1549,10 +1544,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateSub(
+    	    Value* Xtmp0_val = this->builder.CreateSub(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 28);
@@ -1586,12 +1581,12 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateShl(
+    	    Value* Xtmp0_val = this->builder.CreateShl(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 31)));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	            this->gen_const(32U, 0x1f)));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 29);
@@ -1625,7 +1620,7 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_choose(
+    	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_SLT,
     	            this->gen_ext(
@@ -1637,7 +1632,7 @@ private:
     	        this->gen_const(32U, 1),
     	        this->gen_const(32U, 0),
     	        32);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 30);
@@ -1671,7 +1666,7 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_choose(
+    	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
     	            this->gen_ext(
@@ -1685,7 +1680,7 @@ private:
     	        this->gen_const(32U, 1),
     	        this->gen_const(32U, 0),
     	        32);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 31);
@@ -1719,10 +1714,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateXor(
+    	    Value* Xtmp0_val = this->builder.CreateXor(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 32);
@@ -1756,12 +1751,12 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateLShr(
+    	    Value* Xtmp0_val = this->builder.CreateLShr(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 31)));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	            this->gen_const(32U, 0x1f)));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 33);
@@ -1795,12 +1790,12 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAShr(
+    	    Value* Xtmp0_val = this->builder.CreateAShr(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 31)));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	            this->gen_const(32U, 0x1f)));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 34);
@@ -1834,10 +1829,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateOr(
+    	    Value* Xtmp0_val = this->builder.CreateOr(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 35);
@@ -1871,10 +1866,10 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->builder.CreateAnd(
+    	    Value* Xtmp0_val = this->builder.CreateAnd(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 36);
@@ -1906,15 +1901,15 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* FENCE_fence_val = this->builder.CreateOr(
+    	Value* FENCEtmp0_val = this->builder.CreateOr(
     	    this->builder.CreateShl(
     	        this->gen_const(32U, fld_pred_val),
     	        this->gen_const(32U, 4)),
     	    this->gen_const(32U, fld_succ_val));
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
-    	    (uint64_t)0,
-    	    this->builder.CreateZExtOrTrunc(FENCE_fence_val,this->get_type(32)));
+    	    this->gen_const(64U, 0),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 37);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1944,11 +1939,11 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* FENCE_fencei_val = this->gen_const(32U, fld_imm_val);
+    	Value* FENCEtmp0_val = this->gen_const(32U, fld_imm_val);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
-    	    (uint64_t)1,
-    	    this->builder.CreateZExtOrTrunc(FENCE_fencei_val,this->get_type(32)));
+    	    this->gen_const(64U, 1),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 38);
     	this->gen_trap_check(this->leave_blk);
@@ -2134,16 +2129,16 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* FENCE_fencevmal_val = this->gen_const(32U, fld_rs1_val);
+    	Value* FENCEtmp0_val = this->gen_const(32U, fld_rs1_val);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
-    	    (uint64_t)2,
-    	    this->builder.CreateZExtOrTrunc(FENCE_fencevmal_val,this->get_type(32)));
-    	Value* FENCE_fencevmau_val = this->gen_const(32U, fld_rs2_val);
+    	    this->gen_const(64U, 2),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	Value* FENCEtmp1_val = this->gen_const(32U, fld_rs2_val);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
-    	    (uint64_t)3,
-    	    this->builder.CreateZExtOrTrunc(FENCE_fencevmau_val,this->get_type(32)));
+    	    this->gen_const(64U, 3),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 45);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2177,20 +2172,20 @@ private:
     	
     	Value* rs_val_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	if(fld_rd_val != 0){
-    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
-    	    Value* CSR_csr_val = rs_val_val;
+    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
+    	    Value* CSRtmp0_val = rs_val_val;
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
-    	    Value* X_rd_val = csr_val_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
+    	    Value* Xtmp1_val = csr_val_val;
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	} else {
-    	    Value* CSR_csr_val = rs_val_val;
+    	    Value* CSRtmp2_val = rs_val_val;
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp2_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 46);
@@ -2223,20 +2218,20 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
     	Value* xrs1_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = xrd_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = xrd_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	if(fld_rs1_val != 0){
-    	    Value* CSR_csr_val = this->builder.CreateOr(
+    	    Value* CSRtmp1_val = this->builder.CreateOr(
     	        xrd_val,
     	        xrs1_val);
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 47);
@@ -2269,20 +2264,20 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
     	Value* xrs1_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = xrd_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = xrd_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	if(fld_rs1_val != 0){
-    	    Value* CSR_csr_val = this->builder.CreateAnd(
+    	    Value* CSRtmp1_val = this->builder.CreateAnd(
     	        xrd_val,
     	        this->builder.CreateNot(xrs1_val));
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 48);
@@ -2316,17 +2311,17 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
-    	Value* CSR_csr_val = this->gen_ext(
+    	Value* CSRtmp1_val = this->gen_ext(
     	    this->gen_const(32U, fld_zimm_val),
     	    32,
     	    false);
     	this->gen_write_mem(
     	    traits<ARCH>::CSR,
-    	    fld_csr_val,
-    	    this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	    this->gen_const(16U, fld_csr_val),
+    	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 49);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2358,9 +2353,9 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
     	if(fld_zimm_val != 0){
-    	    Value* CSR_csr_val = this->builder.CreateOr(
+    	    Value* CSRtmp0_val = this->builder.CreateOr(
     	        res_val,
     	        this->gen_ext(
     	            this->gen_const(32U, fld_zimm_val),
@@ -2368,12 +2363,12 @@ private:
     	            false));
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
     	}
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp1_val = res_val;
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 50);
@@ -2406,13 +2401,13 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, fld_csr_val, 32/8);
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, fld_csr_val), 32/8);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	if(fld_zimm_val != 0){
-    	    Value* CSR_csr_val = this->builder.CreateAnd(
+    	    Value* CSRtmp1_val = this->builder.CreateAnd(
     	        res_val,
     	        this->builder.CreateNot(this->gen_ext(
     	            this->gen_const(32U, fld_zimm_val),
@@ -2420,8 +2415,8 @@ private:
     	            false)));
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
-    	        fld_csr_val,
-    	        this->builder.CreateZExtOrTrunc(CSR_csr_val,this->get_type(32)));
+    	        this->gen_const(16U, fld_csr_val),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 51);
@@ -2464,11 +2459,11 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            128,
     	            false));
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        res_val,
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 52);
@@ -2511,13 +2506,13 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            128,
     	            true));
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->builder.CreateLShr(
     	            res_val,
     	            this->gen_const(32U, 32)),
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 53);
@@ -2560,13 +2555,13 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            128,
     	            false));
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->builder.CreateLShr(
     	            res_val,
     	            this->gen_const(32U, 32)),
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 54);
@@ -2609,13 +2604,13 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            128,
     	            false));
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->builder.CreateLShr(
     	            res_val,
     	            this->gen_const(32U, 32)),
     	        32,
     	        false);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 55);
@@ -2649,95 +2644,101 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bb_else);
-    	    this->builder.SetInsertPoint(bb_then);
     	    {
-    	        uint32_t M1_val = (-1);
-    	        uint32_t MMIN_val = (-1) << (32 - 1);
     	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
     	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
     	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
-    	            ICmpInst::ICMP_EQ,
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
-    	                32, true),
-    	            this->gen_ext(
-    	                this->gen_const(32U, MMIN_val),
-    	                32, true)),
+    	            ICmpInst::ICMP_NE,
+    	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
     	        {
-    	            llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	            llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	            llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	            // this->builder.SetInsertPoint(bb);
-    	            this->gen_cond_branch(this->builder.CreateICmp(
-    	                ICmpInst::ICMP_EQ,
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
-    	                    32, true),
-    	                this->gen_ext(
-    	                    this->gen_const(32U, M1_val),
-    	                    32, true)),
-    	                bb_then,
-    	                bb_else);
-    	            this->builder.SetInsertPoint(bb_then);
+    	            int32_t M1_val = (-1);
+    	            uint32_t MMIN_val = (-1) << (32 - 1);
     	            {
-    	                Value* X_rd_val = this->gen_const(32U, MMIN_val);
-    	                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	            }
-    	            this->builder.CreateBr(bbnext);
-    	            this->builder.SetInsertPoint(bb_else);
-    	            {
-    	                Value* X_rd_val = this->builder.CreateSDiv(
+    	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                // this->builder.SetInsertPoint(bb);
+    	                this->gen_cond_branch(this->builder.CreateICmp(
+    	                    ICmpInst::ICMP_EQ,
     	                    this->gen_ext(
-    	                        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 3),
+    	                        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
     	                        32, true),
     	                    this->gen_ext(
-    	                        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 3),
-    	                        32, true));
-    	                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        this->gen_const(32U, MMIN_val),
+    	                        32, true)),
+    	                    bb_then,
+    	                    bb_else);
+    	                this->builder.SetInsertPoint(bb_then);
+    	                {
+    	                    {
+    	                        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                        // this->builder.SetInsertPoint(bb);
+    	                        this->gen_cond_branch(this->builder.CreateICmp(
+    	                            ICmpInst::ICMP_EQ,
+    	                            this->gen_ext(
+    	                                this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
+    	                                32, true),
+    	                            this->gen_ext(
+    	                                this->gen_const(32U, M1_val),
+    	                                32, true)),
+    	                            bb_then,
+    	                            bb_else);
+    	                        this->builder.SetInsertPoint(bb_then);
+    	                        {
+    	                            Value* Xtmp0_val = this->gen_const(32U, MMIN_val);
+    	                            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        }
+    	                        this->builder.CreateBr(bbnext);
+    	                        this->builder.SetInsertPoint(bb_else);
+    	                        {
+    	                            Value* Xtmp1_val = this->builder.CreateSDiv(
+    	                                this->gen_ext(
+    	                                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 3),
+    	                                    32, true),
+    	                                this->gen_ext(
+    	                                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 3),
+    	                                    32, true));
+    	                            this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        }
+    	                        this->builder.CreateBr(bbnext);
+    	                        bb=bbnext;
+    	                    }
+    	                    this->builder.SetInsertPoint(bb);
+    	                }
+    	                this->builder.CreateBr(bbnext);
+    	                this->builder.SetInsertPoint(bb_else);
+    	                {
+    	                    Value* Xtmp2_val = this->builder.CreateSDiv(
+    	                        this->gen_ext(
+    	                            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 2),
+    	                            32, true),
+    	                        this->gen_ext(
+    	                            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
+    	                            32, true));
+    	                    this->builder.CreateStore(Xtmp2_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                }
+    	                this->builder.CreateBr(bbnext);
+    	                bb=bbnext;
     	            }
-    	            this->builder.CreateBr(bbnext);
-    	            bb=bbnext;
     	            this->builder.SetInsertPoint(bb);
     	        }
     	        this->builder.CreateBr(bbnext);
     	        this->builder.SetInsertPoint(bb_else);
     	        {
-    	            Value* X_rd_val = this->builder.CreateSDiv(
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 2),
-    	                    32, true),
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
-    	                    32, true));
-    	            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	            Value* Xtmp3_val = this->builder.CreateNeg(this->gen_const(32U, 1));
+    	            this->builder.CreateStore(Xtmp3_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	        }
     	        this->builder.CreateBr(bbnext);
     	        bb=bbnext;
-    	        this->builder.SetInsertPoint(bb);
     	    }
-    	    this->builder.CreateBr(bbnext);
-    	    this->builder.SetInsertPoint(bb_else);
-    	    {
-    	        Value* X_rd_val = this->builder.CreateNeg(this->gen_const(32U, 1));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2772,37 +2773,39 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bb_else);
-    	    this->builder.SetInsertPoint(bb_then);
     	    {
-    	        Value* X_rd_val = this->builder.CreateUDiv(
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
-    	                32,
-    	                false),
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1),
-    	                32,
-    	                false));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        // this->builder.SetInsertPoint(bb);
+    	        this->gen_cond_branch(this->builder.CreateICmp(
+    	            ICmpInst::ICMP_NE,
+    	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, 0)),
+    	            bb_then,
+    	            bb_else);
+    	        this->builder.SetInsertPoint(bb_then);
+    	        {
+    	            Value* Xtmp0_val = this->builder.CreateUDiv(
+    	                this->gen_ext(
+    	                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
+    	                    32,
+    	                    false),
+    	                this->gen_ext(
+    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1),
+    	                    32,
+    	                    false));
+    	            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        }
+    	        this->builder.CreateBr(bbnext);
+    	        this->builder.SetInsertPoint(bb_else);
+    	        {
+    	            Value* Xtmp1_val = this->builder.CreateNeg(this->gen_const(32U, 1));
+    	            this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        }
+    	        this->builder.CreateBr(bbnext);
+    	        bb=bbnext;
     	    }
-    	    this->builder.CreateBr(bbnext);
-    	    this->builder.SetInsertPoint(bb_else);
-    	    {
-    	        Value* X_rd_val = this->builder.CreateNeg(this->gen_const(32U, 1));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2837,99 +2840,105 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bb_else);
-    	    this->builder.SetInsertPoint(bb_then);
     	    {
-    	        uint32_t M1_val = (-1);
-    	        uint32_t MMIN_val = (-1) << (32 - 1);
     	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
     	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
     	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
-    	            ICmpInst::ICMP_EQ,
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
-    	                32, true),
-    	            this->gen_ext(
-    	                this->gen_const(32U, MMIN_val),
-    	                32, true)),
+    	            ICmpInst::ICMP_NE,
+    	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
     	        {
-    	            llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	            llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	            llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	            // this->builder.SetInsertPoint(bb);
-    	            this->gen_cond_branch(this->builder.CreateICmp(
-    	                ICmpInst::ICMP_EQ,
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
-    	                    32, true),
-    	                this->gen_ext(
-    	                    this->gen_const(32U, M1_val),
-    	                    32, true)),
-    	                bb_then,
-    	                bb_else);
-    	            this->builder.SetInsertPoint(bb_then);
+    	            int32_t M1_val = (-1);
+    	            uint32_t MMIN_val = (-1) << (32 - 1);
     	            {
-    	                Value* X_rd_val = this->gen_const(32U, 0);
-    	                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	            }
-    	            this->builder.CreateBr(bbnext);
-    	            this->builder.SetInsertPoint(bb_else);
-    	            {
-    	                Value* X_rd_val = this->builder.CreateSRem(
+    	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                // this->builder.SetInsertPoint(bb);
+    	                this->gen_cond_branch(this->builder.CreateICmp(
+    	                    ICmpInst::ICMP_EQ,
     	                    this->gen_ext(
-    	                        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 3),
-    	                        32,
-    	                        true),
+    	                        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
+    	                        32, true),
     	                    this->gen_ext(
-    	                        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 3),
-    	                        32,
-    	                        true));
-    	                this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        this->gen_const(32U, MMIN_val),
+    	                        32, true)),
+    	                    bb_then,
+    	                    bb_else);
+    	                this->builder.SetInsertPoint(bb_then);
+    	                {
+    	                    {
+    	                        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                        // this->builder.SetInsertPoint(bb);
+    	                        this->gen_cond_branch(this->builder.CreateICmp(
+    	                            ICmpInst::ICMP_EQ,
+    	                            this->gen_ext(
+    	                                this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
+    	                                32, true),
+    	                            this->gen_ext(
+    	                                this->gen_const(32U, M1_val),
+    	                                32, true)),
+    	                            bb_then,
+    	                            bb_else);
+    	                        this->builder.SetInsertPoint(bb_then);
+    	                        {
+    	                            Value* Xtmp0_val = this->gen_const(32U, 0);
+    	                            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        }
+    	                        this->builder.CreateBr(bbnext);
+    	                        this->builder.SetInsertPoint(bb_else);
+    	                        {
+    	                            Value* Xtmp1_val = this->builder.CreateSRem(
+    	                                this->gen_ext(
+    	                                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 3),
+    	                                    32,
+    	                                    true),
+    	                                this->gen_ext(
+    	                                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 3),
+    	                                    32,
+    	                                    true));
+    	                            this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                        }
+    	                        this->builder.CreateBr(bbnext);
+    	                        bb=bbnext;
+    	                    }
+    	                    this->builder.SetInsertPoint(bb);
+    	                }
+    	                this->builder.CreateBr(bbnext);
+    	                this->builder.SetInsertPoint(bb_else);
+    	                {
+    	                    Value* Xtmp2_val = this->builder.CreateSRem(
+    	                        this->gen_ext(
+    	                            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 2),
+    	                            32,
+    	                            true),
+    	                        this->gen_ext(
+    	                            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
+    	                            32,
+    	                            true));
+    	                    this->builder.CreateStore(Xtmp2_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	                }
+    	                this->builder.CreateBr(bbnext);
+    	                bb=bbnext;
     	            }
-    	            this->builder.CreateBr(bbnext);
-    	            bb=bbnext;
     	            this->builder.SetInsertPoint(bb);
     	        }
     	        this->builder.CreateBr(bbnext);
     	        this->builder.SetInsertPoint(bb_else);
     	        {
-    	            Value* X_rd_val = this->builder.CreateSRem(
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 2),
-    	                    32,
-    	                    true),
-    	                this->gen_ext(
-    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 2),
-    	                    32,
-    	                    true));
-    	            this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	            Value* Xtmp3_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1);
+    	            this->builder.CreateStore(Xtmp3_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	        }
     	        this->builder.CreateBr(bbnext);
     	        bb=bbnext;
-    	        this->builder.SetInsertPoint(bb);
     	    }
-    	    this->builder.CreateBr(bbnext);
-    	    this->builder.SetInsertPoint(bb_else);
-    	    {
-    	        Value* X_rd_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1);
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2964,37 +2973,39 @@ private:
     	pc=pc+4;
     	
     	if(fld_rd_val != 0){
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bb_else);
-    	    this->builder.SetInsertPoint(bb_then);
     	    {
-    	        Value* X_rd_val = this->builder.CreateURem(
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
-    	                32,
-    	                false),
-    	            this->gen_ext(
-    	                this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1),
-    	                32,
-    	                false));
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        // this->builder.SetInsertPoint(bb);
+    	        this->gen_cond_branch(this->builder.CreateICmp(
+    	            ICmpInst::ICMP_NE,
+    	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, 0)),
+    	            bb_then,
+    	            bb_else);
+    	        this->builder.SetInsertPoint(bb_then);
+    	        {
+    	            Value* Xtmp0_val = this->builder.CreateURem(
+    	                this->gen_ext(
+    	                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1),
+    	                    32,
+    	                    false),
+    	                this->gen_ext(
+    	                    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1),
+    	                    32,
+    	                    false));
+    	            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        }
+    	        this->builder.CreateBr(bbnext);
+    	        this->builder.SetInsertPoint(bb_else);
+    	        {
+    	            Value* Xtmp1_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1);
+    	            this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        }
+    	        this->builder.CreateBr(bbnext);
+    	        bb=bbnext;
     	    }
-    	    this->builder.CreateBr(bbnext);
-    	    this->builder.SetInsertPoint(bb_else);
-    	    {
-    	        Value* X_rd_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 1);
-    	        this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -3031,19 +3042,19 @@ private:
     	
     	if(fld_rd_val != 0){
     	    Value* offs_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
     	        32,
     	        true);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	    Value* RES_offs_val = this->gen_ext(
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* REStmp1_val = this->gen_ext(
     	        this->builder.CreateNeg(this->gen_const(8U, 1)),
     	        32,
     	        true);
     	    this->gen_write_mem(
     	        traits<ARCH>::RES,
     	        offs_val,
-    	        this->builder.CreateZExtOrTrunc(RES_offs_val,this->get_type(32)));
+    	        this->builder.CreateZExtOrTrunc(REStmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 60);
@@ -3080,28 +3091,30 @@ private:
     	
     	Value* offs_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
-    	llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	// this->builder.SetInsertPoint(bb);
-    	this->gen_cond_branch(this->builder.CreateICmp(
-    	    ICmpInst::ICMP_NE,
-    	    res1_val,
-    	    this->gen_const(32U, 0)),
-    	    bb_then,
-    	    bbnext);
-    	this->builder.SetInsertPoint(bb_then);
     	{
-    	    Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1);
-    	    this->gen_write_mem(
-    	        traits<ARCH>::MEM,
-    	        offs_val,
-    	        this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	    // this->builder.SetInsertPoint(bb);
+    	    this->gen_cond_branch(this->builder.CreateICmp(
+    	        ICmpInst::ICMP_NE,
+    	        res1_val,
+    	        this->gen_const(32U, 0)),
+    	        bb_then,
+    	        bbnext);
+    	    this->builder.SetInsertPoint(bb_then);
+    	    {
+    	        Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 1);
+    	        this->gen_write_mem(
+    	            traits<ARCH>::MEM,
+    	            offs_val,
+    	            this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
+    	    }
+    	    this->builder.CreateBr(bbnext);
+    	    bb=bbnext;
     	}
-    	this->builder.CreateBr(bbnext);
-    	bb=bbnext;
     	this->builder.SetInsertPoint(bb);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_choose(
+    	    Value* Xtmp1_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            res1_val,
@@ -3109,7 +3122,7 @@ private:
     	        this->gen_const(32U, 0),
     	        this->gen_const(32U, 1),
     	        32);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 61);
@@ -3146,17 +3159,17 @@ private:
     	
     	Value* offs_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = this->gen_ext(
+    	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
     	        32,
     	        true);
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
-    	Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp1_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 62);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3196,17 +3209,17 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->builder.CreateAdd(
     	    res1_val,
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 63);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3246,17 +3259,17 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->builder.CreateXor(
     	    res1_val,
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 64);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3296,17 +3309,17 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->builder.CreateAnd(
     	    res1_val,
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 65);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3346,17 +3359,17 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->builder.CreateOr(
     	    res1_val,
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 66);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3396,8 +3409,8 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->gen_choose(
     	    this->builder.CreateICmp(
@@ -3411,11 +3424,11 @@ private:
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	    res1_val,
     	    32);
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 67);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3455,8 +3468,8 @@ private:
     	    32,
     	    true);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->gen_choose(
     	    this->builder.CreateICmp(
@@ -3470,11 +3483,11 @@ private:
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	    res1_val,
     	    32);
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 68);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3514,8 +3527,8 @@ private:
     	    32,
     	    false);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->gen_choose(
     	    this->builder.CreateICmp(
@@ -3525,11 +3538,11 @@ private:
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	    res1_val,
     	    32);
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 69);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3569,8 +3582,8 @@ private:
     	    32,
     	    false);
     	if(fld_rd_val != 0){
-    	    Value* X_rd_val = res1_val;
-    	    this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* res2_val = this->gen_choose(
     	    this->builder.CreateICmp(
@@ -3580,11 +3593,11 @@ private:
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	    res1_val,
     	    32);
-    	Value* MEM_offs_val = res2_val;
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 70);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3618,12 +3631,10 @@ private:
     	if(fld_imm_val == 0){
     	    this->gen_raise_trap(0, 2);
     	}
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
-    	uint8_t x2_idx_val = 2;
-    	Value* X_rd_idx_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(x2_idx_val + traits<ARCH>::X0, 0),
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 71);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3655,13 +3666,11 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
-    	Value* X_rd_idx_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 72);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3693,16 +3702,14 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
-    	uint8_t rs2_idx_val = (fld_rs2_val + 8);
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
-    	Value* MEM_offs_val = this->gen_reg_load(rs2_idx_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 73);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3733,10 +3740,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	Value* X_rs1_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	this->builder.CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 74);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3794,11 +3801,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rd_val = 1;
-    	Value* X_rd_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
     	    cur_pc_val,
     	    this->gen_const(32U, 2));
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(rd_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
     	Value* PC_val = this->builder.CreateAdd(
     	    cur_pc_val,
     	    this->gen_const(32U, fld_imm_val));
@@ -3834,8 +3840,8 @@ private:
     	if(fld_rd_val == 0){
     	    this->gen_raise_trap(0, 2);
     	}
-    	Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	Value* Xtmp0_val = this->gen_const(32U, fld_imm_val);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 77);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3872,8 +3878,8 @@ private:
     	if(fld_imm_val == 0){
     	    this->gen_raise_trap(0, 2);
     	}
-    	Value* X_rd_val = this->gen_const(32U, fld_imm_val);
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	Value* Xtmp0_val = this->gen_const(32U, fld_imm_val);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 78);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3903,13 +3909,12 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t x2_idx_val = 2;
-    	Value* X_x2_idx_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
     	    this->gen_ext(
-    	        this->gen_reg_load(x2_idx_val + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(2 + traits<ARCH>::X0, 0),
     	        32, true),
     	    this->gen_const(32U, fld_imm_val));
-    	this->builder.CreateStore(X_x2_idx_val, get_reg_ptr(x2_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(2 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 79);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3941,10 +3946,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rs1_idx_val = (fld_rs1_val + 8);
-    	Value* X_rs1_idx_val = this->builder.CreateLShr(
+    	Value* Xtmp0_val = this->builder.CreateLShr(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_shamt_val));
-    	this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 80);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3976,10 +3981,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rs1_idx_val = (fld_rs1_val + 8);
-    	Value* X_rs1_idx_val = this->builder.CreateAShr(
+    	Value* Xtmp0_val = this->builder.CreateAShr(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_shamt_val));
-    	this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 81);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4011,10 +4016,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rs1_idx_val = (fld_rs1_val + 8);
-    	Value* X_rs1_idx_val = this->builder.CreateAnd(
+    	Value* Xtmp0_val = this->builder.CreateAnd(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	this->builder.CreateStore(X_rs1_idx_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 82);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4046,11 +4051,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rd_idx_val = (fld_rd_val + 8);
-    	uint8_t rs2_idx_val = (fld_rs2_val + 8);
-    	Value* X_rd_idx_val = this->builder.CreateSub(
+    	Value* Xtmp0_val = this->builder.CreateSub(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2_idx_val + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 83);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4082,11 +4086,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rd_idx_val = (fld_rd_val + 8);
-    	uint8_t rs2_idx_val = (fld_rs2_val + 8);
-    	Value* X_rd_idx_val = this->builder.CreateXor(
+    	Value* Xtmp0_val = this->builder.CreateXor(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2_idx_val + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 84);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4118,11 +4121,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rd_idx_val = (fld_rd_val + 8);
-    	uint8_t rs2_idx_val = (fld_rs2_val + 8);
-    	Value* X_rd_idx_val = this->builder.CreateOr(
+    	Value* Xtmp0_val = this->builder.CreateOr(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2_idx_val + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 85);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4154,11 +4156,10 @@ private:
     	pc=pc+2;
     	
     	uint8_t rd_idx_val = (fld_rd_val + 8);
-    	uint8_t rs2_idx_val = (fld_rs2_val + 8);
-    	Value* X_rd_idx_val = this->builder.CreateAnd(
+    	Value* Xtmp0_val = this->builder.CreateAnd(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2_idx_val + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(X_rd_idx_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 86);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4220,11 +4221,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
     	Value* PC_val = this->gen_choose(
     	    this->builder.CreateICmp(
     	        ICmpInst::ICMP_EQ,
-    	        this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, 0)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -4262,11 +4262,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
     	Value* PC_val = this->gen_choose(
     	    this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, 0)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -4307,10 +4306,10 @@ private:
     	if(fld_rs1_val == 0){
     	    this->gen_raise_trap(0, 2);
     	}
-    	Value* X_rs1_val = this->builder.CreateShl(
+    	Value* Xtmp0_val = this->builder.CreateShl(
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_shamt_val));
-    	this->builder.CreateStore(X_rs1_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 90);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4341,12 +4340,11 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t x2_idx_val = 2;
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(x2_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
-    	Value* X_rd_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 91);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4377,8 +4375,8 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	Value* X_rd_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	Value* Xtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 92);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4438,10 +4436,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	Value* X_rd_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
     	    this->gen_reg_load(fld_rd_val + traits<ARCH>::X0, 0),
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(X_rd_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 94);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4471,11 +4469,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t r_idx_val = 1;
-    	Value* X_r_idx_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
     	    cur_pc_val,
     	    this->gen_const(32U, 2));
-    	this->builder.CreateStore(X_r_idx_val, get_reg_ptr(r_idx_val + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
     	Value* PC_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	this->gen_sync(iss::POST_SYNC, 95);
@@ -4532,15 +4529,14 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t x2_idx_val = 2;
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(x2_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
-    	Value* MEM_offs_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEM_offs_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 97);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4695,16 +4691,7 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
                           bb, this->trap_blk, 1);
 }
 
-template<typename ARCH>
-inline llvm::Value* vm_impl<ARCH>::gen_fdispatch(std::string fname, const std::vector<llvm::Value*>& args) {
-        return this->builder.CreateCall(this->mod->getFunction(fname), args);
-}
-
-template<typename ARCH>
-inline llvm::Value* vm_impl<ARCH>::gen_dispatch(std::string name, llvm::Value* val1, llvm::Value* val2, llvm::Value* val3) {
-}
-
-} // namespace rv32imacf
+} // namespace rv32imac
 
 template <>
 std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned short port, bool dump) {

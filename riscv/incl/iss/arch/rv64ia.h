@@ -48,7 +48,7 @@ struct traits<rv64ia> {
 
 	constexpr static char const* const core_type = "RV64IA";
     
-    enum constants {XLEN=64, PCLEN=64, MISA_VAL=2147746049, PGSIZE=4096, PGMASK=4095};
+    enum constants {XLEN=64, PCLEN=64, MISA_VAL=0b10000000000001000000000100000001, PGSIZE=0x1000, PGMASK=0xfff};
 
     constexpr static unsigned FP_REGS_SIZE = 0;
 

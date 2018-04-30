@@ -1,298 +1,298 @@
 import "RV32IBase.core_desc"
 
 InsructionSet RV32D extends RV32IBase{
-	constants {
-		FLEN, FFLAG_MASK := 0x1f
-	} 
-	registers {
-		[31:0]    F[FLEN],  FCSR[32]
-    }	
-	instructions{
-		FLD {
-			encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000111;
-			args_disass:"f%rd$d, %imm%(x%rs1$d)";
-			val offs[XLEN] <= X[rs1]+imm;
-			val res[64] <= MEM[offs]{64};
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FSD {
-			encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0]s | b0100111;
-			args_disass:"f%rs2$d, %imm%(x%rs1$d)";
-			val offs[XLEN] <= X[rs1]+imm;
-			MEM[offs]{64}<=F[rs2]{64};
-		}
-		FMADD.D {
-			encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
-			//F[rd]f<= F[rs1]f * F[rs2]f + F[rs3]f;
-			val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(0, 64), choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FMSUB.D {
-			encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000111;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
-			//F[rd]f<=F[rs1]f * F[rs2]f - F[rs3]f;
-			val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(1, 32), choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};	
-		}
-		FNMADD.D {
-			encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001111;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
-			//F[rd]f<=-F[rs1]f * F[rs2]f + F[rs3]f;
-			val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(2, 32), choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FNMSUB.D {
-			encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
-			//F[rd]f<=-F[rs1]f * F[rs2]f - F[rs3]f;
-			val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(3, 32), choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FADD.D {
-			encoding: b0000001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			// F[rd]f <= F[rs1]f + F[rs2]f;
-			val res[64] <= fdispatch_fadd_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FSUB.D {
-			encoding: b0000101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			// F[rd]f <= F[rs1]f - F[rs2]f;
-			val res[64] <= fdispatch_fsub_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FMUL.D {
-			encoding: b0001001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			// F[rd]f <= F[rs1]f * F[rs2]f;
-			val res[64] <= fdispatch_fmul_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FDIV.D {
-			encoding: b0001101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			// F[rd]f <= F[rs1]f / F[rs2]f;
-			val res[64] <= fdispatch_fdiv_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FSQRT.D {
-			encoding: b0101101 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d";
-			//F[rd]f<=sqrt(F[rs1]f);
-			val res[64] <= fdispatch_fsqrt_d(F[rs1]{64}, choose(rm<7, rm{8}, FCSR{8}));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FSGNJ.D {
-			encoding: b0010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
-			val res[64] <= (F[rs1]{64} & 0x7fffffff) | (F[rs2]{64} & 0x80000000);
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FSGNJN.D {
-			encoding: b0010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
-			val res[64] <= (F[rs1]{64} & 0x7fffffff) | (~F[rs2]{64} & 0x80000000);
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FSGNJX.D {
-			encoding: b0010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
-			val res[64] <= F[rs1]{64} ^ (F[rs2]{64} & 0x80000000);
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FMIN.D  {
-			encoding: b0010101 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
-			//F[rd]f<= choose(F[rs1]f<F[rs2]f, F[rs1]f, F[rs2]f);
-			val res[64] <= fdispatch_fsel_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FMAX.D {
-			encoding: b0010101 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
-			//F[rd]f<= choose(F[rs1]f>F[rs2]f, F[rs1]f, F[rs2]f);
-			val res[64] <= fdispatch_fsel_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32));
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FCVT.S.D {
-			encoding: b0100000 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d";
-			val res[32] <= fdispatch_fconv_d2f(F[rs1], rm{8});
-			// NaN boxing
-			val upper[FLEN] <= -1;
-			F[rd] <= upper<<32 | zext(res, FLEN);
-		}
-		FCVT.D.S {
-			encoding: b0100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, f%rs1$d";
-			val res[64] <= fdispatch_fconv_f2d(F[rs1]{32}, rm{8});
-			if(FLEN==64){
-				F[rd] <= res;
-			} else {
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FEQ.D {
-			encoding: b1010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32));
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FLT.D {
-			encoding: b1010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(2, 32));
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FLE.D {
-			encoding: b1010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
-			X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32));
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FCLASS.D {
-			encoding: b1110001 | b00000 | rs1[4:0] | b001 | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d";
-			X[rd]<=fdispatch_fclass_d(F[rs1]{64});
-		}
-		FCVT.W.D {
-			encoding: b1100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d";
-			X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FCVT.WU.D {
-			encoding: b1100001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"x%rd$d, f%rs1$d";
-			X[rd]<= zext(fdispatch_fcvt_d(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
-			val flags[32] <= fdispatch_fget_flags();
-			FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
-		}
-		FCVT.D.W {
-			encoding: b1101001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, x%rs1$d";
-			val res[64] <= fdispatch_fcvt_d(sext(X[rs1],64), zext(2, 32), rm{8});
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-		FCVT.D.WU {
-			encoding: b1101001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-			args_disass:"f%rd$d, x%rs1$d";
-			val res[64] <=fdispatch_fcvt_d(zext(X[rs1],64), zext(3,32), rm{8});
-			if(FLEN==64)
-				F[rd] <= res;
-			else { // NaN boxing
-				val upper[FLEN] <= -1;
-				F[rd] <= (upper<<64) | res;
-			}
-		}
-	}
+    constants {
+        FLEN, FFLAG_MASK := 0x1f
+    } 
+    registers {
+        [31:0]    F[FLEN],  FCSR[32]
+    }    
+    instructions{
+        FLD {
+            encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000111;
+            args_disass:"f%rd$d, %imm%(x%rs1$d)";
+            val offs[XLEN] <= X[rs1]+imm;
+            val res[64] <= MEM[offs]{64};
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FSD {
+            encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0]s | b0100111;
+            args_disass:"f%rs2$d, %imm%(x%rs1$d)";
+            val offs[XLEN] <= X[rs1]+imm;
+            MEM[offs]{64}<=F[rs2]{64};
+        }
+        FMADD.D {
+            encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
+            //F[rd]f<= F[rs1]f * F[rs2]f + F[rs3]f;
+            val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(0, 64), choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FMSUB.D {
+            encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000111;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
+            //F[rd]f<=F[rs1]f * F[rs2]f - F[rs3]f;
+            val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(1, 32), choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};    
+        }
+        FNMADD.D {
+            encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001111;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
+            //F[rd]f<=-F[rs1]f * F[rs2]f + F[rs3]f;
+            val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(2, 32), choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FNMSUB.D {
+            encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d, f%rs3$d";
+            //F[rd]f<=-F[rs1]f * F[rs2]f - F[rs3]f;
+            val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(3, 32), choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FADD.D {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            // F[rd]f <= F[rs1]f + F[rs2]f;
+            val res[64] <= fdispatch_fadd_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FSUB.D {
+            encoding: b0000101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            // F[rd]f <= F[rs1]f - F[rs2]f;
+            val res[64] <= fdispatch_fsub_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FMUL.D {
+            encoding: b0001001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            // F[rd]f <= F[rs1]f * F[rs2]f;
+            val res[64] <= fdispatch_fmul_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FDIV.D {
+            encoding: b0001101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            // F[rd]f <= F[rs1]f / F[rs2]f;
+            val res[64] <= fdispatch_fdiv_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FSQRT.D {
+            encoding: b0101101 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d";
+            //F[rd]f<=sqrt(F[rs1]f);
+            val res[64] <= fdispatch_fsqrt_d(F[rs1]{64}, choose(rm<7, rm{8}, FCSR{8}));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FSGNJ.D {
+            encoding: b0010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
+            val res[64] <= (F[rs1]{64} & 0x7fffffff) | (F[rs2]{64} & 0x80000000);
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FSGNJN.D {
+            encoding: b0010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
+            val res[64] <= (F[rs1]{64} & 0x7fffffff) | (~F[rs2]{64} & 0x80000000);
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FSGNJX.D {
+            encoding: b0010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
+            val res[64] <= F[rs1]{64} ^ (F[rs2]{64} & 0x80000000);
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FMIN.D  {
+            encoding: b0010101 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
+            //F[rd]f<= choose(F[rs1]f<F[rs2]f, F[rs1]f, F[rs2]f);
+            val res[64] <= fdispatch_fsel_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FMAX.D {
+            encoding: b0010101 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d, f%rs2$d";
+            //F[rd]f<= choose(F[rs1]f>F[rs2]f, F[rs1]f, F[rs2]f);
+            val res[64] <= fdispatch_fsel_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32));
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCVT.S.D {
+            encoding: b0100000 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d";
+            val res[32] <= fdispatch_fconv_d2f(F[rs1], rm{8});
+            // NaN boxing
+            val upper[FLEN] <= -1;
+            F[rd] <= upper<<32 | zext(res, FLEN);
+        }
+        FCVT.D.S {
+            encoding: b0100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, f%rs1$d";
+            val res[64] <= fdispatch_fconv_f2d(F[rs1]{32}, rm{8});
+            if(FLEN==64){
+                F[rd] <= res;
+            } else {
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FEQ.D {
+            encoding: b1010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32));
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FLT.D {
+            encoding: b1010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(2, 32));
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FLE.D {
+            encoding: b1010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d, f%rs2$d";
+            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32));
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCLASS.D {
+            encoding: b1110001 | b00000 | rs1[4:0] | b001 | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d";
+            X[rd]<=fdispatch_fclass_d(F[rs1]{64});
+        }
+        FCVT.W.D {
+            encoding: b1100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d";
+            X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCVT.WU.D {
+            encoding: b1100001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"x%rd$d, f%rs1$d";
+            X[rd]<= zext(fdispatch_fcvt_d(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCVT.D.W {
+            encoding: b1101001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, x%rs1$d";
+            val res[64] <= fdispatch_fcvt_d(sext(X[rs1],64), zext(2, 32), rm{8});
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FCVT.D.WU {
+            encoding: b1101001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f%rd$d, x%rs1$d";
+            val res[64] <=fdispatch_fcvt_d(zext(X[rs1],64), zext(3,32), rm{8});
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+    }
 }
