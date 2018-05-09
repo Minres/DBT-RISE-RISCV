@@ -11,7 +11,7 @@ InsructionSet RV32D extends RV32IBase{
         FLD {
             encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000111;
             args_disass:"f%rd$d, %imm%(x%rs1$d)";
-            val offs[XLEN] <= X[rs1]+imm;
+            val offs[XLEN] <= X[rs1]'s + imm;
             val res[64] <= MEM[offs]{64};
             if(FLEN==64)
                 F[rd] <= res;
@@ -23,7 +23,7 @@ InsructionSet RV32D extends RV32IBase{
         FSD {
             encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0]s | b0100111;
             args_disass:"f%rs2$d, %imm%(x%rs1$d)";
-            val offs[XLEN] <= X[rs1]+imm;
+            val offs[XLEN] <= X[rs1]'s + imm;
             MEM[offs]{64}<=F[rs2]{64};
         }
         FMADD.D {

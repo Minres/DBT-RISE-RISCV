@@ -571,7 +571,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
@@ -612,7 +614,9 @@ private:
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	Value* PC_val = this->builder.CreateAdd(
-    	    cur_pc_val,
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	this->gen_sync(iss::POST_SYNC, 2);
@@ -644,19 +648,47 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	if(fld_rd_val != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	}
-    	Value* ret_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	Value* new_pc_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
-    	Value* PC_val = this->builder.CreateAnd(
-    	    ret_val,
-    	    this->builder.CreateNot(this->gen_const(32U, 0x1)));
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* align_val = this->builder.CreateAnd(
+    	    new_pc_val,
+    	    this->gen_const(32U, 0x1));
+    	{
+    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	    // this->builder.SetInsertPoint(bb);
+    	    this->gen_cond_branch(this->builder.CreateICmp(
+    	        ICmpInst::ICMP_NE,
+    	        align_val,
+    	        this->gen_const(64U, 0)),
+    	        bb_then,
+    	        bb_else);
+    	    this->builder.SetInsertPoint(bb_then);
+    	    {
+    	        this->gen_raise_trap(0, 0);
+    	    }
+    	    this->builder.CreateBr(bbnext);
+    	    this->builder.SetInsertPoint(bb_else);
+    	    {
+    	        if(fld_rd_val != 0){
+    	            Value* Xtmp0_val = this->builder.CreateAdd(
+    	                cur_pc_val,
+    	                this->gen_const(32U, 4));
+    	            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
+    	        }
+    	        Value* PC_val = this->builder.CreateAnd(
+    	            new_pc_val,
+    	            this->builder.CreateNot(this->gen_const(32U, 0x1)));
+    	        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	    }
+    	    this->builder.CreateBr(bbnext);
+    	    bb=bbnext;
+    	}
+    	this->builder.SetInsertPoint(bb);
     	this->gen_sync(iss::POST_SYNC, 3);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -692,7 +724,9 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -734,7 +768,9 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -780,7 +816,9 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            32, true)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -826,7 +864,9 @@ private:
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
     	            32, true)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -868,7 +908,9 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -910,7 +952,9 @@ private:
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -947,7 +991,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->gen_ext(
@@ -988,7 +1034,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->gen_ext(
@@ -1029,7 +1077,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->gen_ext(
@@ -1070,7 +1120,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->gen_ext(
@@ -1111,7 +1163,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->gen_ext(
@@ -1152,7 +1206,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
@@ -1191,7 +1247,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
@@ -1230,7 +1288,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
@@ -1270,7 +1330,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        this->gen_ext(
+    	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
@@ -1376,11 +1438,11 @@ private:
     	
     	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
     	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("XORI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1413,11 +1475,11 @@ private:
     	
     	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
     	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ORI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1450,11 +1512,11 @@ private:
     	
     	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
     	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ANDI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1665,8 +1727,8 @@ private:
     	
     	if(fld_rd_val != 0){
     	    Value* Xtmp0_val = this->builder.CreateSub(
-    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
+    	         this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	         this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -2772,13 +2834,13 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 0)),
+    	            this->gen_const(64U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
     	        {
-    	            int32_t M1_val = (-1);
-    	            uint32_t MMIN_val = (-1) << (32 - 1);
+    	            uint32_t M1_val = - 1;
+    	            uint32_t MMIN_val = - 1 << 32 - 1;
     	            {
     	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
     	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -2901,7 +2963,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 0)),
+    	            this->gen_const(64U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -2968,13 +3030,13 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 0)),
+    	            this->gen_const(64U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
     	        {
-    	            int32_t M1_val = (-1);
-    	            uint32_t MMIN_val = (-1) << (32 - 1);
+    	            uint32_t M1_val = - 1;
+    	            uint32_t MMIN_val = - 1 << 32 - 1;
     	            {
     	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
     	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -3015,7 +3077,7 @@ private:
     	                        this->builder.CreateBr(bbnext);
     	                        this->builder.SetInsertPoint(bb_else);
     	                        {
-    	                            Value* Xtmp1_val = this->builder.CreateSRem(
+    	                            Value* Xtmp1_val = this->builder.CreateURem(
     	                                this->gen_ext(
     	                                    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 3),
     	                                    32,
@@ -3034,7 +3096,7 @@ private:
     	                this->builder.CreateBr(bbnext);
     	                this->builder.SetInsertPoint(bb_else);
     	                {
-    	                    Value* Xtmp2_val = this->builder.CreateSRem(
+    	                    Value* Xtmp2_val = this->builder.CreateURem(
     	                        this->gen_ext(
     	                            this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 2),
     	                            32,
@@ -3101,7 +3163,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, 0)),
+    	            this->gen_const(64U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -3218,7 +3280,7 @@ private:
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
     	        res1_val,
-    	        this->gen_const(32U, 0)),
+    	        this->gen_const(64U, 0)),
     	        bb_then,
     	        bbnext);
     	    this->builder.SetInsertPoint(bb_then);
@@ -3754,7 +3816,7 @@ private:
     	Value* Xtmp0_val = this->builder.CreateAdd(
     	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 71);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3787,10 +3849,10 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
     	Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::X0), false);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 72);
     	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3823,9 +3885,9 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
-    	Value* MEMtmp0_val = this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0);
+    	Value* MEMtmp0_val = this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
@@ -3861,7 +3923,9 @@ private:
     	pc=pc+2;
     	
     	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -3926,7 +3990,9 @@ private:
     	    this->gen_const(32U, 2));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
     	Value* PC_val = this->builder.CreateAdd(
-    	    cur_pc_val,
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	this->gen_sync(iss::POST_SYNC, 76);
@@ -3975,12 +4041,12 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 78);
     	
-    	int32_t fld_imm_val = 0 | (bit_sub<2,5>(instr) << 12) | (signed_bit_sub<12,1>(instr) << 17);
+    	int32_t fld_imm_val = 0 | (bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17);
     	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.LUI x%1$d, 0x%2$05x");
-    	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4065,7 +4131,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
+    	uint8_t rs1_idx_val = fld_rs1_val + 8;
     	Value* Xtmp0_val = this->builder.CreateLShr(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_shamt_val));
@@ -4100,7 +4166,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
+    	uint8_t rs1_idx_val = fld_rs1_val + 8;
     	Value* Xtmp0_val = this->builder.CreateAShr(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_shamt_val));
@@ -4118,12 +4184,12 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 82);
     	
-    	int8_t fld_imm_val = 0 | (bit_sub<2,5>(instr)) | (signed_bit_sub<12,1>(instr) << 5);
+    	uint8_t fld_imm_val = 0 | (bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5);
     	uint8_t fld_rs1_val = 0 | (bit_sub<7,3>(instr));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ANDI x(8+%1$d), 0x%2$05x");
-    	    ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4135,7 +4201,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rs1_idx_val = (fld_rs1_val + 8);
+    	uint8_t rs1_idx_val = fld_rs1_val + 8;
     	Value* Xtmp0_val = this->builder.CreateAnd(
     	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_imm_val));
@@ -4170,10 +4236,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
+    	uint8_t rd_idx_val = fld_rd_val + 8;
     	Value* Xtmp0_val = this->builder.CreateSub(
-    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	     this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
+    	     this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::X0, 0));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 83);
@@ -4205,10 +4271,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
+    	uint8_t rd_idx_val = fld_rd_val + 8;
     	Value* Xtmp0_val = this->builder.CreateXor(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	    this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::X0, 0));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 84);
@@ -4240,10 +4306,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
+    	uint8_t rd_idx_val = fld_rd_val + 8;
     	Value* Xtmp0_val = this->builder.CreateOr(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	    this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::X0, 0));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 85);
@@ -4275,10 +4341,10 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+2;
     	
-    	uint8_t rd_idx_val = (fld_rd_val + 8);
+    	uint8_t rd_idx_val = fld_rd_val + 8;
     	Value* Xtmp0_val = this->builder.CreateAnd(
     	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::X0, 0));
+    	    this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::X0, 0));
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 86);
@@ -4310,7 +4376,9 @@ private:
     	pc=pc+2;
     	
     	Value* PC_val = this->builder.CreateAdd(
-    	    cur_pc_val,
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	this->gen_sync(iss::POST_SYNC, 87);
@@ -4344,10 +4412,12 @@ private:
     	Value* PC_val = this->gen_choose(
     	    this->builder.CreateICmp(
     	        ICmpInst::ICMP_EQ,
-    	        this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -4385,10 +4455,12 @@ private:
     	Value* PC_val = this->gen_choose(
     	    this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	        this->gen_const(32U, 0)),
     	    this->builder.CreateAdd(
-    	        cur_pc_val,
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
     	        this->gen_const(32U, fld_imm_val)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
@@ -4717,14 +4789,16 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* res_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
     	if(64 == 32){
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -4767,7 +4841,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* MEMtmp0_val = this->builder.CreateTrunc(
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::F0, 0),
@@ -4830,8 +4906,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -4843,7 +4919,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -4915,8 +4991,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -4928,7 +5004,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5000,8 +5076,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5013,7 +5089,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5085,8 +5161,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5098,7 +5174,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5161,8 +5237,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5174,7 +5250,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5237,8 +5313,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5250,7 +5326,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5313,8 +5389,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5326,7 +5402,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5389,8 +5465,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5402,7 +5478,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5460,8 +5536,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5473,7 +5549,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5540,7 +5616,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5599,7 +5675,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5656,7 +5732,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5716,7 +5792,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -5784,7 +5860,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6156,7 +6232,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6213,7 +6289,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6296,7 +6372,7 @@ private:
     	    Value* Ftmp0_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6339,14 +6415,14 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
     	Value* res_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8);
     	if(64 == 32){
     	    Value* Ftmp0_val = res_val;
-    	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::F0), false);
+    	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6355,7 +6431,7 @@ private:
     	            res_val,
     	            64,
     	            false));
-    	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::F0), false);
+    	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::F0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 125);
@@ -6389,10 +6465,10 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
     	Value* MEMtmp0_val = this->builder.CreateTrunc(
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::F0, 0),
+    	    this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::F0, 0),
     	    this-> get_type(32) 
     	);
     	this->gen_write_mem(
@@ -6437,7 +6513,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6521,14 +6597,16 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* res_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 64/8);
     	if(64 == 64){
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6568,7 +6646,9 @@ private:
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	    this->gen_ext(
+    	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
+    	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	Value* MEMtmp0_val = this->builder.CreateTrunc(
     	    this->gen_reg_load(fld_rs2_val + traits<ARCH>::F0, 0),
@@ -6631,8 +6711,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6644,7 +6724,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6713,8 +6793,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6726,7 +6806,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6795,8 +6875,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6808,7 +6888,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6877,8 +6957,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6890,7 +6970,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -6950,8 +7030,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6963,7 +7043,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7023,8 +7103,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7036,7 +7116,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7096,8 +7176,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7109,7 +7189,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7169,8 +7249,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7182,7 +7262,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7237,8 +7317,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(8U, fld_rm_val),
-    	            this->gen_const(8U, 7)),
+    	            this->gen_const(64U, fld_rm_val),
+    	            this->gen_const(64U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7250,7 +7330,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7314,7 +7394,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7370,7 +7450,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7424,7 +7504,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7481,7 +7561,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7546,7 +7626,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -7597,7 +7677,7 @@ private:
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0), 
     	    this->gen_const(8U, fld_rm_val)
     	});
-    	int64_t upper_val = (-1);
+    	uint64_t upper_val = - 1;
     	Value* Ftmp0_val = this->builder.CreateOr(
     	    this->builder.CreateShl(
     	        this->gen_const(64U, upper_val),
@@ -7649,7 +7729,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -8010,7 +8090,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -8064,7 +8144,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
@@ -8104,20 +8184,20 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
     	Value* res_val = this->gen_read_mem(traits<ARCH>::MEM, offs_val, 64/8);
     	if(64 == 64){
     	    Value* Ftmp0_val = res_val;
-    	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::F0), false);
+    	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),
     	            this->gen_const(64U, 64)),
     	        res_val);
-    	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr((fld_rd_val + 8) + traits<ARCH>::F0), false);
+    	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::F0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 155);
@@ -8151,10 +8231,10 @@ private:
     	pc=pc+2;
     	
     	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load((fld_rs1_val + 8) + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(fld_rs1_val + 8 + traits<ARCH>::X0, 0),
     	    this->gen_const(32U, fld_uimm_val));
     	Value* MEMtmp0_val = this->builder.CreateTrunc(
-    	    this->gen_reg_load((fld_rs2_val + 8) + traits<ARCH>::F0, 0),
+    	    this->gen_reg_load(fld_rs2_val + 8 + traits<ARCH>::F0, 0),
     	    this-> get_type(64) 
     	);
     	this->gen_write_mem(
@@ -8199,7 +8279,7 @@ private:
     	    Value* Ftmp0_val = res_val;
     	    this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	} else {
-    	    int64_t upper_val = (-1);
+    	    uint64_t upper_val = - 1;
     	    Value* Ftmp1_val = this->builder.CreateOr(
     	        this->builder.CreateShl(
     	            this->gen_const(64U, upper_val),

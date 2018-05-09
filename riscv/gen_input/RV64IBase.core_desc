@@ -5,19 +5,19 @@ InsructionSet RV64IBase extends RV32IBase {
         LWU { //    80000104: 0000ef03            lwu t5,0(ra)
             encoding: imm[11:0]s | rs1[4:0] | b110 | rd[4:0] | b0000011;
             args_disass:"x%rd$d, %imm%(x%rs1$d)";
-            val offs[XLEN] <= X[rs1]+imm;
+            val offs[XLEN] <= X[rs1]'s+imm;
             if(rd!=0) X[rd]<=zext(MEM[offs]{32});
         }
         LD{
             encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000011;
             args_disass:"x%rd$d, %imm%(x%rs1$d)";
-            val offs[XLEN] <= X[rs1]+imm;
+            val offs[XLEN] <= X[rs1]'s + imm;
             if(rd!=0) X[rd]<=sext(MEM[offs]{64});
         }
         SD{
             encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0]s | b0100011;
             args_disass:"x%rs2$d, %imm%(x%rs1$d)";
-            val offs[XLEN] <= X[rs1] + imm;
+            val offs[XLEN] <= X[rs1]'s + imm;
             MEM[offs]{64} <= X[rs2];
         }
         SLLI {
@@ -39,7 +39,7 @@ InsructionSet RV64IBase extends RV32IBase {
             encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b0011011;
             args_disass:"x%rd$d, x%rs1$d, %imm%";
             if(rd != 0){
-                val res[32] <= X[rs1]{32} + imm;
+                val res[32] <= X[rs1]{32}'s + imm;
                 X[rd] <= sext(res);
             } 
         }

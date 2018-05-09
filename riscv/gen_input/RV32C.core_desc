@@ -15,9 +15,14 @@ InsructionSet RV32IC {
         JALR(no_cont){ // overwriting the implementation if rv32i, alignment does not need to be word
             encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
             args_disass: "x%rd$d, x%rs1$d, 0x%imm$x";
-            if(rd!=0) X[rd] <= PC+4;
-            val ret[XLEN] <= X[rs1]+ imm;
-            PC<=ret& ~0x1;
+            val new_pc[XLEN] <= X[rs1]s+ imm;
+            val align[XLEN] <= new_pc & 0x1;
+            if(align != 0){
+                raise(0, 0);
+            } else {
+                if(rd!=0) X[rd] <= PC+4;
+                PC<=new_pc & ~0x1;
+            }
         }
         C.ADDI4SPN { //(RES, imm=0)
             encoding: b000 | imm[5:4] | imm[9:6] | imm[2:2] | imm[3:3] | rd[2:0] | b00;
@@ -40,7 +45,7 @@ InsructionSet RV32IC {
         C.ADDI {//(RV32)
             encoding:b000 | imm[5:5]s | rs1[4:0] | imm[4:0]s | b01;
             args_disass: "x%rs1$d, 0x%imm$05x";
-            X[rs1] <= X[rs1] + imm;
+            X[rs1] <= X[rs1]'s + imm;
         }
         C.NOP {
             encoding:b000 | b0 | b00000 | b00000 | b01;
@@ -50,7 +55,7 @@ InsructionSet RV32IC {
             encoding: b001 | imm[11:11]s | imm[4:4]s | imm[9:8]s | imm[10:10]s | imm[6:6]s | imm[7:7]s | imm[3:1]s | imm[5:5]s | b01;
             args_disass: "0x%imm$05x";
             X[1] <= PC+2;
-            PC<=PC+imm;
+            PC<=PC's+imm;
         }
         C.LI {//(RV32)
             encoding:b010 | imm[5:5]s | rd[4:0] | imm[4:0]s | b01;
@@ -60,7 +65,7 @@ InsructionSet RV32IC {
         }
         // order matters here as C.ADDI16SP overwrites C.LUI vor rd==2
         C.LUI {//(RV32)
-            encoding:b011 | imm[17:17]s | rd[4:0] | imm[16:12]s | b01;
+            encoding:b011 | imm[17:17] | rd[4:0] | imm[16:12]s | b01;
             args_disass: "x%rd$d, 0x%imm$05x";
             if(rd == 0) raise(0, 2);   //TODO: should it be handled as trap?
             if(imm == 0) raise(0, 2);   //TODO: should it be handled as trap?
@@ -84,7 +89,7 @@ InsructionSet RV32IC {
             X[rs1_idx] <= shra(X[rs1_idx], shamt);
         }
         C.ANDI {//(RV32)
-            encoding:b100 | imm[5:5]s | b10 | rs1[2:0] | imm[4:0]s | b01;
+            encoding:b100 | imm[5:5] | b10 | rs1[2:0] | imm[4:0] | b01;
             args_disass: "x(8+%rs1$d), 0x%imm$05x";
             val rs1_idx[5] <= rs1 + 8;
             X[rs1_idx] <= X[rs1_idx] & imm;
@@ -116,17 +121,17 @@ InsructionSet RV32IC {
         C.J(no_cont) {//(RV32)
             encoding:b101 | imm[11:11]s | imm[4:4]s | imm[9:8]s | imm[10:10]s | imm[6:6]s | imm[7:7]s | imm[3:1]s | imm[5:5]s | b01;
             args_disass: "0x%imm$05x";
-            PC<=PC+imm;
+            PC<=PC's+imm;
         }
         C.BEQZ(no_cont,cond) {//(RV32)
             encoding:b110 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s |imm[2:1]s | imm[5:5]s | b01;
             args_disass: "x(8+%rs1$d), 0x%imm$05x";
-            PC<=choose(X[rs1+8]==0, PC+imm, PC+2);
+            PC<=choose(X[rs1+8]==0, PC's+imm, PC+2);
         }
         C.BNEZ(no_cont,cond) {//(RV32)
             encoding:b111 | imm[8:8]s | imm[4:3]s | rs1[2:0] | imm[7:6]s | imm[2:1]s | imm[5:5]s | b01;
             args_disass: "x(8+%rs1$d), 0x%imm$05x";
-            PC<=choose(X[rs1+8]!=0, PC+imm, PC+2);
+            PC<=choose(X[rs1+8]!=0, PC's+imm, PC+2);
         }
         C.SLLI {//(RV32)
             encoding:b000 | b0 | rs1[4:0] | shamt[4:0] | b10;
