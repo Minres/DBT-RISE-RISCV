@@ -92,8 +92,7 @@ protected:
         vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
 
-    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
-                                   unsigned size) const {
+    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal, unsigned size) {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
@@ -1144,6 +1143,8 @@ private:
     	        64, true),
     	    this->gen_const(64U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 17);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1209,6 +1210,7 @@ private:
     	            new_pc_val,
     	            this->builder.CreateNot(this->gen_const(64U, 0x1)));
     	        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	        this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	    }
     	    this->builder.CreateBr(bbnext);
     	    bb=bbnext;
@@ -1258,6 +1260,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 19);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1302,6 +1306,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 20);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1350,6 +1356,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 21);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1398,6 +1406,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 22);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1442,6 +1452,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 23);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -1486,6 +1498,8 @@ private:
     	        this->gen_const(64U, 4)),
     	    64);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 24);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -2528,6 +2542,7 @@ private:
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 1),
     	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(64)));
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 50);
     	this->gen_trap_check(this->leave_blk);
@@ -3683,7 +3698,7 @@ private:
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
     	        res1_val,
-    	        this->gen_const(64U, 0)),
+    	        this->gen_const(32U, 0)),
     	        bb_then,
     	        bbnext);
     	    this->builder.SetInsertPoint(bb_then);
@@ -4255,7 +4270,6 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     }
     if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
-    typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;
     auto lut_val = extract_fields(insn);
     auto f = qlut[insn & 0x3][lut_val];
@@ -4273,6 +4287,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
@@ -4282,6 +4297,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
     this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
@@ -4294,8 +4310,11 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    std::vector<llvm::Value *> args{
+    	this->core_ptr,
+    	this->adj_to64(trap_state_val),
+        this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
     this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
     auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     this->builder.CreateRet(trap_addr_val);

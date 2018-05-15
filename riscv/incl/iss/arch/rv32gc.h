@@ -124,6 +124,7 @@ struct traits<rv32gc> {
         TRAP_STATE,
         PENDING_TRAP,
         MACHINE_STATE,
+        LAST_BRANCH,
         ICOUNT
     };
 
@@ -138,12 +139,12 @@ struct traits<rv32gc> {
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, 71> RV32GC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,32,32,64}};
+        constexpr std::array<const uint32_t, 72> RV32GC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,32,32,32,64}};
         return RV32GC_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, 72> RV32GC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,280,288,296,304,312,320,328,336,344,352,360,368,376,384,392,396,400,404,408,416,424}};
+    	constexpr std::array<const uint32_t, 73> RV32GC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,280,288,296,304,312,320,328,336,344,352,360,368,376,384,392,396,400,404,408,412,416,424}};
         return RV32GC_reg_byte_offset[r];
     }
 
@@ -190,6 +191,9 @@ struct rv32gc: public arch_if {
     virtual phys_addr_t virt2phys(const iss::addr_t& addr);
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
+
+    inline
+    uint32_t get_last_branch(){return reg.last_branch;}
 
 protected:
     struct RV32GC_regs {
@@ -260,7 +264,7 @@ protected:
         uint64_t F31 = 0;
         uint32_t FCSR = 0;
         uint32_t NEXT_PC = 0;
-        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;
+        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0, last_branch = 0;
         uint64_t icount = 0;
     } reg;
 

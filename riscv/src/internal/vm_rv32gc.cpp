@@ -92,8 +92,7 @@ protected:
         vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
 
-    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
-                                   unsigned size) const {
+    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal, unsigned size) {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
@@ -619,6 +618,8 @@ private:
     	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 2);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -664,7 +665,7 @@ private:
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
     	        align_val,
-    	        this->gen_const(64U, 0)),
+    	        this->gen_const(32U, 0)),
     	        bb_then,
     	        bb_else);
     	    this->builder.SetInsertPoint(bb_then);
@@ -684,6 +685,7 @@ private:
     	            new_pc_val,
     	            this->builder.CreateNot(this->gen_const(32U, 0x1)));
     	        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	        this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	    }
     	    this->builder.CreateBr(bbnext);
     	    bb=bbnext;
@@ -733,6 +735,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 4);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -777,6 +781,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 5);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -825,6 +831,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 6);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -873,6 +881,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 7);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -917,6 +927,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 8);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -961,6 +973,8 @@ private:
     	        this->gen_const(32U, 4)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 9);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -2126,6 +2140,7 @@ private:
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 1),
     	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 38);
     	this->gen_trap_check(this->leave_blk);
@@ -2834,7 +2849,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 0)),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -2963,7 +2978,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 0)),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -3030,7 +3045,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 0)),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -3163,7 +3178,7 @@ private:
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
     	            this->gen_reg_load(fld_rs2_val + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, 0)),
+    	            this->gen_const(32U, 0)),
     	            bb_then,
     	            bb_else);
     	        this->builder.SetInsertPoint(bb_then);
@@ -3280,7 +3295,7 @@ private:
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
     	        res1_val,
-    	        this->gen_const(64U, 0)),
+    	        this->gen_const(32U, 0)),
     	        bb_then,
     	        bbnext);
     	    this->builder.SetInsertPoint(bb_then);
@@ -3995,6 +4010,8 @@ private:
     	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 76);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4381,6 +4398,8 @@ private:
     	        32, true),
     	    this->gen_const(32U, fld_imm_val));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 87);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4424,6 +4443,8 @@ private:
     	        this->gen_const(32U, 2)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 88);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4467,6 +4488,8 @@ private:
     	        this->gen_const(32U, 2)),
     	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 89);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4600,6 +4623,7 @@ private:
     	
     	Value* PC_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 93);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4667,6 +4691,7 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
     	Value* PC_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 95);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(iss::vm::BRANCH, nullptr);
@@ -4906,8 +4931,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -4991,8 +5016,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5076,8 +5101,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5161,8 +5186,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5237,8 +5262,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5313,8 +5338,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5389,8 +5414,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5465,8 +5490,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -5536,8 +5561,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6711,8 +6736,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6793,8 +6818,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6875,8 +6900,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -6957,8 +6982,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7030,8 +7055,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7103,8 +7128,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7176,8 +7201,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7249,8 +7274,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -7317,8 +7342,8 @@ private:
     	    this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
-    	            this->gen_const(64U, fld_rm_val),
-    	            this->gen_const(64U, 7)),
+    	            this->gen_const(8U, fld_rm_val),
+    	            this->gen_const(8U, 7)),
     	        this->gen_const(8U, fld_rm_val),
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(traits<ARCH>::FCSR, 0),
@@ -8403,7 +8428,6 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     }
     if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
-    typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;
     auto lut_val = extract_fields(insn);
     auto f = qlut[insn & 0x3][lut_val];
@@ -8421,6 +8445,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
@@ -8430,6 +8455,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
     this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
@@ -8442,8 +8468,11 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    std::vector<llvm::Value *> args{
+    	this->core_ptr,
+    	this->adj_to64(trap_state_val),
+        this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
     this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
     auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     this->builder.CreateRet(trap_addr_val);

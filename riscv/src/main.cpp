@@ -41,7 +41,7 @@
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv32gc.h>
 #include <iss/arch/rv64ia.h>
-#include <iss/jit/MCJIThelper.h>
+#include <iss/jit/jit_helper.h>
 #include <iss/log_categories.h>
 #include <iss/plugin/instruction_count.h>
 #include <iss/plugin/cycle_estimate.h>
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
         ("logfile,f", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
         ("gdb-port,g", po::value<unsigned>()->default_value(0), "enable gdb server and specify port to use")
-        ("instructions,i", po::value<int64_t>()->default_value(-1), "max. number of instructions to simulate")
+        ("instructions,i", po::value<uint64_t>()->default_value(std::numeric_limits<uint64_t>::max()), "max. number of instructions to simulate")
         ("reset,r", po::value<std::string>(), "reset address")
         ("dump-ir", "dump the intermediate representation")
         ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
         }
 		vm->reset(start_address);
-        auto cycles = clim["instructions"].as<int64_t>();
+        auto cycles = clim["instructions"].as<uint64_t>();
         res = vm->start(cycles, dump);
     } catch (std::exception &e) {
         LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit" << std::endl;

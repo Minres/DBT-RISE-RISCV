@@ -50,6 +50,9 @@
 #include <array>
 #include <type_traits>
 
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 namespace iss {
 namespace arch {
 
@@ -647,14 +650,14 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
     try {
         switch (addr.space) {
         case traits<BASE>::MEM: {
-            if ((addr.access == iss::access_type::FETCH || addr.access == iss::access_type::DEBUG_FETCH) && (addr.val & 0x1) == 1) {
+            if (unlikely((addr.access == iss::access_type::FETCH || addr.access == iss::access_type::DEBUG_FETCH) && (addr.val & 0x1) == 1)) {
                 fault_data = addr.val;
                 if (addr.access && iss::access_type::DEBUG) throw trap_access(0, addr.val);
                 this->reg.trap_state = (1 << 31); // issue trap 0
                 return iss::Err;
             }
             try {
-                if ((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK)) { // we may cross a page boundary
+                if (unlikely((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK))) { // we may cross a page boundary
                     vm_info vm = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
                     if (vm.levels != 0) { // VM is active
                         auto split_addr = (addr.val + length) & ~PGMASK;
@@ -666,7 +669,7 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
                     }
                 }
                 auto res = read_mem( BASE::v2p(addr), length, data);
-                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
+                if (unlikely(res != iss::Ok)) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 5 (load access fault
                 return res;
             } catch (trap_access &ta) {
                 this->reg.trap_state = (1 << 31) | ta.id;
@@ -738,14 +741,14 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
     try {
         switch (addr.space) {
         case traits<BASE>::MEM: {
-            if ((addr.access && iss::access_type::FETCH) && (addr.val & 0x1) == 1) {
+            if (unlikely((addr.access && iss::access_type::FETCH) && (addr.val & 0x1) == 1)) {
                 fault_data = addr.val;
                 if (addr.access && iss::access_type::DEBUG) throw trap_access(0, addr.val);
                 this->reg.trap_state = (1 << 31); // issue trap 0
                 return iss::Err;
             }
             try {
-                if ((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK)) { // we may cross a page boundary
+                if (unlikely((addr.val & ~PGMASK) != ((addr.val + length - 1) & ~PGMASK))) { // we may cross a page boundary
                     vm_info vm = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
                     if (vm.levels != 0) { // VM is active
                         auto split_addr = (addr.val + length) & ~PGMASK;
@@ -757,7 +760,7 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                     }
                 }
                 auto res = write_mem(BASE::v2p(addr), length, data);
-                if (res != iss::Ok) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
+                if (unlikely(res != iss::Ok)) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
                 return res;
             } catch (trap_access &ta) {
                 this->reg.trap_state = (1 << 31) | ta.id;

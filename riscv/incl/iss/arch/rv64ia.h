@@ -91,6 +91,7 @@ struct traits<rv64ia> {
         TRAP_STATE,
         PENDING_TRAP,
         MACHINE_STATE,
+        LAST_BRANCH,
         ICOUNT
     };
 
@@ -105,12 +106,12 @@ struct traits<rv64ia> {
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
     constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, 38> RV64IA_reg_size{{64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,64}};
+        constexpr std::array<const uint32_t, 39> RV64IA_reg_size{{64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,32,64}};
         return RV64IA_reg_size[r];
     }
 
     constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, 39> RV64IA_reg_byte_offset{{0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,288,296}};
+    	constexpr std::array<const uint32_t, 40> RV64IA_reg_byte_offset{{0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,284,288,296}};
         return RV64IA_reg_byte_offset[r];
     }
 
@@ -158,6 +159,9 @@ struct rv64ia: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
+    inline
+    uint32_t get_last_branch(){return reg.last_branch;}
+
 protected:
     struct RV64IA_regs {
         uint64_t X0 = 0;
@@ -194,7 +198,7 @@ protected:
         uint64_t X31 = 0;
         uint64_t PC = 0;
         uint64_t NEXT_PC = 0;
-        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0;
+        uint32_t trap_state = 0, pending_trap = 0, machine_state = 0, last_branch = 0;
         uint64_t icount = 0;
     } reg;
 

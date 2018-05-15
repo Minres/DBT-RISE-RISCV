@@ -35,7 +35,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <boost/program_options.hpp>
-#include <iss/jit/MCJIThelper.h>
 #include <iss/log_categories.h>
 #include <sstream>
 #include <sysc/SiFive/platform.h>
@@ -44,6 +43,7 @@
 #include "scc/scv_tr_db.h"
 #include "scc/tracer.h"
 #include <cci_utils/broker.h>
+#include <iss/jit/jit_helper.h>
 
 using namespace sysc;
 namespace po = boost::program_options;
