@@ -12,7 +12,7 @@
 
 [options]
     Poco:shared=True
-    Seasocks:shared=False
+    Seasocks:shared=True
     SystemC:stdcxx=14
     SystemC:shared=True
     SystemCVerification:stdcxx=14
