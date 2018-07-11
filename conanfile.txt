@@ -4,7 +4,7 @@
     Seasocks/1.3.2@minres/stable
     SystemC/2.3.2@minres/stable
     SystemCVerification/2.0.1@minres/stable
-    SystemC-CCI/0.9.0@minres/stable
+    SystemC-CCI/1.0.0@minres/stable
 
 [generators]
     cmake
