@@ -50,3 +50,39 @@ DBT-RISE-RISCV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 compiler.libcxx=libstdc++11
 ```
 in $HOME/.conan/profiles/default
+
+** Detailed Setup steps**
+
+*** prepare Ubuntu 18.04 ***
+
+```
+    sudo apt-get install -y git python-pip build-essential cmake libloki-dev zlib1g-dev libncurses5-dev \	
+        libboost-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev llvm-dev llvm-doc
+    pip install --user conan
+```
+
+*** prepare Fedora 28 ***
+
+```
+    #prepare system
+    dnf install @development-tools gcc-c++ boost-devel zlib-devel loki-lib-devel cmake python2 python3 llvm-devel llvm-static
+    #install conan
+    pip3 install --user conan
+    export PATH=${PATH}:$HOME/.local/bin
+```
+ 
+*** Build the ISS ***
+
+```
+    # configure conan
+    conan remote add minres https://api.bintray.com/conan/minres/conan-repo
+    conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
+    conan profile new default --detect
+    # clone and build DBT-RISE-RISCV
+    git clone --recursive https://github.com/Minres/DBT-RISE-RISCV.git
+    cd DBT-RISE-RISCV/
+    git checkout develop
+    mkdir build;cd build
+    MAKE_FLAGS="-j4" cmake ..
+    make -j4
+```
