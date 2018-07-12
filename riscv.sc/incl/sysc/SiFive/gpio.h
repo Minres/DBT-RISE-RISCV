@@ -38,8 +38,10 @@
 #define _GPIO_H_
 
 #include "scc/tlm_target.h"
+#include "scc/signal_target_mixin.h"
+#include "scc/signal_initiator_mixin.h"
+#include <tlm/tlm_signal.h>
 #include "cci_configuration"
-#include <sysc/communication/sc_signal_rv_ports.h>
 
 namespace sysc {
 
@@ -51,7 +53,15 @@ public:
     SC_HAS_PROCESS(gpio);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
-    sc_core::sc_inout_rv<32> pins_io;
+    // sc_core::sc_inout_rv<32> pins_io;
+
+    sc_core::sc_vector<scc::tlm_signal_logic_out> pins_o;
+    sc_core::sc_vector<scc::tlm_signal_logic_in>  pins_i;
+
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_out> iof0_o;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_out> iof1_o;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_in>  iof0_i;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_in>  iof1_i;
 
     gpio(sc_core::sc_module_name nm);
     virtual ~gpio() override; // need to keep it in source file because of fwd declaration of gpio_regs
@@ -62,14 +72,13 @@ protected:
     void clock_cb();
     void reset_cb();
     void update_pins();
-    void pins_cb();
     void before_end_of_elaboration();
+    void pin_input(unsigned int tag, tlm::tlm_signal_gp<sc_logic>& gp, sc_core::sc_time& delay);
+    void forward_pin_input(unsigned int tag, tlm::tlm_signal_gp<sc_logic>& gp);
+    void iof_input(unsigned int tag, unsigned iof_idx, tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay);
     sc_core::sc_time clk;
     std::unique_ptr<gpio_regs> regs;
     std::shared_ptr<sysc::WsHandler> handler;
-
-private:
-	void update_value_reg();
 };
 
 } /* namespace sysc */

@@ -37,7 +37,7 @@
 #include <boost/program_options.hpp>
 #include <iss/log_categories.h>
 #include <sstream>
-#include <sysc/SiFive/platform.h>
+#include <sysc/General/system.h>
 #include "scc/configurer.h"
 #include "scc/report.h"
 #include "scc/scv_tr_db.h"
@@ -123,7 +123,7 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // instantiate top level
     ///////////////////////////////////////////////////////////////////////////
-    platform i_simple_system("i_simple_system");
+    sysc::system i_system("i_system");
     // sr_report_handler::add_sc_object_to_filter(&i_simple_system.i_master,
     // sc_core::SC_WARNING, sc_core::SC_MEDIUM);
     if(vm["dump-config"].as<std::string>().size()>0){
@@ -134,20 +134,20 @@ int sc_main(int argc, char *argv[]) {
 	cfg.configure();
     // overwrite with command line settings
     if (vm["gdb-port"].as<unsigned short>())
-    	cfg.set_value("i_simple_system.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
+    	cfg.set_value("i_system.i_platform.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
     if (vm.count("dump-ir"))
-    	cfg.set_value("i_simple_system.i_core_complex.dump_ir", vm.count("dump-ir") != 0);
+    	cfg.set_value("i_system.i_platform.i_core_complex.dump_ir", vm.count("dump-ir") != 0);
     if (vm.count("elf"))
-    	cfg.set_value("i_simple_system.i_core_complex.elf_file", vm["elf"].as<std::string>());
+    	cfg.set_value("i_system.i_platform.i_core_complex.elf_file", vm["elf"].as<std::string>());
     if (vm.count("quantum"))
         tlm::tlm_global_quantum::instance().set(sc_core::sc_time(vm["quantum"].as<unsigned>(), sc_core::SC_NS));
     if (vm.count("reset")) {
         auto str = vm["reset"].as<std::string>();
         uint64_t start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
-        cfg.set_value("i_simple_system.i_core_complex.reset_address", start_address);
+        cfg.set_value("i_system.i_platform.i_core_complex.reset_address", start_address);
     }
     if (vm.count("disass")) {
-        cfg.set_value("i_simple_system.i_core_complex.enable_disass", true);
+        cfg.set_value("i_system.i_platform.i_core_complex.enable_disass", true);
         LOGGER(disass)::reporting_level() = logging::INFO;
         auto file_name = vm["disass"].as<std::string>();
         if (file_name.length() > 0) {

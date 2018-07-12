@@ -47,7 +47,8 @@ const int lfclk_mutiplier = 1 << 12;
 clint::clint(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , tlm_target<>(clk)
-, NAMED(clk_i)
+, NAMED(tlclk_i)
+, NAMED(lfclk_i)
 , NAMED(rst_i)
 , NAMED(mtime_int_o)
 , NAMED(msip_int_o)
@@ -55,7 +56,7 @@ clint::clint(sc_core::sc_module_name nm)
 , cnt_fraction(0) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
-    sensitive << clk_i;
+    sensitive << tlclk_i<<lfclk_i;
     SC_METHOD(reset_cb);
     sensitive << rst_i;
     dont_initialize();
@@ -84,7 +85,7 @@ clint::clint(sc_core::sc_module_name nm)
 
 void clint::clock_cb() {
     update_mtime();
-    this->clk = clk_i.read();
+    clk = lfclk_i.read();
     update_mtime();
 }
 
@@ -101,20 +102,23 @@ void clint::reset_cb() {
 }
 
 void clint::update_mtime() {
-    auto diff = (sc_core::sc_time_stamp() - last_updt) / clk;
-    auto diffi = (int)diff;
-    regs->r_mtime += (diffi + cnt_fraction) / lfclk_mutiplier;
-    cnt_fraction = (cnt_fraction + diffi) % lfclk_mutiplier;
-    mtime_evt.cancel();
-    if (regs->r_mtimecmp > 0)
-    	if(regs->r_mtimecmp > regs->r_mtime && clk > sc_core::SC_ZERO_TIME) {
-    		sc_core::sc_time next_trigger = (clk * lfclk_mutiplier) * (regs->r_mtimecmp - regs->mtime) - cnt_fraction * clk;
-    		LOG(DEBUG)<<"Timer fires at "<< sc_time_stamp()+next_trigger;
-    		mtime_evt.notify(next_trigger);
-    		mtime_int_o.write(false);
-    	} else
-    		mtime_int_o.write(true);
-    last_updt = sc_core::sc_time_stamp();
+    if(clk>SC_ZERO_TIME){
+        uint64_t elapsed_clks = (sc_time_stamp()-last_updt)/clk; // get the number of clock periods since last invocation
+        last_updt += elapsed_clks*clk; // increment the last_updt timestamp by the number of clocks
+        if(elapsed_clks){ // update mtime reg if we have more than 0 elapsed clk periods
+            regs->r_mtime+=elapsed_clks;
+            mtime_evt.cancel();
+            if (regs->r_mtimecmp > 0)
+                if(regs->r_mtimecmp > regs->r_mtime && clk > sc_core::SC_ZERO_TIME) {
+                    sc_core::sc_time next_trigger = (clk * lfclk_mutiplier) * (regs->r_mtimecmp - regs->mtime) - cnt_fraction * clk;
+                    LOG(DEBUG)<<"Timer fires at "<< sc_time_stamp()+next_trigger;
+                    mtime_evt.notify(next_trigger);
+                    mtime_int_o.write(false);
+                } else
+                    mtime_int_o.write(true);
+        }
+    } else
+        last_updt = sc_time_stamp();
 }
 
 } /* namespace sysc */

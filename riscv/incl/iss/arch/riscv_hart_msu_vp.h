@@ -697,7 +697,7 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
         } break;
         case traits<BASE>::RES: {
             auto it = atomic_reservation.find(addr.val);
-            if (it != atomic_reservation.end() && (*it).second != 0) {
+            if (it != atomic_reservation.end() && it->second != 0) {
                 memset(data, 0xff, length);
                 atomic_reservation.erase(addr.val);
             } else

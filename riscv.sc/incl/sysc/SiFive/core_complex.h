@@ -109,7 +109,8 @@ public:
     ~core_complex();
 
     inline void sync(uint64_t cycle) {
-        quantum_keeper.inc(curr_clk*(cycle-last_sync_cycle));
+        auto time = curr_clk*(cycle-last_sync_cycle);
+        quantum_keeper.inc(time);
         if (quantum_keeper.need_sync()) {
             wait(quantum_keeper.get_local_time());
             quantum_keeper.reset();

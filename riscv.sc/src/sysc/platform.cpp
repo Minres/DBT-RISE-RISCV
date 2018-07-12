@@ -40,6 +40,8 @@ namespace sysc {
 
 platform::platform(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
+, NAMED(pins_o, 32)
+, NAMED(pins_i, 32)
 , NAMED(i_core_complex)
 , NAMED(i_router, 12, 1)
 , NAMED(i_uart0)
@@ -54,12 +56,15 @@ platform::platform(sc_core::sc_module_name nm)
 , NAMED(i_clint)
 , NAMED(i_mem_qspi)
 , NAMED(i_mem_ram)
-, NAMED(s_clk)
+, NAMED(s_tlclk)
 , NAMED(s_rst)
 , NAMED(s_global_int, 256)
 , NAMED(s_local_int, 16)
 , NAMED(s_core_int)
-, NAMED(s_gpio_pins) {
+, NAMED(s_dummy, 16)
+, NAMED(s_dummy_sck_i, 16)
+, NAMED(s_dummy_sck_o, 16)
+{
     i_core_complex.initiator(i_router.target[0]);
     size_t i = 0;
     for (const auto &e : e300_plat_map) {
@@ -72,17 +77,18 @@ platform::platform(sc_core::sc_module_name nm)
     i_router.initiator.at(++i)(i_mem_ram.target);
     i_router.add_target_range(i, 0x80000000, 128_kB);
 
-    i_uart0.clk_i(s_clk);
-    i_uart1.clk_i(s_clk);
-    i_qspi0.clk_i(s_clk);
-    i_qspi1.clk_i(s_clk);
-    i_qspi2.clk_i(s_clk);
-    i_gpio0.clk_i(s_clk);
-    i_plic.clk_i(s_clk);
-    i_aon.clk_i(s_clk);
-    i_prci.clk_i(s_clk);
-    i_clint.clk_i(s_clk);
-    i_core_complex.clk_i(s_clk);
+    i_uart0.clk_i(s_tlclk);
+    i_uart1.clk_i(s_tlclk);
+    i_qspi0.clk_i(s_tlclk);
+    i_qspi1.clk_i(s_tlclk);
+    i_qspi2.clk_i(s_tlclk);
+    i_gpio0.clk_i(s_tlclk);
+    i_plic.clk_i(s_tlclk);
+    i_aon.clk_i(s_tlclk);
+    i_prci.clk_i(s_tlclk);
+    i_clint.tlclk_i(s_tlclk);
+    i_clint.lfclk_i(s_lfclk);
+    i_core_complex.clk_i(s_tlclk);
 
     i_uart0.rst_i(s_rst);
     i_uart1.rst_i(s_rst);
@@ -107,13 +113,25 @@ platform::platform(sc_core::sc_module_name nm)
     i_core_complex.global_irq_i(s_core_int);
     i_core_complex.local_irq_i(s_local_int);
 
-    i_gpio0.pins_io(s_gpio_pins);
+    pins_i(i_gpio0.pins_i);
+    i_gpio0.pins_o(pins_o);
+
+    i_gpio0.iof0_i[17](i_uart0.tx_o);
+    i_uart0.rx_i(i_gpio0.iof0_o[16]);
+    i_uart0.irq_o(s_global_int[3]);
+
+    s_dummy_sck_i[0](i_uart1.tx_o);
+    i_uart1.rx_i(s_dummy_sck_o[0]);
+    i_uart1.irq_o(s_dummy[0]);
 
     SC_THREAD(gen_reset);
+
+    for(auto& sock:s_dummy_sck_i) sock.error_if_no_callback=false;
 }
 
 void platform::gen_reset() {
-    s_clk = 10_ns;
+    s_tlclk = 10_ns;
+    s_lfclk = 30517_ns;
     s_rst = true;
     wait(10_ns);
     s_rst = false;

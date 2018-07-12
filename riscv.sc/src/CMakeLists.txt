@@ -1,5 +1,5 @@
 # library files
-FILE(GLOB RiscVSCHeaders *.h)
+FILE(GLOB RiscVSCHeaders *.h */*.h)
 FILE(GLOB RiscvSCSources sysc/*.cpp)
 
 set(LIB_HEADERS ${RiscVSCHeaders} )

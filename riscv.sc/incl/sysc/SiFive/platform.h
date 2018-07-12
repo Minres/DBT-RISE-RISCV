@@ -34,8 +34,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef SIMPLESYSTEM_H_
-#define SIMPLESYSTEM_H_
+#ifndef _PLATFORM_H_
+#define _PLATFORM_H_
 
 #include "aon.h"
 #include "clint.h"
@@ -44,14 +44,15 @@
 #include "prci.h"
 #include "spi.h"
 #include "uart.h"
-
-#include <array>
-#include <sysc/kernel/sc_module.h>
+#include "core_complex.h"
 
 #include "scc/memory.h"
 #include "scc/router.h"
 #include "scc/utilities.h"
-#include "core_complex.h"
+#include "tlm/tlm_signal_sockets.h"
+#include <sysc/kernel/sc_module.h>
+#include <array>
+
 
 namespace sysc {
 
@@ -59,6 +60,12 @@ class platform : public sc_core::sc_module {
 public:
     SC_HAS_PROCESS(platform);
 
+    sc_core::sc_vector<tlm::tlm_signal_initiator_socket<sc_dt::sc_logic>> pins_o;
+    sc_core::sc_vector<tlm::tlm_signal_target_socket<sc_dt::sc_logic>>    pins_i;
+
+    platform(sc_core::sc_module_name nm);
+
+private:
     SiFive::core_complex i_core_complex;
     scc::router<> i_router;
     uart i_uart0, i_uart1;
@@ -71,13 +78,15 @@ public:
 
     scc::memory<512_MB, 32> i_mem_qspi;
     scc::memory<128_kB, 32> i_mem_ram;
-    sc_core::sc_signal<sc_core::sc_time> s_clk;
+    sc_core::sc_signal<sc_core::sc_time> s_tlclk;
+    sc_core::sc_signal<sc_core::sc_time> s_lfclk;
     sc_core::sc_signal<bool> s_rst, s_mtime_int, s_msie_int;
-    sc_core::sc_vector<sc_core::sc_signal<bool>> s_global_int, s_local_int;
+    sc_core::sc_vector<sc_core::sc_signal<bool, SC_MANY_WRITERS>> s_global_int, s_local_int;
     sc_core::sc_signal<bool> s_core_int;
-    sc_core::sc_signal_rv<32> s_gpio_pins;
+    sc_core::sc_vector<sc_core::sc_signal<bool>> s_dummy;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_in>  s_dummy_sck_i;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_out> s_dummy_sck_o;
 
-    platform(sc_core::sc_module_name nm);
 
 protected:
     void gen_reset();
@@ -87,4 +96,4 @@ protected:
 
 } /* namespace sysc */
 
-#endif /* SIMPLESYSTEM_H_ */
+#endif /* _PLATFORM_H_ */

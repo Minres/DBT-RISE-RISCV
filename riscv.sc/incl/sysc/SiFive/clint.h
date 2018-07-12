@@ -55,7 +55,8 @@ class core_complex;
 class clint : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(clint);
-    sc_core::sc_in<sc_core::sc_time> clk_i;
+    sc_core::sc_in<sc_core::sc_time> tlclk_i;
+    sc_core::sc_in<sc_core::sc_time> lfclk_i;
     sc_core::sc_in<bool> rst_i;
     sc_core::sc_out<bool> mtime_int_o;
     sc_core::sc_out<bool> msip_int_o;

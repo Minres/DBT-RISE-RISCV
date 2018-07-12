@@ -37,11 +37,14 @@
 #ifndef _UART_H_
 #define _UART_H_
 
-#include "cci_configuration"
 #include "scc/tlm_target.h"
+#include "scc/signal_target_mixin.h"
+#include "scc/signal_initiator_mixin.h"
+#include <tlm/tlm_signal.h>
+#include "cci_configuration"
 
 namespace sysc {
-
+class tlm_signal_uart_extension;
 class uart_regs;
 class WsHandler;
 
@@ -50,18 +53,28 @@ public:
     SC_HAS_PROCESS(uart);
     sc_core::sc_in<sc_core::sc_time> clk_i;
     sc_core::sc_in<bool> rst_i;
+    scc::tlm_signal_bool_out tx_o;
+    scc::tlm_signal_bool_in  rx_i;
+
+    sc_core::sc_out<bool> irq_o;
+
+    cci::cci_param<bool> write_to_ws;
+
     uart(sc_core::sc_module_name nm);
     virtual ~uart() override;
 
-    cci::cci_param<bool> write_to_ws;
 protected:
     void clock_cb();
     void reset_cb();
     void transmit_data();
+    void receive_data(tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay);
+    void update_irq();
     void before_end_of_elaboration();
     sc_core::sc_time clk;
     std::unique_ptr<uart_regs> regs;
+    sc_core::sc_fifo<uint8_t> rx_fifo, tx_fifo;
     std::vector<uint8_t> queue;
+    sysc::tlm_signal_uart_extension *rx_ext, *tx_ext;
     std::shared_ptr<sysc::WsHandler> handler;
 };
 
