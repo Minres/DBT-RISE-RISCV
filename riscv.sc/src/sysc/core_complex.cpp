@@ -101,6 +101,12 @@ public:
 
     uint32_t get_mode(){ return this->reg.machine_state; }
 
+    inline
+    void set_interrupt_execution(bool v){ this->interrupt_sim=v;}
+
+    inline
+    bool get_interrupt_execution(){ return this->interrupt_sim;}
+
     base_type::hart_state<base_type::reg_t>& get_state() { return this->state; }
 
     void notify_phase(exec_phase p) override {
@@ -241,6 +247,8 @@ core_complex::core_complex(sc_core::sc_module_name name)
     SC_THREAD(run);
     SC_METHOD(clk_cb);
     sensitive << clk_i;
+    SC_METHOD(rst_cb);
+    sensitive << rst_i;
     SC_METHOD(sw_irq_cb);
     sensitive<<sw_irq_i;
     SC_METHOD(timer_irq_cb);
@@ -299,6 +307,12 @@ void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
 
 void core_complex::clk_cb() {
 	curr_clk = clk_i.read();
+	if(curr_clk==SC_ZERO_TIME) cpu->set_interrupt_execution(true);
+}
+
+void core_complex::rst_cb() {
+    if(rst_i.read())
+        cpu->set_interrupt_execution(true);
 }
 
 void core_complex::sw_irq_cb(){
@@ -314,13 +328,19 @@ void core_complex::global_irq_cb(){
 }
 
 void core_complex::run() {
-    wait(sc_core::SC_ZERO_TIME);
-    cpu->reset(reset_address.get_value());
-    try {
-        vm->start(-1);
-    } catch (simulation_stopped &e) {
-    }
-    sc_core::sc_stop();
+    wait(SC_ZERO_TIME); // separate from elaboration phase
+    do{
+        if(rst_i.read()){
+            cpu->reset(reset_address.get_value());
+            wait(rst_i.negedge_event());
+        }
+        while(clk_i.read()==SC_ZERO_TIME){
+            wait(clk_i.value_changed_event());
+        }
+        cpu->set_interrupt_execution(false);
+        vm->start();
+    } while(cpu->get_interrupt_execution());
+    sc_stop();
 }
 
 bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data, bool is_fetch) {

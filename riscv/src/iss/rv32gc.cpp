@@ -62,6 +62,7 @@ void rv32gc::reset(uint64_t address) {
     reg.NEXT_PC=reg.PC;
     reg.trap_state=0;
     reg.machine_state=0x0;
+    reg.icount=0;
 }
 
 uint8_t* rv32gc::get_regs_base_ptr(){

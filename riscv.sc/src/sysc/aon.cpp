@@ -45,14 +45,19 @@ aon::aon(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , tlm_target<>(clk)
 , NAMED(clk_i)
-, NAMED(rst_i)
+, NAMED(erst_n_i)
+, NAMED(lfclkc_o)
+, NAMED(rst_o)
 , NAMEDD(aon_regs, regs) {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
     sensitive << clk_i;
     SC_METHOD(reset_cb);
-    sensitive << rst_i;
-    dont_initialize();
+    sensitive << erst_n_i;
+}
+
+void aon::start_of_simulation() {
+    rst_o=true;
 }
 
 void aon::clock_cb() {
@@ -62,10 +67,17 @@ void aon::clock_cb() {
 aon::~aon() {}
 
 void aon::reset_cb() {
-    if (rst_i.read())
+    if (!erst_n_i.read()){
         regs->reset_start();
-    else
+        rst_o=true;
+    } else {
         regs->reset_stop();
+        rst_o=false;
+    }
+    lfclkc_o.write(sc_core::sc_time(1/32768., sc_core::SC_SEC));
+}
+
+void aon::reset_internal_cb() {
 }
 
 } /* namespace sysc */

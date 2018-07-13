@@ -3,16 +3,16 @@ FILE(GLOB RiscVSCHeaders *.h */*.h)
 FILE(GLOB RiscvSCSources sysc/*.cpp)
 
 set(LIB_HEADERS ${RiscVSCHeaders} )
-set(LIB_SOURCES ${RiscvSCSources}
-)
+set(LIB_SOURCES ${RiscvSCSources} )
 
 set(APP_HEADERS )
-
-set(APP_SOURCES sc_main.cpp
-)
+set(APP_SOURCES sc_main.cpp)
 
 # Define two variables in order not to repeat ourselves.
 set(LIBRARY_NAME risc-v.sc)
+
+## the following setting needs to be consistent with the library
+#add_definitions(-DSC_DEFAULT_WRITER_POLICY=SC_MANY_WRITERS)
 
 # Define the library
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})

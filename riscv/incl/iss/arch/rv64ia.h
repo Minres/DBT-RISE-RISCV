@@ -146,6 +146,8 @@ struct rv64ia: public arch_if {
 
     uint64_t get_icount() { return reg.icount;}
 
+    bool should_stop(){return false;}
+
     inline phys_addr_t v2p(const iss::addr_t& addr){
         if(addr.space != traits<rv64ia>::MEM ||
                 addr.type == iss::address_type::PHYSICAL ||

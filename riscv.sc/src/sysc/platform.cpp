@@ -42,6 +42,7 @@ platform::platform(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , NAMED(pins_o, 32)
 , NAMED(pins_i, 32)
+, NAMED(erst_n)
 , NAMED(i_core_complex)
 , NAMED(i_router, 12, 1)
 , NAMED(i_uart0)
@@ -85,7 +86,8 @@ platform::platform(sc_core::sc_module_name nm)
     i_gpio0.clk_i(s_tlclk);
     i_plic.clk_i(s_tlclk);
     i_aon.clk_i(s_tlclk);
-    i_prci.clk_i(s_tlclk);
+    i_aon.lfclkc_o(s_lfclk);
+    i_prci.hfclk_o(s_tlclk); // clock driver
     i_clint.tlclk_i(s_tlclk);
     i_clint.lfclk_i(s_lfclk);
     i_core_complex.clk_i(s_tlclk);
@@ -97,10 +99,12 @@ platform::platform(sc_core::sc_module_name nm)
     i_qspi2.rst_i(s_rst);
     i_gpio0.rst_i(s_rst);
     i_plic.rst_i(s_rst);
-    i_aon.rst_i(s_rst);
+    i_aon.rst_o(s_rst);
     i_prci.rst_i(s_rst);
     i_clint.rst_i(s_rst);
     i_core_complex.rst_i(s_rst);
+
+    i_aon.erst_n_i(erst_n);
 
     i_clint.mtime_int_o(s_mtime_int);
     i_clint.msip_int_o(s_msie_int);
@@ -124,17 +128,7 @@ platform::platform(sc_core::sc_module_name nm)
     i_uart1.rx_i(s_dummy_sck_o[0]);
     i_uart1.irq_o(s_dummy[0]);
 
-    SC_THREAD(gen_reset);
-
     for(auto& sock:s_dummy_sck_i) sock.error_if_no_callback=false;
-}
-
-void platform::gen_reset() {
-    s_tlclk = 10_ns;
-    s_lfclk = 30517_ns;
-    s_rst = true;
-    wait(10_ns);
-    s_rst = false;
 }
 
 } /* namespace sysc */

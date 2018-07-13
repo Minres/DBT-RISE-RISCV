@@ -63,6 +63,8 @@ public:
     sc_core::sc_vector<tlm::tlm_signal_initiator_socket<sc_dt::sc_logic>> pins_o;
     sc_core::sc_vector<tlm::tlm_signal_target_socket<sc_dt::sc_logic>>    pins_i;
 
+    sc_core::sc_in<bool> erst_n;
+
     platform(sc_core::sc_module_name nm);
 
 private:

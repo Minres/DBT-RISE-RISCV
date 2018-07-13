@@ -134,54 +134,40 @@ void uart::reset_cb() {
 
 void uart::transmit_data() {
     uint8_t txdata;
-    sc_core::sc_time delay(SC_ZERO_TIME);
+    sysc::tlm_signal_uart_extension ext;
     tlm::tlm_phase phase(tlm::BEGIN_REQ);
     tlm::tlm_signal_gp<> gp;
-    gp.set_command(tlm::TLM_WRITE_COMMAND);
-    gp.set_value(true);
-    tx_o->nb_transport_fw(gp, phase, delay);
+    sc_core::sc_time delay(SC_ZERO_TIME);
+    sc_core::sc_time bit_duration(SC_ZERO_TIME);
+
+    gp.set_extension(&ext);
+    ext.tx.data_bits=8;
+    ext.tx.parity=false;
+
+    auto set_bit = [&](bool val){
+        gp.set_command(tlm::TLM_WRITE_COMMAND);
+        gp.set_value(val);
+        tlm::tlm_phase phase(tlm::BEGIN_REQ);
+        tx_o->nb_transport_fw(gp, phase, delay);
+        if(delay<bit_duration) wait(bit_duration-delay);
+    };
+    wait(delay);
     while(true){
+        set_bit(true);
         wait(tx_fifo.data_written_event());
         while(tx_fifo.nb_read(txdata)){
             regs->r_txdata.full=tx_fifo.num_free()==0;
             regs->r_ip.txwm=regs->r_txctrl.txcnt<=(7-tx_fifo.num_free())?1:0;
-            auto bit_duration = (regs->r_div.div+1)*clk;
-            sysc::tlm_signal_uart_extension ext;
+            bit_duration = (regs->r_div.div+1)*clk;
             ext.start_time = sc_core::sc_time_stamp();
-            ext.tx.data_bits=8;
-            ext.tx.parity=false;
             ext.tx.stop_bits=1+regs->r_txctrl.nstop;
             ext.tx.baud_rate=static_cast<unsigned>(1/bit_duration.to_seconds());
             ext.tx.data=txdata;
-            delay=SC_ZERO_TIME;
-            auto start = sc_time_stamp();
-            gp.set_command(tlm::TLM_WRITE_COMMAND);
-            gp.set_value(false);
-            gp.set_extension(&ext);
-            phase=tlm::BEGIN_REQ;
-            tx_o->nb_transport_fw(gp, phase, delay);
-            auto duration = bit_duration*(1+8+1+ext.tx.stop_bits);//start+data+parity+stop
-            auto diff=start+duration-sc_time_stamp();
-            if(diff>SC_ZERO_TIME) wait(diff);
-            delay=SC_ZERO_TIME;
-            gp.set_command(tlm::TLM_WRITE_COMMAND);
-            gp.set_value(true);
-            phase=tlm::BEGIN_REQ;
-            tx_o->nb_transport_fw(gp, phase, delay);
-
-//            if(txdata != '\r') queue.push_back(txdata);
-//            if (queue.size() >> 0 && (txdata == '\n' || txdata == 0)) {
-//                std::string msg(queue.begin(), queue.end()-1);
-//                LOG(INFO) << this->name() << " transmit: '" << msg << "'";
-//                sc_core::sc_time now = sc_core::sc_time_stamp();
-//                if(handler)
-//                    sc_comm_singleton::inst().execute([this, msg, now](){
-//                        std::stringstream os;
-//                        os << "{\"time\":\"" << now << "\",\"message\":\""<<msg<<"\"}";
-//                        this->handler->send(os.str());
-//                    });
-//                queue.clear();
-//            }
+            set_bit(false); // start bit
+            for(int i = 8; i>0; --i)
+                set_bit(txdata&(1<<(i-1))); // 8 data bits, MSB first
+            set_bit(true); // stop bit 1
+            if(regs->r_txctrl.nstop) set_bit(true); // stop bit 2
         }
     }
 }

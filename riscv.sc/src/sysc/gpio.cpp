@@ -73,6 +73,7 @@ gpio::gpio(sc_core::sc_module_name nm)
     }
     auto iof0_i_cb =[this](unsigned int tag, tlm::tlm_signal_gp<bool>& gp,
             tlm::tlm_phase& phase, sc_core::sc_time& delay)->tlm::tlm_sync_enum{
+        last_iof0[tag]=gp.get_value();
         this->iof_input(tag, 0, gp, delay);
         return tlm::TLM_COMPLETED;
     };
@@ -83,6 +84,7 @@ gpio::gpio(sc_core::sc_module_name nm)
     }
     auto iof1_i_cb =[this](unsigned int tag, tlm::tlm_signal_gp<bool>& gp,
             tlm::tlm_phase& phase, sc_core::sc_time& delay)->tlm::tlm_sync_enum{
+        last_iof1[tag]=gp.get_value();
         this->iof_input(tag, 1, gp, delay);
         return tlm::TLM_COMPLETED;
     };
@@ -96,6 +98,13 @@ gpio::gpio(sc_core::sc_module_name nm)
             reg.put(data);
             // read r_ports and update pins_io
             update_pins();
+        }
+        return true;
+    });
+    regs->iof_en.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        if (!this->regs->in_reset()) {
+            enable_outputs(data);
+            reg.put(data);
         }
         return true;
     });
@@ -123,19 +132,49 @@ void gpio::clock_cb() {
 	this->clk = clk_i.read();
 }
 
+tlm::tlm_phase gpio::write_output(tlm::tlm_signal_gp<sc_dt::sc_logic>& gp, size_t i, sc_dt::sc_logic val) {
+    sc_core::sc_time delay{SC_ZERO_TIME};
+    tlm::tlm_phase phase{ tlm::BEGIN_REQ };
+    gp.set_command(tlm::TLM_WRITE_COMMAND);
+    gp.set_response_status(tlm::TLM_OK_RESPONSE);
+    gp.set_value(val);
+    pins_o.at(i)->nb_transport_fw(gp, phase, delay);
+    return phase;
+}
+
 void gpio::update_pins() {
 	sc_core::sc_inout_rv<32>::data_type out_val;
 	tlm::tlm_signal_gp<sc_dt::sc_logic> gp;
 	for(size_t i=0, mask = 1; i<32; ++i, mask<<=1){
 	    if((regs->iof_en&mask == 0) || (iof0_i[i].size()==0 && iof1_i[i].size()==0)){
-	        sc_core::sc_time delay{SC_ZERO_TIME};
-            tlm::tlm_phase phase{tlm::BEGIN_REQ};
-            gp.set_command(tlm::TLM_WRITE_COMMAND);
-            gp.set_response_status(tlm::TLM_OK_RESPONSE);
-            gp.set_value(regs->r_output_en&mask?regs->r_port&mask?sc_dt::Log_1:sc_dt::Log_0:sc_dt::Log_Z);
-            pins_o.at(i)->nb_transport_fw(gp, phase, delay);
+	        auto val = regs->r_output_en&mask?
+	                regs->r_port&mask?
+	                        sc_dt::Log_1:
+	                        sc_dt::Log_0:
+	                sc_dt::Log_Z;
+            tlm::tlm_phase phase = write_output(gp, i, val);
 	    }
 	}
+}
+
+void gpio::enable_outputs(uint32_t new_data) {
+    auto changed_bits = regs->r_iof_en^new_data;
+    tlm::tlm_signal_gp<sc_dt::sc_logic> gp;
+    for(size_t i=0, mask=1; i<32; ++i, mask<<=1){
+        if(changed_bits&mask){
+            if(new_data&mask){
+                if((regs->r_iof_sel&mask)==0 && iof0_i[i].size()>0){
+                    tlm::tlm_phase phase = write_output(gp, i, last_iof0[i]?sc_dt::Log_1:sc_dt::Log_0);
+                } else if((regs->r_iof_sel&mask)==1 && iof1_i[i].size()>0)
+                    tlm::tlm_phase phase = write_output(gp, i, last_iof1[i]?sc_dt::Log_1:sc_dt::Log_0);
+            } else {
+                auto val = regs->r_output_en&mask?
+                        regs->r_port&mask?sc_dt::Log_1:sc_dt::Log_0:
+                        sc_dt::Log_Z;
+                tlm::tlm_phase phase = write_output(gp, i, val);
+            }
+        }
+    }
 }
 
 void gpio::pin_input(unsigned int tag, tlm::tlm_signal_gp<sc_logic>& gp, sc_core::sc_time& delay) {
@@ -187,7 +226,8 @@ void gpio::iof_input(unsigned int tag, unsigned iof_idx, tlm::tlm_signal_gp<>& g
                 tlm::tlm_phase phase{tlm::BEGIN_REQ};
                 tlm::tlm_signal_gp<sc_logic> new_gp;
                 new_gp.set_command(tlm::TLM_WRITE_COMMAND);
-                new_gp.set_value(gp.get_value()?sc_dt::Log_1:sc_dt::Log_0);
+                auto val = gp.get_value();
+                new_gp.set_value(val?sc_dt::Log_1:sc_dt::Log_0);
                 new_gp.copy_extensions_from(gp);
                 socket->nb_transport_fw(new_gp, phase, delay); // we don't care about phase and sync enum
             }

@@ -77,8 +77,13 @@ protected:
     void forward_pin_input(unsigned int tag, tlm::tlm_signal_gp<sc_logic>& gp);
     void iof_input(unsigned int tag, unsigned iof_idx, tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay);
     sc_core::sc_time clk;
+    std::array<bool, 32> last_iof0, last_iof1;
     std::unique_ptr<gpio_regs> regs;
     std::shared_ptr<sysc::WsHandler> handler;
+
+private:
+    tlm::tlm_phase write_output(tlm::tlm_signal_gp<sc_dt::sc_logic>& gp, size_t i, sc_dt::sc_logic val);
+    void enable_outputs(uint32_t new_data);
 };
 
 } /* namespace sysc */

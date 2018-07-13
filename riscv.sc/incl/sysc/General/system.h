@@ -16,14 +16,17 @@ namespace sysc {
 
 class system: sc_core::sc_module {
 public:
+    SC_HAS_PROCESS(system);
+
     system(sc_core::sc_module_name nm);
     virtual ~system();
 
-    sc_core::sc_vector<tlm::tlm_signal<sc_dt::sc_logic>> s_gpio;
-
 private:
+    sc_core::sc_vector<tlm::tlm_signal<sc_dt::sc_logic>> s_gpio;
+    sc_core::sc_signal<bool> s_rst_n;
     sysc::platform i_platform;
     sysc::terminal i_terminal;
+    void gen_por();
 };
 
 }

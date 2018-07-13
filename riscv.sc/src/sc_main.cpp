@@ -54,6 +54,16 @@ const size_t SUCCESS = 0;
 const size_t ERROR_UNHANDLED_EXCEPTION = 2;
 } // namespace
 
+#include "sysc/kernel/sc_externs.h"
+int
+main( int argc, char* argv[]){
+#ifdef _POSIX_SOURCE
+    putenv(const_cast<char*>("SC_SIGNAL_WRITE_CHECK=DISABLE"));
+    putenv(const_cast<char*>("SC_VCD_SCOPES=ENABLE"));
+#endif
+    return sc_core::sc_elab_and_sim( argc, argv );
+}
+
 int sc_main(int argc, char *argv[]) {
     //    sc_report_handler::set_handler(my_report_handler);
     scc::Logger<>::reporting_level() = logging::ERROR;
@@ -159,11 +169,15 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // run simulation
     ///////////////////////////////////////////////////////////////////////////
-    if(vm.count("max_time")){
-    	sc_core::sc_time max_time = scc::parse_from_string(vm["max_time"].as<std::string>());
-    	sc_core::sc_start(max_time);
-    } else
-    	sc_core::sc_start();
+    try {
+        if(vm.count("max_time")){
+            sc_core::sc_time max_time = scc::parse_from_string(vm["max_time"].as<std::string>());
+            sc_core::sc_start(max_time);
+        } else
+            sc_core::sc_start();
+    } catch(sc_core::sc_report& rep){
+        CLOG(FATAL, SystemC)<<"IWEF"[rep.get_severity()]<<"("<<rep.get_id()<<") "<<rep.get_msg_type()<<": "<<rep.get_msg()<<std::endl;
+    }
     if (!sc_core::sc_end_of_simulation_invoked()) sc_core::sc_stop();
     return 0;
 }

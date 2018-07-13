@@ -63,6 +63,7 @@ void rv64ia::reset(uint64_t address) {
     reg.NEXT_PC = reg.PC;
     reg.trap_state = 0;
     reg.machine_state = 0x3;
+    reg.icount=0;
 }
 
 uint8_t *rv64ia::get_regs_base_ptr() { return reinterpret_cast<uint8_t *>(&reg); }

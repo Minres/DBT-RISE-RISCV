@@ -162,6 +162,7 @@ protected:
 
     std::array<address_type, 4> addr_mode;
     
+    bool interrupt_sim=false;
 <%
 def fcsr = allRegs.find {it.name=='FCSR'}
 if(fcsr != null) {%>

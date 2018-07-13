@@ -144,7 +144,11 @@ struct rv32imac: public arch_if {
     /// deprecated
     void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
 
+    inline
     uint64_t get_icount() { return reg.icount;}
+
+    inline
+    bool should_stop() { return interrupt_sim;}
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
         if(addr.space != traits<rv32imac>::MEM ||
@@ -204,6 +208,7 @@ protected:
 
     std::array<address_type, 4> addr_mode;
     
+    bool interrupt_sim=false;
 
 	uint32_t get_fcsr(){return 0;}
 	void set_fcsr(uint32_t val){}

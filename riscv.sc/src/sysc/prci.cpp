@@ -43,24 +43,35 @@ namespace sysc {
 
 prci::prci(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
-, tlm_target<>(clk)
-, NAMED(clk_i)
+, tlm_target<>(hfclk)
 , NAMED(rst_i)
+, NAMED(hfclk_o)
 , NAMEDD(prci_regs, regs) {
     regs->registerResources(*this);
-    SC_METHOD(clock_cb);
-    sensitive << clk_i;
     SC_METHOD(reset_cb);
     sensitive << rst_i;
     dont_initialize();
+    SC_METHOD(hfxosc_cb);
+    sensitive << hfxosc_i;
     SC_METHOD(hfrosc_en_cb);
     sensitive << hfrosc_en_evt;
     dont_initialize();
 
+    regs->hfxosccfg.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        reg.put(data);
+        if (this->regs->r_hfxosccfg.hfxoscen==1) { // check rosc_en
+            this->hfxosc_en_evt.notify(1, sc_core::SC_US);
+        } else {
+            this->hfxosc_en_evt.notify(SC_ZERO_TIME);
+        }
+        return true;
+    });
     regs->hfrosccfg.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         reg.put(data);
-        if (this->regs->r_hfrosccfg & (1 << 30)) { // check rosc_en
+        if (this->regs->r_hfrosccfg.hfroscen==1) { // check rosc_en
             this->hfrosc_en_evt.notify(1, sc_core::SC_US);
+        } else {
+            this->hfrosc_en_evt.notify(SC_ZERO_TIME);
         }
         return true;
     });
@@ -70,13 +81,15 @@ prci::prci(sc_core::sc_module_name nm)
         if (pllcfg.pllbypass == 0 && pllcfg.pllq != 0) { // set pll_lock if pll is selected
             pllcfg.plllock = 1;
         }
+        update_hfclk();
         return true;
     });
-}
-
-void prci::clock_cb() {
-	this->clk = clk_i.read();
-
+    regs->plloutdiv.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        reg.put(data);
+        update_hfclk();
+        return true;
+    });
+    hfxosc_clk=62.5_ns;
 }
 
 prci::~prci() {}
@@ -84,12 +97,49 @@ prci::~prci() {}
 void prci::reset_cb() {
     if (rst_i.read())
         regs->reset_start();
-    else
+    else {
         regs->reset_stop();
+        this->hfxosc_en_evt.notify(1, sc_core::SC_US);
+    }
+}
+
+void prci::hfxosc_cb() {
+    this->regs->r_hfxosccfg.hfxoscrdy=0;
+    this->hfxosc_en_evt.notify(1, sc_core::SC_US);
+
+}
+
+void prci::hfxosc_en_cb() {
+    update_hfclk();
+    if(regs->r_hfxosccfg.hfxoscen==1)// set rosc_rdy
+        regs->r_hfxosccfg.hfxoscrdy =1;
+    else
+        regs->r_hfxosccfg.hfxoscrdy =0;
 }
 
 void prci::hfrosc_en_cb() {
-    regs->r_hfrosccfg |= (1 << 31); // set rosc_rdy
+    update_hfclk();
+    auto& hfrosccfg=regs->r_hfrosccfg;
+    if(regs->r_hfrosccfg.hfroscen==1) {// set rosc_rdy
+        regs->r_hfrosccfg.hfroscrdy =1;
+    } else {
+        regs->r_hfrosccfg.hfroscrdy =0;
+    }
+}
+
+void prci::update_hfclk() {
+    auto& hfrosccfg=regs->r_hfrosccfg;
+    auto& pllcfg=regs->r_pllcfg;
+    auto& plldiv=regs->r_plloutdiv;
+    hfrosc_clk = sc_core::sc_time(((hfrosccfg.hfroscdiv+1)*1.0)/(1125000.0*(hfrosccfg.hfrosctrim+1)), sc_core::SC_SEC);
+    auto pll_ref = pllcfg.pllrefsel==1?hfxosc_clk:hfrosc_clk;
+    auto r = pllcfg.pllr+1;
+    auto f = 2*(pllcfg.pllf+1);
+    auto q = 1<<pllcfg.pllq;
+    auto pll_out = pllcfg.pllbypass==1 || pllcfg.plllock==0?pll_ref:((pll_ref*r)/f)*q;
+    auto pll_res = plldiv&0x100?pll_out:2*pll_out*((plldiv&0x3f)+1);
+    hfclk = pllcfg.pllsel?pll_res:hfrosc_clk;
+    hfclk_o.write(hfclk);
 }
 
 } /* namespace sysc */

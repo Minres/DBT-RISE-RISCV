@@ -134,6 +134,7 @@ protected:
     void start_of_simulation();
     void run();
     void clk_cb();
+    void rst_cb();
     void sw_irq_cb();
     void timer_irq_cb();
     void global_irq_cb();

@@ -95,7 +95,7 @@ public:
 inline sysc::prci_regs::prci_regs(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , NAMED(hfrosccfg, r_hfrosccfg, 0, *this)
-, NAMED(hfxosccfg, r_hfxosccfg, 0, *this)
+, NAMED(hfxosccfg, r_hfxosccfg, 0x40000000, *this)
 , NAMED(pllcfg, r_pllcfg, 0, *this)
 , NAMED(plloutdiv, r_plloutdiv, 0, *this)
 , NAMED(coreclkcfg, r_coreclkcfg, 0, *this)
