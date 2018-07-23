@@ -58,7 +58,7 @@ public:
 
     sc_core::sc_out<bool> irq_o;
 
-    cci::cci_param<bool> write_to_ws;
+    cci::cci_param<bool> bit_true_transfer;
 
     uart(sc_core::sc_module_name nm);
     virtual ~uart() override;
@@ -69,13 +69,9 @@ protected:
     void transmit_data();
     void receive_data(tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay);
     void update_irq();
-    void before_end_of_elaboration();
-    sc_core::sc_time clk;
+    sc_core::sc_time clk{SC_ZERO_TIME},rx_last_start{SC_ZERO_TIME};
     std::unique_ptr<uart_regs> regs;
     sc_core::sc_fifo<uint8_t> rx_fifo, tx_fifo;
-    std::vector<uint8_t> queue;
-    sysc::tlm_signal_uart_extension *rx_ext, *tx_ext;
-    std::shared_ptr<sysc::WsHandler> handler;
 };
 
 } /* namespace sysc */

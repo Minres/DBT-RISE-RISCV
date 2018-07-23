@@ -24,6 +24,23 @@ struct tlm_signal_uart_extension : public tlm::tlm_unmanaged_extension<tlm_signa
 
 };
 
+struct tlm_signal_spi_extension : public tlm::tlm_unmanaged_extension<tlm_signal_spi_extension> {
+
+    struct spi_tx {
+        unsigned data_bits:5;
+        bool msb_first:1;
+        bool s2m_data_valid:1;
+        unsigned m2s_data, s2m_data;
+    } tx;
+    sc_core::sc_time start_time;
+
+    void copy_from(tlm_extension_base const & other) override {
+        auto& o = static_cast<const type&>(other);
+        this->tx=o.tx;
+        this->start_time=o.start_time;
+    }
+};
+
 }
 
 

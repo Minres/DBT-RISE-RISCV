@@ -83,7 +83,7 @@ protected:
 
 private:
     tlm::tlm_phase write_output(tlm::tlm_signal_gp<sc_dt::sc_logic>& gp, size_t i, sc_dt::sc_logic val);
-    void enable_outputs(uint32_t new_data);
+    void enable_outputs(uint32_t new_iof_en, uint32_t new_iof_sel);
 };
 
 } /* namespace sysc */

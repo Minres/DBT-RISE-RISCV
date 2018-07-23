@@ -124,9 +124,20 @@ platform::platform(sc_core::sc_module_name nm)
     i_uart0.rx_i(i_gpio0.iof0_o[16]);
     i_uart0.irq_o(s_global_int[3]);
 
+    i_gpio0.iof0_i[2](i_qspi1.scs_o[0]);
+    i_gpio0.iof0_i[3](i_qspi1.mosi_o);
+    i_qspi1.miso_i(i_gpio0.iof0_o[4]);
+    i_gpio0.iof0_i[5](i_qspi1.sck_o);
+    i_gpio0.iof0_i[9](i_qspi1.scs_o[2]);
+    i_gpio0.iof0_i[10](i_qspi1.scs_o[3]);
+
+    i_qspi0.irq_o(s_global_int[5]);
+    i_qspi1.irq_o(s_global_int[6]);
+    i_qspi2.irq_o(s_global_int[7]);
+
     s_dummy_sck_i[0](i_uart1.tx_o);
     i_uart1.rx_i(s_dummy_sck_o[0]);
-    i_uart1.irq_o(s_dummy[0]);
+    i_uart1.irq_o(s_global_int[4]);
 
     for(auto& sock:s_dummy_sck_i) sock.error_if_no_callback=false;
 }

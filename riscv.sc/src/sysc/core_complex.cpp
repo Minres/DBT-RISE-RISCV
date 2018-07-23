@@ -218,7 +218,7 @@ core_complex::core_complex(sc_core::sc_module_name name)
 , NAMED(timer_irq_i)
 , NAMED(local_irq_i, 16)
 , NAMED(elf_file, "")
-, NAMED(enable_disass, true)
+, NAMED(enable_disass, false)
 , NAMED(reset_address, 0ULL)
 , NAMED(gdb_server_port, 0)
 , NAMED(dump_ir, false)
@@ -264,7 +264,11 @@ void core_complex::trace(sc_core::sc_trace_file *trf) {}
 void core_complex::before_end_of_elaboration() {
     cpu = make_unique<core_wrapper>(this);
     vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
+#ifdef WITH_SCV
+    vm->setDisassEnabled(enable_disass.get_value() || m_db!=nullptr);
+#else
     vm->setDisassEnabled(enable_disass.get_value());
+#endif
     auto* srv = debugger::server<debugger::gdb_session>::get();
     if(srv) tgt_adapter = srv->get_target();
     if(tgt_adapter)

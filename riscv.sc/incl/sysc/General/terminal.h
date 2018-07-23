@@ -32,8 +32,10 @@ public:
     cci::cci_param<bool> write_to_ws;
 
 protected:
-    std::vector<uint8_t> queue;
+    void before_end_of_elaboration();
     void receive(tlm::tlm_signal_gp<sc_dt::sc_logic>& gp, sc_core::sc_time& delay);
+
+    std::vector<uint8_t> queue;
     std::shared_ptr<sysc::WsHandler> handler;
     sc_core::sc_time last_tx_start=sc_core::SC_ZERO_TIME;
 };

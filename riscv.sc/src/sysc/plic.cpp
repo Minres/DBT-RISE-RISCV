@@ -167,7 +167,7 @@ void plic::handle_pending_int() {
 void plic::reset_pending_int(uint32_t irq) {
     // todo: evaluate enable register (see spec)
     // todo: make sure that pending is set, otherwise don't reset irq ... read spec.
-    LOG(INFO) << "reset pending interrupt: " << irq;
+    LOG(TRACE) << "reset pending interrupt: " << irq;
     // reset related pending bit
 	auto reg_idx = irq>>5;
 	auto bit_ofs = irq & 0x1F;

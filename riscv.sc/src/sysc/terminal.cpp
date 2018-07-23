@@ -12,7 +12,9 @@
 
 using namespace sysc;
 
-terminal::terminal() :terminal(sc_core::sc_gen_unique_name("terminal")){
+terminal::terminal()
+: terminal(sc_core::sc_gen_unique_name("terminal"))
+{
 }
 
 terminal::terminal(const sc_core::sc_module_name& nm)
@@ -32,6 +34,15 @@ terminal::terminal(const sc_core::sc_module_name& nm)
 
 terminal::~terminal() {
 }
+
+void terminal::before_end_of_elaboration() {
+    if(write_to_ws.get_value()) {
+        LOG(TRACE)<<"Adding WS handler for "<<(std::string{"/ws/"}+name());
+        handler=std::make_shared<WsHandler>();
+        sc_comm_singleton::inst().registerWebSocketHandler((std::string{"/ws/"}+name()).c_str(), handler);
+    }
+}
+
 
 void terminal::receive(tlm::tlm_signal_gp<sc_dt::sc_logic>& gp, sc_core::sc_time& delay) {
     sysc::tlm_signal_uart_extension* ext;

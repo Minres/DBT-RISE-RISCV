@@ -38,6 +38,11 @@
 #define _SPI_H_
 
 #include "scc/tlm_target.h"
+#include "scc/signal_target_mixin.h"
+#include "scc/signal_initiator_mixin.h"
+#include <tlm/tlm_signal.h>
+#include "cci_configuration"
+#include <sysc/utils/sc_vector.h>
 
 namespace sysc {
 
@@ -47,15 +52,28 @@ class spi : public sc_core::sc_module, public scc::tlm_target<> {
 public:
     SC_HAS_PROCESS(spi);
     sc_core::sc_in<sc_core::sc_time> clk_i;
-    sc_core::sc_in<bool> rst_i;
+    sc_core::sc_in<bool>             rst_i;
+    scc::tlm_signal_bool_opt_out         sck_o;
+    scc::tlm_signal_bool_opt_out         mosi_o;
+    scc::tlm_signal_bool_opt_in          miso_i;
+    sc_core::sc_vector<scc::tlm_signal_bool_opt_out> scs_o;
+
+    sc_core::sc_out<bool> irq_o;
+
+    cci::cci_param<bool> bit_true_transfer;
+
     spi(sc_core::sc_module_name nm);
     virtual ~spi() override;
 
 protected:
     void clock_cb();
     void reset_cb();
+    void transmit_data();
+    void receive_data(tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay);
+    void update_irq();
     sc_core::sc_time clk;
     std::unique_ptr<spi_regs> regs;
+    sc_core::sc_fifo<uint8_t> rx_fifo, tx_fifo;
 };
 
 } /* namespace sysc */

@@ -2,10 +2,19 @@
 	"i_simple_system":{
 		"i_platform": {
 			"i_uart0":{
-				"write_to_ws": false
+				"bit_true_transfer": false
 			},
 			"i_uart1":{
-				"write_to_ws": false
+				"bit_true_transfer": false
+			},
+			"i_qspi0":{
+				"bit_true_transfer": false
+			},
+			"i_qspi1":{
+				"bit_true_transfer": false
+			},
+			"i_qspi2":{
+				"bit_true_transfer": false
 			},
 			"i_gpio0.write_to_ws": false
 		}

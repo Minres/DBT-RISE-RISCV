@@ -103,7 +103,14 @@ gpio::gpio(sc_core::sc_module_name nm)
     });
     regs->iof_en.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
         if (!this->regs->in_reset()) {
-            enable_outputs(data);
+            enable_outputs(data, regs->r_iof_sel);
+            reg.put(data);
+        }
+        return true;
+    });
+    regs->iof_sel.set_write_cb([this](scc::sc_register<uint32_t> &reg, uint32_t data) -> bool {
+        if (!this->regs->in_reset()) {
+            enable_outputs(regs->r_iof_en, data);
             reg.put(data);
         }
         return true;
@@ -157,12 +164,12 @@ void gpio::update_pins() {
 	}
 }
 
-void gpio::enable_outputs(uint32_t new_data) {
-    auto changed_bits = regs->r_iof_en^new_data;
+void gpio::enable_outputs(uint32_t new_iof_en, uint32_t new_iof_sel) {
+    auto changed_bits = (regs->r_iof_en^new_iof_en) | (regs->r_iof_sel^new_iof_sel);
     tlm::tlm_signal_gp<sc_dt::sc_logic> gp;
     for(size_t i=0, mask=1; i<32; ++i, mask<<=1){
         if(changed_bits&mask){
-            if(new_data&mask){
+            if(new_iof_en&mask){
                 if((regs->r_iof_sel&mask)==0 && iof0_i[i].size()>0){
                     tlm::tlm_phase phase = write_output(gp, i, last_iof0[i]?sc_dt::Log_1:sc_dt::Log_0);
                 } else if((regs->r_iof_sel&mask)==1 && iof1_i[i].size()>0)
@@ -230,6 +237,7 @@ void gpio::iof_input(unsigned int tag, unsigned iof_idx, tlm::tlm_signal_gp<>& g
                 new_gp.set_value(val?sc_dt::Log_1:sc_dt::Log_0);
                 new_gp.copy_extensions_from(gp);
                 socket->nb_transport_fw(new_gp, phase, delay); // we don't care about phase and sync enum
+                gp.update_extensions_from(new_gp);
             }
         }
     }

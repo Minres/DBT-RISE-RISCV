@@ -10,6 +10,7 @@
 
 #include "sysc/SiFive/platform.h"
 #include "sysc/General/terminal.h"
+#include "sysc/General/mcp3008.h"
 #include <systemc>
 
 namespace sysc {
@@ -24,8 +25,11 @@ public:
 private:
     sc_core::sc_vector<tlm::tlm_signal<sc_dt::sc_logic>> s_gpio;
     sc_core::sc_signal<bool> s_rst_n;
+    sc_core::sc_signal<double> s_vref;
+    sc_core::sc_vector<sc_core::sc_signal<double>> s_ana;
     sysc::platform i_platform;
     sysc::terminal i_terminal;
+    sysc::mcp3008 i_adc;
     void gen_por();
 };
 

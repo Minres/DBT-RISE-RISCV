@@ -122,11 +122,6 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     iss::init_jit(argc, argv);
     ///////////////////////////////////////////////////////////////////////////
-    // set up tracing & transaction recording
-    ///////////////////////////////////////////////////////////////////////////
-    auto trace_val = vm["trace"].as<unsigned>();
-    scc::tracer trace("simple_system", static_cast<scc::tracer::file_type>(trace_val >> 1), trace_val != 0);
-    ///////////////////////////////////////////////////////////////////////////
     // set up configuration
     ///////////////////////////////////////////////////////////////////////////
     scc::configurer cfg(vm["config-file"].as<std::string>());
@@ -134,16 +129,24 @@ int sc_main(int argc, char *argv[]) {
     // instantiate top level
     ///////////////////////////////////////////////////////////////////////////
     sysc::system i_system("i_system");
-    // sr_report_handler::add_sc_object_to_filter(&i_simple_system.i_master,
-    // sc_core::SC_WARNING, sc_core::SC_MEDIUM);
+    ///////////////////////////////////////////////////////////////////////////
+    // set up tracing & transaction recording
+    ///////////////////////////////////////////////////////////////////////////
+    auto trace_val = vm["trace"].as<unsigned>();
+    scc::tracer trace("simple_system", static_cast<scc::tracer::file_type>(trace_val >> 1), trace_val != 0);
+    ///////////////////////////////////////////////////////////////////////////
+    // dump configuration if requested
+    ///////////////////////////////////////////////////////////////////////////
     if(vm["dump-config"].as<std::string>().size()>0){
     	std::ofstream of{vm["dump-config"].as<std::string>()};
     	if(of.is_open())
     	    cfg.dump_configuration(of);
     }
 	cfg.configure();
-    // overwrite with command line settings
-    if (vm["gdb-port"].as<unsigned short>())
+    ///////////////////////////////////////////////////////////////////////////
+    // overwrite config with command line settings
+    ///////////////////////////////////////////////////////////////////////////
+   if (vm["gdb-port"].as<unsigned short>())
     	cfg.set_value("i_system.i_platform.i_core_complex.gdb_server_port", vm["gdb-port"].as<unsigned short>());
     if (vm.count("dump-ir"))
     	cfg.set_value("i_system.i_platform.i_core_complex.dump_ir", vm.count("dump-ir") != 0);

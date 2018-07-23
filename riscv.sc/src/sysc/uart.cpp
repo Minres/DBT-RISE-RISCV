@@ -36,7 +36,6 @@
 
 #include "sysc/SiFive/uart.h"
 
-#include "sysc/sc_comm_singleton.h"
 #include "sysc/tlm_extensions.h"
 #include "scc/report.h"
 #include "scc/utilities.h"
@@ -46,12 +45,7 @@ using namespace std;
 
 
 namespace sysc {
-namespace {
 
-using namespace seasocks;
-
-
-}
 uart::uart(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , tlm_target<>(clk)
@@ -60,8 +54,10 @@ uart::uart(sc_core::sc_module_name nm)
 , NAMED(tx_o)
 , NAMED(rx_i)
 , NAMED(irq_o)
-, NAMED(write_to_ws, false)
+, NAMED(bit_true_transfer, false)
 , NAMEDD(uart_regs, regs)
+, NAMED(rx_fifo, 8)
+, NAMED(tx_fifo, 8)
 {
     regs->registerResources(*this);
     SC_METHOD(clock_cb);
@@ -113,14 +109,6 @@ void uart::update_irq() {
     irq_o=(regs->r_ip.rxwm==1 && regs->r_ie.rxwm==1) || (regs->r_ip.txwm==1 && regs->r_ie.txwm==1);
 }
 
-void uart::before_end_of_elaboration() {
-	if(write_to_ws.get_value()) {
-	    LOG(TRACE)<<"Adding WS handler for "<<(std::string{"/ws/"}+name());
-	    handler=std::make_shared<WsHandler>();
-	    sc_comm_singleton::inst().registerWebSocketHandler((std::string{"/ws/"}+name()).c_str(), handler);
-	}
-}
-
 void uart::clock_cb() {
 	this->clk = clk_i.read();
 }
@@ -164,10 +152,13 @@ void uart::transmit_data() {
             ext.tx.baud_rate=static_cast<unsigned>(1/bit_duration.to_seconds());
             ext.tx.data=txdata;
             set_bit(false); // start bit
-            for(int i = 8; i>0; --i)
-                set_bit(txdata&(1<<(i-1))); // 8 data bits, MSB first
-            set_bit(true); // stop bit 1
-            if(regs->r_txctrl.nstop) set_bit(true); // stop bit 2
+            if(bit_true_transfer.get_value()){
+                for(int i = 8; i>0; --i)
+                    set_bit(txdata&(1<<(i-1))); // 8 data bits, MSB first
+                if(regs->r_txctrl.nstop) set_bit(true); // stop bit 1
+            } else
+                wait(8*bit_duration);
+            set_bit(true); // stop bit 1/2
         }
     }
 }
@@ -175,7 +166,7 @@ void uart::transmit_data() {
 void uart::receive_data(tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay) {
     sysc::tlm_signal_uart_extension* ext{nullptr};
     gp.get_extension(ext);
-    if(ext && ext != rx_ext){
+    if(ext && ext->start_time != rx_last_start){
         auto data = static_cast<uint8_t>(ext->tx.data);
         if(ext->tx.parity || ext->tx.data_bits!=8) data = rand(); // random value if wrong config
         rx_fifo.write(data);
@@ -183,7 +174,7 @@ void uart::receive_data(tlm::tlm_signal_gp<>& gp, sc_core::sc_time& delay) {
             regs->r_ip.rxwm=1;
             update_irq();
         }
-        rx_ext=ext; // omit repeated handling of signale changes
+        rx_last_start=ext->start_time; // omit repeated handling of signal changes
     }
     gp.set_response_status(tlm::TLM_OK_RESPONSE);
 }
