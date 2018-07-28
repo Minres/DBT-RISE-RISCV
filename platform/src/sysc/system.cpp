@@ -5,7 +5,7 @@
  *      Author: eyck
  */
 
-#include "sysc/General/system.h"
+#include "sysc/top/system.h"
 
 using namespace sysc;
 
@@ -14,10 +14,15 @@ system::system(sc_core::sc_module_name nm)
 , NAMED(s_gpio, 32)
 , NAMED(s_rst_n)
 , NAMED(s_vref)
-, NAMED(s_ana, 8)
+, NAMED(s_va)
+, NAMED(s_vb)
+, NAMED(s_vc)
+, NAMED(s_ana, 5)
 , NAMED(i_platform)
 , NAMED(i_terminal)
 , NAMED(i_adc)
+, NAMED(i_h_bridge)
+, NAMED(i_motor)
 {
     // connect platform
     i_platform.erst_n(s_rst_n);
@@ -36,8 +41,32 @@ system::system(sc_core::sc_module_name nm)
     i_adc.miso_o(s_gpio[4].in);
     s_gpio[5].out(i_adc.sck_i);
     // adc analog inputs
-    i_adc.ch_i(s_ana);
     i_adc.vref_i(s_vref);
+    i_adc.ch_i[0](s_vasens);
+    i_adc.ch_i[1](s_vbsens);
+    i_adc.ch_i[2](s_vcsens);
+    i_adc.ch_i[3](s_ana[0]);
+    i_adc.ch_i[4](s_ana[1]);
+    i_adc.ch_i[5](s_ana[2]);
+    i_adc.ch_i[6](s_ana[3]);
+    i_adc.ch_i[7](s_ana[4]);
+
+    i_h_bridge.ha_i(s_gpio[0]);
+    i_h_bridge.la_i(s_gpio[1]);
+    i_h_bridge.hb_i(s_gpio[10]);
+    i_h_bridge.lb_i(s_gpio[11]);
+    i_h_bridge.hc_i(s_gpio[19]);
+    i_h_bridge.lc_i(s_gpio[20]);
+    i_h_bridge.va_o(s_va);
+    i_h_bridge.vb_o(s_vb);
+    i_h_bridge.vc_o(s_vc);
+
+    i_motor.va_i(s_va);
+    i_motor.vb_i(s_vb);
+    i_motor.vc_i(s_vc);
+    i_motor.va_o(s_vasens);
+    i_motor.vb_o(s_vbsens);
+    i_motor.vc_o(s_vcsens);
 
     SC_THREAD(gen_por);
 }

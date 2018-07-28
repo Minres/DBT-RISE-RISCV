@@ -5,7 +5,8 @@
  *      Author: eyck
  */
 
-#include "sysc/General/mcp3008.h"
+#include "sysc/top/mcp3008.h"
+
 #include <scc/report.h>
 #include <util/ities.h>
 

@@ -44,7 +44,7 @@
 #include "prci.h"
 #include "spi.h"
 #include "uart.h"
-#include "core_complex.h"
+#include "sysc/core_complex.h"
 
 #include "scc/memory.h"
 #include "scc/router.h"
@@ -56,16 +56,16 @@
 
 namespace sysc {
 
-class platform : public sc_core::sc_module {
+class hifive1 : public sc_core::sc_module {
 public:
-    SC_HAS_PROCESS(platform);
+    SC_HAS_PROCESS(hifive1);
 
     sc_core::sc_vector<tlm::tlm_signal_initiator_socket<sc_dt::sc_logic>> pins_o;
     sc_core::sc_vector<tlm::tlm_signal_target_socket<sc_dt::sc_logic>>    pins_i;
 
     sc_core::sc_in<bool> erst_n;
 
-    platform(sc_core::sc_module_name nm);
+    hifive1(sc_core::sc_module_name nm);
 
 private:
     SiFive::core_complex i_core_complex;

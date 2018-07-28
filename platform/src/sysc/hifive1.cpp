@@ -34,11 +34,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <sysc/SiFive/platform.h>
+#include "sysc/SiFive/hifive1.h"
 
 namespace sysc {
 
-platform::platform(sc_core::sc_module_name nm)
+hifive1::hifive1(sc_core::sc_module_name nm)
 : sc_core::sc_module(nm)
 , NAMED(pins_o, 32)
 , NAMED(pins_i, 32)

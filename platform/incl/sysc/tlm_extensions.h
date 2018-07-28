@@ -5,8 +5,8 @@
  *      Author: eyck
  */
 
-#ifndef RISCV_SC_INCL_SYSC_TLM_EXTENSIONS_H_
-#define RISCV_SC_INCL_SYSC_TLM_EXTENSIONS_H_
+#ifndef _SYSC_TLM_EXTENSIONS_H_
+#define _SYSC_TLM_EXTENSIONS_H_
 
 #include "tlm/tlm_extensions.h"
 
@@ -45,4 +45,4 @@ struct tlm_signal_spi_extension : public tlm::tlm_unmanaged_extension<tlm_signal
 
 
 
-#endif /* RISCV_SC_INCL_SYSC_TLM_EXTENSIONS_H_ */
+#endif /* _SYSC_TLM_EXTENSIONS_H_ */

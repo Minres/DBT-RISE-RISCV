@@ -9,7 +9,7 @@ set(APP_HEADERS )
 set(APP_SOURCES sc_main.cpp)
 
 # Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME risc-v.sc)
+set(LIBRARY_NAME platform)
 
 ## the following setting needs to be consistent with the library
 #add_definitions(-DSC_DEFAULT_WRITER_POLICY=SC_MANY_WRITERS)
@@ -24,7 +24,7 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 )
 
 # This is a make target, so you can do a "make riscv-sc"
-set(APPLICATION_NAME riscv.sc)
+set(APPLICATION_NAME riscv.vp)
 
 include_directories(${CONAN_INCLUDE_DIRS_SEASOCKS})
 include_directories(${SystemC_INCLUDE_DIRS})
@@ -39,7 +39,8 @@ add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 # Links the target exe against the libraries
 
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
-target_link_libraries(${APPLICATION_NAME} risc-v)
+target_link_libraries(${APPLICATION_NAME} riscv.sc)
+target_link_libraries(${APPLICATION_NAME} riscv)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} softfloat)
 target_link_libraries(${APPLICATION_NAME} sc-components)

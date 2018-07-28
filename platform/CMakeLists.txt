@@ -69,6 +69,7 @@ include_directories(
 add_dependent_subproject(dbt-core)
 add_dependent_subproject(sc-components)
 add_dependent_subproject(riscv)
+add_dependent_subproject(riscv.sc)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
@@ -86,26 +87,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-# library files
-FILE(GLOB RiscVSCHeaders *.h */*.h)
-
-set(LIB_HEADERS ${RiscVSCHeaders} )
-set(LIB_SOURCES src/core_complex.cpp )
-
-# Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME riscv.sc)
-
-## the following setting needs to be consistent with the library
-#add_definitions(-DSC_DEFAULT_WRITER_POLICY=SC_MANY_WRITERS)
-
-# Define the library
-add_library(${LIBRARY_NAME} ${LIB_SOURCES})
-
-set_target_properties(${LIBRARY_NAME} PROPERTIES
-  VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
-  FRAMEWORK FALSE
-  PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
-)
+add_subdirectory(src)
 
 #
 # SYSTEM PACKAGING (RPM, TGZ, ...)

@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="org.eclipse.cdt.launch.applicationLaunchType">
+<booleanAttribute key="de.toem.impulse.launchactivateLaunch" value="false"/>
+<booleanAttribute key="de.toem.impulse.launchactivateTermination" value="false"/>
+<intAttribute key="de.toem.impulse.launchdelayLaunch" value="0"/>
+<intAttribute key="de.toem.impulse.launchlaunch" value="2"/>
+<intAttribute key="de.toem.impulse.launchmode" value="3"/>
+<stringAttribute key="de.toem.impulse.launchport" value=""/>
+<booleanAttribute key="de.toem.impulse.launchrestart" value="true"/>
+<intAttribute key="de.toem.impulse.launchterminate" value="1"/>
 <booleanAttribute key="org.eclipse.cdt.dsf.gdb.AUTO_SOLIB" value="true"/>
 <listAttribute key="org.eclipse.cdt.dsf.gdb.AUTO_SOLIB_LIST"/>
 <stringAttribute key="org.eclipse.cdt.dsf.gdb.DEBUG_NAME" value="gdb"/>
@@ -19,7 +27,7 @@
 <booleanAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN" value="true"/>
 <stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_STOP_AT_MAIN_SYMBOL" value="main"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROGRAM_ARGUMENTS" value="-v4&#10;-p ic=${workspace_loc:DBT-RISE-RISCV}/cycles.txt&#10;${project_loc:hello}/hello"/>
-<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="build/Debug/riscv/bin/riscv"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="build/Debug/riscv/bin/riscv-sim"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="DBT-RISE-RISCV"/>
 <booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="false"/>
 <stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value="cdt.managedbuild.config.gnu.exe.debug.1751741082"/>

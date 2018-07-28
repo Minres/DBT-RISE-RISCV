@@ -43,7 +43,7 @@
 #include "iss/debugger/gdb_session.h"
 #include "iss/debugger/target_adapter_if.h"
 #include "iss/debugger/encoderdecoder.h"
-#include "sysc/SiFive/core_complex.h"
+#include "sysc/core_complex.h"
 
 #ifdef WITH_SCV
 #include <scv.h>

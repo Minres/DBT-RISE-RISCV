@@ -5,8 +5,8 @@
  *      Author: eyck
  */
 
-#ifndef RISCV_SC_INCL_SYSC_GENERAL_MCP3008_H_
-#define RISCV_SC_INCL_SYSC_GENERAL_MCP3008_H_
+#ifndef _SYSC_TOP_MCP3008_H_
+#define _SYSC_TOP_MCP3008_H_
 
 #include "scc/signal_target_mixin.h"
 #include "scc/signal_initiator_mixin.h"
@@ -44,4 +44,4 @@ private:
 
 } /* namespace sysc */
 
-#endif /* RISCV_SC_INCL_SYSC_GENERAL_MCP3008_H_ */
+#endif /* _SYSC_TOP_MCP3008_H_ */

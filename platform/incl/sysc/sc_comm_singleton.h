@@ -34,8 +34,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef RISCV_SC_INCL_SYSC_SC_COMM_SINGLETON_H_
-#define RISCV_SC_INCL_SYSC_SC_COMM_SINGLETON_H_
+#ifndef _SYSC_SC_COMM_SINGLETON_H_
+#define _SYSC_SC_COMM_SINGLETON_H_
 
 #include <sysc/kernel/sc_module.h>
 #include <seasocks/PageHandler.h>
@@ -110,4 +110,4 @@ private:
 
 } /* namespace sysc */
 
-#endif /* RISCV_SC_INCL_SYSC_SC_COMM_SINGLETON_H_ */
+#endif /* _SYSC_SC_COMM_SINGLETON_H_ */

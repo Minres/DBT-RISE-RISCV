@@ -5,7 +5,8 @@
  *      Author: eyck
  */
 
-#include "sysc/General/terminal.h"
+#include "sysc/top/terminal.h"
+
 #include "sysc/sc_comm_singleton.h"
 #include "sysc/tlm_extensions.h"
 #include "scc/report.h"

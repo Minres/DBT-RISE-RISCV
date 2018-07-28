@@ -1,7 +1,11 @@
 #!/bin/sh
 ##
 
-suffix=Debug
+if [ -n "$1" ]; then
+	suffix=$1
+else
+	suffix=Debug
+fi
 cwd=`pwd`
 for i in $*; do	
 	if echo "$i" | grep 'CMAKE_BUILD_TYPE='; then

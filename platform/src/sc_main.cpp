@@ -37,13 +37,13 @@
 #include <boost/program_options.hpp>
 #include <iss/log_categories.h>
 #include <sstream>
-#include <sysc/General/system.h>
 #include "scc/configurer.h"
 #include "scc/report.h"
 #include "scc/scv_tr_db.h"
 #include "scc/tracer.h"
 #include <cci_utils/broker.h>
 #include <iss/jit/jit_helper.h>
+#include "../incl/sysc/top/system.h"
 
 using namespace sysc;
 namespace po = boost::program_options;
@@ -128,7 +128,7 @@ int sc_main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////
     // instantiate top level
     ///////////////////////////////////////////////////////////////////////////
-    sysc::system i_system("i_system");
+    auto i_system = std::make_unique<sysc::system>("i_system");
     ///////////////////////////////////////////////////////////////////////////
     // set up tracing & transaction recording
     ///////////////////////////////////////////////////////////////////////////

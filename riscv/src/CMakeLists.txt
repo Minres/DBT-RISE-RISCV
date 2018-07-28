@@ -15,7 +15,7 @@ set(APP_HEADERS )
 set(APP_SOURCES main.cpp)
 
 # Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME risc-v)
+set(LIBRARY_NAME riscv)
 
 # Define the library
 #add_library(${LIBRARY_NAME} SHARED ${LIB_SOURCES})
@@ -28,7 +28,7 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 )
 
 # This is a make target, so you can do a "make riscv-sc"
-set(APPLICATION_NAME riscv)
+set(APPLICATION_NAME riscv-sim)
 
 add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 
