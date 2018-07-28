@@ -1,5 +1,5 @@
 # DBT-RISE-RISCV
-Am instruction set simulator based on DBT-RISE implementing the RISC-V ISA. The project is hosted at https://git.minres.com/DBT-RISE/DBT-RISE-RISCV.
+Am instruction set simulator based on DBT-RISE implementing the RISC-V ISA. The project is hosted at https://git.minres.com/DBT-RISE/DBT-RISE-RISCV .
 
 **DBT-RISE-RISCV README**
 
