@@ -1,9 +1,9 @@
 [submodule "dbt-core"]
 	path = dbt-core
-	url = https://github.com/Minres/DBT-RISE-Core.git
+	url = https://git.minres.com/DBT-RISE/DBT-RISE-Core.git
 [submodule "sc-components"]
 	path = sc-components
-	url = https://github.com/Minres/SystemC-Components.git
+	url = https://git.minres.com/SystemC/SystemC-Components.git
 [submodule "external/elfio"]
 	path = external/elfio
 	url = http://git.code.sf.net/p/elfio/code
