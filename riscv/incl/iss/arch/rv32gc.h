@@ -179,7 +179,7 @@ struct rv32gc: public arch_if {
 
     uint64_t get_icount() { return reg.icount;}
 
-    bool should_stop(){return false;}
+    inline bool should_stop() { return interrupt_sim; }
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
         if(addr.space != traits<rv32gc>::MEM ||
@@ -272,6 +272,7 @@ protected:
 
     std::array<address_type, 4> addr_mode;
     
+    bool interrupt_sim=false;
 
 	uint32_t get_fcsr(){return reg.FCSR;}
 	void set_fcsr(uint32_t val){reg.FCSR = val;}		

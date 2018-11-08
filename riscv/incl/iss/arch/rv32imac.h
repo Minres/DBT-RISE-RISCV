@@ -1,54 +1,59 @@
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017, MINRES Technologies GmbH
-// All rights reserved.
-// 
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-// 
-// 1. Redistributions of source code must retain the above copyright notice,
-//    this list of conditions and the following disclaimer.
-// 
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-// 
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// 
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-// 
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ * Copyright (C) 2017, 2018 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
 #ifndef _RV32IMAC_H_
 #define _RV32IMAC_H_
 
+#include <array>
+#include <iss/arch/traits.h>
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
-#include <iss/arch/traits.h>
-#include <array>
 
 namespace iss {
 namespace arch {
 
 struct rv32imac;
 
-template<>
-struct traits<rv32imac> {
+template <> struct traits<rv32imac> {
 
-	constexpr static char const* const core_type = "RV32IMAC";
-    
-    enum constants {XLEN=32, PCLEN=32, MISA_VAL=0b1000000000101000001000100000101, PGSIZE=0x1000, PGMASK=0xfff};
+    constexpr static char const *const core_type = "RV32IMAC";
+
+    enum constants {
+        XLEN = 32,
+        PCLEN = 32,
+        MISA_VAL = 0b1000000000101000001000100000101,
+        PGSIZE = 0x1000,
+        PGMASK = 0xfff
+    };
 
     constexpr static unsigned FP_REGS_SIZE = 0;
 
@@ -87,7 +92,7 @@ struct traits<rv32imac> {
         X31,
         PC,
         NUM_REGS,
-        NEXT_PC=NUM_REGS,
+        NEXT_PC = NUM_REGS,
         TRAP_STATE,
         PENDING_TRAP,
         MACHINE_STATE,
@@ -99,72 +104,70 @@ struct traits<rv32imac> {
 
     using addr_t = uint32_t;
 
-    using code_word_t = uint32_t; //TODO: check removal
+    using code_word_t = uint32_t; // TODO: check removal
 
     using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
-    constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, 39> RV32IMAC_reg_size{{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64}};
-        return RV32IMAC_reg_size[r];
-    }
+    static constexpr std::array<const uint32_t, 39> RV32IMAC_reg_size{
+        {32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+         32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 64}};
 
-    constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, 40> RV32IMAC_reg_byte_offset{{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152,160}};
-        return RV32IMAC_reg_byte_offset[r];
-    }
+    constexpr static unsigned reg_bit_width(unsigned r) { return RV32IMAC_reg_size[r]; }
+
+    static constexpr std::array<const uint32_t, 40> RV32IMAC_reg_byte_offset{
+        {0,  4,  8,  12, 16, 20,  24,  28,  32,  36,  40,  44,  48,  52,  56,  60,  64,  68,  72,  76,
+         80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 148, 152, 160}};
+
+    constexpr static unsigned reg_byte_offset(unsigned r) { return RV32IMAC_reg_byte_offset[r]; }
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 
-    enum sreg_flag_e {FLAGS};
+    enum sreg_flag_e { FLAGS };
 
-    enum mem_type_e {MEM, CSR, FENCE, RES};
+    enum mem_type_e { MEM, CSR, FENCE, RES };
 };
 
-struct rv32imac: public arch_if {
+struct rv32imac : public arch_if {
 
     using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
     using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
-    using reg_t =  typename traits<rv32imac>::reg_t;
+    using reg_t = typename traits<rv32imac>::reg_t;
     using addr_t = typename traits<rv32imac>::addr_t;
 
     rv32imac();
     ~rv32imac();
 
-    void reset(uint64_t address=0) override;
+    void reset(uint64_t address = 0) override;
 
-    uint8_t* get_regs_base_ptr() override;
+    uint8_t *get_regs_base_ptr() override;
     /// deprecated
-    void get_reg(short idx, std::vector<uint8_t>& value) override {}
-    void set_reg(short idx, const std::vector<uint8_t>& value) override {}
+    void get_reg(short idx, std::vector<uint8_t> &value) override {}
+    void set_reg(short idx, const std::vector<uint8_t> &value) override {}
     /// deprecated
-    bool get_flag(int flag) override {return false;}
-    void set_flag(int, bool value) override {};
+    bool get_flag(int flag) override { return false; }
+    void set_flag(int, bool value) override{};
     /// deprecated
-    void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
+    void update_flags(operations op, uint64_t opr1, uint64_t opr2) override{};
 
-    inline
-    uint64_t get_icount() { return reg.icount;}
+    inline uint64_t get_icount() { return reg.icount; }
 
-    inline
-    bool should_stop() { return interrupt_sim;}
+    inline bool should_stop() { return interrupt_sim; }
 
-    inline phys_addr_t v2p(const iss::addr_t& addr){
-        if(addr.space != traits<rv32imac>::MEM ||
-                addr.type == iss::address_type::PHYSICAL ||
-                addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL){
-            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv32imac>::addr_mask);
+    inline phys_addr_t v2p(const iss::addr_t &addr) {
+        if (addr.space != traits<rv32imac>::MEM || addr.type == iss::address_type::PHYSICAL ||
+            addr_mode[static_cast<uint16_t>(addr.access) & 0x3] == address_type::PHYSICAL) {
+            return phys_addr_t(addr.access, addr.space, addr.val & traits<rv32imac>::addr_mask);
         } else
             return virt2phys(addr);
     }
 
-    virtual phys_addr_t virt2phys(const iss::addr_t& addr);
+    virtual phys_addr_t virt2phys(const iss::addr_t &addr);
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
-    inline
-    uint32_t get_last_branch(){return reg.last_branch;}
+    inline uint32_t get_last_branch() { return reg.last_branch; }
 
 protected:
     struct RV32IMAC_regs {
@@ -207,14 +210,12 @@ protected:
     } reg;
 
     std::array<address_type, 4> addr_mode;
-    
-    bool interrupt_sim=false;
 
-	uint32_t get_fcsr(){return 0;}
-	void set_fcsr(uint32_t val){}
+    bool interrupt_sim = false;
 
+    uint32_t get_fcsr() { return 0; }
+    void set_fcsr(uint32_t val) {}
 };
-
 }
-}            
+}
 #endif /* _RV32IMAC_H_ */

@@ -1,9 +1,34 @@
-/*
- * riscv_target_adapter.h
+/*******************************************************************************
+ * Copyright (C) 2017, 2018 MINRES Technologies GmbH
+ * All rights reserved.
  *
- *  Created on: 26.09.2017
- *      Author: eyck
- */
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
 #ifndef _ISS_DEBUGGER_RISCV_TARGET_ADAPTER_H_
 #define _ISS_DEBUGGER_RISCV_TARGET_ADAPTER_H_
@@ -13,9 +38,9 @@
 #include <iss/debugger/target_adapter_base.h>
 #include <iss/iss.h>
 
+#include <array>
 #include <memory>
 #include <util/logging.h>
-#include <array>
 
 namespace iss {
 namespace debugger {
@@ -95,9 +120,10 @@ public:
 
     status remove_break(int type, uint64_t addr, unsigned int length) override;
 
-    status resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread, std::function<void(unsigned)> stop_callback) override;
+    status resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
+                            std::function<void(unsigned)> stop_callback) override;
 
-    status target_xml_query(std::string& out_buf) override;
+    status target_xml_query(std::string &out_buf) override;
 
 protected:
     static inline constexpr addr_t map_addr(const addr_t &i) { return i; }
@@ -160,11 +186,11 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
             data.push_back(*(reg_base + offset + j));
             avail.push_back(0xff);
         }
-//        if(arch::traits<ARCH>::XLEN < 64)
-//            for(unsigned j=0; j<4; ++j){
-//                data.push_back(0);
-//                avail.push_back(0xff);
-//            }
+        // if(arch::traits<ARCH>::XLEN < 64)
+        //     for(unsigned j=0; j<4; ++j){
+        //         data.push_back(0);
+        //         avail.push_back(0xff);
+        //     }
     }
     // work around fill with F type registers
     if (arch::traits<ARCH>::NUM_REGS < 65) {
@@ -174,11 +200,11 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
                 data.push_back(0x0);
                 avail.push_back(0x00);
             }
-//            if(arch::traits<ARCH>::XLEN < 64)
-//                for(unsigned j=0; j<4; ++j){
-//                    data.push_back(0x0);
-//                    avail.push_back(0x00);
-//                }
+            // if(arch::traits<ARCH>::XLEN < 64)
+            //     for(unsigned j=0; j<4; ++j){
+            //         data.push_back(0x0);
+            //         avail.push_back(0x00);
+            //     }
         }
     }
     return Ok;
@@ -280,10 +306,10 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::threadinfo_query(int
 
 template <typename ARCH>
 status riscv_target_adapter<ARCH>::threadextrainfo_query(const rp_thread_ref &thread, std::string &out_buf) {
-	std::array<char, 20> buf;
-	memset(buf.data(), 0, 20);
-	sprintf(buf.data(), "%02x%02x%02x%02x%02x%02x%02x%02x%02x", 'R', 'u', 'n', 'n', 'a', 'b', 'l', 'e', 0);
-	out_buf = buf.data();
+    std::array<char, 20> buf;
+    memset(buf.data(), 0, 20);
+    sprintf(buf.data(), "%02x%02x%02x%02x%02x%02x%02x%02x%02x", 'R', 'u', 'n', 'n', 'a', 'b', 'l', 'e', 0);
+    out_buf = buf.data();
     return Ok;
 }
 
@@ -317,56 +343,56 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int typ
     return Err;
 }
 
-template <typename ARCH> status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
-        std::function<void(unsigned)> stop_callback) {
-    auto* reg_base = core->get_regs_base_ptr();
+template <typename ARCH>
+status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
+                                                    std::function<void(unsigned)> stop_callback) {
+    auto *reg_base = core->get_regs_base_ptr();
     auto reg_width = arch::traits<ARCH>::reg_bit_width(arch::traits<ARCH>::PC) / 8;
     auto offset = traits<ARCH>::reg_byte_offset(arch::traits<ARCH>::PC);
-    const uint8_t* iter = reinterpret_cast<const uint8_t*>(&addr);
+    const uint8_t *iter = reinterpret_cast<const uint8_t *>(&addr);
     std::copy(iter, iter + reg_width, reg_base);
     return resume_from_current(step, sig, thread, stop_callback);
 }
 
-template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string& out_buf) {
-    const std::string res{
-        "<?xml version=\"1.0\"?><!DOCTYPE target SYSTEM \"gdb-target.dtd\">"
-"<target><architecture>riscv:rv32</architecture>"
-//"  <feature name=\"org.gnu.gdb.riscv.rv32i\">\n"
-//"    <reg name=\"x0\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x1\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x2\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x3\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x4\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x5\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x6\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x7\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x8\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x9\"  bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x10\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x11\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x12\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x13\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x14\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x15\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x16\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x17\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x18\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x19\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x20\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x21\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x22\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x23\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x24\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x25\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x26\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x27\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x28\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x29\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x30\" bitsize=\"32\" group=\"general\"/>\n"
-//"    <reg name=\"x31\" bitsize=\"32\" group=\"general\"/>\n"
-//"  </feature>\n"
-"</target>"};
-    out_buf=res;
+template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string &out_buf) {
+    const std::string res{"<?xml version=\"1.0\"?><!DOCTYPE target SYSTEM \"gdb-target.dtd\">"
+                          "<target><architecture>riscv:rv32</architecture>"
+                          //"  <feature name=\"org.gnu.gdb.riscv.rv32i\">\n"
+                          //"    <reg name=\"x0\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x1\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x2\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x3\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x4\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x5\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x6\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x7\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x8\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x9\"  bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x10\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x11\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x12\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x13\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x14\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x15\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x16\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x17\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x18\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x19\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x20\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x21\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x22\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x23\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x24\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x25\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x26\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x27\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x28\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x29\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x30\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"    <reg name=\"x31\" bitsize=\"32\" group=\"general\"/>\n"
+                          //"  </feature>\n"
+                          "</target>"};
+    out_buf = res;
     return Ok;
 }
 

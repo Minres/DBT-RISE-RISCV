@@ -79,7 +79,7 @@ span.value_x { background-color: red;}
 			}
 		}
 		var open_connection = function(name){
-			var s = new WebSocket('ws://'+window.location.host+'/ws/i_simple_system.i_'+name);
+			var s = new WebSocket('ws://'+window.location.host+'/ws/i_system.i_hifive1.i_'+name);
 			s.addEventListener('error',   function (m) { log(name, new Date().toISOString()+': ===connection error ==='); });
 			s.addEventListener('open',    function (m) { log(name, new Date().toISOString()+': ===connection opened==='); });
 			s.addEventListener('message', function (m) { log(name, m.data); });
@@ -99,8 +99,7 @@ span.value_x { background-color: red;}
 			top.appendChild(div);
 			open_connection(n);
 		}
-		createElem("uart0");
-		createElem("gpio0");
+		createElem("terminal");
 		</script>
 	</body>
 </html>

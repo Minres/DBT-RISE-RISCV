@@ -1,145 +1,111 @@
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017, MINRES Technologies GmbH
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice,
-//    this list of conditions and the following disclaimer.
-//
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-//
-// Contributors:
-//       eyck@minres.com - initial implementation
-//
-//
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ * Copyright (C) 2018 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
-#include "sysc/SiFive/hifive1.h"
+#include <sysc/top/hifive1.h>
 
-namespace sysc {
+using namespace sc_core;
+using namespace sc_dt;
+using namespace sysc;
 
-hifive1::hifive1(sc_core::sc_module_name nm)
-: sc_core::sc_module(nm)
-, NAMED(pins_o, 32)
-, NAMED(pins_i, 32)
+hifive1::hifive1(sc_module_name nm)
+: sc_module(nm)
 , NAMED(erst_n)
-, NAMED(i_core_complex)
-, NAMED(i_router, 12, 1)
-, NAMED(i_uart0)
-, NAMED(i_uart1)
-, NAMED(i_qspi0)
-, NAMED(i_qspi1)
-, NAMED(i_qspi2)
-, NAMED(i_gpio0)
-, NAMED(i_plic)
-, NAMED(i_aon)
-, NAMED(i_prci)
-, NAMED(i_clint)
-, NAMED(i_mem_qspi)
-, NAMED(i_mem_ram)
-, NAMED(s_tlclk)
-, NAMED(s_rst)
-, NAMED(s_global_int, 256)
-, NAMED(s_local_int, 16)
-, NAMED(s_core_int)
-, NAMED(s_dummy, 16)
-, NAMED(s_dummy_sck_i, 16)
-, NAMED(s_dummy_sck_o, 16)
+, NAMED(vref_i)
+#define PORT_NAMING(z, n, _) , NAMED(adc_ch##n##_i)
+BOOST_PP_REPEAT(8, PORT_NAMING, _)
+#undef PORT_NAMING
+, NAMED(ha_o)
+, NAMED(la_o)
+, NAMED(hb_o)
+, NAMED(lb_o)
+, NAMED(hc_o)
+, NAMED(lc_o)
+, NAMED(s_gpio, 32)
+, NAMED(h_bridge, 6)
+, NAMED(i_fe310)
+, NAMED(i_terminal)
+, NAMED(i_adc)
 {
-    i_core_complex.initiator(i_router.target[0]);
-    size_t i = 0;
-    for (const auto &e : e300_plat_map) {
-        i_router.initiator.at(i)(e.target->socket);
-        i_router.add_target_range(i, e.start, e.size);
-        i++;
+    i_fe310.erst_n(erst_n);
+    for (auto i = 0U; i < s_gpio.size(); ++i) {
+        s_gpio[i].in(i_fe310.pins_o[i]);
+        i_fe310.pins_i[i](s_gpio[i].out);
     }
-    i_router.initiator.at(i)(i_mem_qspi.target);
-    i_router.add_target_range(i, 0x20000000, 512_MB);
-    i_router.initiator.at(++i)(i_mem_ram.target);
-    i_router.add_target_range(i, 0x80000000, 128_kB);
+    // connect other units
+    // terminal
+    i_terminal.tx_o(s_gpio[16].in);
+    s_gpio[17].out(i_terminal.rx_i);
+    // adc digital io
+    s_gpio[2].out(i_adc.cs_i);
+    s_gpio[3].out(i_adc.mosi_i);
+    i_adc.miso_o(s_gpio[4].in);
+    s_gpio[5].out(i_adc.sck_i);
+    // adc analog inputs
+    i_adc.vref_i(vref_i);
+    i_adc.ch_i[0](adc_ch0_i);
+    i_adc.ch_i[1](adc_ch1_i);
+    i_adc.ch_i[2](adc_ch2_i);
+    i_adc.ch_i[3](adc_ch3_i);
+    i_adc.ch_i[4](adc_ch4_i);
+    i_adc.ch_i[5](adc_ch5_i);
+    i_adc.ch_i[6](adc_ch6_i);
+    i_adc.ch_i[7](adc_ch7_i);
+    // H-Bridge signal proxies
+    s_gpio[0].out(h_bridge[0]);
+    s_gpio[1].out(h_bridge[1]);
+    s_gpio[10].out(h_bridge[2]);
+    s_gpio[11].out(h_bridge[3]);
+    s_gpio[20].out(h_bridge[4]);
+    s_gpio[19].out(h_bridge[5]);
+    // proxy callbacks
+    h_bridge[0].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        ha_o.write(gp.get_value());
+    });
+    h_bridge[1].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        la_o.write(gp.get_value());
+    });
+    h_bridge[2].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        hb_o.write(gp.get_value());
+    });
+    h_bridge[3].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        lb_o.write(gp.get_value());
+    });
+    h_bridge[4].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        hc_o.write(gp.get_value());
+    });
+    h_bridge[5].register_nb_transport([this](tlm::tlm_signal_gp<sc_logic> &gp, tlm::tlm_phase &phase, sc_time &delay) -> tlm::tlm_sync_enum {
+        lc_o.write(gp.get_value());
+    });
 
-    i_uart0.clk_i(s_tlclk);
-    i_uart1.clk_i(s_tlclk);
-    i_qspi0.clk_i(s_tlclk);
-    i_qspi1.clk_i(s_tlclk);
-    i_qspi2.clk_i(s_tlclk);
-    i_gpio0.clk_i(s_tlclk);
-    i_plic.clk_i(s_tlclk);
-    i_aon.clk_i(s_tlclk);
-    i_aon.lfclkc_o(s_lfclk);
-    i_prci.hfclk_o(s_tlclk); // clock driver
-    i_clint.tlclk_i(s_tlclk);
-    i_clint.lfclk_i(s_lfclk);
-    i_core_complex.clk_i(s_tlclk);
 
-    i_uart0.rst_i(s_rst);
-    i_uart1.rst_i(s_rst);
-    i_qspi0.rst_i(s_rst);
-    i_qspi1.rst_i(s_rst);
-    i_qspi2.rst_i(s_rst);
-    i_gpio0.rst_i(s_rst);
-    i_plic.rst_i(s_rst);
-    i_aon.rst_o(s_rst);
-    i_prci.rst_i(s_rst);
-    i_clint.rst_i(s_rst);
-    i_core_complex.rst_i(s_rst);
-
-    i_aon.erst_n_i(erst_n);
-
-    i_clint.mtime_int_o(s_mtime_int);
-    i_clint.msip_int_o(s_msie_int);
-
-    i_plic.global_interrupts_i(s_global_int);
-    i_plic.core_interrupt_o(s_core_int);
-
-    i_core_complex.sw_irq_i(s_msie_int);
-    i_core_complex.timer_irq_i(s_mtime_int);
-    i_core_complex.global_irq_i(s_core_int);
-    i_core_complex.local_irq_i(s_local_int);
-
-    pins_i(i_gpio0.pins_i);
-    i_gpio0.pins_o(pins_o);
-
-    i_gpio0.iof0_i[17](i_uart0.tx_o);
-    i_uart0.rx_i(i_gpio0.iof0_o[16]);
-    i_uart0.irq_o(s_global_int[3]);
-
-    i_gpio0.iof0_i[2](i_qspi1.scs_o[0]);
-    i_gpio0.iof0_i[3](i_qspi1.mosi_o);
-    i_qspi1.miso_i(i_gpio0.iof0_o[4]);
-    i_gpio0.iof0_i[5](i_qspi1.sck_o);
-    i_gpio0.iof0_i[9](i_qspi1.scs_o[2]);
-    i_gpio0.iof0_i[10](i_qspi1.scs_o[3]);
-
-    i_qspi0.irq_o(s_global_int[5]);
-    i_qspi1.irq_o(s_global_int[6]);
-    i_qspi2.irq_o(s_global_int[7]);
-
-    s_dummy_sck_i[0](i_uart1.tx_o);
-    i_uart1.rx_i(s_dummy_sck_o[0]);
-    i_uart1.irq_o(s_global_int[4]);
-
-    for(auto& sock:s_dummy_sck_i) sock.error_if_no_callback=false;
 }
 
-} /* namespace sysc */

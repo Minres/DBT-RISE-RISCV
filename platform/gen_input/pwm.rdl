@@ -1,0 +1,96 @@
+regfile pwm_regs {
+	reg {
+		name="pwmcfg";
+		desc="pin value";
+		field {
+			name = "pwmscale";
+		} pwmscale[3:0];
+		field {
+			name = "pwmsticky";
+		} pwmsticky[8:8];
+		field {
+			name = "pwmzerocmp";
+		} pwmsticky[9:9];
+		field {
+			name = "pwmdeglitch";
+		} pwmsticky[10:10];
+		field {
+			name = "pwmenalways";
+		} pwmenalways[12:12];
+		field {
+			name = "pwmenoneshot";
+		} pwmenalways[13:13];
+		field {
+			name = "pwmcmp0center";
+		} pwmcmp0center[16:16];
+		field {
+			name = "pwmcmp1center";
+		} pwmcmp1center[17:17];
+		field {
+			name = "pwmcmp2center";
+		} pwmcmp2center[18:18];
+		field {
+			name = "pwmcmp3center";
+		} pwmcmp3center[19:19];
+		field {
+			name = "pwmcmp0gang";
+		} pwmcmp0gang[24:24];
+		field {
+			name = "pwmcmp1gang";
+		} pwmcmp1gang[25:25];
+		field {
+			name = "pwmcmp2gang";
+		} pwmcmp2gang[26:26];
+		field {
+			name = "pwmcmp3gang";
+		} pwmcmp3gang[27:27];
+		field {
+			name = "pwmcmp0ip";
+		} pwmcmp0ip[28:28];
+		field {
+			name = "pwmcmp1ip";
+		} pwmcmp1ip[29:29];
+		field {
+			name = "pwmcmp2ip";
+		} pwmcmp2ip[30:30];
+		field {
+			name = "pwmcmp3ip";
+		} pwmcmp3ip[31:31];
+	} pwmcfg @0x000;
+	reg {
+		name="pwmcount";
+		field {
+			name = "pwmcount"; 
+		} pwmcount[31:0];
+	} pwmcount @0x008;
+	reg {
+		name="pwms";
+		field {
+			name = "pwms";
+		}pwms[15:0];
+	} pwms @0x010;
+	reg {
+		name="pwmcmp0";
+		field {
+			name = "pwmcmp0";
+		} pwmcmp0[15:0];
+	} pwmcmp0 @0x020;
+	reg {
+		name="pwmcmp1";
+		field {
+			name = "pwmcmp0";
+		} pwmcmp0[15:0];
+	} pwmcmp1 @0x024;
+	reg {
+		name="pwmcmp2";
+		field {
+			name = "pwmcmp0";
+		} pwmcmp0[15:0];
+	} pwmcmp2 @0x028;
+	reg {
+		name="pwmcmp3";
+		field {
+			name = "pwmcmp0";
+		} pwmcmp0[15:0];
+	} pwmcmp3 @0x02C;
+};

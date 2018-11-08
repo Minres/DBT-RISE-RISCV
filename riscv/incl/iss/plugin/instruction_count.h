@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2017, MINRES Technologies GmbH
+ * Copyright (C) 2017, 2018, MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,39 +42,40 @@
 namespace iss {
 namespace plugin {
 
-class instruction_count: public iss::vm_plugin {
-	struct instr_delay {
-		std::string instr_name;
-		size_t size;
-		size_t not_taken_delay;
-		size_t taken_delay;
-	};
+class instruction_count : public iss::vm_plugin {
+    struct instr_delay {
+        std::string instr_name;
+        size_t size;
+        size_t not_taken_delay;
+        size_t taken_delay;
+    };
+
 public:
-	instruction_count() = delete;
+    instruction_count() = delete;
 
-	instruction_count(const instruction_count& ) = delete;
+    instruction_count(const instruction_count &) = delete;
 
-	instruction_count(const instruction_count&&) = delete;
+    instruction_count(const instruction_count &&) = delete;
 
-	instruction_count(std::string config_file_name);
+    instruction_count(std::string config_file_name);
 
-	virtual ~instruction_count();
+    virtual ~instruction_count();
 
-	instruction_count& operator=(const instruction_count& ) = delete;
+    instruction_count &operator=(const instruction_count &) = delete;
 
-	instruction_count& operator=(const instruction_count&& ) = delete;
+    instruction_count &operator=(const instruction_count &&) = delete;
 
-	bool registration(const char* const version, vm_if& arch) override;
+    bool registration(const char *const version, vm_if &arch) override;
 
-	sync_type get_sync() override {return POST_SYNC;};
+    sync_type get_sync() override { return POST_SYNC; };
 
-	void callback(instr_info_t instr_info) override;
+    void callback(instr_info_t instr_info) override;
+
 private:
     Json::Value root;
     std::vector<instr_delay> delays;
     std::vector<uint64_t> rep_counts;
 };
-
 }
 }
 

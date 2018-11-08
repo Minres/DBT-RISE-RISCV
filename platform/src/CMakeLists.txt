@@ -1,11 +1,26 @@
 # library files
-FILE(GLOB RiscVSCHeaders *.h */*.h)
-FILE(GLOB RiscvSCSources sysc/*.cpp)
-
+FILE(GLOB RiscVSCHeaders ${PROJECT_SOURCE_DIR}/incl/sysc/*.h ${PROJECT_SOURCE_DIR}/incl/sysc/*/*.h)
 set(LIB_HEADERS ${RiscVSCHeaders} )
-set(LIB_SOURCES ${RiscvSCSources} )
+set(LIB_SOURCES 
+	sysc/aon.cpp
+	sysc/BLDC.cpp
+	sysc/clint.cpp
+	sysc/dcmotor.cpp
+	sysc/gpio.cpp
+	sysc/h_bridge.cpp
+	sysc/hifive1.cpp
+	sysc/fe310.cpp
+	sysc/mcp_adc.cpp
+	sysc/plic.cpp
+	sysc/prci.cpp
+	sysc/pwm.cpp
+	sysc/sc_comm_singleton.cpp
+	sysc/spi.cpp
+	sysc/system.cpp
+	sysc/terminal.cpp
+	sysc/uart.cpp	
+	CLIParser.cpp )
 
-set(APP_HEADERS )
 set(APP_SOURCES sc_main.cpp)
 
 # Define two variables in order not to repeat ourselves.
@@ -26,18 +41,25 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 # This is a make target, so you can do a "make riscv-sc"
 set(APPLICATION_NAME riscv.vp)
 
+include_directories(${PROJECT_SOURCE_DIR}/incl)
 include_directories(${CONAN_INCLUDE_DIRS_SEASOCKS})
+add_definitions(-DWITH_SYSTEMC) # or -DSC_NO_WRITE_CHECK
 include_directories(${SystemC_INCLUDE_DIRS})
 include_directories(${CCI_INCLUDE_DIRS})
+if(SCV_FOUND)
+    add_definitions(-DWITH_SCV)
+    include_directories(${SCV_INCLUDE_DIRS})
+endif()
 
-link_directories(${SystemC_LIBRARY_DIR})
-link_directories(${CCI_LIBRARY_DIR})
+
+link_directories(${SystemC_LIBRARY_DIRS})
+link_directories(${CCI_LIBRARY_DIRS})
 link_directories(${CONAN_LIB_DIRS_SEASOCKS})
 
 add_executable(${APPLICATION_NAME} ${APP_SOURCES})
-
+# include files for this application
+target_include_directories(${APPLICATION_NAME} SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 # Links the target exe against the libraries
-
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
 target_link_libraries(${APPLICATION_NAME} riscv.sc)
 target_link_libraries(${APPLICATION_NAME} riscv)
@@ -50,8 +72,6 @@ target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
 target_link_libraries(${APPLICATION_NAME} ${CCI_LIBRARIES} )
 target_link_libraries(${APPLICATION_NAME} ${SystemC_LIBRARIES} )
 if(SCV_FOUND)
-    add_definitions(-DWITH_SCV)
-    include_directories(${SCV_INCLUDE_DIRS})
     link_directories(${SCV_LIBRARY_DIRS})
     target_link_libraries (${APPLICATION_NAME} ${SCV_LIBRARIES})
 endif()

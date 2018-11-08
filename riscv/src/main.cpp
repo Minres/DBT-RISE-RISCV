@@ -1,36 +1,34 @@
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017, MINRES Technologies GmbH
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice,
-//    this list of conditions and the following disclaimer.
-//
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-//
-// Contributors:
-//       eyck@minres.com - initial implementation
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ * Copyright (C) 2017, 2018 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
 #include <iostream>
 #include <iss/iss.h>
@@ -43,8 +41,8 @@
 #include <iss/arch/rv64ia.h>
 #include <iss/jit/jit_helper.h>
 #include <iss/log_categories.h>
-#include <iss/plugin/instruction_count.h>
 #include <iss/plugin/cycle_estimate.h>
+#include <iss/plugin/instruction_count.h>
 
 namespace po = boost::program_options;
 
@@ -98,8 +96,8 @@ int main(int argc, char *argv[]) {
         LOG_OUTPUT(connection)::stream() = f;
     }
 
-    std::vector<iss::vm_plugin*> plugin_list;
-    auto res=0;
+    std::vector<iss::vm_plugin *> plugin_list;
+    auto res = 0;
     try {
         // application code comes here //
         iss::init_jit(argc, argv);
@@ -125,24 +123,24 @@ int main(int argc, char *argv[]) {
             return 127;
         }
         if (clim.count("plugin")) {
-           for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()){
-               auto plugin_name{opt_val};
-               std::string filename{"cycles.txt"};
-               std::size_t found = opt_val.find('=');
-               if (found!=std::string::npos){
-                   plugin_name=opt_val.substr(0, found);
-                   filename=opt_val.substr(found+1, opt_val.size());
-               }
-                if(plugin_name=="ic"){
-                    auto* ic_plugin= new iss::plugin::instruction_count(filename);
+            for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
+                std::string plugin_name{opt_val};
+                std::string filename{"cycles.txt"};
+                std::size_t found = opt_val.find('=');
+                if (found != std::string::npos) {
+                    plugin_name = opt_val.substr(0, found);
+                    filename = opt_val.substr(found + 1, opt_val.size());
+                }
+                if (plugin_name == "ic") {
+                    auto *ic_plugin = new iss::plugin::instruction_count(filename);
                     vm->register_plugin(*ic_plugin);
                     plugin_list.push_back(ic_plugin);
-                } else if(plugin_name=="ce"){
-                    auto* ce_plugin= new iss::plugin::cycle_estimate(filename);
+                } else if (plugin_name == "ce") {
+                    auto *ce_plugin = new iss::plugin::cycle_estimate(filename);
                     vm->register_plugin(*ce_plugin);
                     plugin_list.push_back(ce_plugin);
                 } else {
-                    LOG(ERROR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'"<<std::endl;
+                    LOG(ERROR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'" << std::endl;
                     return 127;
                 }
             }
@@ -157,33 +155,32 @@ int main(int argc, char *argv[]) {
                 LOGGER(disass)::print_severity() = false;
             }
         }
-        uint64_t start_address=0;
+        uint64_t start_address = 0;
         if (clim.count("mem"))
-             vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
+            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
         if (clim.count("elf"))
-            for (std::string input : clim["elf"].as<std::vector<std::string>>()){
-            	auto start_addr = vm->get_arch()->load_file(input);
-            	if(start_addr.second)
-            		start_address=start_addr.first;
+            for (std::string input : clim["elf"].as<std::vector<std::string>>()) {
+                auto start_addr = vm->get_arch()->load_file(input);
+                if (start_addr.second) start_address = start_addr.first;
             }
-        for (std::string input : args){
-        	auto start_addr = vm->get_arch()->load_file(input);// treat remaining arguments as elf files
-        	if(start_addr.second)
-        		start_address=start_addr.first;
+        for (std::string input : args) {
+            auto start_addr = vm->get_arch()->load_file(input); // treat remaining arguments as elf files
+            if (start_addr.second) start_address = start_addr.first;
         }
         if (clim.count("reset")) {
             auto str = clim["reset"].as<std::string>();
-            start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), 0, 16) : std::stoull(str, 0, 10);
+            start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), nullptr, 16) : std::stoull(str, nullptr, 10);
         }
-		vm->reset(start_address);
+        vm->reset(start_address);
         auto cycles = clim["instructions"].as<uint64_t>();
         res = vm->start(cycles, dump);
     } catch (std::exception &e) {
-        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit" << std::endl;
-        res=2;
+        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
+                   << std::endl;
+        res = 2;
     }
     // cleanup to let plugins report of needed
-    for(auto* p:plugin_list){
+    for (auto *p : plugin_list) {
         delete p;
     }
     return res;

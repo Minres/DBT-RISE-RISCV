@@ -143,19 +143,19 @@ InsructionSet RV32IBase {
             if (rd != 0) X[rd] <= choose(X[rs1]'u < full_imm'u, 1, 0);
         }
         XORI {
-            encoding: imm[11:0] | rs1[4:0] | b100 | rd[4:0] | b0010011;
+            encoding: imm[11:0]s | rs1[4:0] | b100 | rd[4:0] | b0010011;
             args_disass:"x%rd$d, x%rs1$d, %imm%";
-            if(rd != 0) X[rd] <= X[rs1] ^ imm;
+            if(rd != 0) X[rd] <= X[rs1]s ^ imm;
         }
         ORI {
-            encoding: imm[11:0] | rs1[4:0] | b110 | rd[4:0] | b0010011;
+            encoding: imm[11:0]s | rs1[4:0] | b110 | rd[4:0] | b0010011;
             args_disass:"x%rd$d, x%rs1$d, %imm%";
-            if(rd != 0) X[rd] <= X[rs1] | imm;
+            if(rd != 0) X[rd] <= X[rs1]s | imm;
         }
         ANDI {
-            encoding: imm[11:0] | rs1[4:0] | b111 | rd[4:0] | b0010011;
+            encoding: imm[11:0]s | rs1[4:0] | b111 | rd[4:0] | b0010011;
             args_disass:"x%rd$d, x%rs1$d, %imm%";
-            if(rd != 0) X[rd] <= X[rs1] & imm;
+            if(rd != 0) X[rd] <= X[rs1]s & imm;
         }
         SLLI {
             encoding: b0000000 | shamt[4:0] | rs1[4:0] | b001 | rd[4:0] | b0010011;

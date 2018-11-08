@@ -7,7 +7,7 @@ project("external")
 include(Common)
 
 
-include_directories( ${PROJECT_SOURCE_DIR}/external/libGIS )
+include_directories( ${PROJECT_SOURCE_DIR}/libGIS )
 
 FILE(GLOB ElfioHeaders elfio *.hpp)
 FILE(GLOB GISHeaders libGis *.h)

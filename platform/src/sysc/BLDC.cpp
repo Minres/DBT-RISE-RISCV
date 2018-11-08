@@ -1,9 +1,34 @@
-/*
- * BLDC.cpp
+/*******************************************************************************
+ * Copyright (C) 2018 MINRES Technologies GmbH
+ * All rights reserved.
  *
- *  Created on: 26.06.2018
- *      Author: eyck
- */
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
 #include "sysc/top/BLDC.h"
 
@@ -14,50 +39,48 @@ BLDC::BLDC(const Config config)
 , stateVector({{0.0, 0.0, 0.0, 0.0, 0.0}})
 , state(stateVector)
 , vin({{0.0, 0.0, 0.0}})
-, voltages({{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}})
-{
+, voltages({{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}) {
     state.init();
 }
 
-BLDC::~BLDC() {
+BLDC::~BLDC() = default;
 
-}
-
-double BLDC::calc_bemf_factor(const State& x, double theta){
-    if(theta>=0 && theta < 2./3.*M_PI){
+double BLDC::calc_bemf_factor(const State &x, double theta) {
+    if (theta >= 0 && theta < 2. / 3. * M_PI) {
         return 1;
-    } else if(theta>=2./3.*M_PI && theta < M_PI){
-        return 1-6/M_PI*(theta-2./3.*M_PI);
-    } else if(theta>=M_PI && theta < 5./3. * M_PI){
+    } else if (theta >= 2. / 3. * M_PI && theta < M_PI) {
+        return 1 - 6 / M_PI * (theta - 2. / 3. * M_PI);
+    } else if (theta >= M_PI && theta < 5. / 3. * M_PI) {
         return -1;
-    } else if(theta>=5./3. * M_PI && theta < 2. * M_PI){
-        return -1+6/M_PI*(theta-5./3.*M_PI);
+    } else if (theta >= 5. / 3. * M_PI && theta <= 2. * M_PI) {
+        return -1 + 6 / M_PI * (theta - 5. / 3. * M_PI);
     } else {
         fprintf(stderr, "ERROR: angle out of bounds can not calculate bemf %f\n", theta);
         throw std::runtime_error("angle out of bounds can not calculate bemf");
     }
 }
 
-void BLDC::calc_back_emf(const State& state, double theta_e) {
+void BLDC::calc_back_emf(const State &state, double theta_e) {
     double max_bemf = config.Ke * state.omega;
-    voltages[EA] = max_bemf*calc_bemf_factor(state, norm_angle(theta_e));
-    voltages[EB] = max_bemf*calc_bemf_factor(state, norm_angle(theta_e + M_PI * (2. / 3.)));
-    voltages[EC] = max_bemf*calc_bemf_factor(state, norm_angle(theta_e + M_PI * (4. / 3.)));
+    theta_e-=M_PI * (1. / 3.);
+    voltages[EA] = max_bemf * calc_bemf_factor(state, norm_angle(theta_e));
+    voltages[EB] = max_bemf * calc_bemf_factor(state, norm_angle(theta_e + M_PI * (2. / 3.)));
+    voltages[EC] = max_bemf * calc_bemf_factor(state, norm_angle(theta_e + M_PI * (4. / 3.)));
 }
 
-
-void BLDC::calc_voltages(){
+void BLDC::calc_voltages() {
     const double NaN = nan("");
     /* Check which phases are excited. */
-    bool pa = isnan(vin[0])?false:true;
-    bool pb = isnan(vin[1])?false:true;
-    bool pc = isnan(vin[2])?false:true;
+    bool pa = isnan(vin[0]) ? false : true;
+    bool pb = isnan(vin[1]) ? false : true;
+    bool pc = isnan(vin[2]) ? false : true;
 
     if (pa && pb && pc) {
         voltages[VA] = vin[0];
         voltages[VB] = vin[1];
         voltages[VC] = vin[2];
-        voltages[VCENTER] = (voltages[VA] + voltages[VB] + voltages[VC] - voltages[EA] - voltages[EB] - voltages[EC]) / 3.;
+        voltages[VCENTER] =
+            (voltages[VA] + voltages[VB] + voltages[VC] - voltages[EA] - voltages[EB] - voltages[EC]) / 3.;
     } else if (pa && pb) {
         voltages[VA] = vin[0];
         voltages[VB] = vin[1];
@@ -93,19 +116,21 @@ void BLDC::calc_voltages(){
         voltages[VB] = voltages[EB];
         voltages[VC] = voltages[EC];
         voltages[VCENTER] = 0;
+        // return;
     }
+    auto vmax = std::max({pa ? vin[0] : 0, pb ? vin[1] : 0, pc ? vin[2] : 0});
+    voltages[VCENTER] = vmax / 2;
 }
 
-void BLDC::printToStream(std::ostream& os) const {
-    os<<state.omega<<";"<<state.theta<<";"
-            <<state.ia<<";"<<state.ib<<";"<<state.ic<<";"
-            <<voltages[VA]<<";"<<voltages[VB]<<";"<<voltages[VC]<<";"
-            <<voltages[EA]<<";"<<voltages[EB]<<";"<<voltages[EC]<<";"<<voltages[VCENTER]<<";"
-            <<vin[0]<<";"<<vin[1]<<";"<<vin[2]<<";"<<etorque;
+void BLDC::printToStream(std::ostream &os) const {
+    os << state.omega << ";" << state.theta << ";" << state.ia << ";" << state.ib << ";" << state.ic << ";"
+       << voltages[VA] << ";" << voltages[VB] << ";" << voltages[VC] << ";" << voltages[EA] << ";" << voltages[EB]
+       << ";" << voltages[EC] << ";" << voltages[VCENTER] << ";" << vin[0] << ";" << vin[1] << ";" << vin[2] << ";"
+       << etorque;
 }
 
-void BLDC::rotor_dyn(const StateVector& x_, StateVector& dxdt_, const double t) {
-    const State x(const_cast<StateVector&>(x_));
+void BLDC::rotor_dyn(const StateVector &x_, StateVector &dxdt_, const double t) {
+    const State x(const_cast<StateVector &>(x_));
     State dxdt(dxdt_);
     double theta_e = state.theta * (config.NbPoles / 2.);
     /* Calculate backemf voltages. */
@@ -113,18 +138,16 @@ void BLDC::rotor_dyn(const StateVector& x_, StateVector& dxdt_, const double t) 
     /* Calculate voltages. */
     calc_voltages();
     /* Electromagnetic torque. */
-//    if (x.omega == 0) {
-//        printf("ERROR: input state vector omega equals 0!!!\n");
-//        throw std::runtime_error("input state vector omega equals 0");
-//    }
+    //    if (x.omega == 0) {
+    //        printf("ERROR: input state vector omega equals 0!!!\n");
+    //        throw std::runtime_error("input state vector omega equals 0");
+    //    }
     /* electrical torque */
-    //etorque = ((voltages[EA] * x.ia) + (voltages[EB] * x.ib) + (voltages[EC] * x.ic)) / x.omega;
+    // etorque = ((voltages[EA] * x.ia) + (voltages[EB] * x.ib) + (voltages[EC] * x.ic)) / x.omega;
     // which is equivalent to:
-    etorque = config.Ke*(
-            x.ia * (calc_bemf_factor(state, norm_angle(theta_e))) +
-            x.ib * (calc_bemf_factor(state, norm_angle(theta_e + M_PI * (2. / 3.)))) +
-            x.ic * (calc_bemf_factor(state, norm_angle(theta_e + M_PI * (4. / 3.))))
-            );
+    etorque = config.Ke * (x.ia * (calc_bemf_factor(state, norm_angle(theta_e))) +
+                           x.ib * (calc_bemf_factor(state, norm_angle(theta_e + M_PI * (2. / 3.)))) +
+                           x.ic * (calc_bemf_factor(state, norm_angle(theta_e + M_PI * (4. / 3.)))));
     /* Mechanical torque. */
     mtorque = ((etorque * (config.NbPoles / 2)) - (config.damping * x.omega) - torque_load);
 
@@ -149,16 +172,17 @@ void BLDC::rotor_dyn(const StateVector& x_, StateVector& dxdt_, const double t) 
 }
 
 void BLDC::run(double incr) {
-    if(dt>incr) throw std::runtime_error("incr needs to be larger than dt");
-    double next_time = current_time+incr;
-    odeint::integrate_adaptive(make_controlled( 1.0e-10 , 1.0e-6 , stepper_type() ),
-            [this]( const StateVector &x , StateVector &dxdt , double t ) {this->rotor_dyn(x, dxdt,t);},
-            stateVector, current_time, next_time, dt);
-    current_time=next_time;
-    state.theta=norm_angle(state.theta);
+    if (dt > incr) throw std::runtime_error("incr needs to be larger than dt");
+    double next_time = current_time + incr;
+    odeint::integrate_adaptive(
+        make_controlled(1.0e-10, 1.0e-6, stepper_type()),
+        [this](const StateVector &x, StateVector &dxdt, double t) { this->rotor_dyn(x, dxdt, t); }, stateVector,
+        current_time, next_time, dt);
+    current_time = next_time;
+    state.theta = norm_angle(state.theta);
 }
 
-std::ostream& operator <<(std::ostream& os, const BLDC& bldc) {
+std::ostream &operator<<(std::ostream &os, const BLDC &bldc) {
     bldc.printToStream(os);
     return os;
 }

@@ -371,9 +371,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 0);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LWU x%1$d, %2%(x%3$d)");
@@ -414,9 +414,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 1);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LD x%1$d, %2%(x%3$d)");
@@ -457,9 +457,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 2);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SD x%1$d, %2%(x%3$d)");
@@ -498,9 +498,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 3);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLLI x%1$d, x%2$d, %3%");
@@ -539,9 +539,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 4);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRLI x%1$d, x%2$d, %3%");
@@ -580,9 +580,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 5);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRAI x%1$d, x%2$d, %3%");
@@ -621,9 +621,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 6);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ADDIW x%1$d, x%2$d, %3%");
@@ -667,9 +667,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 7);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLLIW x%1$d, x%2$d, %3%");
@@ -711,9 +711,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 8);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRLIW x%1$d, x%2$d, %3%");
@@ -755,9 +755,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 9);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_shamt_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_shamt_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRAIW x%1$d, x%2$d, %3%");
@@ -799,9 +799,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 10);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -844,9 +844,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 11);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -889,9 +889,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 12);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLLW x%1$d, x%2$d, x%3$d");
@@ -940,9 +940,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 13);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRLW x%1$d, x%2$d, x%3$d");
@@ -991,9 +991,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 14);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRAW x%1$d, x%2$d, x%3$d");
@@ -1042,8 +1042,8 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 15);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	int32_t fld_imm_val = 0 | (signed_bit_sub<12,20>(instr) << 12);
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	int32_t fld_imm_val = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LUI x%1$d, 0x%2$05x");
@@ -1076,8 +1076,8 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 16);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	int32_t fld_imm_val = 0 | (signed_bit_sub<12,20>(instr) << 12);
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	int32_t fld_imm_val = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AUIPC x%1%, 0x%2$08x");
@@ -1114,8 +1114,8 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 17);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	int32_t fld_imm_val = 0 | (bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (signed_bit_sub<31,1>(instr) << 20);
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	int32_t fld_imm_val = signextend<int32_t,21>((bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (bit_sub<31,1>(instr) << 20));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("JAL x%1$d, 0x%2$x");
@@ -1156,9 +1156,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 18);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("JALR x%1$d, x%2$d, 0x%3$x");
@@ -1227,9 +1227,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 19);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BEQ x%1$d, x%2$d, 0x%3$x");
@@ -1273,9 +1273,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 20);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BNE x%1$d, x%2$d, 0x%3$x");
@@ -1319,9 +1319,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 21);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BLT x%1$d, x%2$d, 0x%3$x");
@@ -1369,9 +1369,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 22);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BGE x%1$d, x%2$d, 0x%3$x");
@@ -1419,9 +1419,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 23);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BLTU x%1$d, x%2$d, 0x%3$x");
@@ -1465,9 +1465,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 24);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (signed_bit_sub<31,1>(instr) << 12);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BGEU x%1$d, x%2$d, 0x%3$x");
@@ -1511,9 +1511,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 25);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LB x%1$d, %2%(x%3$d)");
@@ -1554,9 +1554,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 26);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LH x%1$d, %2%(x%3$d)");
@@ -1597,9 +1597,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 27);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LW x%1$d, %2%(x%3$d)");
@@ -1640,9 +1640,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 28);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LBU x%1$d, %2%(x%3$d)");
@@ -1683,9 +1683,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 29);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LHU x%1$d, %2%(x%3$d)");
@@ -1726,9 +1726,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 30);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SB x%1$d, %2%(x%3$d)");
@@ -1767,9 +1767,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 31);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SH x%1$d, %2%(x%3$d)");
@@ -1808,9 +1808,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 32);
     	
-    	int16_t fld_imm_val = 0 | (bit_sub<7,5>(instr)) | (signed_bit_sub<25,7>(instr) << 5);
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SW x%1$d, %2%(x%3$d)");
@@ -1849,9 +1849,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 33);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ADDI x%1$d, x%2$d, %3%");
@@ -1888,9 +1888,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 34);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTI x%1$d, x%2$d, %3%");
@@ -1932,9 +1932,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 35);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	int16_t fld_imm_val = 0 | (signed_bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTIU x%1$d, x%2$d, %3%");
@@ -1975,13 +1975,13 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 36);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("XORI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -2012,13 +2012,13 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 37);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ORI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -2049,13 +2049,13 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 38);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	int16_t fld_imm_val = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ANDI x%1$d, x%2$d, %3%");
-    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
+    	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
     	    std::vector<llvm::Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -2086,9 +2086,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 39);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ADD x%1$d, x%2$d, x%3$d");
@@ -2123,9 +2123,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 40);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SUB x%1$d, x%2$d, x%3$d");
@@ -2160,9 +2160,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 41);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLL x%1$d, x%2$d, x%3$d");
@@ -2199,9 +2199,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 42);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLT x%1$d, x%2$d, x%3$d");
@@ -2245,9 +2245,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 43);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTU x%1$d, x%2$d, x%3$d");
@@ -2293,9 +2293,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 44);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("XOR x%1$d, x%2$d, x%3$d");
@@ -2330,9 +2330,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 45);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRL x%1$d, x%2$d, x%3$d");
@@ -2369,9 +2369,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 46);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRA x%1$d, x%2$d, x%3$d");
@@ -2408,9 +2408,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 47);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("OR x%1$d, x%2$d, x%3$d");
@@ -2445,9 +2445,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 48);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AND x%1$d, x%2$d, x%3$d");
@@ -2482,10 +2482,10 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 49);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_succ_val = 0 | (bit_sub<20,4>(instr));
-    	uint8_t fld_pred_val = 0 | (bit_sub<24,4>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_succ_val = ((bit_sub<20,4>(instr)));
+    	uint8_t fld_pred_val = ((bit_sub<24,4>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2521,9 +2521,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 50);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_imm_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_imm_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2555,7 +2555,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 51);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2581,7 +2580,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 52);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2607,7 +2605,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 53);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2633,7 +2630,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 54);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2659,7 +2655,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 55);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2685,7 +2680,6 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 56);
     	
-    	;
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2713,8 +2707,8 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 57);
     	
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    std::vector<llvm::Value*> args {
@@ -2751,9 +2745,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 58);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRW x%1$d, %2$d, x%3$d");
@@ -2799,9 +2793,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 59);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRS x%1$d, %2$d, x%3$d");
@@ -2845,9 +2839,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 60);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRC x%1$d, %2$d, x%3$d");
@@ -2891,9 +2885,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 61);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_zimm_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRWI x%1$d, %2$d, 0x%3$x");
@@ -2934,9 +2928,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 62);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_zimm_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRSI x%1$d, %2$d, 0x%3$x");
@@ -2982,9 +2976,9 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 63);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_zimm_val = 0 | (bit_sub<15,5>(instr));
-    	uint16_t fld_csr_val = 0 | (bit_sub<20,12>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_zimm_val = ((bit_sub<15,5>(instr)));
+    	uint16_t fld_csr_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRCI x%1$d, %2$d, 0x%3$x");
@@ -3030,10 +3024,10 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 64);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LR.D x%1$d, x%2$d");
@@ -3078,11 +3072,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 65);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SC.D x%1$d, x%2$d, x%3$d");
@@ -3147,11 +3141,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 66);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOSWAP.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3193,11 +3187,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 67);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOADD.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3243,11 +3237,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 68);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOXOR.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3293,11 +3287,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 69);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOAND.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3343,11 +3337,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 70);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOOR.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3393,11 +3387,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 71);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMIN.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3452,11 +3446,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 72);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAX.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3511,11 +3505,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 73);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMINU.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3566,11 +3560,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 74);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAXU.D x%1$d, x%2$d, x%3$d (aqu=%a,rel=%rl)");
@@ -3621,10 +3615,10 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 75);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LR.W x%1$d, x%2$d");
@@ -3669,11 +3663,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 76);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SC.W x%1$d, x%2$d, x%3$d");
@@ -3737,11 +3731,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 77);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOSWAP.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -3783,11 +3777,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 78);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOADD.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -3833,11 +3827,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 79);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOXOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -3883,11 +3877,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 80);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOAND.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -3933,11 +3927,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 81);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -3983,11 +3977,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 82);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMIN.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -4042,11 +4036,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 83);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAX.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -4101,11 +4095,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 84);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMINU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
@@ -4156,11 +4150,11 @@ private:
     	
     	this->gen_sync(iss::PRE_SYNC, 85);
     	
-    	uint8_t fld_rd_val = 0 | (bit_sub<7,5>(instr));
-    	uint8_t fld_rs1_val = 0 | (bit_sub<15,5>(instr));
-    	uint8_t fld_rs2_val = 0 | (bit_sub<20,5>(instr));
-    	uint8_t fld_rl_val = 0 | (bit_sub<25,1>(instr));
-    	uint8_t fld_aq_val = 0 | (bit_sub<26,1>(instr));
+    	uint8_t fld_rd_val = ((bit_sub<7,5>(instr)));
+    	uint8_t fld_rs1_val = ((bit_sub<15,5>(instr)));
+    	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
+    	uint8_t fld_rl_val = ((bit_sub<25,1>(instr)));
+    	uint8_t fld_aq_val = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAXU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");

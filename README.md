@@ -25,8 +25,8 @@ DBT-RISE-RISCV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO
 
 **Quick start**
 
-* you need to have a decent compiler, make, python, and cmake installed
-* install LLVM 4.0 according to http://apt.llvm.org/ (if it is not already provided by your distribution e.g by Ubuntu 17.04)
+* you need to have a C++11 capable compiler, make, python, and cmake installed
+* install LLVM >= 4.0 according to http://apt.llvm.org/ (if it is not already provided by your distribution e.g by Ubuntu 18.04)
 * install conan.io (see also http://docs.conan.io/en/latest/installation.html):
 ```
     pip install conan

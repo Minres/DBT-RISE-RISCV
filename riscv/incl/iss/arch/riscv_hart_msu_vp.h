@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2017, MINRES Technologies GmbH
+ * Copyright (C) 2017, 2018, MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,21 +37,26 @@
 
 #include "iss/arch/traits.h"
 #include "iss/arch_if.h"
+#include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
-#include "iss/instrumentation_if.h"
+#include <array>
 #include <elfio/elfio.hpp>
 #include <iomanip>
 #include <sstream>
+#include <type_traits>
 #include <unordered_map>
+#include <util/bit_field.h>
 #include <util/ities.h>
 #include <util/sparse_array.h>
-#include <util/bit_field.h>
-#include <array>
-#include <type_traits>
 
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
+#if defined(__GNUC__)
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x) x
+#define unlikely(x) x
+#endif
 
 namespace iss {
 namespace arch {
@@ -165,29 +170,29 @@ enum riscv_csr {
 
 namespace {
 
-std::array<const char, 4> lvl = { { 'U', 'S', 'H', 'M' } };
+std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
 
-std::array<const char*, 16> trap_str = { { ""
-		"Instruction address misaligned", //0
-		"Instruction access fault", //1
-		"Illegal instruction", //2
-		"Breakpoint", //3
-		"Load address misaligned", //4
-		"Load access fault", //5
-		"Store/AMO address misaligned", //6
-		"Store/AMO access fault", //7
-		"Environment call from U-mode", //8
-		"Environment call from S-mode", //9
-		"Reserved", //a
-		"Environment call from M-mode", //b
-		"Instruction page fault", //c
-		"Load page fault", //d
-		"Reserved", //e
-		"Store/AMO page fault" } };
-std::array<const char*, 12> irq_str = { {
-		"User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
-		"User timer interrupt", "Supervisor timer interrupt", "Reserved", "Machine timer interrupt", "User external interrupt",
-		"Supervisor external interrupt", "Reserved", "Machine external interrupt" } };
+std::array<const char *, 16> trap_str = {{""
+                                          "Instruction address misaligned", // 0
+                                          "Instruction access fault",       // 1
+                                          "Illegal instruction",            // 2
+                                          "Breakpoint",                     // 3
+                                          "Load address misaligned",        // 4
+                                          "Load access fault",              // 5
+                                          "Store/AMO address misaligned",   // 6
+                                          "Store/AMO access fault",         // 7
+                                          "Environment call from U-mode",   // 8
+                                          "Environment call from S-mode",   // 9
+                                          "Reserved",                       // a
+                                          "Environment call from M-mode",   // b
+                                          "Instruction page fault",         // c
+                                          "Load page fault",                // d
+                                          "Reserved",                       // e
+                                          "Store/AMO page fault"}};
+std::array<const char *, 12> irq_str = {
+    {"User software interrupt", "Supervisor software interrupt", "Reserved", "Machine software interrupt",
+     "User timer interrupt", "Supervisor timer interrupt", "Reserved", "Machine timer interrupt",
+     "User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt"}};
 
 enum {
     PGSHIFT = 12,
@@ -229,7 +234,7 @@ struct vm_info {
     int idxbits;
     int ptesize;
     uint64_t ptbase;
-    bool is_active() { return levels;}
+    bool is_active() { return levels; }
 };
 
 class trap_load_access_fault : public trap_access {
@@ -272,10 +277,9 @@ public:
     using wr_csr_f = iss::status (this_class::*)(unsigned addr, reg_t);
 
     // primary template
-    template<class T, class Enable = void> struct hart_state { };
+    template <class T, class Enable = void> struct hart_state {};
     // specialization 32bit
-    template <typename T>
-    class hart_state<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
+    template <typename T> class hart_state<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
     public:
         BEGIN_BF_DECL(mstatus_t, T);
         // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR XS==11)))
@@ -318,10 +322,10 @@ public:
 
         static const reg_t mstatus_reset_val = 0;
 
-        void write_mstatus(T val, unsigned priv_lvl){
+        void write_mstatus(T val, unsigned priv_lvl) {
             auto mask = get_mask(priv_lvl);
             auto new_val = (mstatus.st.value & ~mask) | (val & mask);
-            mstatus=new_val;
+            mstatus = new_val;
         }
 
         T satp;
@@ -329,11 +333,15 @@ public:
         static constexpr T get_misa() { return (1UL << 30) | ISA_I | ISA_M | ISA_A | ISA_U | ISA_S | ISA_M; }
 
         static constexpr uint32_t get_mask(unsigned priv_lvl) {
+#if __cplusplus < 201402L
+            return priv_lvl == PRIV_U ? 0x80000011UL : priv_lvl == PRIV_S ? 0x800de133UL : 0x807ff9ddUL;
+#else
             switch (priv_lvl) {
             case PRIV_U: return 0x80000011UL; // 0b1000 0000 0000 0000 0000 0000 0001 0001
             case PRIV_S: return 0x800de133UL; // 0b1000 0000 0000 1101 1110 0001 0011 0011
             default:     return 0x807ff9ddUL; // 0b1000 0000 0111 1111 1111 1001 1011 1011
             }
+#endif
         }
 
         static inline vm_info decode_vm_info(uint32_t state, T sptbr) {
@@ -349,8 +357,7 @@ public:
         }
     };
     // specialization 64bit
-    template <typename T>
-    class hart_state<T, typename std::enable_if<std::is_same<T, uint64_t>::value>::type> {
+    template <typename T> class hart_state<T, typename std::enable_if<std::is_same<T, uint64_t>::value>::type> {
     public:
         BEGIN_BF_DECL(mstatus_t, T);
         // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR XS==11)))
@@ -397,17 +404,17 @@ public:
 
         static const reg_t mstatus_reset_val = 0xa00000000;
 
-        void write_mstatus(T val, unsigned priv_lvl){
+        void write_mstatus(T val, unsigned priv_lvl) {
             T old_val = mstatus;
             auto mask = get_mask(priv_lvl);
             auto new_val = (old_val & ~mask) | (val & mask);
-            if((new_val&mstatus.SXL.Mask)==0){
-                new_val |= old_val&mstatus.SXL.Mask;
+            if ((new_val & mstatus.SXL.Mask) == 0) {
+                new_val |= old_val & mstatus.SXL.Mask;
             }
-            if((new_val&mstatus.UXL.Mask)==0){
-                new_val |= old_val&mstatus.UXL.Mask;
+            if ((new_val & mstatus.UXL.Mask) == 0) {
+                new_val |= old_val & mstatus.UXL.Mask;
             }
-            mstatus=new_val;
+            mstatus = new_val;
         }
 
         T satp;
@@ -426,9 +433,9 @@ public:
             if (state == PRIV_M) return {0, 0, 0, 0};
             if (state <= PRIV_S)
                 switch (bit_sub<60, 4>(sptbr)) {
-                case 0: return {0, 0, 0, 0}; // off
-                case 8: return {3, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV39
-                case 9: return {4, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV48
+                case 0:  return {0, 0, 0, 0}; // off
+                case 8:  return {3, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV39
+                case 9:  return {4, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV48
                 case 10: return {5, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV57
                 case 11: return {6, 9, 8, bit_sub<0, 44>(sptbr) << PGSHIFT};// SV64
                 default: abort();
@@ -442,12 +449,12 @@ public:
     const typename super::reg_t PGMASK = PGSIZE - 1;
 
     constexpr reg_t get_irq_mask(size_t mode) {
-			std::array<const reg_t,4> m = { {
-					0b000100010001,// U mode
-					0b001100110011,// S mode
-					0,
-					0b101110111011 // M mode
-					}};
+        std::array<const reg_t, 4> m = {{
+            0b000100010001, // U mode
+            0b001100110011, // S mode
+            0,
+            0b101110111011 // M mode
+        }};
         return m[mode];
     }
 
@@ -456,7 +463,7 @@ public:
 
     void reset(uint64_t address) override;
 
-    std::pair<uint64_t,bool> load_file(std::string name, int type = -1) override;
+    std::pair<uint64_t, bool> load_file(std::string name, int type = -1) override;
 
     virtual phys_addr_t virt2phys(const iss::addr_t &addr) override;
 
@@ -468,40 +475,39 @@ public:
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
-
     void disass_output(uint64_t pc, const std::string instr) override {
         std::stringstream s;
         s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
           << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
-        CLOG(INFO, disass) << "0x"<<std::setw(16)<<std::setfill('0')<<std::hex<<pc<<"\t\t"<<instr<<"\t"<<s.str();
+        CLOG(INFO, disass) << "0x" << std::setw(16) << std::setfill('0') << std::hex << pc << "\t\t" << instr << "\t" << s.str();
     };
 
-    iss::instrumentation_if* get_instrumentation_if() override {return &instr_if;}
-
+    iss::instrumentation_if *get_instrumentation_if() override { return &instr_if; }
+ 
 protected:
-    struct riscv_instrumentation_if : public iss::instrumentation_if{
+    struct riscv_instrumentation_if : public iss::instrumentation_if {
 
-    	riscv_instrumentation_if(riscv_hart_msu_vp<BASE>& arch):arch(arch){}
+        riscv_instrumentation_if(riscv_hart_msu_vp<BASE> &arch)
+        : arch(arch) {}
         /**
          * get the name of this architecture
          *
          * @return the name of this architecture
          */
-    	const std::string core_type_name() const override {return traits<BASE>::core_type;}
+        const std::string core_type_name() const override { return traits<BASE>::core_type; }
 
-        virtual uint64_t get_pc(){ return arch.get_pc(); };
+        virtual uint64_t get_pc() { return arch.get_pc(); };
 
-    	virtual uint64_t get_next_pc(){ return arch.get_next_pc(); };
+        virtual uint64_t get_next_pc() { return arch.get_next_pc(); };
 
-    	virtual void set_curr_instr_cycles(unsigned cycles){ arch.cycle_offset+=cycles-1; };
+        virtual void set_curr_instr_cycles(unsigned cycles) { arch.cycle_offset += cycles - 1; };
 
-    	riscv_hart_msu_vp<BASE>& arch;
+        riscv_hart_msu_vp<BASE> &arch;
     };
 
     friend struct riscv_instrumentation_if;
-    addr_t get_pc(){return this->reg.PC;}
-    addr_t get_next_pc(){return this->reg.NEXT_PC;}
-
+    addr_t get_pc() { return this->reg.PC; }
+    addr_t get_next_pc() { return this->reg.NEXT_PC; }
 
     virtual iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data);
     virtual iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data);
@@ -512,7 +518,7 @@ protected:
     hart_state<reg_t> state;
     uint64_t cycle_offset;
     reg_t fault_data;
-    std::array<vm_info,2> vm;
+    std::array<vm_info, 2> vm;
     uint64_t tohost = tohost_dflt;
     uint64_t fromhost = fromhost_dflt;
     unsigned to_host_wr_cnt = 0;
@@ -541,15 +547,18 @@ private:
     iss::status write_ip(unsigned addr, reg_t val);
     iss::status read_satp(unsigned addr, reg_t &val);
     iss::status write_satp(unsigned addr, reg_t val);
-    iss::status read_fcsr(unsigned addr, reg_t& val);
+    iss::status read_fcsr(unsigned addr, reg_t &val);
     iss::status write_fcsr(unsigned addr, reg_t val);
+
 protected:
     void check_interrupt();
 };
 
 template <typename BASE>
 riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
-: state(), cycle_offset(0), instr_if(*this) {
+: state()
+, cycle_offset(0)
+, instr_if(*this) {
     csr[misa] = hart_state<reg_t>::get_misa();
     uart_buf.str("");
     // read-only registers
@@ -591,27 +600,26 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
     csr_wr_cb[fflags] = &riscv_hart_msu_vp<BASE>::write_fcsr;
     csr_rd_cb[frm] = &riscv_hart_msu_vp<BASE>::read_fcsr;
     csr_wr_cb[frm] = &riscv_hart_msu_vp<BASE>::write_fcsr;
-
 }
 
-template <typename BASE> std::pair<uint64_t,bool> riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
+template <typename BASE> std::pair<uint64_t, bool> riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
     FILE *fp = fopen(name.c_str(), "r");
     if (fp) {
-		std::array<char, 5> buf;
-		auto n = fread(buf.data(), 1, 4, fp);
+        std::array<char, 5> buf;
+        auto n = fread(buf.data(), 1, 4, fp);
         if (n != 4) throw std::runtime_error("input file has insufficient size");
         buf[4] = 0;
-		if (strcmp(buf.data() + 1, "ELF") == 0) {
+        if (strcmp(buf.data() + 1, "ELF") == 0) {
             fclose(fp);
             // Create elfio reader
             ELFIO::elfio reader;
             // Load ELF data
             if (!reader.load(name)) throw std::runtime_error("could not process elf file");
             // check elf properties
-            if ( reader.get_class() != ELFCLASS32 )
-                if(sizeof(reg_t) == 4) throw std::runtime_error("wrong elf class in file");
+            if (reader.get_class() != ELFCLASS32)
+                if (sizeof(reg_t) == 4) throw std::runtime_error("wrong elf class in file");
             if (reader.get_type() != ET_EXEC) throw std::runtime_error("wrong elf type in file");
-            if ( reader.get_machine() != EM_RISCV ) throw std::runtime_error("wrong elf machine in file");
+            if (reader.get_machine() != EM_RISCV) throw std::runtime_error("wrong elf machine in file");
             for (const auto pseg : reader.segments) {
                 const auto fsize = pseg->get_file_size(); // 0x42c/0x0
                 const auto seg_data = pseg->get_data();
@@ -642,9 +650,9 @@ template <typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned length, uint8_t *const data) {
 #ifndef NDEBUG
     if (addr.access && iss::access_type::DEBUG) {
-        LOG(DEBUG) << "debug read of " << length << " bytes @addr " << addr;
+        LOG(TRACE) << "debug read of " << length << " bytes @addr " << addr;
     } else {
-        LOG(DEBUG) << "read of " << length << " bytes  @addr " << addr;
+        LOG(TRACE) << "read of " << length << " bytes  @addr " << addr;
     }
 #endif
     try {
@@ -716,26 +724,26 @@ iss::status riscv_hart_msu_vp<BASE>::read(const iss::addr_t &addr, unsigned leng
 template <typename BASE>
 iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned length, const uint8_t *const data) {
 #ifndef NDEBUG
-    const char *prefix = (addr.access && iss::access_type::DEBUG)? "debug " : "";
+    const char *prefix = (addr.access && iss::access_type::DEBUG) ? "debug " : "";
     switch (length) {
     case 8:
-        LOG(DEBUG) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t *)&data[0] << std::dec
+        LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t *)&data[0] << std::dec
                    << ") @addr " << addr;
         break;
     case 4:
-        LOG(DEBUG) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t *)&data[0] << std::dec
+        LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t *)&data[0] << std::dec
                    << ") @addr " << addr;
         break;
     case 2:
-        LOG(DEBUG) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t *)&data[0] << std::dec
+        LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t *)&data[0] << std::dec
                    << ") @addr " << addr;
         break;
     case 1:
-        LOG(DEBUG) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec
+        LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec
                    << ") @addr " << addr;
         break;
     default:
-        LOG(DEBUG) << prefix << "write of " << length << " bytes @addr " << addr;
+        LOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;
     }
 #endif
     try {
@@ -760,7 +768,8 @@ iss::status riscv_hart_msu_vp<BASE>::write(const iss::addr_t &addr, unsigned len
                     }
                 }
                 auto res = write_mem(BASE::v2p(addr), length, data);
-                if (unlikely(res != iss::Ok)) this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
+                if (unlikely(res != iss::Ok))
+                    this->reg.trap_state = (1 << 31) | (5 << 16); // issue trap 7 (Store/AMO access fault)
                 return res;
             } catch (trap_access &ta) {
                 this->reg.trap_state = (1 << 31) | ta.id;
@@ -857,7 +866,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_csr(unsigned
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigned addr, reg_t &val) {
-    auto cycle_val= this->reg.icount + cycle_offset;
+    auto cycle_val = this->reg.icount + cycle_offset;
     if (addr == mcycle) {
         val = static_cast<reg_t>(cycle_val);
     } else if (addr == mcycleh) {
@@ -868,7 +877,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigne
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned addr, reg_t &val) {
-	uint64_t time_val=(this->reg.icount + cycle_offset) / (100000000/32768-1); //-> ~3052;
+    uint64_t time_val = (this->reg.icount + cycle_offset) / (100000000 / 32768 - 1); //-> ~3052;
     if (addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if (addr == timeh) {
@@ -925,7 +934,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_ip(unsigned 
     auto req_priv_lvl = addr >> 8;
     if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto mask = get_irq_mask(req_priv_lvl);
-    mask &= ~(1<<7); // MTIP is read only
+    mask &= ~(1 << 7); // MTIP is read only
     csr[mip] = (csr[mip] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -953,16 +962,16 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_satp(unsigne
     update_vm_info();
     return iss::Ok;
 }
-template<typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_fcsr(unsigned addr, reg_t& val) {
-    switch(addr){
-    case 1: //fflags, 4:0
+template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_fcsr(unsigned addr, reg_t &val) {
+    switch (addr) {
+    case 1: // fflags, 4:0
         val = bit_sub<0, 5>(this->get_fcsr());
         break;
     case 2: // frm, 7:5
         val = bit_sub<5, 3>(this->get_fcsr());
-       break;
+        break;
     case 3: // fcsr
-        val=this->get_fcsr();
+        val = this->get_fcsr();
         break;
     default:
         return iss::Err;
@@ -970,16 +979,16 @@ template<typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_fcsr(unsigned 
     return iss::Ok;
 }
 
-template<typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_fcsr(unsigned addr, reg_t val) {
-    switch(addr){
-    case 1: //fflags, 4:0
-        this->set_fcsr( (this->get_fcsr() & 0xffffffe0) | (val&0x1f));
+template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_fcsr(unsigned addr, reg_t val) {
+    switch (addr) {
+    case 1: // fflags, 4:0
+        this->set_fcsr((this->get_fcsr() & 0xffffffe0) | (val & 0x1f));
         break;
     case 2: // frm, 7:5
-        this->set_fcsr( (this->get_fcsr() & 0xffffff1f) | ((val&0x7)<<5));
-       break;
+        this->set_fcsr((this->get_fcsr() & 0xffffff1f) | ((val & 0x7) << 5));
+        break;
     case 3: // fcsr
-        this->set_fcsr(val&0xff);
+        this->set_fcsr(val & 0xff);
         break;
     default:
         return iss::Err;
@@ -992,7 +1001,7 @@ iss::status riscv_hart_msu_vp<BASE>::read_mem(phys_addr_t paddr, unsigned length
     if ((paddr.val + length) > mem.size()) return iss::Err;
     switch (paddr.val) {
     case 0x0200BFF8: { // CLINT base, mtime reg
-        if(sizeof(reg_t)<length) return iss::Err;
+        if (sizeof(reg_t) < length) return iss::Err;
         reg_t time_val;
         this->read_csr(time, time_val);
         std::copy((uint8_t *)&time_val, ((uint8_t *)&time_val) + length, data);
@@ -1054,10 +1063,10 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
                 if (tohost_upper || (tohost_lower && to_host_wr_cnt > 0)) {
                     switch (hostvar >> 48) {
                     case 0:
-                        if (hostvar != 0x1){
+                        if (hostvar != 0x1) {
                             LOG(FATAL) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                        << "), stopping simulation";
-                        }else{
+                        } else {
                             LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                       << "), stopping simulation";
                         }
@@ -1087,22 +1096,20 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
     return iss::Ok;
 }
 
-template<typename BASE>
-inline void riscv_hart_msu_vp<BASE>::reset(uint64_t address) {
+template <typename BASE> inline void riscv_hart_msu_vp<BASE>::reset(uint64_t address) {
     BASE::reset(address);
     state.mstatus = hart_state<reg_t>::mstatus_reset_val;
     update_vm_info();
 }
 
-template<typename BASE>
-inline void riscv_hart_msu_vp<BASE>::update_vm_info() {
+template <typename BASE> inline void riscv_hart_msu_vp<BASE>::update_vm_info() {
     vm[1] = hart_state<reg_t>::decode_vm_info(this->reg.machine_state, state.satp);
-    BASE::addr_mode[3]=BASE::addr_mode[2]=vm[1].is_active()?iss::address_type::VIRTUAL:iss::address_type::PHYSICAL;
-    if(state.mstatus.MPRV)
+    BASE::addr_mode[3]=BASE::addr_mode[2] = vm[1].is_active()? iss::address_type::VIRTUAL : iss::address_type::PHYSICAL;
+    if (state.mstatus.MPRV)
         vm[0] = hart_state<reg_t>::decode_vm_info(state.mstatus.MPP, state.satp);
     else
         vm[0] = vm[1];
-    BASE::addr_mode[1]=BASE::addr_mode[0]=vm[0].is_active()?iss::address_type::VIRTUAL:iss::address_type::PHYSICAL;
+    BASE::addr_mode[1] = BASE::addr_mode[0]=vm[0].is_active() ? iss::address_type::VIRTUAL : iss::address_type::PHYSICAL;
     ptw.clear();
 }
 
@@ -1117,7 +1124,7 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::check_interrupt() {
     // any synchronous traps.
     auto ena_irq = ip & ie;
 
-    auto mie = state.mstatus.MIE;
+    bool mie = state.mstatus.MIE;
     auto m_enabled = this->reg.machine_state < PRIV_M || (this->reg.machine_state == PRIV_M && mie);
     auto enabled_interrupts = m_enabled ? ena_irq & ~ideleg : 0;
 
@@ -1153,10 +1160,10 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::virt2phys
 #endif
     } else {
         uint32_t mode = type != iss::access_type::FETCH && state.mstatus.MPRV ? // MPRV
-                            state.mstatus.MPP:
+                            state.mstatus.MPP :
                             this->reg.machine_state;
 
-        const vm_info& vm = this->vm[static_cast<uint16_t>(type)/2];
+        const vm_info &vm = this->vm[static_cast<uint16_t>(type) / 2];
 
         const bool s_mode = mode == PRIV_S;
         const bool sum = state.mstatus.SUM;
@@ -1175,8 +1182,8 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::virt2phys
 
             // check that physical address of PTE is legal
             reg_t pte = 0;
-            const uint8_t res =
-                this->read(phys_addr_t{addr.access, traits<BASE>::MEM, base + idx * vm.ptesize}, vm.ptesize, (uint8_t *)&pte);
+            const uint8_t res = this->read(phys_addr_t{addr.access, traits<BASE>::MEM, base + idx * vm.ptesize},
+                                           vm.ptesize, (uint8_t *)&pte);
             if (res != 0) throw trap_load_access_fault(addr.val);
             const reg_t ppn = pte >> PTE_PPN_SHIFT;
 
@@ -1186,9 +1193,10 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::virt2phys
                 break;
             } else if (!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
                 break;
-            } else if (type == iss::access_type::FETCH ? !(pte & PTE_X)
-                                          : type == iss::access_type::READ ? !(pte & PTE_R) && !(mxr && (pte & PTE_X))
-                                                              : !((pte & PTE_R) && (pte & PTE_W))) {
+            } else if (type == iss::access_type::FETCH
+                           ? !(pte & PTE_X)
+                           : type == iss::access_type::READ ? !(pte & PTE_R) && !(mxr && (pte & PTE_X))
+                                                            : !((pte & PTE_R) && (pte & PTE_W))) {
                 break;
             } else if ((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
                 break;
@@ -1254,8 +1262,8 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
         csr[uepc | (new_priv << 8)] = this->reg.NEXT_PC; // store next address if interrupt
         this->reg.pending_trap = 0;
     }
-    size_t adr=ucause | (new_priv << 8);
-    csr[adr] = (trap_id<<31)+cause;
+    size_t adr = ucause | (new_priv << 8);
+    csr[adr] = (trap_id << 31) + cause;
     // update mstatus
     // xPP field of mstatus is written with the active privilege mode at the time
     // of the trap; the x PIE field of mstatus
@@ -1265,15 +1273,18 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     // store the actual privilege level in yPP and store interrupt enable flags
     switch (new_priv) {
     case PRIV_M:
-        state.mstatus.MPP=cur_priv;
-        state.mstatus.MPIE=state.mstatus.MIE;
+        state.mstatus.MPP = cur_priv;
+        state.mstatus.MPIE = state.mstatus.MIE;
+        state.mstatus.MIE = false;
         break;
     case PRIV_S:
         state.mstatus.SPP = cur_priv;
-        state.mstatus.SPIE=state.mstatus.SIE;
+        state.mstatus.SPIE = state.mstatus.SIE;
+        state.mstatus.SIE = false;
         break;
     case PRIV_U:
-        state.mstatus.UPIE=state.mstatus.UIE;
+        state.mstatus.UPIE = state.mstatus.UIE;
+        state.mstatus.UIE = false;
         break;
     default:
         break;
@@ -1288,11 +1299,12 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     // reset trap state
     this->reg.machine_state = new_priv;
     this->reg.trap_state = 0;
-	std::array<char, 32> buffer;
-	sprintf(buffer.data(), "0x%016lx", addr);
-    CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause])<<"' ("<<trap_id<<")"
-                       << " at address " << buffer.data() << " occurred, changing privilege level from " << lvl[cur_priv]
-                       << " to " << lvl[new_priv];
+    std::array<char, 32> buffer;
+    sprintf(buffer.data(), "0x%016lx", addr);
+    CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
+                       << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << trap_id << ")"
+                       << " at address " << buffer.data() << " occurred, changing privilege level from "
+                       << lvl[cur_priv] << " to " << lvl[new_priv];
     update_vm_info();
     return this->reg.NEXT_PC;
 }
@@ -1314,22 +1326,23 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::leave_trap(uint64_t f
     switch (inst_priv) {
     case PRIV_M:
         this->reg.machine_state = state.mstatus.MPP;
-        state.mstatus.MPP=0; // clear mpp to U mode
-        state.mstatus.MIE=state.mstatus.MPIE;
+        state.mstatus.MPP = 0; // clear mpp to U mode
+        state.mstatus.MIE = state.mstatus.MPIE;
         break;
     case PRIV_S:
         this->reg.machine_state = state.mstatus.SPP;
-        state.mstatus.SPP= 0; // clear spp to U mode
-        state.mstatus.SIE=state.mstatus.SPIE;
+        state.mstatus.SPP = 0; // clear spp to U mode
+        state.mstatus.SIE = state.mstatus.SPIE;
         break;
     case PRIV_U:
         this->reg.machine_state = 0;
-        state.mstatus.UIE=state.mstatus.UPIE;
+        state.mstatus.UIE = state.mstatus.UPIE;
         break;
     }
     // sets the pc to the value stored in the x epc register.
     this->reg.NEXT_PC = csr[uepc | inst_priv << 8];
-    CLOG(INFO, disass) << "Executing xRET , changing privilege level from " << lvl[cur_priv] << " to " << lvl[this->reg.machine_state];
+    CLOG(INFO, disass) << "Executing xRET , changing privilege level from " << lvl[cur_priv] << " to "
+                       << lvl[this->reg.machine_state];
     update_vm_info();
     return this->reg.NEXT_PC;
 }
@@ -1344,6 +1357,5 @@ template <typename BASE> void riscv_hart_msu_vp<BASE>::wait_until(uint64_t flags
 }
 }
 }
-
 
 #endif /* _RISCV_CORE_H_ */

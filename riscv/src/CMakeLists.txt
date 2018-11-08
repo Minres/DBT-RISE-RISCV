@@ -1,14 +1,16 @@
 # library files
-FILE(GLOB RiscVHeaders *.h)
-FILE(GLOB IssSources iss/*.cpp internal/*.cpp) 
-
-
-set(LIB_HEADERS ${RiscVHeaders} )
-set(LIB_SOURCES
-    ${IssSources}
+FILE(GLOB RiscVSCHeaders ${PROJECT_SOURCE_DIR}/incl/sysc/*.h ${PROJECT_SOURCE_DIR}/incl/sysc/*/*.h)
+set(LIB_HEADERS ${RiscVSCHeaders} )
+set(LIB_SOURCES 
+	iss/rv32gc.cpp
+	iss/rv32imac.cpp
+	iss/rv64ia.cpp
+	internal/fp_functions.cpp
+	internal/vm_rv32gc.cpp
+	internal/vm_rv32imac.cpp
+	internal/vm_rv64ia.cpp
     plugin/instruction_count.cpp
-    plugin/cycle_estimate.cpp
-)
+    plugin/cycle_estimate.cpp)
 
 set(APP_HEADERS )
 
@@ -18,7 +20,6 @@ set(APP_SOURCES main.cpp)
 set(LIBRARY_NAME riscv)
 
 # Define the library
-#add_library(${LIBRARY_NAME} SHARED ${LIB_SOURCES})
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})
 SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
