@@ -269,7 +269,8 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::read_mem(uint64_t ad
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t> &data) {
     auto a = map_addr({iss::access_type::DEBUG_READ, iss::address_type::VIRTUAL, 0, addr});
-    return srv->execute_syncronized(&arch_if::write, core, a, data.size(), data.data());
+    auto f = [&]() -> status { return core->write(a, data.size(), data.data()); };
+    return srv->execute_syncronized(f);
 }
 
 template <typename ARCH>
