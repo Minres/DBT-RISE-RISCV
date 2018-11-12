@@ -1,0 +1,34 @@
+{
+	"i_system":{
+		"enableTracing" : true,
+		"i_motor.enableTracing" : true,
+		"i_h_bridge.enableTracing" : false,
+		"i_h_bridge.vcc" : 48.0,
+		"i_hifive1" : 
+		{
+			"i_adc.enableTracing" : false,
+			"i_terminal.enableTracing" : true,
+			"i_terminal.write_to_ws" : false,
+			"i_fe310": {
+				"enableTracing" : false,
+				"i_gpio.write_to_ws": true,
+				"i_pwm0.enableTracing" : true,
+				"i_pwm0.regs.enableTracing" : true,
+				"i_uart0.bit_true_transfer": false,
+				"i_uart1":{
+					"bit_true_transfer": false
+				},
+				"i_qspi0":{
+					"bit_true_transfer": false
+				},
+				"i_qspi1":{
+					"bit_true_transfer": false,
+					"enableTracing": true
+				},
+				"i_qspi2":{
+					"bit_true_transfer": false
+				}
+			}
+		}
+	}
+}
