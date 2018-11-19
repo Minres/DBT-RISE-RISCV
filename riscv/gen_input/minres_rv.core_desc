@@ -9,7 +9,6 @@ import "RV64IBase.core_desc"
 import "RV64A.core_desc"
 
 Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
-    template:"vm_riscv.in.cpp";
     constants {
         XLEN:=32;
         PCLEN:=32;
@@ -36,7 +35,6 @@ Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32
 
 
 Core RV64IA provides RV64IBase, RV64A, RV32A {
-    template:"vm_riscv.in.cpp";
     constants {
         XLEN:=64;
         PCLEN:=64;

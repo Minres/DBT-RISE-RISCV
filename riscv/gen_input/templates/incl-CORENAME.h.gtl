@@ -1,34 +1,35 @@
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017, MINRES Technologies GmbH
-// All rights reserved.
-// 
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-// 
-// 1. Redistributions of source code must retain the above copyright notice,
-//    this list of conditions and the following disclaimer.
-// 
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-// 
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// 
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-// 
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ * Copyright (C) 2017, 2018 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
+
 <% 
 import com.minres.coredsl.coreDsl.Register
 import com.minres.coredsl.coreDsl.RegisterFile
@@ -39,18 +40,17 @@ def getTypeSize(size){
 #ifndef _${coreDef.name.toUpperCase()}_H_
 #define _${coreDef.name.toUpperCase()}_H_
 
+#include <array>
+#include <iss/arch/traits.h>
 #include <iss/arch_if.h>
 #include <iss/vm_if.h>
-#include <iss/arch/traits.h>
-#include <array>
 
 namespace iss {
 namespace arch {
 
 struct ${coreDef.name.toLowerCase()};
 
-template<>
-struct traits<${coreDef.name.toLowerCase()}> {
+template <> struct traits<${coreDef.name.toLowerCase()}> {
 
 	constexpr static char const* const core_type = "${coreDef.name}";
     
@@ -87,21 +87,21 @@ struct traits<${coreDef.name.toLowerCase()}> {
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
-    constexpr static unsigned reg_bit_width(unsigned r) {
-        constexpr std::array<const uint32_t, ${regSizes.size}> ${coreDef.name}_reg_size{{${regSizes.join(",")}}};
-        return ${coreDef.name}_reg_size[r];
-    }
+ 	static constexpr std::array<const uint32_t, ${regSizes.size}> ${coreDef.name}_reg_size{
+ 		{${regSizes.join(",")}}};
 
-    constexpr static unsigned reg_byte_offset(unsigned r) {
-    	constexpr std::array<const uint32_t, ${regOffsets.size}> ${coreDef.name}_reg_byte_offset{{${regOffsets.join(",")}}};
-        return ${coreDef.name}_reg_byte_offset[r];
-    }
+    static constexpr unsigned reg_bit_width(unsigned r) { return ${coreDef.name}_reg_size[r]; }
+
+    static constexpr std::array<const uint32_t, ${regOffsets.size}> ${coreDef.name}_reg_byte_offset{
+    	{${regOffsets.join(",")}}};
+
+    constexpr static unsigned reg_byte_offset(unsigned r) { return ${coreDef.name}_reg_byte_offset[r]; }
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 
-    enum sreg_flag_e {FLAGS};
+    enum sreg_flag_e { FLAGS };
 
-    enum mem_type_e {${allSpaces.collect{s -> s.name}.join(', ')}};
+    enum mem_type_e { ${allSpaces.collect{s -> s.name}.join(', ')} };
 };
 
 struct ${coreDef.name.toLowerCase()}: public arch_if {
@@ -126,12 +126,13 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
     /// deprecated
     void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
 
-    uint64_t get_icount() { return reg.icount;}
+    inline uint64_t get_icount() { return reg.icount; }
+
+    inline bool should_stop() { return interrupt_sim; }
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
-        if(addr.space != traits<${coreDef.name.toLowerCase()}>::MEM ||
-                addr.type == iss::address_type::PHYSICAL ||
-                addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL){
+        if (addr.space != traits<${coreDef.name.toLowerCase()}>::MEM || addr.type == iss::address_type::PHYSICAL ||
+                addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL) {
             return phys_addr_t(addr.access, addr.space, addr.val&traits<${coreDef.name.toLowerCase()}>::addr_mask);
         } else
             return virt2phys(addr);
@@ -141,8 +142,7 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
-    inline
-    uint32_t get_last_branch(){return reg.last_branch;}
+    inline uint32_t get_last_branch() { return reg.last_branch; }
 
 protected:
     struct ${coreDef.name}_regs {<%

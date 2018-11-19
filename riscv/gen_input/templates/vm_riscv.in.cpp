@@ -44,6 +44,12 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
+namespace vm {
+namespace fp_impl {
+void add_fp_functions_2_module(llvm::Module *, unsigned);
+}
+}
+
 namespace CORE_DEF_NAME {
 using namespace iss::arch;
 using namespace llvm;
@@ -63,7 +69,7 @@ public:
 
     void enableDebug(bool enable) { super::sync_exec = super::ALL_SYNC; }
 
-    target_adapter_if *accquire_target_adapter(server_if *srv) {
+    target_adapter_if *accquire_target_adapter(server_if *srv) override {
         debugger_if::dbg_enabled = true;
         if (vm::vm_base<ARCH>::tgt_adapter == nullptr)
             vm::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
@@ -77,8 +83,12 @@ protected:
         return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
-    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal,
-                                   unsigned size) const {
+    void setup_module(llvm::Module *m) override {
+        super::setup_module(m);
+        vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
+    }
+
+    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal, unsigned size) {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
@@ -225,7 +235,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
     phys_addr_t paddr(pc);
     try {
-        uint8_t *const data = (uint8_t *)&insn;
+        auto *const data = (uint8_t *)&insn;
         paddr = this->core.v2p(pc);
         if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
             auto res = this->core.read(paddr, 2, data);
@@ -242,7 +252,6 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     }
     if (insn == 0x0000006f || (insn & 0xffff) == 0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
     // curr pc on stack
-    typename vm_impl<ARCH>::processing_pc_entry addr(*this, pc, paddr);
     ++inst_cnt;
     auto lut_val = extract_fields(insn);
     auto f = qlut[insn & 0x3][lut_val];
@@ -260,6 +269,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
@@ -269,6 +280,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
     this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
@@ -281,6 +294,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
                                     this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
     this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
@@ -298,12 +313,10 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
 
 } // namespace CORE_DEF_NAME
 
-template <>
-std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(arch::CORE_DEF_NAME *core, unsigned short port, bool dump) {
-    std::unique_ptr<CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>> ret =
-        std::make_unique<CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>>(*core, dump);
-    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
-    return ret;
+template <> std::unique_ptr<vm_if> create<arch::CORE_DEF_NAME>(arch::CORE_DEF_NAME *core, unsigned short port, bool dump) {
+    auto ret = new CORE_DEF_NAME::vm_impl<arch::CORE_DEF_NAME>(*core, dump);
+    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
+    return std::unique_ptr<vm_if>(ret);
 }
 
 } // namespace iss

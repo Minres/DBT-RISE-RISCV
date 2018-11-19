@@ -1,8 +1,6 @@
 InsructionSet RV32IBase {
     constants {
         XLEN,
-        PCLEN,
-        XLEN_BIT_MASK:=0x1f,
         fence:=0,
         fencei:=1,
         fencevmal:=2,
@@ -16,7 +14,7 @@ InsructionSet RV32IBase {
     registers { 
         [31:0]   X[XLEN],
                 PC[XLEN](is_pc),
-                alias ZERO[XLEN] is X[0] 
+                alias ZERO[XLEN] is X[0]
     }
      
     instructions { 
@@ -197,7 +195,7 @@ InsructionSet RV32IBase {
         SLL {
             encoding: b0000000 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
             args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
-            if(rd != 0) X[rd] <= shll(X[rs1], X[rs2]&XLEN_BIT_MASK);
+            if(rd != 0) X[rd] <= shll(X[rs1], X[rs2]&(XLEN-1));
         }
         SLT {
             encoding: b0000000 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
@@ -217,12 +215,12 @@ InsructionSet RV32IBase {
         SRL {
             encoding: b0000000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
             args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
-            if(rd != 0) X[rd] <= shrl(X[rs1], X[rs2]&XLEN_BIT_MASK);
+            if(rd != 0) X[rd] <= shrl(X[rs1], X[rs2]&(XLEN-1));
         }
         SRA {
             encoding: b0100000 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
             args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
-            if(rd != 0) X[rd] <= shra(X[rs1], X[rs2]&XLEN_BIT_MASK);
+            if(rd != 0) X[rd] <= shra(X[rs1], X[rs2]&(XLEN-1));
         }
         OR {
             encoding: b0000000 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0110011;
@@ -279,8 +277,8 @@ InsructionSet RV32IBase {
                 val csr_val[XLEN] <= CSR[csr];
                 CSR[csr] <= rs_val; 
                 // make sure Xrd is updated once CSR write succeeds
-                   X[rd] <= csr_val;
-               } else {
+                X[rd] <= csr_val;
+            } else {
                 CSR[csr] <= rs_val;
             }
         }

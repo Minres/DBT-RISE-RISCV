@@ -1,38 +1,34 @@
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017, MINRES Technologies GmbH
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice,
-//    this list of conditions and the following disclaimer.
-//
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its contributors
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-//
-// Contributors:
-//       eyck@minres.com - initial API and implementation
-//
-//
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ * Copyright (C) 2017, 2018 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
 
 #include <iss/arch/${coreDef.name.toLowerCase()}.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
@@ -44,12 +40,12 @@
 
 #include <boost/format.hpp>
 
-#include <iss/debugger/riscv_target_adapter.h>
 #include <array>
+#include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
 namespace vm {
-namespace fp_impl{
+namespace fp_impl {
 void add_fp_functions_2_module(llvm::Module *, unsigned);
 }
 }
@@ -73,7 +69,7 @@ public:
 
     void enableDebug(bool enable) { super::sync_exec = super::ALL_SYNC; }
 
-    target_adapter_if *accquire_target_adapter(server_if *srv) {
+    target_adapter_if *accquire_target_adapter(server_if *srv) override {
         debugger_if::dbg_enabled = true;
         if (vm::vm_base<ARCH>::tgt_adapter == nullptr)
             vm::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
@@ -87,7 +83,7 @@ protected:
         return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
-    void setup_module(llvm::Module* m) override {
+    void setup_module(llvm::Module *m) override {
         super::setup_module(m);
         vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
@@ -117,7 +113,7 @@ protected:
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
         llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                                  this->get_type(traits<ARCH>::XLEN));
+                                                                 this->get_type(traits<ARCH>::XLEN));
         this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
     }
 
@@ -136,9 +132,9 @@ protected:
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-	std::array<compile_func*, 4> qlut;
+	std::array<compile_func *, 4> qlut;
 
-	std::array<const uint32_t, 4> lutmasks = { { EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32 } };
+	std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -248,7 +244,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
     phys_addr_t paddr(pc);
     try {
-        uint8_t *const data = (uint8_t *)&insn;
+        auto *const data = (uint8_t *)&insn;
         paddr = this->core.v2p(pc);
         if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
             auto res = this->core.read(paddr, 2, data);
@@ -282,7 +278,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+    						  get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
@@ -292,7 +289,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
     this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
@@ -305,11 +303,10 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    std::vector<llvm::Value *> args{
-    	this->core_ptr,
-    	this->adj_to64(trap_state_val),
-        this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
+                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
+                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
     this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
     auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     this->builder.CreateRet(trap_addr_val);
@@ -327,10 +324,9 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBl
 
 template <>
 std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreDef.name.toLowerCase()} *core, unsigned short port, bool dump) {
-    std::unique_ptr<${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>> ret =
-        std::make_unique<${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>>(*core, dump);
-    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret.get(), port);
-    return ret;
+    auto ret = new ${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*core, dump);
+    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
+    return std::unique_ptr<vm_if>(ret);
 }
 
 } // namespace iss
