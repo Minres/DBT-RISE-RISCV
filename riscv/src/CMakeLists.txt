@@ -12,6 +12,10 @@ set(LIB_SOURCES
     plugin/instruction_count.cpp
     plugin/cycle_estimate.cpp)
 
+if(SystemC_FOUND)
+	set(LIB_SOURCES ${LIB_SOURCES} sysc/core_complex.cpp)
+endif()
+
 set(APP_HEADERS )
 
 set(APP_SOURCES main.cpp)
@@ -27,6 +31,18 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
 )
+
+if(SystemC_FOUND)
+	add_definitions(-DWITH_SYSTEMC) 
+	include_directories(${SystemC_INCLUDE_DIRS})
+	
+	include_directories(${CCI_INCLUDE_DIRS})
+	
+	if(SCV_FOUND)   
+	    add_definitions(-DWITH_SCV)
+	    include_directories(${SCV_INCLUDE_DIRS})
+	endif()
+endif()
 
 # This is a make target, so you can do a "make riscv-sc"
 set(APPLICATION_NAME riscv-sim)

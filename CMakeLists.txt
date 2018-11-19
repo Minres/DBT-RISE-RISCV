@@ -112,7 +112,6 @@ add_subdirectory(sc-components)
 add_subdirectory(softfloat)
 GET_DIRECTORY_PROPERTY(SOFTFLOAT_INCLUDE_DIRS DIRECTORY softfloat DEFINITION SOFTFLOAT_INCLUDE_DIRS)
 add_subdirectory(riscv)
-add_subdirectory(riscv.sc)
 add_subdirectory(platform)
 
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")

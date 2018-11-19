@@ -61,7 +61,6 @@ add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 target_include_directories(${APPLICATION_NAME} SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 # Links the target exe against the libraries
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
-target_link_libraries(${APPLICATION_NAME} riscv.sc)
 target_link_libraries(${APPLICATION_NAME} riscv)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} softfloat)
