@@ -35,7 +35,7 @@
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <iss/vm_base.h>
+#include <iss/llvm/vm_base.h>
 #include <util/logging.h>
 
 #include <boost/format.hpp>

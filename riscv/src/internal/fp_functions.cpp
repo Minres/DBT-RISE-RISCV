@@ -33,7 +33,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iss/iss.h>
-#include <iss/vm_base.h>
+#include <iss/llvm/vm_base.h>
 
 extern "C" {
 #include <softfloat.h>

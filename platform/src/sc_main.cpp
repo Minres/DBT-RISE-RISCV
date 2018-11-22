@@ -32,7 +32,6 @@
 
 #include "CLIParser.h"
 #include <sysc/top/system.h>
-#include <iss/jit/jit_helper.h>
 #include <iss/log_categories.h>
 
 #include <scc/configurable_tracer.h>
@@ -45,6 +44,7 @@
 #include <cci_utils/broker.h>
 
 #include <boost/program_options.hpp>
+#include <iss/llvm/jit_helper.h>
 #include <fstream>
 #include <sstream>
 

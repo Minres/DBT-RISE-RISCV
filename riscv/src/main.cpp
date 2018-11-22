@@ -39,7 +39,7 @@
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv32gc.h>
 #include <iss/arch/rv64ia.h>
-#include <iss/jit/jit_helper.h>
+#include <iss/llvm/jit_helper.h>
 #include <iss/log_categories.h>
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>

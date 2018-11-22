@@ -39,7 +39,7 @@
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <iss/vm_base.h>
+#include <iss/llvm/vm_base.h>
 #include <util/logging.h>
 
 #include <boost/format.hpp>
@@ -58,10 +58,11 @@ namespace rv32gc {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
+using namespace iss::vm::llvm;
 
-template <typename ARCH> class vm_impl : public vm::vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename vm::vm_base<ARCH>;
+    using super = typename iss::vm::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -75,31 +76,31 @@ public:
 
     target_adapter_if *accquire_target_adapter(server_if *srv) {
         debugger_if::dbg_enabled = true;
-        if (vm::vm_base<ARCH>::tgt_adapter == nullptr)
-            vm::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
-        return vm::vm_base<ARCH>::tgt_adapter;
+        if (vm_base<ARCH>::tgt_adapter == nullptr)
+            vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
+        return vm_base<ARCH>::tgt_adapter;
     }
 
 protected:
-    using vm::vm_base<ARCH>::get_reg_ptr;
+    using vm_base<ARCH>::get_reg_ptr;
 
-    template <typename T> inline llvm::ConstantInt *size(T type) {
-        return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
+    template <typename T> inline ConstantInt *size(T type) {
+        return ConstantInt::get(getContext(), APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
-    void setup_module(llvm::Module* m) override {
+    void setup_module(Module* m) override {
         super::setup_module(m);
-        vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
+        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
 
-    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal, unsigned size) {
+    inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
-    std::tuple<vm::continuation_e, llvm::BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &,
-                                                                                llvm::BasicBlock *) override;
+    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &,
+                                                                                BasicBlock *) override;
 
-    void gen_leave_behavior(llvm::BasicBlock *leave_blk) override;
+    void gen_leave_behavior(BasicBlock *leave_blk) override;
 
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
 
@@ -107,16 +108,16 @@ protected:
 
     void gen_wait(unsigned type);
 
-    void gen_trap_behavior(llvm::BasicBlock *) override;
+    void gen_trap_behavior(BasicBlock *) override;
 
-    void gen_trap_check(llvm::BasicBlock *bb);
+    void gen_trap_check(BasicBlock *bb);
 
-    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
+    inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
+        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
                                                                   this->get_type(traits<ARCH>::XLEN));
         this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
     }
@@ -128,9 +129,9 @@ protected:
     enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
     using this_class = vm_impl<ARCH>;
-    using compile_func = std::tuple<vm::continuation_e, llvm::BasicBlock *> (this_class::*)(virt_addr_t &pc,
+    using compile_func = std::tuple<continuation_e, BasicBlock *> (this_class::*)(virt_addr_t &pc,
                                                                                             code_word_t instr,
-                                                                                            llvm::BasicBlock *bb);
+                                                                                            BasicBlock *bb);
     std::array<compile_func, LUT_SIZE> lut;
 
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
@@ -512,7 +513,7 @@ private:
  
     /* instruction definitions */
     /* instruction 0: LUI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LUI");
     	
     	this->gen_sync(iss::PRE_SYNC, 0);
@@ -523,7 +524,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LUI x%1$d, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -540,13 +541,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 0);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 1: AUIPC */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AUIPC");
     	
     	this->gen_sync(iss::PRE_SYNC, 1);
@@ -557,7 +558,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AUIPC x%1%, 0x%2$08x");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -578,13 +579,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 1);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 2: JAL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("JAL");
     	
     	this->gen_sync(iss::PRE_SYNC, 2);
@@ -595,7 +596,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("JAL x%1$d, 0x%2$x");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -622,11 +623,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 2);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 3: JALR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("JALR");
     	
     	this->gen_sync(iss::PRE_SYNC, 3);
@@ -638,7 +639,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("JALR x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -658,9 +659,9 @@ private:
     	    new_pc_val,
     	    this->gen_const(32U, 0x1));
     	{
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	    BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	    // this->builder.SetInsertPoint(bb);
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
@@ -693,11 +694,11 @@ private:
     	this->builder.SetInsertPoint(bb);
     	this->gen_sync(iss::POST_SYNC, 3);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 4: BEQ */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BEQ");
     	
     	this->gen_sync(iss::PRE_SYNC, 4);
@@ -709,7 +710,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BEQ x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -739,11 +740,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 4);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 5: BNE */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BNE");
     	
     	this->gen_sync(iss::PRE_SYNC, 5);
@@ -755,7 +756,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BNE x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -785,11 +786,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 5);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 6: BLT */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BLT");
     	
     	this->gen_sync(iss::PRE_SYNC, 6);
@@ -801,7 +802,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BLT x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -835,11 +836,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 6);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 7: BGE */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BGE");
     	
     	this->gen_sync(iss::PRE_SYNC, 7);
@@ -851,7 +852,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BGE x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -885,11 +886,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 7);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 8: BLTU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BLTU");
     	
     	this->gen_sync(iss::PRE_SYNC, 8);
@@ -901,7 +902,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BLTU x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -931,11 +932,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 8);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 9: BGEU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("BGEU");
     	
     	this->gen_sync(iss::PRE_SYNC, 9);
@@ -947,7 +948,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("BGEU x%1$d, x%2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -977,11 +978,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 9);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 10: LB */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LB");
     	
     	this->gen_sync(iss::PRE_SYNC, 10);
@@ -993,7 +994,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LB x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1018,13 +1019,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 10);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 11: LH */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LH");
     	
     	this->gen_sync(iss::PRE_SYNC, 11);
@@ -1036,7 +1037,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LH x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1061,13 +1062,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 11);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 12: LW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LW");
     	
     	this->gen_sync(iss::PRE_SYNC, 12);
@@ -1079,7 +1080,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LW x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1104,13 +1105,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 12);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 13: LBU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LBU");
     	
     	this->gen_sync(iss::PRE_SYNC, 13);
@@ -1122,7 +1123,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LBU x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1147,13 +1148,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 13);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 14: LHU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LHU");
     	
     	this->gen_sync(iss::PRE_SYNC, 14);
@@ -1165,7 +1166,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LHU x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1190,13 +1191,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 14);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 15: SB */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SB");
     	
     	this->gen_sync(iss::PRE_SYNC, 15);
@@ -1208,7 +1209,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SB x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1231,13 +1232,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(8)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 15);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 16: SH */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SH");
     	
     	this->gen_sync(iss::PRE_SYNC, 16);
@@ -1249,7 +1250,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SH x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1272,13 +1273,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(16)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 16);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 17: SW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SW");
     	
     	this->gen_sync(iss::PRE_SYNC, 17);
@@ -1290,7 +1291,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SW x%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1313,13 +1314,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 17);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 18: ADDI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("ADDI");
     	
     	this->gen_sync(iss::PRE_SYNC, 18);
@@ -1331,7 +1332,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ADDI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1352,13 +1353,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 18);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 19: SLTI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLTI");
     	
     	this->gen_sync(iss::PRE_SYNC, 19);
@@ -1370,7 +1371,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1396,13 +1397,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 19);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 20: SLTIU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLTIU");
     	
     	this->gen_sync(iss::PRE_SYNC, 20);
@@ -1414,7 +1415,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTIU x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1439,13 +1440,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 20);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 21: XORI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("XORI");
     	
     	this->gen_sync(iss::PRE_SYNC, 21);
@@ -1457,7 +1458,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("XORI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1476,13 +1477,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 21);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 22: ORI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("ORI");
     	
     	this->gen_sync(iss::PRE_SYNC, 22);
@@ -1494,7 +1495,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ORI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1513,13 +1514,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 22);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 23: ANDI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("ANDI");
     	
     	this->gen_sync(iss::PRE_SYNC, 23);
@@ -1531,7 +1532,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ANDI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1550,13 +1551,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 23);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 24: SLLI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLLI");
     	
     	this->gen_sync(iss::PRE_SYNC, 24);
@@ -1568,7 +1569,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLLI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1591,13 +1592,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 24);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 25: SRLI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SRLI");
     	
     	this->gen_sync(iss::PRE_SYNC, 25);
@@ -1609,7 +1610,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRLI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1632,13 +1633,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 25);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 26: SRAI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SRAI");
     	
     	this->gen_sync(iss::PRE_SYNC, 26);
@@ -1650,7 +1651,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRAI x%1$d, x%2$d, %3%");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1673,13 +1674,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 26);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 27: ADD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("ADD");
     	
     	this->gen_sync(iss::PRE_SYNC, 27);
@@ -1691,7 +1692,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("ADD x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1710,13 +1711,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 27);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 28: SUB */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SUB");
     	
     	this->gen_sync(iss::PRE_SYNC, 28);
@@ -1728,7 +1729,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SUB x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1747,13 +1748,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 28);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 29: SLL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLL");
     	
     	this->gen_sync(iss::PRE_SYNC, 29);
@@ -1765,7 +1766,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLL x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1786,13 +1787,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 29);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 30: SLT */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLT");
     	
     	this->gen_sync(iss::PRE_SYNC, 30);
@@ -1804,7 +1805,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLT x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1832,13 +1833,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 30);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 31: SLTU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SLTU");
     	
     	this->gen_sync(iss::PRE_SYNC, 31);
@@ -1850,7 +1851,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SLTU x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1880,13 +1881,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 31);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 32: XOR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("XOR");
     	
     	this->gen_sync(iss::PRE_SYNC, 32);
@@ -1898,7 +1899,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("XOR x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1917,13 +1918,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 32);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 33: SRL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SRL");
     	
     	this->gen_sync(iss::PRE_SYNC, 33);
@@ -1935,7 +1936,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRL x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1956,13 +1957,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 33);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 34: SRA */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SRA");
     	
     	this->gen_sync(iss::PRE_SYNC, 34);
@@ -1974,7 +1975,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SRA x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -1995,13 +1996,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 34);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 35: OR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("OR");
     	
     	this->gen_sync(iss::PRE_SYNC, 35);
@@ -2013,7 +2014,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("OR x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2032,13 +2033,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 35);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 36: AND */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AND");
     	
     	this->gen_sync(iss::PRE_SYNC, 36);
@@ -2050,7 +2051,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AND x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2069,13 +2070,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 36);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 37: FENCE */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FENCE");
     	
     	this->gen_sync(iss::PRE_SYNC, 37);
@@ -2086,7 +2087,7 @@ private:
     	uint8_t fld_pred_val = ((bit_sub<24,4>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("FENCE"),
@@ -2108,13 +2109,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 37);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 38: FENCE_I */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FENCE_I");
     	
     	this->gen_sync(iss::PRE_SYNC, 38);
@@ -2124,7 +2125,7 @@ private:
     	uint16_t fld_imm_val = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("FENCE_I"),
@@ -2144,18 +2145,18 @@ private:
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 38);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::FLUSH, nullptr);
+    	return std::make_tuple(FLUSH, nullptr);
     }
     
     /* instruction 39: ECALL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("ECALL");
     	
     	this->gen_sync(iss::PRE_SYNC, 39);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("ECALL"),
@@ -2169,18 +2170,18 @@ private:
     	this->gen_raise_trap(0, 11);
     	this->gen_sync(iss::POST_SYNC, 39);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 40: EBREAK */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("EBREAK");
     	
     	this->gen_sync(iss::PRE_SYNC, 40);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("EBREAK"),
@@ -2194,18 +2195,18 @@ private:
     	this->gen_raise_trap(0, 3);
     	this->gen_sync(iss::POST_SYNC, 40);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 41: URET */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("URET");
     	
     	this->gen_sync(iss::PRE_SYNC, 41);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("URET"),
@@ -2219,18 +2220,18 @@ private:
     	this->gen_leave_trap(0);
     	this->gen_sync(iss::POST_SYNC, 41);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 42: SRET */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SRET");
     	
     	this->gen_sync(iss::PRE_SYNC, 42);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("SRET"),
@@ -2244,18 +2245,18 @@ private:
     	this->gen_leave_trap(1);
     	this->gen_sync(iss::POST_SYNC, 42);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 43: MRET */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MRET");
     	
     	this->gen_sync(iss::PRE_SYNC, 43);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("MRET"),
@@ -2269,18 +2270,18 @@ private:
     	this->gen_leave_trap(3);
     	this->gen_sync(iss::POST_SYNC, 43);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 44: WFI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("WFI");
     	
     	this->gen_sync(iss::PRE_SYNC, 44);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("WFI"),
@@ -2294,13 +2295,13 @@ private:
     	this->gen_wait(1);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 44);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 45: SFENCE.VMA */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SFENCE.VMA");
     	
     	this->gen_sync(iss::PRE_SYNC, 45);
@@ -2309,7 +2310,7 @@ private:
     	uint8_t fld_rs2_val = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("SFENCE.VMA"),
@@ -2332,13 +2333,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 45);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 46: CSRRW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRW");
     	
     	this->gen_sync(iss::PRE_SYNC, 46);
@@ -2350,7 +2351,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRW x%1$d, %2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2380,13 +2381,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 46);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 47: CSRRS */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRS");
     	
     	this->gen_sync(iss::PRE_SYNC, 47);
@@ -2398,7 +2399,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRS x%1$d, %2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2426,13 +2427,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 47);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 48: CSRRC */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRC");
     	
     	this->gen_sync(iss::PRE_SYNC, 48);
@@ -2444,7 +2445,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRC x%1$d, %2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2472,13 +2473,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 48);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 49: CSRRWI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRWI");
     	
     	this->gen_sync(iss::PRE_SYNC, 49);
@@ -2490,7 +2491,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRWI x%1$d, %2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_zimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2515,13 +2516,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 49);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 50: CSRRSI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRSI");
     	
     	this->gen_sync(iss::PRE_SYNC, 50);
@@ -2533,7 +2534,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRSI x%1$d, %2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_zimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2563,13 +2564,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 50);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 51: CSRRCI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("CSRRCI");
     	
     	this->gen_sync(iss::PRE_SYNC, 51);
@@ -2581,7 +2582,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("CSRRCI x%1$d, %2$d, 0x%3$x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_csr_val % (uint64_t)fld_zimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2611,13 +2612,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 51);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 52: MUL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __mul(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __mul(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MUL");
     	
     	this->gen_sync(iss::PRE_SYNC, 52);
@@ -2629,7 +2630,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("MUL x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2658,13 +2659,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 52);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 53: MULH */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulh(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __mulh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULH");
     	
     	this->gen_sync(iss::PRE_SYNC, 53);
@@ -2676,7 +2677,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("MULH x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2707,13 +2708,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 53);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 54: MULHSU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhsu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __mulhsu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULHSU");
     	
     	this->gen_sync(iss::PRE_SYNC, 54);
@@ -2725,7 +2726,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("MULHSU x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2756,13 +2757,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 54);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 55: MULHU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __mulhu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __mulhu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULHU");
     	
     	this->gen_sync(iss::PRE_SYNC, 55);
@@ -2774,7 +2775,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("MULHU x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2805,13 +2806,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 55);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 56: DIV */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __div(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __div(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("DIV");
     	
     	this->gen_sync(iss::PRE_SYNC, 56);
@@ -2823,7 +2824,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("DIV x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2836,9 +2837,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    {
-    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
@@ -2851,9 +2852,9 @@ private:
     	            uint32_t M1_val = - 1;
     	            uint32_t MMIN_val = - 1 << 32 - 1;
     	            {
-    	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	                llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	                // this->builder.SetInsertPoint(bb);
     	                this->gen_cond_branch(this->builder.CreateICmp(
     	                    ICmpInst::ICMP_EQ,
@@ -2868,9 +2869,9 @@ private:
     	                this->builder.SetInsertPoint(bb_then);
     	                {
     	                    {
-    	                        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	                        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	                        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	                        // this->builder.SetInsertPoint(bb);
     	                        this->gen_cond_branch(this->builder.CreateICmp(
     	                            ICmpInst::ICMP_EQ,
@@ -2934,13 +2935,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 56);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 57: DIVU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __divu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __divu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("DIVU");
     	
     	this->gen_sync(iss::PRE_SYNC, 57);
@@ -2952,7 +2953,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("DIVU x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -2965,9 +2966,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    {
-    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
@@ -3001,13 +3002,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 57);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 58: REM */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __rem(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __rem(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("REM");
     	
     	this->gen_sync(iss::PRE_SYNC, 58);
@@ -3019,7 +3020,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("REM x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3032,9 +3033,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    {
-    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
@@ -3047,9 +3048,9 @@ private:
     	            uint32_t M1_val = - 1;
     	            uint32_t MMIN_val = - 1 << 32 - 1;
     	            {
-    	                llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	                llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	                llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	                // this->builder.SetInsertPoint(bb);
     	                this->gen_cond_branch(this->builder.CreateICmp(
     	                    ICmpInst::ICMP_EQ,
@@ -3064,9 +3065,9 @@ private:
     	                this->builder.SetInsertPoint(bb_then);
     	                {
     	                    {
-    	                        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	                        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	                        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	                        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	                        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	                        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	                        // this->builder.SetInsertPoint(bb);
     	                        this->gen_cond_branch(this->builder.CreateICmp(
     	                            ICmpInst::ICMP_EQ,
@@ -3134,13 +3135,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 58);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 59: REMU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __remu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __remu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("REMU");
     	
     	this->gen_sync(iss::PRE_SYNC, 59);
@@ -3152,7 +3153,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("REMU x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3165,9 +3166,9 @@ private:
     	
     	if(fld_rd_val != 0){
     	    {
-    	        llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	        llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	        llvm::BasicBlock* bb_else = llvm::BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
+    	        BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	        BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	        BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
     	        // this->builder.SetInsertPoint(bb);
     	        this->gen_cond_branch(this->builder.CreateICmp(
     	            ICmpInst::ICMP_NE,
@@ -3201,13 +3202,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 59);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 60: LR.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("LR.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 60);
@@ -3220,7 +3221,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("LR.W x%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3249,13 +3250,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 60);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 61: SC.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("SC.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 61);
@@ -3269,7 +3270,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("SC.W x%1$d, x%2$d, x%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3283,8 +3284,8 @@ private:
     	Value* offs_val = this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0);
     	Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
     	{
-    	    llvm::BasicBlock* bbnext = llvm::BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    llvm::BasicBlock* bb_then = llvm::BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
     	    // this->builder.SetInsertPoint(bb);
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
@@ -3317,13 +3318,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 61);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 62: AMOSWAP.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOSWAP.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 62);
@@ -3337,7 +3338,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOSWAP.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3363,13 +3364,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 62);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 63: AMOADD.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOADD.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 63);
@@ -3383,7 +3384,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOADD.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3413,13 +3414,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 63);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 64: AMOXOR.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOXOR.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 64);
@@ -3433,7 +3434,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOXOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3463,13 +3464,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 64);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 65: AMOAND.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOAND.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 65);
@@ -3483,7 +3484,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOAND.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3513,13 +3514,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 65);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 66: AMOOR.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOOR.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 66);
@@ -3533,7 +3534,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOOR.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3563,13 +3564,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 66);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 67: AMOMIN.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOMIN.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 67);
@@ -3583,7 +3584,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMIN.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3622,13 +3623,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 67);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 68: AMOMAX.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOMAX.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 68);
@@ -3642,7 +3643,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAX.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3681,13 +3682,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 68);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 69: AMOMINU.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOMINU.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 69);
@@ -3701,7 +3702,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMINU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3736,13 +3737,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 69);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 70: AMOMAXU.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("AMOMAXU.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 70);
@@ -3756,7 +3757,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("AMOMAXU.W x%1$d, x%2$d, x%3$d (aqu=%4$d,rel=%5$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_aq_val % (uint64_t)fld_rl_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3791,13 +3792,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 70);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 71: C.ADDI4SPN */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.ADDI4SPN");
     	
     	this->gen_sync(iss::PRE_SYNC, 71);
@@ -3808,7 +3809,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ADDI4SPN x%1$d, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3828,13 +3829,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 71);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 72: C.LW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.LW");
     	
     	this->gen_sync(iss::PRE_SYNC, 72);
@@ -3846,7 +3847,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.LW x(8+%1$d), x(8+%2$d), 0x%3$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3864,13 +3865,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 72);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 73: C.SW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SW");
     	
     	this->gen_sync(iss::PRE_SYNC, 73);
@@ -3882,7 +3883,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SW x(8+%1$d), x(8+%2$d), 0x%3$05x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3903,13 +3904,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 73);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 74: C.ADDI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.ADDI");
     	
     	this->gen_sync(iss::PRE_SYNC, 74);
@@ -3920,7 +3921,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ADDI x%1$d, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -3939,20 +3940,20 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 74);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 75: C.NOP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.NOP");
     	
     	this->gen_sync(iss::PRE_SYNC, 75);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("C.NOP"),
@@ -3966,13 +3967,13 @@ private:
     	/* TODO: describe operations for C.NOP ! */
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 75);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 76: C.JAL */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.JAL");
     	
     	this->gen_sync(iss::PRE_SYNC, 76);
@@ -3982,7 +3983,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.JAL 0x%1$05x");
     	    ins_fmter % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4007,11 +4008,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 76);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 77: C.LI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.LI");
     	
     	this->gen_sync(iss::PRE_SYNC, 77);
@@ -4022,7 +4023,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.LI x%1$d, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4040,13 +4041,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 77);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 78: C.LUI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.LUI");
     	
     	this->gen_sync(iss::PRE_SYNC, 78);
@@ -4057,7 +4058,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.LUI x%1$d, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4078,13 +4079,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 78);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 79: C.ADDI16SP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.ADDI16SP");
     	
     	this->gen_sync(iss::PRE_SYNC, 79);
@@ -4094,7 +4095,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ADDI16SP 0x%1$05x");
     	    ins_fmter % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4113,13 +4114,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(2 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 79);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 80: C.SRLI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SRLI");
     	
     	this->gen_sync(iss::PRE_SYNC, 80);
@@ -4130,7 +4131,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SRLI x(8+%1$d), %2$d");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4148,13 +4149,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 80);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 81: C.SRAI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SRAI");
     	
     	this->gen_sync(iss::PRE_SYNC, 81);
@@ -4165,7 +4166,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SRAI x(8+%1$d), %2$d");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4183,13 +4184,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 81);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 82: C.ANDI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.ANDI");
     	
     	this->gen_sync(iss::PRE_SYNC, 82);
@@ -4200,7 +4201,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ANDI x(8+%1$d), 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4218,13 +4219,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 82);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 83: C.SUB */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SUB");
     	
     	this->gen_sync(iss::PRE_SYNC, 83);
@@ -4235,7 +4236,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SUB x(8+%1$d), x(8+%2$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4253,13 +4254,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 83);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 84: C.XOR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.XOR");
     	
     	this->gen_sync(iss::PRE_SYNC, 84);
@@ -4270,7 +4271,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.XOR x(8+%1$d), x(8+%2$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4288,13 +4289,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 84);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 85: C.OR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.OR");
     	
     	this->gen_sync(iss::PRE_SYNC, 85);
@@ -4305,7 +4306,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.OR x(8+%1$d), x(8+%2$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4323,13 +4324,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 85);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 86: C.AND */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.AND");
     	
     	this->gen_sync(iss::PRE_SYNC, 86);
@@ -4340,7 +4341,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.AND x(8+%1$d), x(8+%2$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4358,13 +4359,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 86);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 87: C.J */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.J");
     	
     	this->gen_sync(iss::PRE_SYNC, 87);
@@ -4374,7 +4375,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.J 0x%1$05x");
     	    ins_fmter % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4395,11 +4396,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 87);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 88: C.BEQZ */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.BEQZ");
     	
     	this->gen_sync(iss::PRE_SYNC, 88);
@@ -4410,7 +4411,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.BEQZ x(8+%1$d), 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4440,11 +4441,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 88);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 89: C.BNEZ */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.BNEZ");
     	
     	this->gen_sync(iss::PRE_SYNC, 89);
@@ -4455,7 +4456,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.BNEZ x(8+%1$d), 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rs1_val % (int64_t)fld_imm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4485,11 +4486,11 @@ private:
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 89);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 90: C.SLLI */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SLLI");
     	
     	this->gen_sync(iss::PRE_SYNC, 90);
@@ -4500,7 +4501,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SLLI x%1$d, %2$d");
     	    ins_fmter % (uint64_t)fld_rs1_val % (uint64_t)fld_shamt_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4520,13 +4521,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rs1_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 90);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 91: C.LWSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.LWSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 91);
@@ -4537,7 +4538,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.LWSP x%1$d, sp, 0x%2$05x");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4555,13 +4556,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 91);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 92: C.MV */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.MV");
     	
     	this->gen_sync(iss::PRE_SYNC, 92);
@@ -4572,7 +4573,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.MV x%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4587,13 +4588,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 92);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 93: C.JR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.JR");
     	
     	this->gen_sync(iss::PRE_SYNC, 93);
@@ -4603,7 +4604,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.JR x%1$d");
     	    ins_fmter % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4619,11 +4620,11 @@ private:
     	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 93);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 94: C.ADD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.ADD");
     	
     	this->gen_sync(iss::PRE_SYNC, 94);
@@ -4634,7 +4635,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.ADD x%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4651,13 +4652,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 94);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 95: C.JALR */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.JALR");
     	
     	this->gen_sync(iss::PRE_SYNC, 95);
@@ -4667,7 +4668,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.JALR x%1$d");
     	    ins_fmter % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4687,18 +4688,18 @@ private:
     	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(iss::POST_SYNC, 95);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 96: C.EBREAK */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.EBREAK");
     	
     	this->gen_sync(iss::PRE_SYNC, 96);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("C.EBREAK"),
@@ -4712,11 +4713,11 @@ private:
     	this->gen_raise_trap(0, 3);
     	this->gen_sync(iss::POST_SYNC, 96);
     	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(iss::vm::BRANCH, nullptr);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /* instruction 97: C.SWSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.SWSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 97);
@@ -4727,7 +4728,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.SWSP x2+0x%1$05x, x%2$d");
     	    ins_fmter % (uint64_t)fld_uimm_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4748,20 +4749,20 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 97);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 98: DII */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __dii(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __dii(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("DII");
     	
     	this->gen_sync(iss::PRE_SYNC, 98);
     	
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr("DII"),
@@ -4775,13 +4776,13 @@ private:
     	this->gen_raise_trap(0, 2);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 98);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 99: FLW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __flw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __flw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLW");
     	
     	this->gen_sync(iss::PRE_SYNC, 99);
@@ -4793,7 +4794,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLW f%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4827,13 +4828,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 99);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 100: FSW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSW");
     	
     	this->gen_sync(iss::PRE_SYNC, 100);
@@ -4845,7 +4846,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSW f%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4871,13 +4872,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 100);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 101: FMADD.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmadd_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmadd_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMADD.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 101);
@@ -4891,7 +4892,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMADD.S x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4902,7 +4903,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -4946,7 +4947,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -4956,13 +4957,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 101);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 102: FMSUB.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmsub_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmsub_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMSUB.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 102);
@@ -4976,7 +4977,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMSUB.S x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -4987,7 +4988,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5031,7 +5032,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5041,13 +5042,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 102);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 103: FNMADD.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fnmadd_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fnmadd_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FNMADD.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 103);
@@ -5061,7 +5062,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FNMADD.S x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5072,7 +5073,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5116,7 +5117,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5126,13 +5127,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 103);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 104: FNMSUB.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fnmsub_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fnmsub_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FNMSUB.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 104);
@@ -5146,7 +5147,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FNMSUB.S x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5157,7 +5158,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5201,7 +5202,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5211,13 +5212,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 104);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 105: FADD.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fadd_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fadd_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FADD.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 105);
@@ -5230,7 +5231,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FADD.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5241,7 +5242,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fadd_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fadd_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5277,7 +5278,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5287,13 +5288,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 105);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 106: FSUB.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsub_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsub_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSUB.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 106);
@@ -5306,7 +5307,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSUB.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5317,7 +5318,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsub_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsub_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5353,7 +5354,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5363,13 +5364,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 106);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 107: FMUL.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmul_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmul_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMUL.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 107);
@@ -5382,7 +5383,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMUL.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5393,7 +5394,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmul_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmul_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5429,7 +5430,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5439,13 +5440,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 107);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 108: FDIV.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fdiv_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fdiv_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FDIV.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 108);
@@ -5458,7 +5459,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FDIV.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5469,7 +5470,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fdiv_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fdiv_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5505,7 +5506,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5515,13 +5516,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 108);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 109: FSQRT.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsqrt_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsqrt_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSQRT.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 109);
@@ -5533,7 +5534,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSQRT.S f%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5544,7 +5545,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsqrt_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsqrt_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5576,7 +5577,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5586,13 +5587,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 109);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 110: FSGNJ.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnj_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnj_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJ.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 110);
@@ -5604,7 +5605,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJ.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5645,13 +5646,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 110);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 111: FSGNJN.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnjn_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnjn_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJN.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 111);
@@ -5663,7 +5664,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJN.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5704,13 +5705,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 111);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 112: FSGNJX.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnjx_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnjx_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJX.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 112);
@@ -5722,7 +5723,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJX.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5761,13 +5762,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 112);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 113: FMIN.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmin_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmin_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMIN.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 113);
@@ -5779,7 +5780,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMIN.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5790,7 +5791,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5819,7 +5820,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5829,13 +5830,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 113);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 114: FMAX.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmax_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmax_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMAX.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 114);
@@ -5847,7 +5848,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMAX.S f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5858,7 +5859,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -5887,7 +5888,7 @@ private:
     	            false));
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5897,13 +5898,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 114);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 115: FCVT.W.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_w_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_w_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.W.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 115);
@@ -5915,7 +5916,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.W.S x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5927,7 +5928,7 @@ private:
     	pc=pc+4;
     	
     	Value* Xtmp0_val = this->gen_ext(
-    	    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<llvm::Value*>{
+    	    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<Value*>{
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	            this-> get_type(32) 
@@ -5941,7 +5942,7 @@ private:
     	    32,
     	    true);
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -5951,13 +5952,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 115);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 116: FCVT.WU.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_wu_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_wu_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.WU.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 116);
@@ -5969,7 +5970,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.WU.S x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -5981,7 +5982,7 @@ private:
     	pc=pc+4;
     	
     	Value* Xtmp0_val = this->gen_ext(
-    	    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<llvm::Value*>{
+    	    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<Value*>{
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	            this-> get_type(32) 
@@ -5995,7 +5996,7 @@ private:
     	    32,
     	    false);
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6005,13 +6006,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 116);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 117: FEQ.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __feq_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __feq_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FEQ.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 117);
@@ -6023,7 +6024,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FEQ.S x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6034,7 +6035,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -6049,7 +6050,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6059,13 +6060,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 117);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 118: FLT.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __flt_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __flt_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLT.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 118);
@@ -6077,7 +6078,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLT.S x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6088,7 +6089,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -6103,7 +6104,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6113,13 +6114,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 118);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 119: FLE.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fle_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fle_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLE.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 119);
@@ -6131,7 +6132,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLE.S x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6142,7 +6143,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -6157,7 +6158,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6167,13 +6168,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 119);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 120: FCLASS.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fclass_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fclass_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCLASS.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 120);
@@ -6184,7 +6185,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCLASS.S x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6195,7 +6196,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fclass_s"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fclass_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -6204,13 +6205,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 120);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 121: FCVT.S.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_s_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_s_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.S.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 121);
@@ -6222,7 +6223,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.S.W f%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6233,7 +6234,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this-> get_type(32) 
@@ -6261,13 +6262,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 121);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 122: FCVT.S.WU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_s_wu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_s_wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.S.WU");
     	
     	this->gen_sync(iss::PRE_SYNC, 122);
@@ -6279,7 +6280,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.S.WU f%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6290,7 +6291,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_s"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        this-> get_type(32) 
@@ -6318,13 +6319,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 122);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 123: FMV.X.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmv_x_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmv_x_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMV.X.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 123);
@@ -6335,7 +6336,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMV.X.W x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6356,13 +6357,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 123);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 124: FMV.W.X */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmv_w_x(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmv_w_x(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMV.W.X");
     	
     	this->gen_sync(iss::PRE_SYNC, 124);
@@ -6373,7 +6374,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMV.W.X f%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6401,13 +6402,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 124);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 125: C.FLW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_flw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_flw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FLW");
     	
     	this->gen_sync(iss::PRE_SYNC, 125);
@@ -6419,7 +6420,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FLW f(8+%1$d), %2%(x(8+%3$d))");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_uimm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6451,13 +6452,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 125);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 126: C.FSW */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fsw(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fsw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FSW");
     	
     	this->gen_sync(iss::PRE_SYNC, 126);
@@ -6469,7 +6470,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FSW f(8+%1$d), %2%(x(8+%3$d))");
     	    ins_fmter % (uint64_t)fld_rs2_val % (uint64_t)fld_uimm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6493,13 +6494,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 126);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 127: C.FLWSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_flwsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_flwsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FLWSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 127);
@@ -6510,7 +6511,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FLWSP f%1$d, %2%(x2)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6542,13 +6543,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 127);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 128: C.FSWSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fswsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fswsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FSWSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 128);
@@ -6559,7 +6560,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FSWSP f%1$d, %2%(x2), ");
     	    ins_fmter % (uint64_t)fld_rs2_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6583,13 +6584,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 128);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 129: FLD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fld(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fld(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLD");
     	
     	this->gen_sync(iss::PRE_SYNC, 129);
@@ -6601,7 +6602,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLD f%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rd_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6632,13 +6633,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 129);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 130: FSD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsd(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsd(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSD");
     	
     	this->gen_sync(iss::PRE_SYNC, 130);
@@ -6650,7 +6651,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSD f%1$d, %2%(x%3$d)");
     	    ins_fmter % (uint64_t)fld_rs2_val % (int64_t)fld_imm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6676,13 +6677,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(64)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 130);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 131: FMADD.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmadd_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMADD.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 131);
@@ -6696,7 +6697,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMADD.D x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6707,7 +6708,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -6748,7 +6749,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6758,13 +6759,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 131);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 132: FMSUB.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmsub_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMSUB.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 132);
@@ -6778,7 +6779,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMSUB.D x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6789,7 +6790,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -6830,7 +6831,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6840,13 +6841,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 132);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 133: FNMADD.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fnmadd_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fnmadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FNMADD.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 133);
@@ -6860,7 +6861,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FNMADD.D x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6871,7 +6872,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -6912,7 +6913,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -6922,13 +6923,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 133);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 134: FNMSUB.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fnmsub_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fnmsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FNMSUB.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 134);
@@ -6942,7 +6943,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FNMSUB.D x%1$d, f%2$d, f%3$d, f%4$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val % (uint64_t)fld_rs3_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -6953,7 +6954,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmadd_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -6994,7 +6995,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7004,13 +7005,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 134);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 135: FADD.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fadd_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FADD.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 135);
@@ -7023,7 +7024,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FADD.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7034,7 +7035,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fadd_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fadd_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7067,7 +7068,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7077,13 +7078,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 135);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 136: FSUB.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsub_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSUB.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 136);
@@ -7096,7 +7097,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSUB.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7107,7 +7108,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsub_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsub_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7140,7 +7141,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7150,13 +7151,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 136);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 137: FMUL.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmul_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmul_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMUL.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 137);
@@ -7169,7 +7170,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMUL.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7180,7 +7181,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmul_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fmul_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7213,7 +7214,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7223,13 +7224,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 137);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 138: FDIV.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fdiv_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fdiv_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FDIV.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 138);
@@ -7242,7 +7243,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FDIV.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7253,7 +7254,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fdiv_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fdiv_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7286,7 +7287,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7296,13 +7297,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 138);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 139: FSQRT.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsqrt_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsqrt_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSQRT.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 139);
@@ -7314,7 +7315,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSQRT.D x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7325,7 +7326,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsqrt_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsqrt_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7354,7 +7355,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7364,13 +7365,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 139);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 140: FSGNJ.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnj_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnj_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJ.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 140);
@@ -7382,7 +7383,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJ.D f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7420,13 +7421,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 140);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 141: FSGNJN.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnjn_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnjn_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJN.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 141);
@@ -7438,7 +7439,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJN.D f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7476,13 +7477,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 141);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 142: FSGNJX.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fsgnjx_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fsgnjx_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FSGNJX.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 142);
@@ -7494,7 +7495,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FSGNJX.D f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7530,13 +7531,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 142);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 143: FMIN.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmin_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmin_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMIN.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 143);
@@ -7548,7 +7549,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMIN.D f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7559,7 +7560,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7585,7 +7586,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7595,13 +7596,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 143);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 144: FMAX.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fmax_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fmax_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FMAX.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 144);
@@ -7613,7 +7614,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FMAX.D f%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7624,7 +7625,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fsel_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7650,7 +7651,7 @@ private:
     	        res_val);
     	    this->builder.CreateStore(Ftmp1_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	}
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7660,13 +7661,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 144);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 145: FCVT.S.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_s_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_s_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.S.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 145);
@@ -7678,7 +7679,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.S.D f%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7689,7 +7690,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fconv_d2f"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fconv_d2f"), std::vector<Value*>{
     	    this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0), 
     	    this->gen_const(8U, fld_rm_val)
     	});
@@ -7705,13 +7706,13 @@ private:
     	this->builder.CreateStore(Ftmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::F0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 145);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 146: FCVT.D.S */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_d_s(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_d_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.D.S");
     	
     	this->gen_sync(iss::PRE_SYNC, 146);
@@ -7723,7 +7724,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.D.S f%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7734,7 +7735,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fconv_f2d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fconv_f2d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(32) 
@@ -7755,13 +7756,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 146);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 147: FEQ.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __feq_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __feq_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FEQ.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 147);
@@ -7773,7 +7774,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FEQ.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7784,7 +7785,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7799,7 +7800,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7809,13 +7810,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 147);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 148: FLT.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __flt_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __flt_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLT.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 148);
@@ -7827,7 +7828,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLT.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7838,7 +7839,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7853,7 +7854,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7863,13 +7864,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 148);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 149: FLE.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fle_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fle_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FLE.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 149);
@@ -7881,7 +7882,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FLE.D x%1$d, f%2$d, f%3$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val % (uint64_t)fld_rs2_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7892,7 +7893,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fcmp_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7907,7 +7908,7 @@ private:
     	        false)
     	});
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -7917,13 +7918,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 149);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 150: FCLASS.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fclass_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fclass_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCLASS.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 150);
@@ -7934,7 +7935,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCLASS.D x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7945,7 +7946,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fclass_d"), std::vector<llvm::Value*>{
+    	Value* Xtmp0_val = this->builder.CreateCall(this->mod->getFunction("fclass_d"), std::vector<Value*>{
     	    this->builder.CreateTrunc(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	        this-> get_type(64) 
@@ -7954,13 +7955,13 @@ private:
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 150);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 151: FCVT.W.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_w_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_w_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.W.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 151);
@@ -7972,7 +7973,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.W.D x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -7984,7 +7985,7 @@ private:
     	pc=pc+4;
     	
     	Value* Xtmp0_val = this->gen_ext(
-    	    this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<llvm::Value*>{
+    	    this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<Value*>{
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	            this-> get_type(64) 
@@ -7998,7 +7999,7 @@ private:
     	    32,
     	    true);
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -8008,13 +8009,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 151);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 152: FCVT.WU.D */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.WU.D");
     	
     	this->gen_sync(iss::PRE_SYNC, 152);
@@ -8026,7 +8027,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.WU.D x%1$d, f%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8038,7 +8039,7 @@ private:
     	pc=pc+4;
     	
     	Value* Xtmp0_val = this->gen_ext(
-    	    this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<llvm::Value*>{
+    	    this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<Value*>{
     	        this->builder.CreateTrunc(
     	            this->gen_reg_load(fld_rs1_val + traits<ARCH>::F0, 0),
     	            this-> get_type(64) 
@@ -8052,7 +8053,7 @@ private:
     	    32,
     	    false);
     	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(fld_rd_val + traits<ARCH>::X0), false);
-    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<llvm::Value*>{
+    	Value* flags_val = this->builder.CreateCall(this->mod->getFunction("fget_flags"), std::vector<Value*>{
     	});
     	Value* FCSR_val = this->builder.CreateAdd(
     	    this->builder.CreateAnd(
@@ -8062,13 +8063,13 @@ private:
     	this->builder.CreateStore(FCSR_val, get_reg_ptr(traits<ARCH>::FCSR), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 152);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 153: FCVT.D.W */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_d_w(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_d_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.D.W");
     	
     	this->gen_sync(iss::PRE_SYNC, 153);
@@ -8080,7 +8081,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.D.W f%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8091,7 +8092,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<Value*>{
     	    this->gen_ext(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        64,
@@ -8116,13 +8117,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 153);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 154: FCVT.D.WU */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("FCVT.D.WU");
     	
     	this->gen_sync(iss::PRE_SYNC, 154);
@@ -8134,7 +8135,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("FCVT.D.WU f%1$d, x%2$d");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8145,7 +8146,7 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<llvm::Value*>{
+    	Value* res_val = this->builder.CreateCall(this->mod->getFunction("fcvt_d"), std::vector<Value*>{
     	    this->gen_ext(
     	        this->gen_reg_load(fld_rs1_val + traits<ARCH>::X0, 0),
     	        64,
@@ -8170,13 +8171,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 154);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 155: C.FLD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fld(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fld(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FLD");
     	
     	this->gen_sync(iss::PRE_SYNC, 155);
@@ -8188,7 +8189,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FLD f(8+%1$d), %2%(x(8+%3$d))");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_uimm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8217,13 +8218,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 155);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 156: C.FSD */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fsd(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fsd(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FSD");
     	
     	this->gen_sync(iss::PRE_SYNC, 156);
@@ -8235,7 +8236,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FSD f(8+%1$d), %2%(x(8+%3$d))");
     	    ins_fmter % (uint64_t)fld_rs2_val % (uint64_t)fld_uimm_val % (uint64_t)fld_rs1_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8259,13 +8260,13 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(64)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 156);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 157: C.FLDSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fldsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fldsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FLDSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 157);
@@ -8276,7 +8277,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FLDSP f%1$d, %2%(x2)");
     	    ins_fmter % (uint64_t)fld_rd_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8308,13 +8309,13 @@ private:
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 157);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /* instruction 158: C.FSDSP */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __c_fsdsp(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){
+    std::tuple<continuation_e, BasicBlock*> __c_fsdsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("C.FSDSP");
     	
     	this->gen_sync(iss::PRE_SYNC, 158);
@@ -8325,7 +8326,7 @@ private:
     	    /* generate console output when executing the command */
     	    boost::format ins_fmter("C.FSDSP f%1$d, %2%(x2), ");
     	    ins_fmter % (uint64_t)fld_rs2_val % (uint64_t)fld_uimm_val;
-    	    std::vector<llvm::Value*> args {
+    	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
     	        this->builder.CreateGlobalStringPtr(ins_fmter.str()),
@@ -8349,16 +8350,16 @@ private:
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(64)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(iss::POST_SYNC, 158);
-    	bb = llvm::BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
-    	return std::make_tuple(vm::CONT, bb);
+    	return std::make_tuple(CONT, bb);
     }
     
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
-                                                                          llvm::BasicBlock *bb) {
+    std::tuple<continuation_e, BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
+                                                                          BasicBlock *bb) {
 		this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
@@ -8370,7 +8371,7 @@ private:
         this->gen_raise_trap(0, 2);     // illegal instruction trap
 		this->gen_sync(iss::POST_SYNC, instr_descr.size());
         this->gen_trap_check(this->leave_blk);
-        return std::make_tuple(iss::vm::BRANCH, nullptr);
+        return std::make_tuple(BRANCH, nullptr);
     }
 };
 
@@ -8383,7 +8384,7 @@ template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm::vm_base<ARCH>(core, core_id, cluster_id) {
+: vm_base<ARCH>(core, core_id, cluster_id) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -8395,8 +8396,8 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 template <typename ARCH>
-std::tuple<vm::continuation_e, llvm::BasicBlock *>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, llvm::BasicBlock *this_block) {
+std::tuple<continuation_e, BasicBlock *>
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     code_word_t insn = 0;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
@@ -8428,7 +8429,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     return (this->*f)(pc, insn, this_block);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock *leave_blk) {
+template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(BasicBlock *leave_blk) {
     this->builder.SetInsertPoint(leave_blk);
     this->builder.CreateRet(this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
 }
@@ -8440,8 +8441,8 @@ template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, ui
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
-    std::vector<llvm::Value *> args{
-        this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, lvl)),
+    std::vector<Value *> args{
+        this->core_ptr, ConstantInt::get(getContext(), APInt(64, lvl)),
     };
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
@@ -8450,17 +8451,17 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
-    std::vector<llvm::Value *> args{
-        this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, type)),
+    std::vector<Value *> args{
+        this->core_ptr, ConstantInt::get(getContext(), APInt(64, type)),
     };
     this->builder.CreateCall(this->mod->getFunction("wait"), args);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
+template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
     this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    std::vector<llvm::Value *> args{
+    std::vector<Value *> args{
     	this->core_ptr,
     	this->adj_to64(trap_state_val),
         this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
@@ -8469,11 +8470,11 @@ template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock 
     this->builder.CreateRet(trap_addr_val);
 }
 
-template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBlock *bb) {
+template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(BasicBlock *bb) {
     auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
     this->gen_cond_branch(this->builder.CreateICmp(
                               ICmpInst::ICMP_EQ, v,
-                              llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
+                              ConstantInt::get(getContext(), APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);
 }
 
