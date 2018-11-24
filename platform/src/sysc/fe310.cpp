@@ -83,13 +83,13 @@ fe310::fe310(sc_core::sc_module_name nm)
     size_t i = 0;
     for (const auto &e : e300_plat_t_map) {
         i_router->initiator.at(i)(e.target);
-        i_router->add_target_range(i, e.start, e.size);
+        i_router->set_target_range(i, e.start, e.size);
         i++;
     }
     i_router->initiator.at(i)(i_mem_qspi->target);
-    i_router->add_target_range(i, 0x20000000, 512_MB);
+    i_router->set_target_range(i, 0x20000000, 512_MB);
     i_router->initiator.at(++i)(i_mem_ram->target);
-    i_router->add_target_range(i, 0x80000000, 128_kB);
+    i_router->set_target_range(i, 0x80000000, 128_kB);
 
     i_uart0->clk_i(s_tlclk);
     i_uart1->clk_i(s_tlclk);
