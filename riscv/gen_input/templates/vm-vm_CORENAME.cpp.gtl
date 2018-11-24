@@ -38,7 +38,7 @@
 #include <iss/llvm/vm_base.h>
 #include <util/logging.h>
 
-#include <boost/format.hpp>
+#include <fmt/format.h>
 
 #include <array>
 #include <iss/debugger/riscv_target_adapter.h>
@@ -54,10 +54,11 @@ namespace ${coreDef.name.toLowerCase()} {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
+using namespace iss::vm::llvm;
 
-template <typename ARCH> class vm_impl : public vm::vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename vm::vm_base<ARCH>;
+    using super = typename iss::vm::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -71,31 +72,32 @@ public:
 
     target_adapter_if *accquire_target_adapter(server_if *srv) override {
         debugger_if::dbg_enabled = true;
-        if (vm::vm_base<ARCH>::tgt_adapter == nullptr)
-            vm::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
-        return vm::vm_base<ARCH>::tgt_adapter;
+        if (vm_base<ARCH>::tgt_adapter == nullptr)
+            vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
+        return vm_base<ARCH>::tgt_adapter;
     }
 
 protected:
-    using vm::vm_base<ARCH>::get_reg_ptr;
+    using vm_base<ARCH>::get_reg_ptr;
 
-    template <typename T> inline llvm::ConstantInt *size(T type) {
-        return llvm::ConstantInt::get(getContext(), llvm::APInt(32, type->getType()->getScalarSizeInBits()));
+    inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
+
+    template <typename T> inline ConstantInt *size(T type) {
+        return ConstantInt::get(getContext(), APInt(32, type->getType()->getScalarSizeInBits()));
     }
 
-    void setup_module(llvm::Module *m) override {
+    void setup_module(Module* m) override {
         super::setup_module(m);
-        vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
+        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE);
     }
 
-    inline llvm::Value *gen_choose(llvm::Value *cond, llvm::Value *trueVal, llvm::Value *falseVal, unsigned size) {
+    inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
-    std::tuple<vm::continuation_e, llvm::BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &,
-                                                                                llvm::BasicBlock *) override;
+    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &, BasicBlock *) override;
 
-    void gen_leave_behavior(llvm::BasicBlock *leave_blk) override;
+    void gen_leave_behavior(BasicBlock *leave_blk) override;
 
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
 
@@ -103,17 +105,17 @@ protected:
 
     void gen_wait(unsigned type);
 
-    void gen_trap_behavior(llvm::BasicBlock *) override;
+    void gen_trap_behavior(BasicBlock *) override;
 
-    void gen_trap_check(llvm::BasicBlock *bb);
+    void gen_trap_check(BasicBlock *bb);
 
-    inline llvm::Value *gen_reg_load(unsigned i, unsigned level = 0) {
+    inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
     inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        llvm::Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                                 this->get_type(traits<ARCH>::XLEN));
+        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
+                                                           this->get_type(traits<ARCH>::XLEN));
         this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
     }
 
@@ -124,9 +126,9 @@ protected:
     enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
 
     using this_class = vm_impl<ARCH>;
-    using compile_func = std::tuple<vm::continuation_e, llvm::BasicBlock *> (this_class::*)(virt_addr_t &pc,
-                                                                                            code_word_t instr,
-                                                                                            llvm::BasicBlock *bb);
+    using compile_func = std::tuple<continuation_e, BasicBlock *> (this_class::*)(virt_addr_t &pc,
+                                                                                  code_word_t instr,
+                                                                                  BasicBlock *bb);
     std::array<compile_func, LUT_SIZE> lut;
 
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
@@ -192,15 +194,14 @@ private:
  
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
-    std::tuple<vm::continuation_e, llvm::BasicBlock*> __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, llvm::BasicBlock* bb){<%instr.code.eachLine{%>
+    std::tuple<continuation_e, BasicBlock*> __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){<%instr.code.eachLine{%>
     	${it}<%}%>
     }
     <%}%>
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    std::tuple<vm::continuation_e, llvm::BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr,
-                                                                          llvm::BasicBlock *bb) {
+    std::tuple<continuation_e, BasicBlock *> illegal_intruction(virt_addr_t &pc, code_word_t instr, BasicBlock *bb) {
 		this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
                                    get_reg_ptr(traits<ARCH>::PC), true);
@@ -212,7 +213,7 @@ private:
         this->gen_raise_trap(0, 2);     // illegal instruction trap
 		this->gen_sync(iss::POST_SYNC, instr_descr.size());
         this->gen_trap_check(this->leave_blk);
-        return std::make_tuple(iss::vm::BRANCH, nullptr);
+        return std::make_tuple(BRANCH, nullptr);
     }
 };
 
@@ -225,7 +226,7 @@ template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm::vm_base<ARCH>(core, core_id, cluster_id) {
+: vm_base<ARCH>(core, core_id, cluster_id) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -237,8 +238,8 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 template <typename ARCH>
-std::tuple<vm::continuation_e, llvm::BasicBlock *>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, llvm::BasicBlock *this_block) {
+std::tuple<continuation_e, BasicBlock *>
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     code_word_t insn = 0;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
@@ -270,7 +271,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     return (this->*f)(pc, insn, this_block);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock *leave_blk) {
+template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(BasicBlock *leave_blk) {
     this->builder.SetInsertPoint(leave_blk);
     this->builder.CreateRet(this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
 }
@@ -278,45 +279,39 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(llvm::BasicBlock
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
-    						  get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
-    std::vector<llvm::Value *> args{
-        this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, lvl)),
-    };
+    std::vector<Value *> args{ this->core_ptr, ConstantInt::get(getContext(), APInt(64, lvl)) };
     this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
     auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
     this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
-                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
-    std::vector<llvm::Value *> args{
-        this->core_ptr, llvm::ConstantInt::get(getContext(), llvm::APInt(64, type)),
-    };
+    std::vector<Value *> args{ this->core_ptr, ConstantInt::get(getContext(), APInt(64, type)) };
     this->builder.CreateCall(this->mod->getFunction("wait"), args);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(llvm::BasicBlock *trap_blk) {
+template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(BasicBlock *trap_blk) {
     this->builder.SetInsertPoint(trap_blk);
     auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
     this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
                               get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    std::vector<llvm::Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                                    this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
+    std::vector<Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
+                              this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
     this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
     auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     this->builder.CreateRet(trap_addr_val);
 }
 
-template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(llvm::BasicBlock *bb) {
+template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(BasicBlock *bb) {
     auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
     this->gen_cond_branch(this->builder.CreateICmp(
                               ICmpInst::ICMP_EQ, v,
-                              llvm::ConstantInt::get(getContext(), llvm::APInt(v->getType()->getIntegerBitWidth(), 0))),
+                              ConstantInt::get(getContext(), APInt(v->getType()->getIntegerBitWidth(), 0))),
                           bb, this->trap_blk, 1);
 }
 

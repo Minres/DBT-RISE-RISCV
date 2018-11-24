@@ -4,35 +4,35 @@ InsructionSet RV64M extends RV64IBase {
     instructions{       
         MULW{
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0111011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 X[rd]<= X[rs1] * X[rs2];
             }
         }
         DIVW {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0111011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 X[rd] <= X[rs1]s / X[rs2]s;
             }
         }
         DIVUW {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0111011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 X[rd] <= X[rs1] / X[rs2];
             }
         }
         REMW {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0111011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 X[rd] <= X[rs1]s % X[rs2]s;
             }
         }
         REMUW {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0111011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 X[rd] <= X[rs1] % X[rs2];
             }

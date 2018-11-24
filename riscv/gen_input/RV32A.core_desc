@@ -9,7 +9,7 @@ InsructionSet RV32A extends RV32IBase{
     instructions{
         LR.W {
             encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d";
+            args_disass: "{name(rd)}, {name(rs1)}";
             if(rd!=0){
                 val offs[XLEN] <= X[rs1];
                 X[rd]<= sext(MEM[offs]{32}, XLEN);
@@ -18,7 +18,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         SC.W {
             encoding: b00011 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}";
             val offs[XLEN] <= X[rs1];
             val res1[32] <= RES[offs]{32};
             if(res1!=0)
@@ -27,14 +27,14 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOSWAP.W{
             encoding: b00001 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             if(rd!=0) X[rd]<=sext(MEM[offs]{32});
             MEM[offs]{32}<=X[rs2];
         }
         AMOADD.W{
             encoding: b00000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -43,7 +43,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOXOR.W{
             encoding: b00100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -52,7 +52,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOAND.W{
             encoding: b01100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -61,7 +61,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOOR.W {
             encoding: b01000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -70,7 +70,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOMIN.W{
             encoding: b10000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -79,7 +79,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOMAX.W{
             encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -88,7 +88,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOMINU.W{
             encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= zext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
@@ -97,7 +97,7 @@ InsructionSet RV32A extends RV32IBase{
         }
         AMOMAXU.W{
             encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%aq$d,rel=%rl$d)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= zext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;

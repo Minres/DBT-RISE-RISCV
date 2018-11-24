@@ -33,8 +33,43 @@
 <% 
 import com.minres.coredsl.coreDsl.Register
 import com.minres.coredsl.coreDsl.RegisterFile
+import com.minres.coredsl.coreDsl.RegisterAlias
 def getTypeSize(size){
 	if(size > 32) 64 else if(size > 16) 32 else if(size > 8) 16 else 8
+}
+def getOriginalName(reg){
+    if( reg.original instanceof RegisterFile) {
+    	if( reg.index != null ) {
+        	return reg.original.name+generator.generateHostCode(reg.index)
+        } else {
+        	return reg.original.name
+        }
+    } else if(reg.original instanceof Register){
+        return reg.original.name
+    }
+}
+def getRegisterNames(){
+	def regNames = []
+ 	allRegs.each { reg -> 
+		if( reg instanceof RegisterFile) {
+			(reg.range.right..reg.range.left).each{
+    			regNames+=reg.name.toLowerCase()+it
+            }
+        } else if(reg instanceof Register){
+    		regNames+=reg.name.toLowerCase()
+        }
+    }
+    return regNames
+}
+def getRegisterAliasNames(){
+	def regMap = allRegs.findAll{it instanceof RegisterAlias }.collectEntries {[getOriginalName(it), it.name]}
+ 	return allRegs.findAll{it instanceof Register || it instanceof RegisterFile}.collect{reg ->
+		if( reg instanceof RegisterFile) {
+			return (reg.range.right..reg.range.left).collect{ (regMap[reg.name]?:regMap[reg.name+it]?:reg.name.toLowerCase()+it).toLowerCase() }
+        } else if(reg instanceof Register){
+    		regMap[reg.name]?:reg.name.toLowerCase()
+        }
+ 	}.flatten()
 }
 %>
 #ifndef _${coreDef.name.toUpperCase()}_H_
@@ -54,6 +89,12 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
 	constexpr static char const* const core_type = "${coreDef.name}";
     
+  	static constexpr std::array<const char*, ${getRegisterNames().size}> reg_names{
+ 		{"${getRegisterNames().join("\", \"")}"}};
+ 
+  	static constexpr std::array<const char*, ${getRegisterAliasNames().size}> reg_aliases{
+ 		{"${getRegisterAliasNames().join("\", \"")}"}};
+
     enum constants {${coreDef.constants.collect{c -> c.name+"="+c.value}.join(', ')}};
 
     constexpr static unsigned FP_REGS_SIZE = ${coreDef.constants.find {it.name=='FLEN'}?.value?:0};
@@ -65,7 +106,7 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
         ${reg.name}${it},<%
                 }
             } else if(reg instanceof Register){ %>
-        ${reg.name},<%
+        ${reg.name},<%  
             }
         }%>
         NUM_REGS,
@@ -74,7 +115,12 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
         PENDING_TRAP,
         MACHINE_STATE,
         LAST_BRANCH,
-        ICOUNT
+        ICOUNT<% 
+     	allRegs.each { reg -> 
+    		if(reg instanceof RegisterAlias){ def aliasname=getOriginalName(reg)%>,
+        ${reg.name} = ${aliasname}<%
+            }
+        }%>
     };
 
     using reg_t = uint${regDataWidth}_t;
@@ -87,15 +133,11 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
- 	static constexpr std::array<const uint32_t, ${regSizes.size}> ${coreDef.name}_reg_size{
+ 	static constexpr std::array<const uint32_t, ${regSizes.size}> reg_bit_widths{
  		{${regSizes.join(",")}}};
 
-    static constexpr unsigned reg_bit_width(unsigned r) { return ${coreDef.name}_reg_size[r]; }
-
-    static constexpr std::array<const uint32_t, ${regOffsets.size}> ${coreDef.name}_reg_byte_offset{
+    static constexpr std::array<const uint32_t, ${regOffsets.size}> reg_byte_offsets{
     	{${regOffsets.join(",")}}};
-
-    constexpr static unsigned reg_byte_offset(unsigned r) { return ${coreDef.name}_reg_byte_offset[r]; }
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 

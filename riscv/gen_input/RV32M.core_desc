@@ -7,7 +7,7 @@ InsructionSet RV32M extends RV32IBase {
     instructions{       
         MUL{
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
                 X[rd]<= zext(res , XLEN);
@@ -15,7 +15,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         MULH {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 val res[MAXLEN] <= sext(X[rs1], MAXLEN) * sext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
@@ -23,7 +23,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         MULHSU {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 val res[MAXLEN] <= sext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
@@ -31,7 +31,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         MULHU {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
@@ -39,7 +39,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         DIV {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0){
                     val M1[XLEN] <= -1;
@@ -57,7 +57,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         DIVU {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0)
                     X[rd] <= zext(X[rs1], 32) / zext(X[rs2], 32);
@@ -67,7 +67,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         REM {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0) {
                     val M1[XLEN] <= -1;
@@ -85,7 +85,7 @@ InsructionSet RV32M extends RV32IBase {
         }
         REMU {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0110011;
-            args_disass:"x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0)
                     X[rd] <= zext(X[rs1], 32) % zext(X[rs2], 32);

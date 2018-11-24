@@ -10,7 +10,7 @@ InsructionSet RV64A extends RV64IBase {
     instructions{
         LR.D {
             encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d";
+            args_disass: "{name(rd)}, {name(rs1)}";
             if(rd!=0){
                 val offs[XLEN] <= X[rs1];
                 X[rd]<= sext(MEM[offs]{64}, XLEN);
@@ -19,7 +19,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         SC.D {
             encoding: b00011 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}";
             val offs[XLEN] <= X[rs1];
             val res[64] <= RES[offs];
             if(res!=0){
@@ -31,14 +31,14 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOSWAP.D{
             encoding: b00001 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             if(rd!=0) X[rd] <= sext(MEM[offs]{64});
             MEM[offs]{64} <= X[rs2];            
         }
         AMOADD.D{
             encoding: b00000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd]<=res;
@@ -47,7 +47,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOXOR.D{
             encoding: b00100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -56,7 +56,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOAND.D{
             encoding: b01100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -65,7 +65,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOOR.D {
             encoding: b01000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -74,7 +74,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOMIN.D{
             encoding: b10000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -83,7 +83,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOMAX.D{
             encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -92,7 +92,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOMINU.D{
             encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= zext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
@@ -101,7 +101,7 @@ InsructionSet RV64A extends RV64IBase {
         }
         AMOMAXU.D{
             encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
-            args_disass: "x%rd$d, x%rs1$d, x%rs2$d (aqu=%a,rel=%rl)";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
             val res[XLEN] <= zext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;

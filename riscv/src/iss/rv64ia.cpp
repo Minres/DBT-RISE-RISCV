@@ -52,6 +52,11 @@ extern "C" {
 
 using namespace iss::arch;
 
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv64ia>::reg_names;
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv64ia>::reg_aliases;
+constexpr std::array<const uint32_t, 39> iss::arch::traits<iss::arch::rv64ia>::reg_bit_widths;
+constexpr std::array<const uint32_t, 40> iss::arch::traits<iss::arch::rv64ia>::reg_byte_offsets;
+
 rv64ia::rv64ia() { reg.icount = 0; reg.machine_state = 0x3;}
 
 rv64ia::~rv64ia(){}
