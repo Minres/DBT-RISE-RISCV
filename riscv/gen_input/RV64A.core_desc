@@ -1,12 +1,7 @@
 import "RV64IBase.core_desc"
-import "RV32A.core_desc"
 
 InsructionSet RV64A extends RV64IBase {
      
-    address_spaces { 
-        RES[8]
-    }
-    
     instructions{
         LR.D {
             encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b011 | rd[4:0] | b0101111;
@@ -76,10 +71,10 @@ InsructionSet RV64A extends RV64IBase {
             encoding: b10000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
-            val res[XLEN] <= sext(MEM[offs]{64});
-            if(rd!=0) X[rd] <= res;
-            val res2[XLEN] <= choose(res s > X[rs2]s, X[rs2], res);            
-            MEM[offs]{64} <= res;            
+            val res1[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1's > X[rs2]s, X[rs2], res1);
+            MEM[offs]{64} <= res2;
         }
         AMOMAX.D{
             encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
@@ -94,7 +89,7 @@ InsructionSet RV64A extends RV64IBase {
             encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
-            val res[XLEN] <= zext(MEM[offs]{64});
+            val res[XLEN] <= sext(MEM[offs]{64});
             if(rd!=0) X[rd] <= res;
             val res2[XLEN] <= choose(res > X[rs2], X[rs2], res);            
             MEM[offs]{64} <= res2;            
@@ -103,10 +98,10 @@ InsructionSet RV64A extends RV64IBase {
             encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN] <= X[rs1];
-            val res[XLEN] <= zext(MEM[offs]{64});
-            if(rd!=0) X[rd] <= res;
-            val res2[XLEN] <= choose(res < X[rs2], X[rs2], res);            
-            MEM[offs]{64} <= res2;            
+            val res1[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1 < X[rs2], X[rs2], res1);
+            MEM[offs]{64} <= res2;
         }
     }
 }

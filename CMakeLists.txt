@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.3)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/sc-components/cmake)
 
 set(ENABLE_SCV TRUE CACHE BOOL "Enable use of SCV")
+set(ENABLE_SHARED TRUE CACHE BOOL "Build shared libraries")
 
 include(GitFunctions)
 get_branch_from_git()
@@ -32,7 +33,8 @@ include(Conan)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-	
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if(COMPILER_SUPPORTS_MARCH_NATIVE)

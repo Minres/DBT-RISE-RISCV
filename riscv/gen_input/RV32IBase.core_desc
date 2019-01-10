@@ -8,7 +8,7 @@ InsructionSet RV32IBase {
     }
     
     address_spaces { 
-        MEM[8], CSR[XLEN], FENCE[XLEN]
+        MEM[8], CSR[XLEN], FENCE[XLEN], RES[8]
     }
                 
     registers { 

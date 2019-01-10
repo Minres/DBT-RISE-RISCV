@@ -43,12 +43,11 @@ InsructionSet RV32M extends RV32IBase {
             if(rd != 0){
                 if(X[rs2]!=0){
                     val M1[XLEN] <= -1;
-                    val MMIN[XLEN] <= -1<<(XLEN-1);
-                    if(X[rs1]s==MMIN's)
-                        if(X[rs2]s==M1's)
-                            X[rd]<=MMIN;
-                        else
-                            X[rd] <= X[rs1]s / X[rs2]s;
+                    val XLM1[8] <= XLEN-1;
+                    val ONE[XLEN] <= 1;
+                    val MMIN[XLEN] <= ONE<<XLM1;
+                    if(X[rs1]==MMIN && X[rs2]==M1)
+                        X[rd] <= MMIN;
                     else
                         X[rd] <= X[rs1]s / X[rs2]s;
                 }else 
@@ -60,7 +59,7 @@ InsructionSet RV32M extends RV32IBase {
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0)
-                    X[rd] <= zext(X[rs1], 32) / zext(X[rs2], 32);
+                    X[rd] <= X[rs1] / X[rs2];
                 else 
                     X[rd] <= -1;
             }
@@ -70,15 +69,14 @@ InsructionSet RV32M extends RV32IBase {
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0) {
-                    val M1[XLEN] <= -1;
-                    val MMIN[XLEN] <= -1<<(XLEN-1);
-                    if(X[rs1]s==MMIN's)
-                        if(X[rs2]s==M1's)
-                            X[rd] <= 0;
-                        else
-                            X[rd] <= sext(X[rs1], 32) % sext(X[rs2], 32);
+                    val M1[XLEN] <= -1; // constant -1 
+                    val XLM1[32] <= XLEN-1;
+                    val ONE[XLEN] <= 1;
+                    val MMIN[XLEN] <= ONE<<XLM1; // -2^(XLEN-1)
+                    if(X[rs1]==MMIN && X[rs2]==M1)
+                        X[rd] <= 0;
                     else
-                        X[rd] <= sext(X[rs1], 32) % sext(X[rs2], 32);
+                        X[rd] <= X[rs1]'s % X[rs2]'s;
                 } else 
                     X[rd] <= X[rs1];
             }
@@ -88,7 +86,7 @@ InsructionSet RV32M extends RV32IBase {
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
                 if(X[rs2]!=0)
-                    X[rd] <= zext(X[rs1], 32) % zext(X[rs2], 32);
+                    X[rd] <= X[rs1] % X[rs2];
                 else 
                     X[rd] <= X[rs1];
             }

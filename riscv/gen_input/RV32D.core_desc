@@ -10,7 +10,7 @@ InsructionSet RV32D extends RV32IBase{
     instructions{
         FLD {
             encoding: imm[11:0]s | rs1[4:0] | b011 | rd[4:0] | b0000111;
-            args_disass:"f{rd}, {imm}({rs1})";
+            args_disass:"f{rd}, {imm}({name(rs1)})";
             val offs[XLEN] <= X[rs1]'s + imm;
             val res[64] <= MEM[offs]{64};
             if(FLEN==64)
@@ -22,7 +22,7 @@ InsructionSet RV32D extends RV32IBase{
         }
         FSD {
             encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b011 | imm[4:0]s | b0100111;
-            args_disass:"f{rs2}, {imm}({rs1})";
+            args_disass:"f{rs2}, {imm}({name(rs1)})";
             val offs[XLEN] <= X[rs1]'s + imm;
             MEM[offs]{64}<=F[rs2]{64};
         }
@@ -155,7 +155,10 @@ InsructionSet RV32D extends RV32IBase{
         FSGNJ.D {
             encoding: b0010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
             args_disass:"f{rd}, f{rs1}, f{rs2}";
-            val res[64] <= (F[rs1]{64} & 0x7fffffff) | (F[rs2]{64} & 0x80000000);
+            val ONE[64] <= 1;
+            val MSK1[64] <= ONE<<63;
+            val MSK2[64] <= MSK1-1;
+            val res[64] <= (F[rs1]{64} & MSK2) | (F[rs2]{64} & MSK1);
             if(FLEN==64)
                 F[rd] <= res;
             else { // NaN boxing
@@ -166,7 +169,10 @@ InsructionSet RV32D extends RV32IBase{
         FSGNJN.D {
             encoding: b0010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
             args_disass:"f{rd}, f{rs1}, f{rs2}";
-            val res[64] <= (F[rs1]{64} & 0x7fffffff) | (~F[rs2]{64} & 0x80000000);
+            val ONE[64] <= 1;
+            val MSK1[64] <= ONE<<63;
+            val MSK2[64] <= MSK1-1;
+            val res[64] <= (F[rs1]{64} & MSK2) | (~F[rs2]{64} & MSK1);
             if(FLEN==64)
                 F[rd] <= res;
             else { // NaN boxing
@@ -177,7 +183,9 @@ InsructionSet RV32D extends RV32IBase{
         FSGNJX.D {
             encoding: b0010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
             args_disass:"f{rd}, f{rs1}, f{rs2}";
-            val res[64] <= F[rs1]{64} ^ (F[rs2]{64} & 0x80000000);
+            val ONE[64] <= 1;
+            val MSK1[64] <= ONE<<63;
+            val res[64] <= F[rs1]{64} ^ (F[rs2]{64} & MSK1);
             if(FLEN==64)
                 F[rd] <= res;
             else { // NaN boxing
@@ -235,21 +243,21 @@ InsructionSet RV32D extends RV32IBase{
         FEQ.D {
             encoding: b1010001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b1010011;
             args_disass:"{name(rd)}, f{rs1}, f{rs2}";
-            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32));
+            X[rd]<=zext(fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(0, 32)));
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FLT.D {
             encoding: b1010001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b1010011;
             args_disass:"{name(rd)}, f{rs1}, f{rs2}";
-            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(2, 32));
+            X[rd]<=zext(fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(2, 32)));
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FLE.D {
             encoding: b1010001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b1010011;
             args_disass:"{name(rd)}, f{rs1}, f{rs2}";
-            X[rd]<=fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32));
+            X[rd]<=zext(fdispatch_fcmp_d(F[rs1]{64}, F[rs2]{64}, zext(1, 32)));
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
@@ -261,21 +269,22 @@ InsructionSet RV32D extends RV32IBase{
         FCVT.W.D {
             encoding: b1100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
             args_disass:"{name(rd)}, f{rs1}";
-            X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
+            X[rd]<= sext(fdispatch_fcvt_64_32(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FCVT.WU.D {
             encoding: b1100001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
             args_disass:"{name(rd)}, f{rs1}";
-            X[rd]<= zext(fdispatch_fcvt_d(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
+            //FIXME: should be zext accodring to spec but needs to be sext according to tests
+            X[rd]<= sext(fdispatch_fcvt_64_32(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FCVT.D.W {
             encoding: b1101001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {rs1}";
-            val res[64] <= fdispatch_fcvt_d(sext(X[rs1],64), zext(2, 32), rm{8});
+            args_disass:"f{rd}, {name(rs1)}";
+            val res[64] <= fdispatch_fcvt_32_64(sext(X[rs1]{32},64), zext(2, 32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
             else { // NaN boxing
@@ -285,8 +294,8 @@ InsructionSet RV32D extends RV32IBase{
         }
         FCVT.D.WU {
             encoding: b1101001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {rs1}";
-            val res[64] <=fdispatch_fcvt_d(zext(X[rs1],64), zext(3,32), rm{8});
+            args_disass:"f{rd}, {name(rs1)}";
+            val res[64] <=fdispatch_fcvt_32_64(zext(X[rs1]{32},64), zext(3,32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
             else { // NaN boxing
@@ -296,3 +305,62 @@ InsructionSet RV32D extends RV32IBase{
         }
     }
 }
+InsructionSet RV64D extends RV32D{
+    constants {
+        FLEN, FFLAG_MASK := 0x1f
+    } 
+    registers {
+        [31:0]    F[FLEN],  FCSR[32]
+    }    
+    instructions{
+        FCVT.L.D {
+            encoding: b1100001 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"{name(rd)}, f{rs1}";
+            X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCVT.LU.D {
+            encoding: b1100001 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"{name(rd)}, f{rs1}";
+            X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
+            val flags[32] <= fdispatch_fget_flags();
+            FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
+        }
+        FCVT.D.L {
+            encoding: b1101001 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f{rd}, {name(rs1)}";
+            val res[64] <= fdispatch_fcvt_d(sext(X[rs1],64), zext(2, 32), rm{8});
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FCVT.D.LU {
+            encoding: b1101001 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
+            args_disass:"f{rd}, {name(rs1)}";
+            val res[64] <=fdispatch_fcvt_d(zext(X[rs1],64), zext(3,32), rm{8});
+            if(FLEN==64)
+                F[rd] <= res;
+            else { // NaN boxing
+                val upper[FLEN] <= -1;
+                F[rd] <= (upper<<64) | res;
+            }
+        }
+        FMV.X.D {
+            encoding: b1110001 | b00000 | rs1[4:0] | b000 | rd[4:0] | b1010011;
+            args_disass:"{name(rd)}, f{rs1}";
+            X[rd]<=sext(F[rs1]);
+        }
+        FMV.D.X {
+            encoding: b1111001 | b00000 | rs1[4:0] | b000 | rd[4:0] | b1010011;
+            args_disass:"f{rd}, {name(rs1)}";
+            F[rd] <= zext(X[rs1]);
+        }
+
+    }
+}
+    
+    

@@ -70,7 +70,7 @@ using namespace std;
 
 using namespace llvm;
 
-void add_fp_functions_2_module(Module *mod, uint32_t flen) {
+void add_fp_functions_2_module(Module *mod, uint32_t flen, uint32_t xlen) {
     if(flen){
         FDECL(fget_flags, INT_TYPE(32));
         FDECL(fadd_s,     INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
@@ -83,6 +83,8 @@ void add_fp_functions_2_module(Module *mod, uint32_t flen) {
         FDECL(fmadd_s,    INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fsel_s,     INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32));
         FDECL(fclass_s,   INT_TYPE(32), INT_TYPE(32));
+        FDECL(fcvt_32_64,     INT_TYPE(64), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
+        FDECL(fcvt_64_32,     INT_TYPE(32), INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
         if(flen>32){
             FDECL(fconv_d2f,  INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
             FDECL(fconv_f2d,  INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
@@ -96,6 +98,8 @@ void add_fp_functions_2_module(Module *mod, uint32_t flen) {
             FDECL(fmadd_d,    INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
             FDECL(fsel_d,     INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(32));
             FDECL(fclass_d,   INT_TYPE(64), INT_TYPE(64));
+            FDECL(unbox_s,      INT_TYPE(32), INT_TYPE(64));
+
         }
     }
 }
@@ -198,13 +202,15 @@ uint32_t fcvt_s(uint32_t v1, uint32_t op, uint8_t mode) {
     float32_t v1f{v1};
     softfloat_exceptionFlags=0;
     float32_t r;
-    int32_t res;
     switch(op){
-    case 0: //w->s, fp to int32
-        res = f32_to_i32(v1f,rmm_map[mode&0x7],true);
+    case 0:{ //w->s, fp to int32
+        uint_fast32_t res = f32_to_i32(v1f,rmm_map[mode&0x7],true);
         return (uint32_t)res;
-    case 1: //wu->s
-        return f32_to_ui32(v1f,rmm_map[mode&0x7],true);
+    }
+    case 1:{ //wu->s
+        uint_fast32_t res = f32_to_ui32(v1f,rmm_map[mode&0x7],true);
+        return (uint32_t)res;
+    }
     case 2: //s->w
         r=i32_to_f32(v1);
         return r.v;
@@ -373,17 +379,19 @@ uint64_t fcvt_d(uint64_t v1, uint32_t op, uint8_t mode) {
     float64_t v1f{v1};
     softfloat_exceptionFlags=0;
     float64_t r;
-    int32_t res;
     switch(op){
-    case 0: //w->s, fp to int32
-        res = f64_to_i64(v1f,rmm_map[mode&0x7],true);
+    case 0:{ //l->d, fp to int32
+        int64_t res = f64_to_i64(v1f,rmm_map[mode&0x7],true);
         return (uint64_t)res;
-    case 1: //wu->s
-        return f64_to_ui64(v1f,rmm_map[mode&0x7],true);
-    case 2: //s->w
+    }
+    case 1:{ //lu->s
+        uint64_t res = f64_to_ui64(v1f,rmm_map[mode&0x7],true);
+        return res;
+    }
+    case 2: //s->l
         r=i64_to_f64(v1);
         return r.v;
-    case 3: //s->wu
+    case 3: //s->lu
         r=ui64_to_f64(v1);
         return r.v;
     }
@@ -454,5 +462,53 @@ uint64_t fclass_d(uint64_t v1  ){
         ( isNaN && !isSNaN )                       << 9;
 }
 
+uint64_t fcvt_32_64(uint32_t v1, uint32_t op, uint8_t mode) {
+    float32_t v1f{v1};
+    softfloat_exceptionFlags=0;
+    float64_t r;
+    switch(op){
+    case 0: //l->s, fp to int32
+        return f32_to_i64(v1f,rmm_map[mode&0x7],true);
+    case 1: //wu->s
+        return f32_to_ui64(v1f,rmm_map[mode&0x7],true);
+    case 2: //s->w
+        r=i32_to_f64(v1);
+        return r.v;
+    case 3: //s->wu
+        r=ui32_to_f64(v1);
+        return r.v;
+    }
+    return 0;
+}
+
+uint32_t fcvt_64_32(uint64_t v1, uint32_t op, uint8_t mode) {
+    softfloat_exceptionFlags=0;
+    float32_t r;
+    switch(op){
+    case 0:{ //wu->s
+        int32_t r=f64_to_i32(float64_t{v1}, rmm_map[mode&0x7],true);
+        return r;
+    }
+    case 1:{ //wu->s
+        uint32_t r=f64_to_ui32(float64_t{v1}, rmm_map[mode&0x7],true);
+        return r;
+    }
+    case 2: //l->s, fp to int32
+        r=i64_to_f32(v1);
+        return r.v;
+    case 3: //wu->s
+        r=ui64_to_f32(v1);
+        return r.v;
+    }
+    return 0;
+}
+
+uint32_t unbox_s(uint64_t v){
+    constexpr uint64_t mask = std::numeric_limits<uint64_t>::max() & ~((uint64_t)std::numeric_limits<uint32_t>::max());
+    if((v & mask) != mask)
+        return 0x7fc00000;
+    else
+        return v & std::numeric_limits<uint32_t>::max();
+}
 }
 

@@ -31,8 +31,8 @@
  *******************************************************************************/
 
 
-#ifndef _RV64IA_H_
-#define _RV64IA_H_
+#ifndef _RV64I_H_
+#define _RV64I_H_
 
 #include <array>
 #include <iss/arch/traits.h>
@@ -42,11 +42,11 @@
 namespace iss {
 namespace arch {
 
-struct rv64ia;
+struct rv64i;
 
-template <> struct traits<rv64ia> {
+template <> struct traits<rv64i> {
 
-	constexpr static char const* const core_type = "RV64IA";
+	constexpr static char const* const core_type = "RV64I";
     
   	static constexpr std::array<const char*, 33> reg_names{
  		{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30", "x31", "pc"}};
@@ -54,7 +54,7 @@ template <> struct traits<rv64ia> {
   	static constexpr std::array<const char*, 33> reg_aliases{
  		{"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6", "pc"}};
 
-    enum constants {XLEN=64, PCLEN=64, MISA_VAL=0b10000000000001000000000100000001, PGSIZE=0x1000, PGMASK=0xfff};
+    enum constants {XLEN=64, PCLEN=64, MISA_VAL=0b10000000000001000000000100000000, PGSIZE=0x1000, PGMASK=0xfff};
 
     constexpr static unsigned FP_REGS_SIZE = 0;
 
@@ -156,15 +156,15 @@ template <> struct traits<rv64ia> {
     enum mem_type_e { MEM, CSR, FENCE, RES };
 };
 
-struct rv64ia: public arch_if {
+struct rv64i: public arch_if {
 
-    using virt_addr_t = typename traits<rv64ia>::virt_addr_t;
-    using phys_addr_t = typename traits<rv64ia>::phys_addr_t;
-    using reg_t =  typename traits<rv64ia>::reg_t;
-    using addr_t = typename traits<rv64ia>::addr_t;
+    using virt_addr_t = typename traits<rv64i>::virt_addr_t;
+    using phys_addr_t = typename traits<rv64i>::phys_addr_t;
+    using reg_t =  typename traits<rv64i>::reg_t;
+    using addr_t = typename traits<rv64i>::addr_t;
 
-    rv64ia();
-    ~rv64ia();
+    rv64i();
+    ~rv64i();
 
     void reset(uint64_t address=0) override;
 
@@ -183,9 +183,9 @@ struct rv64ia: public arch_if {
     inline bool should_stop() { return interrupt_sim; }
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
-        if (addr.space != traits<rv64ia>::MEM || addr.type == iss::address_type::PHYSICAL ||
+        if (addr.space != traits<rv64i>::MEM || addr.type == iss::address_type::PHYSICAL ||
                 addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL) {
-            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv64ia>::addr_mask);
+            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv64i>::addr_mask);
         } else
             return virt2phys(addr);
     }
@@ -197,7 +197,7 @@ struct rv64ia: public arch_if {
     inline uint32_t get_last_branch() { return reg.last_branch; }
 
 protected:
-    struct RV64IA_regs {
+    struct RV64I_regs {
         uint64_t X0 = 0;
         uint64_t X1 = 0;
         uint64_t X2 = 0;
@@ -247,4 +247,4 @@ protected:
 
 }
 }            
-#endif /* _RV64IA_H_ */
+#endif /* _RV64I_H_ */

@@ -2,10 +2,6 @@ import "RV32IBase.core_desc"
 
 InsructionSet RV32A extends RV32IBase{
      
-    address_spaces { 
-        RES[8]
-    }
-    
     instructions{
         LR.W {
             encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b010 | rd[4:0] | b0101111;
@@ -23,7 +19,7 @@ InsructionSet RV32A extends RV32IBase{
             val res1[32] <= RES[offs]{32};
             if(res1!=0)
                 MEM[offs]{32} <= X[rs2];
-            if(rd!=0) X[rd]<= choose(res1!=0, 0, 1);
+            if(rd!=0) X[rd]<= choose(res1!=zext(0, 32), 0, 1);
         }
         AMOSWAP.W{
             encoding: b00001 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
@@ -73,9 +69,9 @@ InsructionSet RV32A extends RV32IBase{
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
             val res1[XLEN] <= sext(MEM[offs]{32});
-            if(rd!=0) X[rd]<=res1;
-            val res2[XLEN]<= choose(res1's>X[rs2]s, X[rs2], res1);
-            MEM[offs]{32}<=res2;
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1's > X[rs2]s, X[rs2], res1);
+            MEM[offs]{32} <= res2;
         }
         AMOMAX.W{
             encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
@@ -90,7 +86,7 @@ InsructionSet RV32A extends RV32IBase{
             encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
-            val res1[XLEN] <= zext(MEM[offs]{32});
+            val res1[XLEN] <= sext(MEM[offs]{32});
             if(rd!=0) X[rd]<=res1;
             val res2[XLEN]<= choose(res1>X[rs2], X[rs2], res1);
             MEM[offs]{32}<=res2;
@@ -99,10 +95,10 @@ InsructionSet RV32A extends RV32IBase{
             encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
             args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
             val offs[XLEN]<=X[rs1];
-            val res1[XLEN] <= zext(MEM[offs]{32});
-            if(rd!=0) X[rd]<=res1;
-            val res2[XLEN]<= choose(res1'u<X[rs2]'u, X[rs2], res1);
-            MEM[offs]{32}<=res2;
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1 < X[rs2], X[rs2], res1);
+            MEM[offs]{32} <= res2;
         }
     }
 }

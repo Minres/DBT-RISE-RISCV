@@ -30,7 +30,17 @@ set(LIBRARY_NAME platform)
 #add_definitions(-DSC_DEFAULT_WRITER_POLICY=SC_MANY_WRITERS)
 
 # Define the library
-add_library(${LIBRARY_NAME} ${LIB_SOURCES})
+add_library(${LIBRARY_NAME} SHARED ${LIB_SOURCES})
+
+# Links the target exe against the libraries
+target_link_libraries(${LIBRARY_NAME} riscv_sc)
+target_link_libraries(${LIBRARY_NAME} dbt-core)
+target_link_libraries(${LIBRARY_NAME} softfloat)
+target_link_libraries(${LIBRARY_NAME} sc-components)
+target_link_libraries(${LIBRARY_NAME} ${CONAN_LIBS_SEASOCKS})
+target_link_libraries(${LIBRARY_NAME} external)
+target_link_libraries(${LIBRARY_NAME} ${llvm_libs})
+target_link_libraries(${LIBRARY_NAME} ${Boost_LIBRARIES} )
 
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
@@ -61,7 +71,7 @@ add_executable(${APPLICATION_NAME} ${APP_SOURCES})
 target_include_directories(${APPLICATION_NAME} SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 # Links the target exe against the libraries
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
-target_link_libraries(${APPLICATION_NAME} riscv)
+target_link_libraries(${APPLICATION_NAME} riscv_sc)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} softfloat)
 target_link_libraries(${APPLICATION_NAME} sc-components)

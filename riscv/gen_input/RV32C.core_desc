@@ -15,14 +15,9 @@ InsructionSet RV32IC {
         JALR(no_cont){ // overwriting the implementation if rv32i, alignment does not need to be word
             encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
             args_disass: "{name(rd)}, {name(rs1)}, {imm:#0x}";
-            val new_pc[XLEN] <= X[rs1]s+ imm;
-            val align[XLEN] <= new_pc & 0x1;
-            if(align != 0){
-                raise(0, 0);
-            } else {
-                if(rd!=0) X[rd] <= PC+4;
-                PC<=new_pc & ~0x1;
-            }
+            val new_pc[XLEN] <= X[rs1]s + imm;
+            if(rd!=0) X[rd] <= PC+4;
+            PC<=new_pc & ~0x1;
         }
         C.ADDI4SPN { //(RES, imm=0)
             encoding: b000 | imm[5:4] | imm[9:6] | imm[2:2] | imm[3:3] | rd[2:0] | b00;
@@ -32,13 +27,13 @@ InsructionSet RV32IC {
         }
         C.LW { // (RV32)
             encoding: b010 | uimm[5:3] | rs1[2:0] | uimm[2:2] | uimm[6:6] | rd[2:0] | b00;
-            args_disass: "{name(8+rd)}, {name(8+rs1)}, {uimm:#05x}";
+            args_disass: "{name(8+rd)}, {uimm:#05x}({name(8+rs1)})";
             val offs[XLEN] <= X[rs1+8]+uimm;
-            X[rd+8] <= MEM[offs]{32};
+            X[rd+8] <= sext(MEM[offs]{32});
         }
         C.SW {//(RV32)
             encoding: b110 | uimm[5:3] | rs1[2:0] | uimm[2:2] | uimm[6:6] | rs2[2:0] | b00;
-            args_disass: "{name(8+rs1)}, {name(8+rs2)}, {uimm:#05x}";
+            args_disass: "{name(8+rs2)}, {uimm:#05x}({name(8+rs1)})";
             val offs[XLEN] <= X[rs1+8]+uimm;
             MEM[offs]{32} <= X[rs2+8];
         }
@@ -89,10 +84,10 @@ InsructionSet RV32IC {
             X[rs1_idx] <= shra(X[rs1_idx], shamt);
         }
         C.ANDI {//(RV32)
-            encoding:b100 | imm[5:5] | b10 | rs1[2:0] | imm[4:0] | b01;
+            encoding:b100 | imm[5:5]s | b10 | rs1[2:0] | imm[4:0]s | b01;
             args_disass: "{name(8+rs1)}, {imm:#05x}";
             val rs1_idx[5] <= rs1 + 8;
-            X[rs1_idx] <= X[rs1_idx] & imm;
+            X[rs1_idx] <= X[rs1_idx]s & imm;
         }
         C.SUB {//(RV32)
             encoding:b100 | b0 | b11 | rd[2:0] | b00 | rs2[2:0] | b01;
@@ -143,7 +138,7 @@ InsructionSet RV32IC {
             encoding:b010 | uimm[5:5] | rd[4:0] | uimm[4:2] | uimm[7:6] | b10;
             args_disass: "{name(rd)}, sp, {uimm:#05x}";
             val offs[XLEN] <= X[2] + uimm;
-            X[rd] <= MEM[offs]{32};
+            X[rd] <= sext(MEM[offs]{32});
         }
         // order matters as C.JR is a special case of C.MV
         C.MV {//(RV32)
@@ -174,7 +169,7 @@ InsructionSet RV32IC {
         }
         C.SWSP {//
             encoding:b110 | uimm[5:2] | uimm[7:6] | rs2[4:0] | b10;
-            args_disass: "x2+{uimm:#05x}, {name(rs2)}";
+            args_disass: "{name(rs2)}, {uimm:#05x}(sp)";
             val offs[XLEN] <= X[2] + uimm;
             MEM[offs]{32} <= X[rs2];
         }
@@ -301,36 +296,65 @@ InsructionSet RV64IC extends RV32IC {
     instructions{
         C.LD {//(RV64/128) 
             encoding:b011 | uimm[5:3] | rs1[2:0] | uimm[7:6] | rd[2:0] | b00;
+            args_disass: "{name(8+rd)}, {uimm},({name(8+rs1)})";
+            val offs[XLEN] <= X[rs1+8] + uimm;
+            X[rd+8]<=sext(MEM[offs]{64});
         }
         C.SD { //(RV64/128) 
             encoding:b111 | uimm[5:3] | rs1[2:0] | uimm[7:6] | rs2[2:0] | b00;
+            args_disass: "{name(8+rs2)}, {uimm},({name(8+rs1)})";
+            val offs[XLEN] <= X[rs1+8] + uimm;
+            MEM[offs]{64} <= X[rs2+8];
         }
         C.SUBW {//(RV64/128, RV32 res)
             encoding:b100 | b1 | b11 | rd[2:0] | b00 | rs2[2:0] | b01;
-            args_disass: "{name(rd)}, sp, {imm:#05x}";
+            args_disass: "{name(8+rd)}, {name(8+rd)}, {name(8+rs2)}";
+            val res[32] <= X[rd+8]{32} - X[rs2+8]{32};
+            X[rd+8] <= sext(res);
         }
         C.ADDW {//(RV64/128 RV32 res)
             encoding:b100 | b1 | b11 | rd[2:0] | b01 | rs2[2:0] | b01;
-            args_disass: "{name(rd)}, sp, {imm:#05x}";
+            args_disass: "{name(8+rd)}, {name(8+rd)}, {name(8+rs2)}";   
+            val res[32] <= X[rd+8]{32} + X[rs2+8]{32};
+            X[rd+8] <= sext(res);
         }
         C.ADDIW {//(RV64/128)
-            encoding:b001 | imm[5:5] | rs1[4:0] | imm[4:0] | b01;
+            encoding:b001 | imm[5:5]s | rs1[4:0] | imm[4:0]s | b01;
+            args_disass: "{name(rs1)}, {imm:#05x}";
+            if(rs1 != 0){
+                val res[32] <= X[rs1]{32}'s + imm;
+                X[rs1] <= sext(res);
+            } 
         }
-           C.SRLI64 {//(RV32/64/128)
-              encoding:b100 | b0 | b00 | rs1[2:0] | b00000 | b01;
-          }
-        C.SRAI64 {//(RV32/64/128)
-            encoding:b100 | b0 | b01 | rs1[2:0] | b00000 | b01;
+        C.SRLI {//(RV64)
+            encoding:b100 | shamt[5:5] | b00 | rs1[2:0] | shamt[4:0] | b01;
+            args_disass: "{name(8+rs1)}, {shamt}";
+            val rs1_idx[5] <= rs1+8;
+            X[rs1_idx] <= shrl(X[rs1_idx], shamt);
         }
-        C.SLLI64 {//(RV128 RV32/64)
-            encoding:b000 | b0 | rs1[4:0] | b00000 | b10;
+        C.SRAI {//(RV64)
+            encoding:b100 | shamt[5:5] | b01 | rs1[2:0] | shamt[4:0] | b01;
+            args_disass: "{name(8+rs1)}, {shamt}";
+            val rs1_idx[5] <= rs1+8;
+            X[rs1_idx] <= shra(X[rs1_idx], shamt);
+        }
+        C.SLLI {//(RV64)
+            encoding:b000 | shamt[5:5] | rs1[4:0] | shamt[4:0] | b10;
+            args_disass: "{name(rs1)}, {shamt}";
+            if(rs1 == 0) raise(0, 2);
+            X[rs1] <= shll(X[rs1], shamt);
         }
         C.LDSP {//(RV64/128
             encoding:b011 | uimm[5:5] | rd[4:0] | uimm[4:3] | uimm[8:6] | b10;
-            args_disass: "{name(rd)}, sp, {imm:#05x}";
+            args_disass:"{name(rd)}, {uimm}(sp)";
+            val offs[XLEN] <= X[2] + uimm;
+            if(rd!=0) X[rd]<=sext(MEM[offs]{64});
         }
         C.SDSP {//(RV64/128)
             encoding:b111 | uimm[5:3] | uimm[8:6] | rs2[4:0] | b10;
+            args_disass:"{name(rs2)}, {uimm}(sp)";
+            val offs[XLEN] <= X[2] + uimm;
+            MEM[offs]{64} <= X[rs2];
         }
     }
 }
@@ -347,6 +371,24 @@ InsructionSet RV128IC extends RV64IC {
                 PC[XLEN](is_pc)
     }
     instructions{
+        C.SRLI {//(RV128)
+            encoding:b100 | shamt[5:5] | b00 | rs1[2:0] | shamt[4:0] | b01;
+            args_disass: "{name(8+rs1)}, {shamt}";
+            val rs1_idx[5] <= rs1+8;
+            X[rs1_idx] <= shrl(X[rs1_idx], shamt);
+        }
+        C.SRAI {//(RV128)
+            encoding:b100 | shamt[5:5] | b01 | rs1[2:0] | shamt[4:0] | b01;
+            args_disass: "{name(8+rs1)}, {shamt}";
+            val rs1_idx[5] <= rs1+8;
+            X[rs1_idx] <= shra(X[rs1_idx], shamt);
+        }
+        C.SLLI {//(RV128)
+            encoding:b000 | shamt[5:5] | rs1[4:0] | shamt[4:0] | b10;
+            args_disass: "{name(rs1)}, {shamt}";
+            if(rs1 == 0) raise(0, 2);
+            X[rs1] <= shll(X[rs1], shamt);
+        }
         C.LQ { //(RV128)
              encoding:b001 | uimm[5:4] | uimm[8:8] | rs1[2:0] | uimm[7:6] | rd[2:0] | b00;
         }
