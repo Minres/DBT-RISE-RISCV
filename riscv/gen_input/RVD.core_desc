@@ -1,6 +1,6 @@
-import "RV32IBase.core_desc"
+import "RISCVBase.core_desc"
 
-InsructionSet RV32D extends RV32IBase{
+InsructionSet RV32D extends RISCVBase{
     constants {
         FLEN, FFLAG_MASK := 0x1f
     } 
@@ -306,12 +306,7 @@ InsructionSet RV32D extends RV32IBase{
     }
 }
 InsructionSet RV64D extends RV32D{
-    constants {
-        FLEN, FFLAG_MASK := 0x1f
-    } 
-    registers {
-        [31:0]    F[FLEN],  FCSR[32]
-    }    
+
     instructions{
         FCVT.L.D {
             encoding: b1100001 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
@@ -359,7 +354,6 @@ InsructionSet RV64D extends RV32D{
             args_disass:"f{rd}, {name(rs1)}";
             F[rd] <= zext(X[rs1]);
         }
-
     }
 }
     

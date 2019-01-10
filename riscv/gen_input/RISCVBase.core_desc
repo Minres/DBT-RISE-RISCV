@@ -1,0 +1,50 @@
+InsructionSet RISCVBase {
+    constants {
+        XLEN,
+        fence:=0,
+        fencei:=1,
+        fencevmal:=2,
+        fencevmau:=3
+    }
+    
+    address_spaces { 
+        MEM[8], CSR[XLEN], FENCE[XLEN], RES[8]
+    }
+                
+    registers { 
+        [31:0]   X[XLEN],
+                PC[XLEN](is_pc),
+                alias ZERO[XLEN] is X[0],
+                alias RA[XLEN] is X[1],
+                alias SP[XLEN] is X[2],
+                alias GP[XLEN] is X[3],
+                alias TP[XLEN] is X[4],
+                alias T0[XLEN] is X[5],
+                alias T1[XLEN] is X[6],
+                alias T2[XLEN] is X[7],
+                alias S0[XLEN] is X[8],
+                alias S1[XLEN] is X[9],
+                alias A0[XLEN] is X[10],
+                alias A1[XLEN] is X[11],
+                alias A2[XLEN] is X[12],
+                alias A3[XLEN] is X[13],
+                alias A4[XLEN] is X[14],
+                alias A5[XLEN] is X[15],
+                alias A6[XLEN] is X[16],
+                alias A7[XLEN] is X[17],
+                alias S2[XLEN] is X[18],
+                alias S3[XLEN] is X[19],
+                alias S4[XLEN] is X[20],
+                alias S5[XLEN] is X[21],
+                alias S6[XLEN] is X[22],
+                alias S7[XLEN] is X[23],
+                alias S8[XLEN] is X[24],
+                alias S9[XLEN] is X[25],
+                alias S10[XLEN] is X[26],
+                alias S11[XLEN] is X[27],
+                alias T3[XLEN] is X[28],
+                alias T4[XLEN] is X[29],
+                alias T5[XLEN] is X[30],
+                alias T6[XLEN] is X[31]
+    }
+}

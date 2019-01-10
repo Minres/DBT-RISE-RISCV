@@ -1,14 +1,12 @@
-import "RV32IBase.core_desc"
-import "RV32M.core_desc"
-import "RV32A.core_desc"
-import "RV32C.core_desc"
-import "RV32F.core_desc"
-import "RV32D.core_desc"
-import "RV64IBase.core_desc"
-import "RV64M.core_desc"
-import "RV64A.core_desc"
+import "RV32I.core_desc"
+import "RV64I.core_desc"
+import "RVM.core_desc"
+import "RVA.core_desc"
+import "RVC.core_desc"
+import "RVF.core_desc"
+import "RVD.core_desc"
 
-Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
+Core RV32IMAC provides RV32I, RV32M, RV32A, RV32IC {
     constants {
         XLEN:=32;
         PCLEN:=32;
@@ -20,7 +18,7 @@ Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
     }
 }
 
-Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32DC {
+Core RV32GC provides RV32I, RV32M, RV32A, RV32F, RV32D, RV32IC, RV32FC, RV32DC {
     constants {
         XLEN:=32;
         FLEN:=64;
@@ -33,7 +31,7 @@ Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32
     }
 }
 
-Core RV64I provides RV64IBase {
+Core RV64I provides RV64I {
     constants {
         XLEN:=64;
         PCLEN:=64;
@@ -45,7 +43,7 @@ Core RV64I provides RV64IBase {
     }
 }
 
-Core RV64GC provides RV64IC, RV64A, RV64M, RV32A, RV32M, RV64F, RV64D, RV32FC, RV32DC {
+Core RV64GC provides RV64I, RV64M, RV64A, RV64F, RV64D, RV64IC, RV32FC, RV32DC {
     constants {
         XLEN:=64;
         FLEN:=64;

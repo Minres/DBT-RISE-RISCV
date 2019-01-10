@@ -1,6 +1,6 @@
-import "RV32IBase.core_desc"
+import "RV32I.core_desc"
 
-InsructionSet RV64IBase extends RV32IBase {
+InsructionSet RV64I extends RV32I {
     instructions{
         LWU { //    80000104: 0000ef03            lwu t5,0(ra)
             encoding: imm[11:0]s | rs1[4:0] | b110 | rd[4:0] | b0000011;

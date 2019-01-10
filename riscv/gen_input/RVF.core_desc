@@ -1,6 +1,6 @@
-import "RV32IBase.core_desc"
+import "RV32I.core_desc"
 
-InsructionSet RV32F extends RV32IBase{
+InsructionSet RV32F extends RV32I{
     constants {
         FLEN, FFLAG_MASK := 0x1f
     } 
@@ -355,12 +355,7 @@ InsructionSet RV32F extends RV32IBase{
 }
 
 InsructionSet RV64F extends RV32F{
-    constants {
-        FLEN, FFLAG_MASK := 0x1f
-    } 
-    registers {
-        [31:0]    F[FLEN],  FCSR[32]
-    }    
+
     instructions{
         FCVT.L.S { // fp to 64bit signed integer
             encoding: b1100000 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;

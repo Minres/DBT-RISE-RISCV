@@ -1,16 +1,7 @@
-import "RV32IBase.core_desc"
+import "RISCVBase.core_desc"
 
-InsructionSet RV32IC {
-    constants {
-        XLEN
-    }
-    address_spaces { 
-        MEM[8]
-    }
-    registers { 
-        [31:0]   X[XLEN],
-                PC[XLEN](is_pc)
-    }
+InsructionSet RV32IC extends RISCVBase{
+
     instructions{
         JALR(no_cont){ // overwriting the implementation if rv32i, alignment does not need to be word
             encoding: imm[11:0]s | rs1[4:0] | b000 | rd[4:0] | b1100111;
@@ -182,13 +173,9 @@ InsructionSet RV32IC {
 
 InsructionSet RV32FC extends RV32IC{
     constants {
-        XLEN, FLEN
-    }
-    address_spaces { 
-        MEM[8]
+        FLEN
     }
     registers { 
-        [31:0]   X[XLEN],
         [31:0]   F[FLEN]
     }
     instructions{
@@ -233,13 +220,9 @@ InsructionSet RV32FC extends RV32IC{
 
 InsructionSet RV32DC extends RV32IC{
     constants {
-        XLEN, FLEN
-    }
-    address_spaces { 
-        MEM[8]
+        FLEN
     }
     registers { 
-        [31:0]   X[XLEN],
         [31:0]   F[FLEN]
     }
     instructions{
@@ -283,16 +266,7 @@ InsructionSet RV32DC extends RV32IC{
 }
 
 InsructionSet RV64IC extends RV32IC {
-    constants {
-        XLEN
-    }
-    address_spaces { 
-        MEM[8]
-    }
-    registers { 
-        [31:0]   X[XLEN],
-                PC[XLEN](is_pc)
-    }
+
     instructions{
         C.LD {//(RV64/128) 
             encoding:b011 | uimm[5:3] | rs1[2:0] | uimm[7:6] | rd[2:0] | b00;
@@ -360,16 +334,7 @@ InsructionSet RV64IC extends RV32IC {
 }
 
 InsructionSet RV128IC extends RV64IC {
-    constants {
-        XLEN
-    }
-    address_spaces { 
-        MEM[8]
-    }
-    registers { 
-        [31:0]   X[XLEN],
-                PC[XLEN](is_pc)
-    }
+
     instructions{
         C.SRLI {//(RV128)
             encoding:b100 | shamt[5:5] | b00 | rs1[2:0] | shamt[4:0] | b01;
