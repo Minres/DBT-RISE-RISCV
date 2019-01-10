@@ -40,6 +40,7 @@
 #include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
+#include <fmt/format.h>
 #include <array>
 #include <elfio/elfio.hpp>
 #include <iomanip>
@@ -478,10 +479,8 @@ public:
     void wait_until(uint64_t flags) override;
 
     void disass_output(uint64_t pc, const std::string instr) override {
-        std::stringstream s;
-        s << "[p:" << lvl[this->reg.machine_state] << ";s:0x" << std::hex << std::setfill('0')
-          << std::setw(sizeof(reg_t) * 2) << (reg_t)state.mstatus << std::dec << ";c:" << this->reg.icount << "]";
-        CLOG(INFO, disass) << "0x" << std::setw(16) << std::setfill('0') << std::hex << pc << "\t\t" << instr << "\t" << s.str();
+        CLOG(INFO, disass) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]",
+                pc, instr, lvl[this->reg.machine_state], (reg_t)state.mstatus, this->reg.icount);
     };
 
     iss::instrumentation_if *get_instrumentation_if() override { return &instr_if; }

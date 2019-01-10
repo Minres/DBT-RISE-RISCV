@@ -1,15 +1,12 @@
-import "RV32IBase.core_desc"
-import "RV32M.core_desc"
-import "RV32A.core_desc"
-import "RV32C.core_desc"
-import "RV32F.core_desc"
-import "RV32D.core_desc"
-import "RV64IBase.core_desc"
-//import "RV64M.core_desc"
-import "RV64A.core_desc"
+import "RV32I.core_desc"
+import "RV64I.core_desc"
+import "RVM.core_desc"
+import "RVA.core_desc"
+import "RVC.core_desc"
+import "RVF.core_desc"
+import "RVD.core_desc"
 
-Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
-    template:"vm_riscv.in.cpp";
+Core RV32IMAC provides RV32I, RV32M, RV32A, RV32IC {
     constants {
         XLEN:=32;
         PCLEN:=32;
@@ -21,7 +18,7 @@ Core RV32IMAC provides RV32IBase, RV32M, RV32A, RV32IC {
     }
 }
 
-Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32DC {
+Core RV32GC provides RV32I, RV32M, RV32A, RV32F, RV32D, RV32IC, RV32FC, RV32DC {
     constants {
         XLEN:=32;
         FLEN:=64;
@@ -34,16 +31,28 @@ Core RV32GC provides RV32IBase, RV32M, RV32A, RV32IC, RV32F, RV32FC, RV32D, RV32
     }
 }
 
-
-Core RV64IA provides RV64IBase, RV64A, RV32A {
-    template:"vm_riscv.in.cpp";
+Core RV64I provides RV64I {
     constants {
         XLEN:=64;
         PCLEN:=64;
         // definitions for the architecture wrapper
         //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        MISA_VAL:=0b10000000000001000000000100000001;
+        MISA_VAL:=0b10000000000001000000000100000000;
         PGSIZE := 0x1000; //1 << 12;
         PGMASK := 0xfff; //PGSIZE-1
     }
 }
+
+Core RV64GC provides RV64I, RV64M, RV64A, RV64F, RV64D, RV64IC, RV32FC, RV32DC {
+    constants {
+        XLEN:=64;
+        FLEN:=64;
+        PCLEN:=64;
+        // definitions for the architecture wrapper
+        //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        MISA_VAL:=0b01000000000101000001000100101101;
+        PGSIZE := 0x1000; //1 << 12;
+        PGMASK := 0xfff; //PGSIZE-1
+    }
+}
+

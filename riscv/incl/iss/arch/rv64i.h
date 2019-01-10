@@ -31,8 +31,8 @@
  *******************************************************************************/
 
 
-#ifndef _RV32IMAC_H_
-#define _RV32IMAC_H_
+#ifndef _RV64I_H_
+#define _RV64I_H_
 
 #include <array>
 #include <iss/arch/traits.h>
@@ -42,11 +42,11 @@
 namespace iss {
 namespace arch {
 
-struct rv32imac;
+struct rv64i;
 
-template <> struct traits<rv32imac> {
+template <> struct traits<rv64i> {
 
-	constexpr static char const* const core_type = "RV32IMAC";
+	constexpr static char const* const core_type = "RV64I";
     
   	static constexpr std::array<const char*, 33> reg_names{
  		{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30", "x31", "pc"}};
@@ -54,7 +54,7 @@ template <> struct traits<rv32imac> {
   	static constexpr std::array<const char*, 33> reg_aliases{
  		{"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6", "pc"}};
 
-    enum constants {XLEN=32, PCLEN=32, MISA_VAL=0b1000000000101000001000100000101, PGSIZE=0x1000, PGMASK=0xfff};
+    enum constants {XLEN=64, PCLEN=64, MISA_VAL=0b10000000000001000000000100000000, PGSIZE=0x1000, PGMASK=0xfff};
 
     constexpr static unsigned FP_REGS_SIZE = 0;
 
@@ -133,21 +133,21 @@ template <> struct traits<rv32imac> {
         T6 = X31
     };
 
-    using reg_t = uint32_t;
+    using reg_t = uint64_t;
 
-    using addr_t = uint32_t;
+    using addr_t = uint64_t;
 
-    using code_word_t = uint32_t; //TODO: check removal
+    using code_word_t = uint64_t; //TODO: check removal
 
     using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
  	static constexpr std::array<const uint32_t, 39> reg_bit_widths{
- 		{32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,64}};
+ 		{64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,32,32,32,32,64}};
 
     static constexpr std::array<const uint32_t, 40> reg_byte_offsets{
-    	{0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152,160}};
+    	{0,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248,256,264,272,276,280,284,288,296}};
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
 
@@ -156,15 +156,15 @@ template <> struct traits<rv32imac> {
     enum mem_type_e { MEM, CSR, FENCE, RES };
 };
 
-struct rv32imac: public arch_if {
+struct rv64i: public arch_if {
 
-    using virt_addr_t = typename traits<rv32imac>::virt_addr_t;
-    using phys_addr_t = typename traits<rv32imac>::phys_addr_t;
-    using reg_t =  typename traits<rv32imac>::reg_t;
-    using addr_t = typename traits<rv32imac>::addr_t;
+    using virt_addr_t = typename traits<rv64i>::virt_addr_t;
+    using phys_addr_t = typename traits<rv64i>::phys_addr_t;
+    using reg_t =  typename traits<rv64i>::reg_t;
+    using addr_t = typename traits<rv64i>::addr_t;
 
-    rv32imac();
-    ~rv32imac();
+    rv64i();
+    ~rv64i();
 
     void reset(uint64_t address=0) override;
 
@@ -183,9 +183,9 @@ struct rv32imac: public arch_if {
     inline bool should_stop() { return interrupt_sim; }
 
     inline phys_addr_t v2p(const iss::addr_t& addr){
-        if (addr.space != traits<rv32imac>::MEM || addr.type == iss::address_type::PHYSICAL ||
+        if (addr.space != traits<rv64i>::MEM || addr.type == iss::address_type::PHYSICAL ||
                 addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL) {
-            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv32imac>::addr_mask);
+            return phys_addr_t(addr.access, addr.space, addr.val&traits<rv64i>::addr_mask);
         } else
             return virt2phys(addr);
     }
@@ -197,41 +197,41 @@ struct rv32imac: public arch_if {
     inline uint32_t get_last_branch() { return reg.last_branch; }
 
 protected:
-    struct RV32IMAC_regs {
-        uint32_t X0 = 0;
-        uint32_t X1 = 0;
-        uint32_t X2 = 0;
-        uint32_t X3 = 0;
-        uint32_t X4 = 0;
-        uint32_t X5 = 0;
-        uint32_t X6 = 0;
-        uint32_t X7 = 0;
-        uint32_t X8 = 0;
-        uint32_t X9 = 0;
-        uint32_t X10 = 0;
-        uint32_t X11 = 0;
-        uint32_t X12 = 0;
-        uint32_t X13 = 0;
-        uint32_t X14 = 0;
-        uint32_t X15 = 0;
-        uint32_t X16 = 0;
-        uint32_t X17 = 0;
-        uint32_t X18 = 0;
-        uint32_t X19 = 0;
-        uint32_t X20 = 0;
-        uint32_t X21 = 0;
-        uint32_t X22 = 0;
-        uint32_t X23 = 0;
-        uint32_t X24 = 0;
-        uint32_t X25 = 0;
-        uint32_t X26 = 0;
-        uint32_t X27 = 0;
-        uint32_t X28 = 0;
-        uint32_t X29 = 0;
-        uint32_t X30 = 0;
-        uint32_t X31 = 0;
-        uint32_t PC = 0;
-        uint32_t NEXT_PC = 0;
+    struct RV64I_regs {
+        uint64_t X0 = 0;
+        uint64_t X1 = 0;
+        uint64_t X2 = 0;
+        uint64_t X3 = 0;
+        uint64_t X4 = 0;
+        uint64_t X5 = 0;
+        uint64_t X6 = 0;
+        uint64_t X7 = 0;
+        uint64_t X8 = 0;
+        uint64_t X9 = 0;
+        uint64_t X10 = 0;
+        uint64_t X11 = 0;
+        uint64_t X12 = 0;
+        uint64_t X13 = 0;
+        uint64_t X14 = 0;
+        uint64_t X15 = 0;
+        uint64_t X16 = 0;
+        uint64_t X17 = 0;
+        uint64_t X18 = 0;
+        uint64_t X19 = 0;
+        uint64_t X20 = 0;
+        uint64_t X21 = 0;
+        uint64_t X22 = 0;
+        uint64_t X23 = 0;
+        uint64_t X24 = 0;
+        uint64_t X25 = 0;
+        uint64_t X26 = 0;
+        uint64_t X27 = 0;
+        uint64_t X28 = 0;
+        uint64_t X29 = 0;
+        uint64_t X30 = 0;
+        uint64_t X31 = 0;
+        uint64_t PC = 0;
+        uint64_t NEXT_PC = 0;
         uint32_t trap_state = 0, pending_trap = 0, machine_state = 0, last_branch = 0;
         uint64_t icount = 0;
     } reg;
@@ -247,4 +247,4 @@ protected:
 
 }
 }            
-#endif /* _RV32IMAC_H_ */
+#endif /* _RV64I_H_ */

@@ -49,8 +49,10 @@ extern "C" {
 
 using namespace iss::arch;
 
-constexpr std::array<const uint32_t, 39> iss::arch::traits<iss::arch::rv32imac>::RV32IMAC_reg_size;
-constexpr std::array<const uint32_t, 40> iss::arch::traits<iss::arch::rv32imac>::RV32IMAC_reg_byte_offset;
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv32imac>::reg_names;
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv32imac>::reg_aliases;
+constexpr std::array<const uint32_t, 39> iss::arch::traits<iss::arch::rv32imac>::reg_bit_widths;
+constexpr std::array<const uint32_t, 40> iss::arch::traits<iss::arch::rv32imac>::reg_byte_offsets;
 
 rv32imac::rv32imac() {
     reg.icount = 0;

@@ -1,0 +1,160 @@
+import "RISCVBase.core_desc"
+
+InsructionSet RV32M extends RISCVBase {
+    constants {
+        MAXLEN:=128
+    }
+    instructions{       
+        MUL{
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                X[rd]<= zext(res , XLEN);
+            }
+        }
+        MULH {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                val res[MAXLEN] <= sext(X[rs1], MAXLEN) * sext(X[rs2], MAXLEN);
+                X[rd]<= zext(res >> XLEN, XLEN);
+            }
+        }
+        MULHSU {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                val res[MAXLEN] <= sext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                X[rd]<= zext(res >> XLEN, XLEN);
+            }
+        }
+        MULHU {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                X[rd]<= zext(res >> XLEN, XLEN);
+            }
+        }
+        DIV {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0){
+                    val M1[XLEN] <= -1;
+                    val XLM1[8] <= XLEN-1;
+                    val ONE[XLEN] <= 1;
+                    val MMIN[XLEN] <= ONE<<XLM1;
+                    if(X[rs1]==MMIN && X[rs2]==M1)
+                        X[rd] <= MMIN;
+                    else
+                        X[rd] <= X[rs1]s / X[rs2]s;
+                }else 
+                    X[rd] <= -1;
+            }
+        }
+        DIVU {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0)
+                    X[rd] <= X[rs1] / X[rs2];
+                else 
+                    X[rd] <= -1;
+            }
+        }
+        REM {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0) {
+                    val M1[XLEN] <= -1; // constant -1 
+                    val XLM1[32] <= XLEN-1;
+                    val ONE[XLEN] <= 1;
+                    val MMIN[XLEN] <= ONE<<XLM1; // -2^(XLEN-1)
+                    if(X[rs1]==MMIN && X[rs2]==M1)
+                        X[rd] <= 0;
+                    else
+                        X[rd] <= X[rs1]'s % X[rs2]'s;
+                } else 
+                    X[rd] <= X[rs1];
+            }
+        }
+        REMU {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0110011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0)
+                    X[rd] <= X[rs1] % X[rs2];
+                else 
+                    X[rd] <= X[rs1];
+            }
+        }
+    }
+}
+
+InsructionSet RV64M extends RV32M {
+    instructions{       
+        MULW{
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0111011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                X[rd]<= sext(X[rs1]{32} * X[rs2]{32});
+            }
+        }
+        DIVW {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b100 | rd[4:0] | b0111011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0){
+                    val M1[32] <= -1;
+                    val ONE[32] <= 1;
+                    val MMIN[32] <= ONE<<31;
+                    if(X[rs1]{32}==MMIN && X[rs2]{32}==M1)
+                        X[rd] <= -1<<31;
+                    else
+                        X[rd] <= sext(X[rs1]{32}s / X[rs2]{32}s);
+                }else 
+                    X[rd] <= -1;
+            }
+        }
+        DIVUW {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b101 | rd[4:0] | b0111011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+	            if(X[rs2]{32}!=0)
+	                X[rd] <= sext(X[rs1]{32} / X[rs2]{32});
+	            else 
+	                X[rd] <= -1;
+	        }
+        }
+        REMW {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b110 | rd[4:0] | b0111011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]!=0) {
+                    val M1[32] <= -1; // constant -1 
+                    val ONE[32] <= 1;
+                    val MMIN[32] <= ONE<<31; // -2^(XLEN-1)
+                    if(X[rs1]{32}==MMIN && X[rs2]==M1)
+                        X[rd] <= 0;
+                    else
+                        X[rd] <= sext(X[rs1]{32}s % X[rs2]{32}s);
+                } else 
+                    X[rd] <= sext(X[rs1]{32});
+            }
+        }
+        REMUW {
+            encoding: b0000001 | rs2[4:0] | rs1[4:0] | b111 | rd[4:0] | b0111011;
+            args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
+            if(rd != 0){
+                if(X[rs2]{32}!=0)
+                    X[rd] <= sext(X[rs1]{32} % X[rs2]{32});
+                else 
+                    X[rd] <= sext(X[rs1]{32});
+            }
+        }
+    }
+}
+

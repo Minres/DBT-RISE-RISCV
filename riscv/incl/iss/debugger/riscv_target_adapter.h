@@ -40,6 +40,7 @@
 
 #include <array>
 #include <memory>
+#include <fmt/format.h>
 #include <util/logging.h>
 
 namespace iss {
@@ -180,8 +181,8 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
     avail.clear();
     const uint8_t *reg_base = core->get_regs_base_ptr();
     for (size_t reg_no = 0; reg_no < arch::traits<ARCH>::NUM_REGS; ++reg_no) {
-        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)) / 8;
-        unsigned offset = traits<ARCH>::reg_byte_offset(reg_no);
+        auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
+        unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
         for (size_t j = 0; j < reg_width; ++j) {
             data.push_back(*(reg_base + offset + j));
             avail.push_back(0xff);
@@ -215,8 +216,8 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_registers(cons
     auto *reg_base = core->get_regs_base_ptr();
     auto iter = data.data();
     for (size_t reg_no = 0; reg_no < reg_count; ++reg_no) {
-        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)) / 8;
-        auto offset = traits<ARCH>::reg_byte_offset(reg_no);
+        auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
+        auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(iter, iter + reg_width, reg_base);
         iter += 4;
         reg_base += offset;
@@ -231,10 +232,10 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
         // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
         // arch::traits<ARCH>::reg_e>(reg_no))/8;
         auto *reg_base = core->get_regs_base_ptr();
-        auto reg_width = arch::traits<ARCH>::reg_bit_width(reg_no) / 8;
+        auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
         data.resize(reg_width);
         avail.resize(reg_width);
-        auto offset = traits<ARCH>::reg_byte_offset(reg_no);
+        auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(reg_base + offset, reg_base + offset + reg_width, data.begin());
         std::fill(avail.begin(), avail.end(), 0xff);
     } else {
@@ -251,8 +252,8 @@ template <typename ARCH>
 status riscv_target_adapter<ARCH>::write_single_register(unsigned int reg_no, const std::vector<uint8_t> &data) {
     if (reg_no < 65) {
         auto *reg_base = core->get_regs_base_ptr();
-        auto reg_width = arch::traits<ARCH>::reg_bit_width(static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)) / 8;
-        auto offset = traits<ARCH>::reg_byte_offset(reg_no);
+        auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
+        auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(data.begin(), data.begin() + reg_width, reg_base + offset);
     } else {
         typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
@@ -296,9 +297,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::raw_query(std::strin
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::threadinfo_query(int first, std::string &out_buf) {
     if (first) {
-        std::stringstream ss;
-        ss << "m" << std::hex << thread_idx.val;
-        out_buf = ss.str();
+        out_buf = fmt::format("m{:x}", thread_idx.val);
     } else {
         out_buf = "l";
     }
@@ -348,8 +347,8 @@ template <typename ARCH>
 status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
                                                     std::function<void(unsigned)> stop_callback) {
     auto *reg_base = core->get_regs_base_ptr();
-    auto reg_width = arch::traits<ARCH>::reg_bit_width(arch::traits<ARCH>::PC) / 8;
-    auto offset = traits<ARCH>::reg_byte_offset(arch::traits<ARCH>::PC);
+    auto reg_width = arch::traits<ARCH>::reg_bit_widths[arch::traits<ARCH>::PC] / 8;
+    auto offset = traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::PC];
     const uint8_t *iter = reinterpret_cast<const uint8_t *>(&addr);
     std::copy(iter, iter + reg_width, reg_base);
     return resume_from_current(step, sig, thread, stop_callback);

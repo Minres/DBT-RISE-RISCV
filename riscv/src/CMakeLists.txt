@@ -4,17 +4,15 @@ set(LIB_HEADERS ${RiscVSCHeaders} )
 set(LIB_SOURCES 
 	iss/rv32gc.cpp
 	iss/rv32imac.cpp
-	iss/rv64ia.cpp
+	iss/rv64i.cpp
+	iss/rv64gc.cpp
 	internal/fp_functions.cpp
 	internal/vm_rv32gc.cpp
 	internal/vm_rv32imac.cpp
-	internal/vm_rv64ia.cpp
+	internal/vm_rv64i.cpp
+	internal/vm_rv64gc.cpp
     plugin/instruction_count.cpp
     plugin/cycle_estimate.cpp)
-
-set(APP_HEADERS )
-
-set(APP_SOURCES main.cpp)
 
 # Define two variables in order not to repeat ourselves.
 set(LIBRARY_NAME riscv)
@@ -27,17 +25,44 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
 )
+#set_property(TARGET ${LIBRARY_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+if(SystemC_FOUND)
+	set(SC_LIBRARY_NAME riscv_sc)
+	add_library(${SC_LIBRARY_NAME} SHARED sysc/core_complex.cpp)
+	add_definitions(-DWITH_SYSTEMC) 
+	include_directories(${SystemC_INCLUDE_DIRS})
+	
+	include_directories(${CCI_INCLUDE_DIRS})
+	
+	if(SCV_FOUND)   
+	    add_definitions(-DWITH_SCV)
+	    include_directories(${SCV_INCLUDE_DIRS})
+	endif()
+	set_target_properties(${SC_LIBRARY_NAME} PROPERTIES
+	  VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
+	  FRAMEWORK FALSE
+	  PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
+	)
+	target_link_libraries(${SC_LIBRARY_NAME} ${LIBRARY_NAME})
+	target_link_libraries(${SC_LIBRARY_NAME} dbt-core)
+	target_link_libraries(${SC_LIBRARY_NAME} softfloat)
+	target_link_libraries(${SC_LIBRARY_NAME} sc-components)
+	target_link_libraries(${SC_LIBRARY_NAME} external)
+	target_link_libraries(${SC_LIBRARY_NAME} ${llvm_libs})
+	target_link_libraries(${SC_LIBRARY_NAME} ${Boost_LIBRARIES} )
+endif()
 
 # This is a make target, so you can do a "make riscv-sc"
 set(APPLICATION_NAME riscv-sim)
 
-add_executable(${APPLICATION_NAME} ${APP_SOURCES})
+add_executable(${APPLICATION_NAME} main.cpp)
 
 # Links the target exe against the libraries
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
+target_link_libraries(${APPLICATION_NAME} jsoncpp)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
 target_link_libraries(${APPLICATION_NAME} softfloat)
-target_link_libraries(${APPLICATION_NAME} sc-components)
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )

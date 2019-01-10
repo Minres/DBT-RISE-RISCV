@@ -25,7 +25,6 @@ endif()
 add_dependent_subproject(dbt-core)
 add_dependent_subproject(sc-components)
 add_dependent_subproject(riscv)
-add_dependent_subproject(riscv.sc)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/../external/elfio

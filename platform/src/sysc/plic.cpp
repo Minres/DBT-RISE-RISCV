@@ -50,7 +50,7 @@ plic::plic(sc_core::sc_module_name nm)
 {
     regs->registerResources(*this);
     // register callbacks
-    regs->claim_complete.set_write_cb([this](scc::sc_register<uint32_t> reg, uint32_t v, sc_core::sc_time d) -> bool {
+    regs->claim_complete.set_write_cb([this](scc::sc_register<uint32_t>& reg, uint32_t v, sc_core::sc_time d) -> bool {
         reg.put(v);
         reset_pending_int(v);
         // std::cout << "Value of register: 0x" << std::hex << reg << std::endl;

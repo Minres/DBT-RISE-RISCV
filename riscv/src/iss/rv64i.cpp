@@ -29,12 +29,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
-
+ 
 #include "util/ities.h"
 #include <util/logging.h>
 
 #include <elfio/elfio.hpp>
-#include <iss/arch/rv32gc.h>
+#include <iss/arch/rv64i.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,26 +43,25 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-#include <fstream>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 
 using namespace iss::arch;
 
-constexpr std::array<const char*, 66>    iss::arch::traits<iss::arch::rv32gc>::reg_names;
-constexpr std::array<const char*, 66>    iss::arch::traits<iss::arch::rv32gc>::reg_aliases;
-constexpr std::array<const uint32_t, 72> iss::arch::traits<iss::arch::rv32gc>::reg_bit_widths;
-constexpr std::array<const uint32_t, 73> iss::arch::traits<iss::arch::rv32gc>::reg_byte_offsets;
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv64i>::reg_names;
+constexpr std::array<const char*, 33>    iss::arch::traits<iss::arch::rv64i>::reg_aliases;
+constexpr std::array<const uint32_t, 39> iss::arch::traits<iss::arch::rv64i>::reg_bit_widths;
+constexpr std::array<const uint32_t, 40> iss::arch::traits<iss::arch::rv64i>::reg_byte_offsets;
 
-rv32gc::rv32gc() {
-    reg.icount=0;
+rv64i::rv64i() {
+    reg.icount = 0;
 }
 
-rv32gc::~rv32gc(){
-}
+rv64i::~rv64i() = default;
 
-void rv32gc::reset(uint64_t address) {
-    for(size_t i=0; i<traits<rv32gc>::NUM_REGS; ++i) set_reg(i, std::vector<uint8_t>(sizeof(traits<rv32gc>::reg_t),0));
+void rv64i::reset(uint64_t address) {
+    for(size_t i=0; i<traits<rv64i>::NUM_REGS; ++i) set_reg(i, std::vector<uint8_t>(sizeof(traits<rv64i>::reg_t),0));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.trap_state=0;
@@ -70,11 +69,11 @@ void rv32gc::reset(uint64_t address) {
     reg.icount=0;
 }
 
-uint8_t* rv32gc::get_regs_base_ptr(){
-    return reinterpret_cast<uint8_t*>(&reg);
+uint8_t *rv64i::get_regs_base_ptr() {
+	return reinterpret_cast<uint8_t*>(&reg);
 }
 
-rv32gc::phys_addr_t rv32gc::virt2phys(const iss::addr_t &pc) {
+rv64i::phys_addr_t rv64i::virt2phys(const iss::addr_t &pc) {
     return phys_addr_t(pc); // change logical address to physical address
 }
 

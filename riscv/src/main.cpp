@@ -38,8 +38,9 @@
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv32gc.h>
-#include <iss/arch/rv64ia.h>
-#include <iss/jit/jit_helper.h>
+#include <iss/arch/rv64gc.h>
+#include <iss/arch/rv64i.h>
+#include <iss/llvm/jit_helper.h>
 #include <iss/log_categories.h>
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
@@ -107,7 +108,11 @@ int main(int argc, char *argv[]) {
         std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
         if (isa_opt=="rv64ia") {
-            iss::arch::rv64ia* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64ia>();
+            iss::arch::rv64i* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64i>();
+            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
+            cpu.reset(lcpu);
+        } else if (isa_opt=="rv64gc") {
+            iss::arch::rv64gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
             vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
             cpu.reset(lcpu);
         } else if (isa_opt=="rv32imac") {

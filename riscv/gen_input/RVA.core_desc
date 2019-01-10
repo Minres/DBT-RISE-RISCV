@@ -1,0 +1,210 @@
+import "RISCVBase.core_desc"
+
+InsructionSet RV32A extends RISCVBase{
+     
+    instructions{
+        LR.W {
+            encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}";
+            if(rd!=0){
+                val offs[XLEN] <= X[rs1];
+                X[rd]<= sext(MEM[offs]{32}, XLEN);
+                RES[offs]{32}<=sext(-1, 32);
+            }
+        }
+        SC.W {
+            encoding: b00011 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}";
+            val offs[XLEN] <= X[rs1];
+            val res1[32] <= RES[offs]{32};
+            if(res1!=0)
+                MEM[offs]{32} <= X[rs2];
+            if(rd!=0) X[rd]<= choose(res1!=zext(0, 32), 0, 1);
+        }
+        AMOSWAP.W{
+            encoding: b00001 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            if(rd!=0) X[rd]<=sext(MEM[offs]{32});
+            MEM[offs]{32}<=X[rs2];
+        }
+        AMOADD.W{
+            encoding: b00000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN]<=res1 + X[rs2];
+            MEM[offs]{32}<=res2;
+        }
+        AMOXOR.W{
+            encoding: b00100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN]<=res1 ^ X[rs2];
+            MEM[offs]{32}<=res2;
+        }
+        AMOAND.W{
+            encoding: b01100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN] <=res1 & X[rs2];
+            MEM[offs]{32}<=res2;
+        }
+        AMOOR.W {
+            encoding: b01000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN]<=res1 | X[rs2];
+            MEM[offs]{32}<=res2;
+        }
+        AMOMIN.W{
+            encoding: b10000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1's > X[rs2]s, X[rs2], res1);
+            MEM[offs]{32} <= res2;
+        }
+        AMOMAX.W{
+            encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN]<= choose(res1's<X[rs2]s, X[rs2], res1);
+            MEM[offs]{32}<=res2;
+        }
+        AMOMINU.W{
+            encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd]<=res1;
+            val res2[XLEN]<= choose(res1>X[rs2], X[rs2], res1);
+            MEM[offs]{32}<=res2;
+        }
+        AMOMAXU.W{
+            encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN]<=X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{32});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1 < X[rs2], X[rs2], res1);
+            MEM[offs]{32} <= res2;
+        }
+    }
+}
+
+InsructionSet RV64A extends RV32A {
+     
+    instructions{
+        LR.D {
+            encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}";
+            if(rd!=0){
+                val offs[XLEN] <= X[rs1];
+                X[rd]<= sext(MEM[offs]{64}, XLEN);
+                RES[offs]{64}<=sext(-1, 64);
+            }        
+        }
+        SC.D {
+            encoding: b00011 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}";
+            val offs[XLEN] <= X[rs1];
+            val res[64] <= RES[offs];
+            if(res!=0){
+                MEM[offs]{64} <= X[rs2];
+                if(rd!=0) X[rd]<=0;
+            } else{ 
+                if(rd!=0) X[rd]<= 1;
+            }
+        }
+        AMOSWAP.D{
+            encoding: b00001 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            if(rd!=0) X[rd] <= sext(MEM[offs]{64});
+            MEM[offs]{64} <= X[rs2];            
+        }
+        AMOADD.D{
+            encoding: b00000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd]<=res;
+            val res2[XLEN] <= res + X[rs2];
+            MEM[offs]{64}<=res2;            
+        }
+        AMOXOR.D{
+            encoding: b00100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res;
+            val res2[XLEN] <= res ^ X[rs2];
+            MEM[offs]{64} <= res2;            
+        }
+        AMOAND.D{
+            encoding: b01100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res;
+            val res2[XLEN] <= res & X[rs2];
+            MEM[offs]{64} <= res2;            
+        }
+        AMOOR.D {
+            encoding: b01000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res;
+            val res2[XLEN] <= res | X[rs2];
+            MEM[offs]{64} <= res2;            
+        }
+        AMOMIN.D{
+            encoding: b10000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1's > X[rs2]s, X[rs2], res1);
+            MEM[offs]{64} <= res2;
+        }
+        AMOMAX.D{
+            encoding: b10100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res;
+            val res2[XLEN] <= choose(res s < X[rs2]s, X[rs2], res);            
+            MEM[offs]{64} <= res2;            
+        }
+        AMOMINU.D{
+            encoding: b11000 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res;
+            val res2[XLEN] <= choose(res > X[rs2], X[rs2], res);            
+            MEM[offs]{64} <= res2;            
+        }
+        AMOMAXU.D{
+            encoding: b11100 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0101111;
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)} (aqu={aq},rel={rl})";
+            val offs[XLEN] <= X[rs1];
+            val res1[XLEN] <= sext(MEM[offs]{64});
+            if(rd!=0) X[rd] <= res1;
+            val res2[XLEN] <= choose(res1 < X[rs2], X[rs2], res1);
+            MEM[offs]{64} <= res2;
+        }
+    }
+}
