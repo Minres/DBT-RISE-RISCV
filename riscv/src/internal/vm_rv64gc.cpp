@@ -38,6 +38,7 @@
 #include <iss/llvm/vm_base.h>
 #include <util/logging.h>
 
+#define FMT_HEADER_ONLY
 #include <fmt/format.h>
 
 #include <array>

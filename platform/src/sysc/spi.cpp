@@ -124,7 +124,7 @@ beh::beh(sc_core::sc_module_name nm)
         return true;
     });
     regs->csmode.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             if (regs->r_csmode.mode == 2 && regs->r_csmode.mode != bit_sub<0, 2>(data) && regs->r_csid < 4) {
                 tlm::tlm_phase phase(tlm::BEGIN_REQ);
                 sc_core::sc_time delay(SC_ZERO_TIME);
@@ -136,7 +136,7 @@ beh::beh(sc_core::sc_module_name nm)
             reg.put(data);
             return true;
         });
-    regs->csid.set_write_cb([this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+    regs->csid.set_write_cb([this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
         if (regs->r_csmode.mode == 2 && regs->csid != data && regs->r_csid < 4) {
             tlm::tlm_phase phase(tlm::BEGIN_REQ);
             sc_core::sc_time delay(SC_ZERO_TIME);
@@ -148,7 +148,7 @@ beh::beh(sc_core::sc_module_name nm)
         reg.put(data);
         return true;
     });
-    regs->csdef.set_write_cb([this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+    regs->csdef.set_write_cb([this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
         auto diff = regs->csdef ^ data;
         if (regs->r_csmode.mode == 2 && diff != 0 && (regs->r_csid < 4) && (diff & (1 << regs->r_csid)) != 0) {
             tlm::tlm_phase phase(tlm::BEGIN_REQ);

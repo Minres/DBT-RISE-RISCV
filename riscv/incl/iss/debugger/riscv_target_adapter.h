@@ -40,6 +40,7 @@
 
 #include <array>
 #include <memory>
+#define FMT_HEADER_ONLY
 #include <fmt/format.h>
 #include <util/logging.h>
 

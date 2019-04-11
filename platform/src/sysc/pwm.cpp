@@ -51,14 +51,14 @@ pwm::pwm(sc_core::sc_module_name nm)
     regs->registerResources(*this);
 
     regs->pwmcfg.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             if (d.value()) wait(d);
             reg.put(data);
             update_counter();
             return true;
         });
     regs->pwmcount.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             if (d.value()) wait(d);
             reg.put(data);
             update_counter();
@@ -83,25 +83,25 @@ pwm::pwm(sc_core::sc_module_name nm)
         return true;
     });
     regs->pwmcmp0.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             reg.put(data);
             update_counter();
             return true;
         });
     regs->pwmcmp1.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             reg.put(data);
             update_counter();
             return true;
         });
     regs->pwmcmp2.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             reg.put(data);
             update_counter();
             return true;
         });
     regs->pwmcmp3.set_write_cb(
-        [this](const scc::sc_register<uint32_t> &reg, uint32_t &data, sc_core::sc_time d) -> bool {
+        [this](const scc::sc_register<uint32_t> &reg, const uint32_t &data, sc_core::sc_time d) -> bool {
             reg.put(data);
             update_counter();
             return true;
