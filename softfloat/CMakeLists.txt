@@ -26,13 +26,6 @@ add_definitions(
 #  	-DTHREAD_LOCAL=__thread
 )
 
-set(SOFTFLOAT_INCLUDE_DIRS
-    ${PROJECT_SOURCE_DIR}/build/Linux-x86_64-GCC
-    ${PROJECT_SOURCE_DIR}/source/include
-    ${PROJECT_SOURCE_DIR}/source/${SPECIALIZATION}
-)
-
-include_directories(${SOFTFLOAT_INCLUDE_DIRS})
 
 set(LIB_HEADERS source/include/softfloat.h source/include/softfloat_types.h)
 set(PRIMITIVES
@@ -354,6 +347,8 @@ set(LIBRARY_NAME softfloat)
 # Define the library
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})
 set_property(TARGET ${LIBRARY_NAME} PROPERTY C_STANDARD 99)
+target_include_directories(${LIBRARY_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/build/Linux-x86_64-GCC)
+target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source/include ${CMAKE_CURRENT_SOURCE_DIR}/source/${SPECIALIZATION})
 # Set the build version. It will be used in the name of the lib, with corresponding
 # symlinks created. SOVERSION could also be specified for api version. 
 set_target_properties(${LIBRARY_NAME} PROPERTIES
@@ -361,7 +356,6 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}"
 )
-target_include_directories (softfloat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source/include)
 
 # Says how and where to install software
 # Targets:
