@@ -14,6 +14,8 @@ include(Common)
 
 conan_basic_setup()
 
+find_package(Boost COMPONENTS program_options system thread filesystem REQUIRED)
+
 # This sets the include directory for the reference project. This is the -I flag in gcc.
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
@@ -62,7 +64,7 @@ add_library(${LIBRARY_NAME} ${LIB_SOURCES})
 SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
 target_link_libraries(${LIBRARY_NAME} softfloat)
 target_link_libraries(${LIBRARY_NAME} dbt-core)
-target_link_libraries(${LIBRARY_NAME} scc)
+target_link_libraries(${LIBRARY_NAME} scc-util)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
   FRAMEWORK FALSE
@@ -72,7 +74,7 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 
 if(SystemC_FOUND)
 	set(SC_LIBRARY_NAME riscv_sc)
-	add_library(${SC_LIBRARY_NAME} SHARED src/sysc/core_complex.cpp)
+	add_library(${SC_LIBRARY_NAME} src/sysc/core_complex.cpp)
 	add_definitions(-DWITH_SYSTEMC) 
 	include_directories(${SystemC_INCLUDE_DIRS})
 	
@@ -96,6 +98,8 @@ if(SystemC_FOUND)
 	)
 endif()
 
+project("riscv-sim")
+
 # This is a make target, so you can do a "make riscv-sc"
 set(APPLICATION_NAME riscv-sim)
 
@@ -105,7 +109,6 @@ add_executable(${APPLICATION_NAME} src/main.cpp)
 target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
 target_link_libraries(${APPLICATION_NAME} jsoncpp)
 target_link_libraries(${APPLICATION_NAME} dbt-core)
-target_link_libraries(${APPLICATION_NAME} softfloat)
 target_link_libraries(${APPLICATION_NAME} external)
 target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
 target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
