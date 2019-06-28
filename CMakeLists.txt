@@ -22,7 +22,7 @@ include_directories(
 	${SOFTFLOAT_INCLUDE_DIRS}
     ${LLVM_INCLUDE_DIRS}
 )
-
+add_dependent_subproject(dbt-core)
 include_directories(
     ${PROJECT_SOURCE_DIR}/incl
     ${PROJECT_SOURCE_DIR}/../external/elfio
