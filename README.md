@@ -10,16 +10,9 @@ The implementation is based on LLVM 4.0. Eclipse CDT 4.7 (Oxygen) is recommended
 
 DBT-RISE-RISCV uses libGIS (https://github.com/vsergeev/libGIS) as well as ELFIO (http://elfio.sourceforge.net/), both under MIT license 
 
-**What's missing**
-
-* F & D standard extensions for 32bit to be implemented
-* MACF &D standard extensions for 64bit to be implemented and verified
-
 **Planned features**
 
 * add platform peripherals beyond programmers view to resemble E300 platform
-  * QSPI
-  * PWM
   * ...
 * and more
 
