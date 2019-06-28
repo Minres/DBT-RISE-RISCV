@@ -93,7 +93,9 @@ public:
     using base_type = arch::riscv_hart_msu_vp<arch::rv32imac>;
     using phys_addr_t = typename arch::traits<arch::rv32imac>::phys_addr_t;
     core_wrapper(core_complex *owner)
-    : owner(owner) {}
+    : owner(owner) 
+    {
+    }
 
     uint32_t get_mode() { return this->reg.machine_state; }
 
@@ -141,6 +143,22 @@ public:
                 if (val & (1ULL << 7)) this->write_csr(arch::mip, val & ~(1ULL << 7));
             }
             return res;
+        }
+    }
+
+    status read_csr(unsigned addr, reg_t &val) override {
+        if((addr==arch::time || addr==arch::timeh) && owner->mtime_o.get_interface(0)){
+            uint64_t time_val;
+            bool ret = owner->mtime_o->nb_peek(time_val);
+            if (addr == iss::arch::time) {
+                val = static_cast<reg_t>(time_val);
+            } else if (addr == iss::arch::timeh) {
+                if (sizeof(reg_t) != 4) return iss::Err;
+                val = static_cast<reg_t>(time_val >> 32);
+            }
+            return ret?Ok:Err;
+        } else {
+            return base_type::read_csr(addr, val);
         }
     }
 

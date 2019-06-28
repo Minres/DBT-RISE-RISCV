@@ -39,6 +39,7 @@
 #include "scv4tlm/tlm_rec_initiator_socket.h"
 #include <cci_configuration>
 #include <tlm>
+#include <tlm_core/tlm_1/tlm_req_rsp/tlm_1_interfaces/tlm_core_ifs.h>
 #include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
 
@@ -89,6 +90,8 @@ public:
     sc_core::sc_in<bool> sw_irq_i;
 
     sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i;
+
+    sc_core::sc_port<tlm::tlm_peek_if<uint64_t>, 1, sc_core::SC_ZERO_OR_MORE_BOUND> mtime_o;
 
     cci::cci_param<std::string> elf_file;
 
