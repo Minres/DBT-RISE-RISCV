@@ -40,7 +40,9 @@
 #include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
+#ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
+#endif
 #include <fmt/format.h>
 #include <array>
 #include <elfio/elfio.hpp>
