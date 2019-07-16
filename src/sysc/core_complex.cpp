@@ -252,7 +252,6 @@ core_complex::core_complex(sc_module_name name)
 , fetch_tr_handle(nullptr)
 #endif
 {
-
     initiator.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
         if (lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
@@ -282,7 +281,7 @@ core_complex::~core_complex() = default;
 void core_complex::trace(sc_trace_file *trf) const {}
 
 void core_complex::before_end_of_elaboration() {
-    cpu = std::make_unique<core_wrapper>(this);
+    cpu = scc::make_unique<core_wrapper>(this);
     vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
 #ifdef WITH_SCV
     vm->setDisassEnabled(enable_disass.get_value() || m_db != nullptr);

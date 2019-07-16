@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     auto res = 0;
     try {
         // application code comes here //
-        iss::init_jit(argc, argv);
+        iss::init_jit_debug(argc, argv);
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
         std::unique_ptr<iss::vm_if> vm{nullptr};

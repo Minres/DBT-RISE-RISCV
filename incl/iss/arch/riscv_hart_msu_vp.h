@@ -426,11 +426,13 @@ public:
         static constexpr T get_misa() { return (2ULL << 62) | ISA_I | ISA_M | ISA_A | ISA_U | ISA_S | ISA_M; }
 
         static constexpr T get_mask(unsigned priv_lvl) {
+            uint64_t ret;
             switch (priv_lvl) {
-            case PRIV_U: return 0x8000000f00000011ULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
-            case PRIV_S: return 0x8000000f000de133ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0001 0011 0011
-            default:     return 0x8000000f007ff9ddULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
+            case PRIV_U: ret = 0x8000000f00000011ULL;break; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
+            case PRIV_S: ret = 0x8000000f000de133ULL;break; // 0b1...0 0011 0000 0000 0000 1101 1110 0001 0011 0011
+            default:     ret = 0x8000000f007ff9ddULL;break; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
             }
+            return ret;
         }
 
         static inline vm_info decode_vm_info(uint32_t state, T sptbr) {

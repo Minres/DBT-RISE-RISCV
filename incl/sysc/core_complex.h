@@ -130,8 +130,8 @@ public:
     void disass_output(uint64_t pc, const std::string instr);
 
 protected:
-    void before_end_of_elaboration();
-    void start_of_simulation();
+    void before_end_of_elaboration() override;
+    void start_of_simulation() override;
     void run();
     void clk_cb();
     void rst_cb();
