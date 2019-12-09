@@ -44,7 +44,7 @@ extern "C" {
 #include <limits>
 
 namespace iss {
-namespace vm {
+namespace llvm {
 namespace fp_impl {
 
 using namespace std;

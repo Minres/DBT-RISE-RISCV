@@ -47,7 +47,7 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
-namespace vm {
+namespace llvm {
 namespace fp_impl {
 void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
 }
@@ -91,7 +91,7 @@ protected:
 
     void setup_module(Module* m) override {
         super::setup_module(m);
-        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
+        iss::llvm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
     }
 
     inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
