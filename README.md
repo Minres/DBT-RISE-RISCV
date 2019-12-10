@@ -1,6 +1,8 @@
 # DBT-RISE-RISCV
 Core of an instruction set simulator based on DBT-RISE implementing the RISC-V ISA. The project is hosted at https://git.minres.com/DBT-RISE/DBT-RISE-RISCV .
 
+This repo contains only the code of the RISC-V ISS and can only be used with the DBT_RISE. A complete VP using this ISS can be found at https://git.minres.com/VP/RISCV-VP which models SiFives FE310 controlling a brushless DC (BLDC) motor.
+
 This library provide the infrastructure to build RISC-V ISS. Currently part of the library are the following implementations adhering to version 2.2 of the 'The RISC-V Instruction Set Manual Volume I: User-Level ISA':
 
 * RV32IMAC
