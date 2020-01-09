@@ -47,7 +47,7 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
-namespace llvm {
+namespace vm {
 namespace fp_impl {
 void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
 }
@@ -57,11 +57,11 @@ namespace rv32gc {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::llvm;
+using namespace iss::vm::llvm;
 
 template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename iss::llvm::vm_base<ARCH>;
+    using super = typename iss::vm::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -91,7 +91,7 @@ protected:
 
     void setup_module(Module* m) override {
         super::setup_module(m);
-        iss::llvm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
+        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
     }
 
     inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
