@@ -6,6 +6,18 @@ import "RVC.core_desc"
 import "RVF.core_desc"
 import "RVD.core_desc"
 
+Core MNRV32 provides RV32I/*, RV32IC */ {
+    constants {
+        XLEN:=32;
+        PCLEN:=32;
+        // definitions for the architecture wrapper
+        //          XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        MISA_VAL:=0b01000000000101000001000100000101;
+        PGSIZE := 0x1000; //1 << 12;
+        PGMASK := 0xfff; //PGSIZE-1
+    }
+}
+
 Core RV32IMAC provides RV32I, RV32M, RV32A, RV32IC {
     constants {
         XLEN:=32;

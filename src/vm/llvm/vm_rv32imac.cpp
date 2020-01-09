@@ -52,16 +52,16 @@ namespace fp_impl {
 void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
 }
 }
-
+namespace llvm {
 namespace rv32imac {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::vm::llvm;
+using namespace iss::llvm;
 
 template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename iss::vm::llvm::vm_base<ARCH>;
+    using super = typename iss::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -4815,5 +4815,5 @@ std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned sho
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-
+}
 } // namespace iss

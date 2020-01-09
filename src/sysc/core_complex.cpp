@@ -282,7 +282,7 @@ void core_complex::trace(sc_trace_file *trf) const {}
 
 void core_complex::before_end_of_elaboration() {
     cpu = scc::make_unique<core_wrapper>(this);
-    vm = create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
+    vm = llvm::create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
 #ifdef WITH_SCV
     vm->setDisassEnabled(enable_disass.get_value() || m_db != nullptr);
 #else

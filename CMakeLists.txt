@@ -44,15 +44,17 @@ add_subdirectory(softfloat)
 FILE(GLOB RiscVSCHeaders ${CMAKE_CURRENT_SOURCE_DIR}/incl/sysc/*.h ${CMAKE_CURRENT_SOURCE_DIR}/incl/sysc/*/*.h)
 set(LIB_HEADERS ${RiscVSCHeaders} )
 set(LIB_SOURCES 
-	src/iss/rv32gc.cpp
+	#src/iss/rv32gc.cpp
 	src/iss/rv32imac.cpp
-	src/iss/rv64i.cpp
-	src/iss/rv64gc.cpp
-	src/internal/fp_functions.cpp
-	src/internal/vm_rv32gc.cpp
-	src/internal/vm_rv32imac.cpp
-	src/internal/vm_rv64i.cpp
-	src/internal/vm_rv64gc.cpp
+	#src/iss/rv64i.cpp
+	#src/iss/rv64gc.cpp
+	src/iss/mnrv32.cpp
+	src/vm/llvm/fp_functions.cpp
+	#src/vm/llvm/vm_rv32gc.cpp
+	src/vm/llvm/vm_rv32imac.cpp
+	#src/vm/llvm/vm_rv64i.cpp
+	#src/vm/llvm/vm_rv64gc.cpp
+	src/vm/tcc/vm_mnrv32.cpp
     src/plugin/instruction_count.cpp
     src/plugin/cycle_estimate.cpp)
 
@@ -62,15 +64,12 @@ set(LIBRARY_NAME riscv)
 # Define the library
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})
 SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
-target_link_libraries(${LIBRARY_NAME} softfloat)
-target_link_libraries(${LIBRARY_NAME} dbt-core)
-target_link_libraries(${LIBRARY_NAME} scc-util)
+target_link_libraries(${LIBRARY_NAME} softfloat dbt-core tinycc scc-util)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
 )
-#set_property(TARGET ${LIBRARY_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 if(SystemC_FOUND)
 	set(SC_LIBRARY_NAME riscv_sc)

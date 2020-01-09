@@ -107,26 +107,26 @@ int main(int argc, char *argv[]) {
         std::unique_ptr<iss::vm_if> vm{nullptr};
         std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-        if (isa_opt=="rv64ia") {
-            iss::arch::rv64i* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64i>();
-            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
-            cpu.reset(lcpu);
-        } else if (isa_opt=="rv64gc") {
-            iss::arch::rv64gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
-            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
-            cpu.reset(lcpu);
-        } else if (isa_opt=="rv32imac") {
+//        if (isa_opt=="rv64ia") {
+//            iss::arch::rv64i* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64i>();
+//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+//            cpu.reset(lcpu);
+//        } else if (isa_opt=="rv64gc") {
+//            iss::arch::rv64gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
+//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+//            cpu.reset(lcpu);
+//        } else if (isa_opt=="rv32imac") {
             iss::arch::rv32imac* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
-            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
+            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
             cpu.reset(lcpu);
-        } else if (isa_opt=="rv32gc") {
-            iss::arch::rv32gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
-            vm = iss::create(lcpu, clim["gdb-port"].as<unsigned>());
-            cpu.reset(lcpu);
-        } else {
-            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
-            return 127;
-        }
+//        } else if (isa_opt=="rv32gc") {
+//            iss::arch::rv32gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
+//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+//            cpu.reset(lcpu);
+//        } else {
+//            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
+//            return 127;
+//        }
         if (clim.count("plugin")) {
             for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
                 std::string plugin_name{opt_val};
