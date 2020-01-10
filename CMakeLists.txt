@@ -50,8 +50,9 @@ set(LIB_SOURCES
 	#src/iss/rv64gc.cpp
 	src/iss/mnrv32.cpp
 	src/vm/llvm/fp_functions.cpp
+	src/vm/llvm/vm_mnrv32.cpp
 	#src/vm/llvm/vm_rv32gc.cpp
-	src/vm/llvm/vm_rv32imac.cpp
+	#src/vm/llvm/vm_rv32imac.cpp
 	#src/vm/llvm/vm_rv64i.cpp
 	#src/vm/llvm/vm_rv64gc.cpp
 	src/vm/tcc/vm_mnrv32.cpp

@@ -47,21 +47,21 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
-namespace vm {
+namespace llvm {
 namespace fp_impl {
 void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
 }
 }
-namespace llvm {
+
 namespace rv32imac {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::llvm;
+using namespace iss::vm::llvm;
 
 template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename iss::llvm::vm_base<ARCH>;
+    using super = typename iss::vm::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -91,7 +91,7 @@ protected:
 
     void setup_module(Module* m) override {
         super::setup_module(m);
-        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
+        iss::llvm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
     }
 
     inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
@@ -4815,5 +4815,5 @@ std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned sho
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-}
+
 } // namespace iss

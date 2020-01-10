@@ -36,10 +36,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <iss/arch/riscv_hart_msu_vp.h>
-#include <iss/arch/rv32imac.h>
-#include <iss/arch/rv32gc.h>
-#include <iss/arch/rv64gc.h>
-#include <iss/arch/rv64i.h>
+#include <iss/arch/mnrv32.h>
 #include <iss/llvm/jit_helper.h>
 #include <iss/log_categories.h>
 #include <iss/plugin/cycle_estimate.h>
@@ -107,26 +104,9 @@ int main(int argc, char *argv[]) {
         std::unique_ptr<iss::vm_if> vm{nullptr};
         std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-//        if (isa_opt=="rv64ia") {
-//            iss::arch::rv64i* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64i>();
-//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-//            cpu.reset(lcpu);
-//        } else if (isa_opt=="rv64gc") {
-//            iss::arch::rv64gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
-//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-//            cpu.reset(lcpu);
-//        } else if (isa_opt=="rv32imac") {
-            iss::arch::rv32imac* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac>();
-            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-            cpu.reset(lcpu);
-//        } else if (isa_opt=="rv32gc") {
-//            iss::arch::rv32gc* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
-//            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-//            cpu.reset(lcpu);
-//        } else {
-//            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
-//            return 127;
-//        }
+        iss::arch::mnrv32* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::mnrv32>();
+        vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+        cpu.reset(lcpu);
         if (clim.count("plugin")) {
             for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
                 std::string plugin_name{opt_val};
@@ -162,7 +142,7 @@ int main(int argc, char *argv[]) {
         }
         uint64_t start_address = 0;
         if (clim.count("mem"))
-            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
+            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::mnrv32>::MEM);
         if (clim.count("elf"))
             for (std::string input : clim["elf"].as<std::vector<std::string>>()) {
                 auto start_addr = vm->get_arch()->load_file(input);

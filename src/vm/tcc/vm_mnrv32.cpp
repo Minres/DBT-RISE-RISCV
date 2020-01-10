@@ -52,11 +52,10 @@ namespace tcc {
 namespace mnrv32 {
 using namespace iss::arch;
 using namespace iss::debugger;
-using namespace iss::vm::tcc;
 
-template <typename ARCH> class vm_impl : public vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::tcc::vm_base<ARCH> {
 public:
-    using super = typename iss::vm::tcc::vm_base<ARCH>;
+    using super = typename iss::tcc::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -92,7 +91,7 @@ protected:
         return nullptr;
     }
 
-    void setup_module(Module* m) override {
+    void setup_module(std::string m) override {
         super::setup_module(m);
     }
 

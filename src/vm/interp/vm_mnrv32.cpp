@@ -53,13 +53,15 @@ namespace mnrv32 {
 using namespace iss::arch;
 using namespace iss::debugger;
 
-template <typename ARCH> class vm_impl : public vm::interp::vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::interp::vm_base<ARCH> {
 public:
-    using super = typename vm::interp::vm_base<ARCH>;
+    using super = typename iss::interp::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
     using addr_t = typename super::addr_t;
+    using reg_t = typename traits<ARCH>::reg_t;
+    using iss::interp::vm_base<ARCH>::get_reg;
 
     vm_impl();
 
@@ -69,9 +71,9 @@ public:
 
     target_adapter_if *accquire_target_adapter(server_if *srv) override {
         debugger_if::dbg_enabled = true;
-        if (vm::interp::vm_base<ARCH>::tgt_adapter == nullptr)
-            vm::interp::vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
-        return vm::interp::vm_base<ARCH>::tgt_adapter;
+        if (super::tgt_adapter == nullptr)
+            super::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
+        return super::tgt_adapter;
     }
 
 protected:
@@ -266,6 +268,33 @@ private:
     
     /* instruction 2: JAL */
     compile_ret_t __jal(virt_addr_t& pc, code_word_t instr){
+        this->do_sync(PRE_SYNC, 2);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,21>((bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (bit_sub<31,1>(instr) << 20));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#0x}", fmt::arg("mnemonic", "jal"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            this->core.disass_output(pc.val, mnemonic);
+        }
+        auto cur_pc = pc.val;
+        pc=pc+4;
+        if(rd != 0){
+            auto& rs = this->template get_reg<reg_t>(traits<ARCH>::X0 + rd);
+            rs=pc.val;
+        }
+        auto& pc_reg = this->template get_reg<reg_t>(arch::traits<ARCH>::PC);
+        pc_reg = cur_pc+imm;
+        this->do_sync(POST_SYNC, 2);
+        auto& trap_state = this->template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
+        if(trap_state!=0){
+            auto& last_br = this->template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
+            last_br = std::numeric_limits<uint32_t>::max();
+            this->core.enter_trap(trap_state, cur_pc);
+            pc.val=this->template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
+        }
+        return pc;
     }
     
     /* instruction 3: JALR */
@@ -482,7 +511,7 @@ template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm::interp::vm_base<ARCH>(core, core_id, cluster_id) {
+: vm_base<ARCH>(core, core_id, cluster_id) {
     qlut[0] = lut_00.data();
     qlut[1] = lut_01.data();
     qlut[2] = lut_10.data();
@@ -494,7 +523,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 template <typename ARCH>
-typename vm::interp::vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_single_inst(virt_addr_t pc) {
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_single_inst(virt_addr_t pc) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t insn = 0;
@@ -530,5 +559,5 @@ std::unique_ptr<vm_if> create<arch::mnrv32>(arch::mnrv32 *core, unsigned short p
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-}
+} // namespace interp
 } // namespace iss
