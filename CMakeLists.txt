@@ -55,6 +55,7 @@ set(LIB_SOURCES
 	#src/vm/llvm/vm_rv64i.cpp
 	#src/vm/llvm/vm_rv64gc.cpp
 	src/vm/tcc/vm_mnrv32.cpp
+	src/vm/interp/vm_mnrv32.cpp
     src/plugin/instruction_count.cpp
     src/plugin/cycle_estimate.cpp)
 
