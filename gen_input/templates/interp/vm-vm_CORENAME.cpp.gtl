@@ -83,8 +83,7 @@ protected:
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
 
-
-    virt_addr_t execute_single_inst(virt_addr_t pc) override;
+    virt_addr_t execute_inst(virt_addr_t start, std::function<bool(void)> pred) override;
 
     // some compile time constants
     // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
@@ -97,9 +96,9 @@ protected:
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-	std::array<compile_func *, 4> qlut;
+    std::array<compile_func *, 4> qlut;
 
-	std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
+    std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -138,6 +137,24 @@ protected:
         return lut_val;
     }
 
+    void raise_trap(uint16_t trap_id, uint16_t cause){
+        auto trap_val =  0x80ULL << 24 | (cause << 16) | trap_id;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE) = trap_val;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::NEXT_PC) = std::numeric_limits<uint32_t>::max();
+    }
+
+    void leave_trap(unsigned lvl){
+        this->core.leave_trap(lvl);
+        auto pc_val = super::template read_mem<reg_t>(traits<ARCH>::CSR, (lvl << 8) + 0x41);
+        this->template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = pc_val;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
+    }
+
+    void wait(unsigned type){
+        this->core.wait_until(type);
+    }
+
+
 private:
     /****************************************************************************
      * start opcode definitions
@@ -158,7 +175,7 @@ private:
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
     compile_ret_t __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr){<%instr.code.eachLine{%>
-    	${it}<%}%>
+        ${it}<%}%>
     }
     <%}%>
     /****************************************************************************
@@ -191,32 +208,30 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 template <typename ARCH>
-typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_single_inst(virt_addr_t pc) {
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(virt_addr_t start, std::function<bool(void)> pred) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
-    code_word_t insn = 0;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
-    phys_addr_t paddr(pc);
+    code_word_t insn = 0;
     auto *const data = (uint8_t *)&insn;
-    paddr = this->core.v2p(pc);
-    if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-        auto res = this->core.read(paddr, 2, data);
-        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
-        if ((insn & 0x3) == 0x3) { // this is a 32bit instruction
-            res = this->core.read(this->core.v2p(pc + 2), 2, data + 2);
+    auto pc=start;
+    while(pred){
+        auto paddr = this->core.v2p(pc);
+        if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
+            if (this->core.read(paddr, 2, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+            if ((insn & 0x3) == 0x3) // this is a 32bit instruction
+                if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+        } else {
+            if (this->core.read(paddr, 4, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
         }
-    } else {
-        auto res = this->core.read(paddr, 4, data);
-        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+        if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+        auto lut_val = extract_fields(insn);
+        auto f = qlut[insn & 0x3][lut_val];
+        if (!f)
+            f = &this_class::illegal_intruction;
+        pc = (this->*f)(pc, insn);
     }
-    if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-    // curr pc on stack
-    auto lut_val = extract_fields(insn);
-    auto f = qlut[insn & 0x3][lut_val];
-    if (f == nullptr) {
-        f = &this_class::illegal_intruction;
-    }
-    return (this->*f)(pc, insn);
+    return pc;
 }
 
 } // namespace mnrv32

@@ -657,9 +657,9 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
         const uint64_t addr, const unsigned length, uint8_t *const data) {
 #ifndef NDEBUG
     if (access && iss::access_type::DEBUG) {
-        LOG(TRACE) << "debug read of " << length << " bytes @addr " << addr;
+        LOG(TRACE) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
     } else {
-        LOG(TRACE) << "read of " << length << " bytes  @addr " << addr;
+        LOG(TRACE) << "read of " << length << " bytes  @addr 0x" << std::hex << addr;
     }
 #endif
     try {
@@ -738,19 +738,19 @@ iss::status riscv_hart_msu_vp<BASE>::write(const address_type type, const access
     switch (length) {
     case 8:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 4:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 2:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 1:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     default:
         LOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;

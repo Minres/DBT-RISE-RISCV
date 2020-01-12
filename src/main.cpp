@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
         iss::arch::mnrv32* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::mnrv32>();
-        vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+        vm = iss::interp::create(lcpu, clim["gdb-port"].as<unsigned>()); //iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
         cpu.reset(lcpu);
         if (clim.count("plugin")) {
             for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
