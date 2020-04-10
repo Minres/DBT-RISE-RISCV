@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../cmake) # main (top) cmake dir
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake) # project specific cmake dir
 
@@ -66,7 +66,7 @@ set(LIBRARY_NAME riscv)
 # Define the library
 add_library(${LIBRARY_NAME} ${LIB_SOURCES})
 SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
-target_link_libraries(${LIBRARY_NAME} softfloat dbt-core tinycc scc-util)
+target_link_libraries(${LIBRARY_NAME} softfloat dbt-core scc-util)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
   VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
   FRAMEWORK FALSE

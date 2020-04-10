@@ -111,16 +111,16 @@ protected:
 
     void gen_trap_behavior(std::ostringstream& os) override;
 
-    void gen_trap_check(std::ostringstream& os){}
+    void gen_trap_check(std::ostringstream& os){
+        os<< fmt::format("if(*(uint32_t){})!=0) goto trap_blk;\n", get_reg_ptr(arch::traits<ARCH>::TRAP_STATE));
+    }
 
     inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
-    inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                           this->get_type(traits<ARCH>::XLEN));
-        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+    inline void gen_set_pc(std::ostringstream& os, virt_addr_t pc, unsigned reg_num) {
+        os<< fmt::format("*((uint64_t*){}) = {}\n", get_reg_ptr(reg_num), pc.val);
     }
 
     // some compile time constants
@@ -301,11 +301,36 @@ private:
     
     /* instruction 1: AUIPC */
     compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
+        os<<fmt::format("AUIPC-{:%08x}:\n", pc.val);
+
+        this->gen_sync(os, PRE_SYNC, 1);
+
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            os<<fmt::format("\tprint_disass((void*){}, {}, {});\n", this->core_ptr, pc.val, mnemonic);
+        }
+
+        Value* cur_pc_val = this->gen_const(64, pc.val);
+        pc=pc+4;
+
+        if(rd != 0){
+            os<<fmt::format("uint64_t res = {} + {};\n", cur_pc_val, imm);
+            os<<fmt::format("*((uint64_t*){}) = ret\n", get_reg_ptr(rd + traits<ARCH>::X0));
+        }
+        this->gen_set_pc(os, pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(os, POST_SYNC, 1);
+        this->gen_trap_check(os);
+        return std::make_tuple(CONT);
+   }
     
     /* instruction 2: JAL */
     compile_ret_t __jal(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-        this->gen_sync(PRE_SYNC, 0);
+        this->gen_sync(os, PRE_SYNC, 0);
 
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -320,6 +345,9 @@ private:
 
         auto cur_pc_val = pc.val;
         pc=pc+4;
+
+
+
     }
     
     /* instruction 3: JALR */
@@ -521,12 +549,12 @@ private:
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, std::ostringstream& oss) {
-        vm_impl::gen_sync(iss::PRE_SYNC, instr_descr.size());
+    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, std::ostringstream& os) {
+        this->gen_sync(os, iss::PRE_SYNC, instr_descr.size());
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         gen_raise_trap(0, 2);     // illegal instruction trap
-        vm_impl::gen_sync(iss::POST_SYNC, instr_descr.size());
-        vm_impl::gen_trap_check(oss);
+        this->gen_sync(os, iss::POST_SYNC, instr_descr.size());
+        this->gen_trap_check(os);
         return BRANCH;
     }
 };

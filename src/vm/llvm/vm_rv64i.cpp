@@ -57,11 +57,11 @@ namespace rv64i {
 using namespace iss::arch;
 using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::vm::llvm;
+using namespace iss::llvm;
 
 template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename iss::vm::llvm::vm_base<ARCH>;
+    using super = typename iss::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;

@@ -35,7 +35,7 @@
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <iss/llvm/vm_base.h>
+#include <iss/tcc/vm_base.h>
 #include <util/logging.h>
 
 #ifndef FMT_HEADER_ONLY
@@ -57,11 +57,10 @@ namespace tcc {
 namespace rv64i {
 using namespace iss::arch;
 using namespace iss::debugger;
-using namespace iss::vm::llvm;
 
 template <typename ARCH> class vm_impl : public vm_base<ARCH> {
 public:
-    using super = typename iss::vm::llvm::vm_base<ARCH>;
+    using super = typename iss::tcc::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -114,16 +113,14 @@ protected:
 
     void gen_trap_behavior(BasicBlock *) override;
 
-    void gen_trap_check(BasicBlock *bb);
+    std::string gen_trap_check(BasicBlock *bb);
 
     inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
         return this->builder.CreateLoad(get_reg_ptr(i), false);
     }
 
-    inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                           this->get_type(traits<ARCH>::XLEN));
-        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+    inline std::string gen_set_pc(virt_addr_t pc, unsigned reg_num) {
+        return fmt::format("*((uint64_t*){}) = {}\n", get_reg_ptr(reg_num), next_pc_v.val);
     }
 
     // some compile time constants
@@ -328,6 +325,33 @@ private:
     
     /* instruction 1: AUIPC */
     compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+        os<<fmt::format("AUIPC-{:%08x}:\n", pc.val);
+
+        os<<this->gen_sync(PRE_SYNC, 1);
+
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+            os<<fmt::format("\tprint_disass((void*){}, {}, {});\n", this->core_ptr, pc.val, mnemonic);
+        }
+
+        Value* cur_pc_val = this->gen_const(64, pc.val);
+        pc=pc+4;
+
+        if(rd != 0){
+            os<<fmt::format("uint64_t res = {} + {};\n", cur_pc_val, imm);
+            os<<fmt::format("*((uint64_t*){}) = ret\n", get_reg_ptr(rd + traits<ARCH>::X0));
+        }
+        os<<this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+        os<<this->gen_sync(POST_SYNC, 1);
+        os<<this->gen_trap_check(bb);
+        return std::make_tuple(CONT);
+
     }
     
     /* instruction 2: JAL */
@@ -684,12 +708,9 @@ template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(BasicBlock *trap_
     this->builder.CreateRet(trap_addr_val);
 }
 
-template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(BasicBlock *bb) {
-    auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
-    this->gen_cond_branch(this->builder.CreateICmp(
-                              ICmpInst::ICMP_EQ, v,
-                              ConstantInt::get(getContext(), APInt(v->getType()->getIntegerBitWidth(), 0))),
-                          bb, this->trap_blk, 1);
+template <typename ARCH> inline std::string vm_impl<ARCH>::gen_trap_check(BasicBlock *bb) {
+    return fmt::format("if(*(uint32_t){})!=0) goto trap_blk;\n", get_reg_ptr(arch::traits<ARCH>::TRAP_STATE));
+
 }
 } // namespace rv64i
 
