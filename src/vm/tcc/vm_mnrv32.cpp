@@ -61,10 +61,6 @@ public:
     using code_word_t = typename super::code_word_t;
     using addr_t = typename super::addr_t;
 
-    using Value = void;
-    using ConstantInt = void;
-    using Type = void;
-
     vm_impl();
 
     vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
@@ -80,28 +76,21 @@ public:
 
 protected:
     using vm_base<ARCH>::get_reg_ptr;
+    using translation_unit = typename vm_base<ARCH>::translation_unit;
 
     using this_class = vm_impl<ARCH>;
     using compile_ret_t = std::tuple<continuation_e>;
-    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, std::ostringstream&);
+    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, translation_unit&);
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
-
-    template <typename T> inline ConstantInt *size(T type) {
-        return nullptr;
-    }
 
     void setup_module(std::string m) override {
         super::setup_module(m);
     }
 
-    inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
-        return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
-    }
+    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, translation_unit&) override;
 
-    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, std::ostringstream&) override;
-
-    void gen_leave_behavior(std::ostringstream& os) override;
+    void gen_trap_behavior(translation_unit& os) override;
 
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
 
@@ -109,18 +98,25 @@ protected:
 
     void gen_wait(unsigned type);
 
-    void gen_trap_behavior(std::ostringstream& os) override;
-
-    void gen_trap_check(std::ostringstream& os){
-        os<< fmt::format("if(*(uint32_t){})!=0) goto trap_blk;\n", get_reg_ptr(arch::traits<ARCH>::TRAP_STATE));
+    inline void gen_trap_check(translation_unit& os) {
+        os<<"  if(*trap_state!=0) goto trap_entry;";
     }
 
-    inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        return this->builder.CreateLoad(get_reg_ptr(i), false);
-    }
-
-    inline void gen_set_pc(std::ostringstream& os, virt_addr_t pc, unsigned reg_num) {
-        os<< fmt::format("*((uint64_t*){}) = {}\n", get_reg_ptr(reg_num), pc.val);
+    inline void gen_set_pc(translation_unit& tu, virt_addr_t pc, unsigned reg_num) {
+        switch(reg_num){
+        case traits<ARCH>::NEXT_PC:
+            tu("  *next_pc = {:#x};", pc.val);
+            break;
+        case traits<ARCH>::PC:
+            tu("  *pc = {:#x};", pc.val);
+            break;
+        default:
+            if(!tu.defined_regs[reg_num]){
+                tu("  reg_t* reg{:02d} = (reg_t*){:#x};", reg_num, reinterpret_cast<uintptr_t>(get_reg_ptr(reg_num)));
+                tu.defined_regs[reg_num]=true;
+            }
+            tu("  *reg{:02d} = {:#x};", reg_num, pc.val);
+        }
     }
 
     // some compile time constants
@@ -296,14 +292,14 @@ private:
  
     /* instruction definitions */
     /* instruction 0: LUI */
-    compile_ret_t __lui(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lui(virt_addr_t& pc, code_word_t instr, translation_unit& tu){
     }
     
     /* instruction 1: AUIPC */
-    compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-        os<<fmt::format("AUIPC-{:%08x}:\n", pc.val);
+    compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, translation_unit& tu){
+        tu("AUIPC_{:#10x}:", pc.val);
 
-        this->gen_sync(os, PRE_SYNC, 1);
+        this->gen_sync(tu, PRE_SYNC, 1);
 
         uint8_t rd = ((bit_sub<7,5>(instr)));
         int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
@@ -312,25 +308,26 @@ private:
             auto mnemonic = fmt::format(
                 "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
                 fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-            os<<fmt::format("\tprint_disass((void*){}, {}, {});\n", this->core_ptr, pc.val, mnemonic);
+            tu("  print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
 
-        Value* cur_pc_val = this->gen_const(64, pc.val);
+        auto cur_pc_val = pc.val;
         pc=pc+4;
 
         if(rd != 0){
-            os<<fmt::format("uint64_t res = {} + {};\n", cur_pc_val, imm);
-            os<<fmt::format("*((uint64_t*){}) = ret\n", get_reg_ptr(rd + traits<ARCH>::X0));
+            auto id = rd + traits<ARCH>::X0;
+            tu.defined_regs[id]=true;
+            tu("  *reg{:02d} = (uint32_t){:#x} + (int32_t){:#x};", id, cur_pc_val, imm);
         }
-        this->gen_set_pc(os, pc, traits<ARCH>::NEXT_PC);
-        this->gen_sync(os, POST_SYNC, 1);
-        this->gen_trap_check(os);
-        return std::make_tuple(CONT);
+        this->gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        this->gen_sync(tu, POST_SYNC, 1);
+        this->gen_trap_check(tu);
+        return std::make_tuple(FLUSH/*CONT*/);
    }
     
     /* instruction 2: JAL */
-    compile_ret_t __jal(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-        this->gen_sync(os, PRE_SYNC, 0);
+    compile_ret_t __jal(virt_addr_t& pc, code_word_t instr, translation_unit& tu){
+        this->gen_sync(tu, PRE_SYNC, 0);
 
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -340,221 +337,220 @@ private:
             auto mnemonic = fmt::format(
                 "{mnemonic:10} {rd}, {rs1}, {imm:#0x}", fmt::arg("mnemonic", "jalr"),
                 fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
-            os<<"print_disass(0x"<<std::hex<<this->core_ptr<<", 0x"<<pc.val<<", \""<<mnemonic<<"\");\n";
+            //tu<<"print_disass(0x"<<std::hex<<&this->core<<", 0x"<<pc.val<<", \""<<mnemonic<<"\");\n";
+            tu("\tprint_disass((void*){:#x}, {}, {});\n", static_cast<void*>(&this->core), pc.val, mnemonic);
+
         }
 
         auto cur_pc_val = pc.val;
         pc=pc+4;
-
-
-
     }
     
     /* instruction 3: JALR */
-    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 4: BEQ */
-    compile_ret_t __beq(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __beq(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 5: BNE */
-    compile_ret_t __bne(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __bne(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 6: BLT */
-    compile_ret_t __blt(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __blt(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 7: BGE */
-    compile_ret_t __bge(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __bge(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 8: BLTU */
-    compile_ret_t __bltu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __bltu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 9: BGEU */
-    compile_ret_t __bgeu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __bgeu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 10: LB */
-    compile_ret_t __lb(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lb(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 11: LH */
-    compile_ret_t __lh(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lh(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 12: LW */
-    compile_ret_t __lw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lw(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 13: LBU */
-    compile_ret_t __lbu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lbu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 14: LHU */
-    compile_ret_t __lhu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __lhu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 15: SB */
-    compile_ret_t __sb(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sb(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 16: SH */
-    compile_ret_t __sh(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sh(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 17: SW */
-    compile_ret_t __sw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sw(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 18: ADDI */
-    compile_ret_t __addi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __addi(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 19: SLTI */
-    compile_ret_t __slti(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __slti(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 20: SLTIU */
-    compile_ret_t __sltiu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sltiu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 21: XORI */
-    compile_ret_t __xori(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __xori(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 22: ORI */
-    compile_ret_t __ori(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __ori(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 23: ANDI */
-    compile_ret_t __andi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __andi(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 24: SLLI */
-    compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 25: SRLI */
-    compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 26: SRAI */
-    compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 27: ADD */
-    compile_ret_t __add(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __add(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 28: SUB */
-    compile_ret_t __sub(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sub(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 29: SLL */
-    compile_ret_t __sll(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sll(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 30: SLT */
-    compile_ret_t __slt(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __slt(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 31: SLTU */
-    compile_ret_t __sltu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sltu(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 32: XOR */
-    compile_ret_t __xor(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __xor(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 33: SRL */
-    compile_ret_t __srl(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __srl(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 34: SRA */
-    compile_ret_t __sra(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sra(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 35: OR */
-    compile_ret_t __or(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __or(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 36: AND */
-    compile_ret_t __and(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __and(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 37: FENCE */
-    compile_ret_t __fence(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __fence(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 38: FENCE_I */
-    compile_ret_t __fence_i(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __fence_i(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 39: ECALL */
-    compile_ret_t __ecall(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __ecall(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 40: EBREAK */
-    compile_ret_t __ebreak(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __ebreak(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 41: URET */
-    compile_ret_t __uret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __uret(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 42: SRET */
-    compile_ret_t __sret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sret(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 43: MRET */
-    compile_ret_t __mret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __mret(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 44: WFI */
-    compile_ret_t __wfi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __wfi(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 45: SFENCE.VMA */
-    compile_ret_t __sfence_vma(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __sfence_vma(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 46: CSRRW */
-    compile_ret_t __csrrw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrw(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 47: CSRRS */
-    compile_ret_t __csrrs(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrs(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 48: CSRRC */
-    compile_ret_t __csrrc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrc(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 49: CSRRWI */
-    compile_ret_t __csrrwi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrwi(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 50: CSRRSI */
-    compile_ret_t __csrrsi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrsi(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /* instruction 51: CSRRCI */
-    compile_ret_t __csrrci(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    compile_ret_t __csrrci(virt_addr_t& pc, code_word_t instr, translation_unit& os){
     }
     
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, std::ostringstream& os) {
-        this->gen_sync(os, iss::PRE_SYNC, instr_descr.size());
+    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, translation_unit& tu) {
+        vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         gen_raise_trap(0, 2);     // illegal instruction trap
-        this->gen_sync(os, iss::POST_SYNC, instr_descr.size());
-        this->gen_trap_check(os);
+        vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
+        vm_impl::gen_trap_check(tu);
         return BRANCH;
     }
 };
@@ -581,7 +577,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 
 template <typename ARCH>
 std::tuple<continuation_e>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, std::ostringstream& os) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, translation_unit& tu) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t insn = 0;
@@ -607,10 +603,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     if (f == nullptr) {
         f = &this_class::illegal_intruction;
     }
-    return (this->*f)(pc, insn, os);
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(std::ostringstream& os) {
+    return (this->*f)(pc, insn, tu);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
@@ -622,9 +615,11 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(std::ostringstream& os) {
+template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(translation_unit& tu) {
+    tu<<"trap_entry:";
+    tu("  enter_trap(core_ptr, *trap_state, *pc);");
+    tu("  return *next_pc;");
 }
-
 } // namespace mnrv32
 
 template <>

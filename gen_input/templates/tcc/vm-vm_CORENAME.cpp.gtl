@@ -61,10 +61,6 @@ public:
     using code_word_t = typename super::code_word_t;
     using addr_t      = typename super::addr_t;
 
-    using Value = void;
-    using ConstantInt = void;
-    using Type = void;
-
     vm_impl();
 
     vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
@@ -80,28 +76,21 @@ public:
 
 protected:
     using vm_base<ARCH>::get_reg_ptr;
+    using translation_unit = typename vm_base<ARCH>::translation_unit;
 
     using this_class = vm_impl<ARCH>;
     using compile_ret_t = std::tuple<continuation_e>;
-    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, std::ostringstream&);
+    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, translation_unit&);
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
-
-    template <typename T> inline ConstantInt *size(T type) {
-        return nullptr;
-    }
 
     void setup_module(std::string m) override {
         super::setup_module(m);
     }
 
-    inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
-        return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
-    }
+    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, translation_unit&) override;
 
-    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, std::ostringstream&) override;
-
-    void gen_leave_behavior(std::ostringstream& os) override;
+    void gen_trap_behavior(translation_unit& os) override;
 
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
 
@@ -109,18 +98,25 @@ protected:
 
     void gen_wait(unsigned type);
 
-    void gen_trap_behavior(std::ostringstream& os) override;
-
-    void gen_trap_check(std::ostringstream& os){}
-
-    inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        return this->builder.CreateLoad(get_reg_ptr(i), false);
+    inline void gen_trap_check(translation_unit& os) {
+        os<<"  if(*trap_state!=0) goto trap_entry;";
     }
 
-    inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                           this->get_type(traits<ARCH>::XLEN));
-        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+    inline void gen_set_pc(translation_unit& tu, virt_addr_t pc, unsigned reg_num) {
+        switch(reg_num){
+        case traits<ARCH>::NEXT_PC:
+            tu("  *next_pc = {:#x};", pc.val);
+            break;
+        case traits<ARCH>::PC:
+            tu("  *pc = {:#x};", pc.val);
+            break;
+        default:
+        if(!tu.defined_regs[reg_num]){
+                tu("  reg_t* reg{:02d} = (reg_t*){:#x};", reg_num, reinterpret_cast<uintptr_t>(get_reg_ptr(reg_num)));
+            tu.defined_regs[reg_num]=true;
+    }
+            tu("  *reg{:02d} = {:#x};", reg_num, pc.val);
+        }
     }
 
     // some compile time constants
@@ -201,12 +197,12 @@ private:
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, std::ostringstream& oss) {
-        vm_impl::gen_sync(iss::PRE_SYNC, instr_descr.size());
+    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, translation_unit& tu) {
+        vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         gen_raise_trap(0, 2);     // illegal instruction trap
-        vm_impl::gen_sync(iss::POST_SYNC, instr_descr.size());
-        vm_impl::gen_trap_check(oss);
+        vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
+        vm_impl::gen_trap_check(tu);
         return BRANCH;
     }
 };
@@ -233,7 +229,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 
 template <typename ARCH>
 std::tuple<continuation_e>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, std::ostringstream& os) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, translation_unit& tu) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t insn = 0;
@@ -259,10 +255,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     if (f == nullptr) {
         f = &this_class::illegal_intruction;
     }
-    return (this->*f)(pc, insn, os);
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(std::ostringstream& os) {
+    return (this->*f)(pc, insn, tu);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
@@ -274,7 +267,10 @@ template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(std::ostringstream& os) {
+template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(translation_unit& tu) {
+    tu<<"trap_entry:";
+    tu("  enter_trap(core_ptr, *trap_state, *pc);");
+    tu("  return *next_pc;");
 }
 
 } // namespace mnrv32
