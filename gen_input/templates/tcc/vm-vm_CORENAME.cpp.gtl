@@ -60,6 +60,7 @@ public:
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
     using addr_t      = typename super::addr_t;
+    using ICmpInst    = typename super::ICmpInst;
 
     vm_impl();
 
@@ -90,16 +91,16 @@ protected:
 
     compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, translation_unit&) override;
 
-    void gen_trap_behavior(translation_unit& os) override;
+    void gen_trap_behavior(translation_unit& tu) override;
 
-    void gen_raise_trap(uint16_t trap_id, uint16_t cause);
+    void gen_raise_trap(translation_unit& tu, uint16_t trap_id, uint16_t cause);
 
-    void gen_leave_trap(unsigned lvl);
+    void gen_leave_trap(translation_unit& tu, unsigned lvl);
 
-    void gen_wait(unsigned type);
+    void gen_wait(translation_unit& tu, unsigned type);
 
-    inline void gen_trap_check(translation_unit& os) {
-        os<<"  if(*trap_state!=0) goto trap_entry;";
+    inline void gen_trap_check(translation_unit& tu) {
+        tu<<"  if(*trap_state!=0) goto trap_entry;";
     }
 
     inline void gen_set_pc(translation_unit& tu, virt_addr_t pc, unsigned reg_num) {
@@ -111,10 +112,10 @@ protected:
             tu("  *pc = {:#x};", pc.val);
             break;
         default:
-        if(!tu.defined_regs[reg_num]){
+            if(!tu.defined_regs[reg_num]){
                 tu("  reg_t* reg{:02d} = (reg_t*){:#x};", reg_num, reinterpret_cast<uintptr_t>(get_reg_ptr(reg_num)));
             tu.defined_regs[reg_num]=true;
-    }
+            }
             tu("  *reg{:02d} = {:#x};", reg_num, pc.val);
         }
     }
@@ -130,9 +131,9 @@ protected:
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-	std::array<compile_func *, 4> qlut;
+    std::array<compile_func *, 4> qlut;
 
-	std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
+    std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -190,8 +191,8 @@ private:
  
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
-    compile_ret_t __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){<%instr.code.eachLine{%>
-    	${it}<%}%>
+    compile_ret_t __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, translation_unit& tu){<%instr.code.eachLine{%>
+        ${it}<%}%>
     }
     <%}%>
     /****************************************************************************
@@ -200,7 +201,7 @@ private:
     compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, translation_unit& tu) {
         vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        gen_raise_trap(0, 2);     // illegal instruction trap
+        gen_raise_trap(tu, 0, 2);     // illegal instruction trap
         vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
         vm_impl::gen_trap_check(tu);
         return BRANCH;
@@ -258,13 +259,18 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     return (this->*f)(pc, insn, tu);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
+template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(translation_unit& tu, uint16_t trap_id, uint16_t cause) {
+    tu("  *trap_state = {:#x};", 0x80 << 24 | (cause << 16) | trap_id);
+    tu << tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
+template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(translation_unit& tu, unsigned lvl) {
+    tu("  leave_trap(core_ptr, {});", lvl);
+    tu("  *next_pc = {};", tu.create_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8));
+    tu << tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
+template <typename ARCH> void vm_impl<ARCH>::gen_wait(translation_unit& tu, unsigned type) {
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(translation_unit& tu) {
