@@ -1082,7 +1082,10 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
                             LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                       << "), stopping simulation";
                         }
-                        throw(iss::simulation_stopped(hostvar));
+                        this->reg.trap_state=std::numeric_limits<uint32_t>::max();
+                        this->interrupt_sim=hostvar;
+                        break;
+                        //throw(iss::simulation_stopped(hostvar));
                     case 0x0101: {
                         char c = static_cast<char>(hostvar & 0xff);
                         if (c == '\n' || c == 0) {
@@ -1313,6 +1316,7 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     this->reg.trap_state = 0;
     std::array<char, 32> buffer;
     sprintf(buffer.data(), "0x%016lx", addr);
+    if((flags&0xffffffff) != 0xffffffff)
     CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
                        << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << trap_id << ")"
                        << " at address " << buffer.data() << " occurred, changing privilege level from "

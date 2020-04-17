@@ -102,7 +102,7 @@ public:
 
     uint32_t get_mode() { return this->reg.machine_state; }
 
-    inline void set_interrupt_execution(bool v) { this->interrupt_sim = v; }
+    inline void set_interrupt_execution(bool v) { this->interrupt_sim = v?1:0; }
 
     inline bool get_interrupt_execution() { return this->interrupt_sim; }
 
