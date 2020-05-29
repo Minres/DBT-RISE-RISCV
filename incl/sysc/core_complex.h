@@ -75,8 +75,6 @@ class core_wrapper;
 
 class core_complex : public sc_core::sc_module, public scc::traceable {
 public:
-    SC_HAS_PROCESS(core_complex);// NOLINT
-
     scc::initiator_mixin<scv4tlm::tlm_rec_initiator_socket<32>> initiator;
 
     sc_core::sc_in<sc_core::sc_time> clk_i;

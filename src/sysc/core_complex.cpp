@@ -32,7 +32,8 @@
 
 #include "sysc/core_complex.h"
 #include "iss/arch/riscv_hart_msu_vp.h"
-#include "iss/arch/rv32imac.h"
+//#include "iss/arch/rv32imac.h"
+#include "iss/arch/mnrv32.h"
 #include "iss/debugger/encoderdecoder.h"
 #include "iss/debugger/gdb_session.h"
 #include "iss/debugger/server.h"
@@ -58,6 +59,9 @@ using namespace sc_core;
 namespace {
 iss::debugger::encoder_decoder encdec;
 }
+
+//using core_type = iss::arch::rv32imac;
+using core_type = iss::arch::mnrv32;
 
 namespace {
 
@@ -87,11 +91,10 @@ std::array<const char*, 12> irq_str = { {
 		"User external interrupt", "Supervisor external interrupt", "Reserved", "Machine external interrupt" } };
 }
 
-class core_wrapper : public iss::arch::riscv_hart_msu_vp<iss::arch::rv32imac> {
+class core_wrapper : public iss::arch::riscv_hart_msu_vp<core_type> {
 public:
-    using core_type = arch::rv32imac;
-    using base_type = arch::riscv_hart_msu_vp<arch::rv32imac>;
-    using phys_addr_t = typename arch::traits<arch::rv32imac>::phys_addr_t;
+    using base_type = arch::riscv_hart_msu_vp<core_type>;
+    using phys_addr_t = typename arch::traits<core_type>::phys_addr_t;
     core_wrapper(core_complex *owner)
     : owner(owner) 
     {
@@ -99,7 +102,7 @@ public:
 
     uint32_t get_mode() { return this->reg.machine_state; }
 
-    inline void set_interrupt_execution(bool v) { this->interrupt_sim = v; }
+    inline void set_interrupt_execution(bool v) { this->interrupt_sim = v?1:0; }
 
     inline bool get_interrupt_execution() { return this->interrupt_sim; }
 
@@ -252,6 +255,7 @@ core_complex::core_complex(sc_module_name name)
 , fetch_tr_handle(nullptr)
 #endif
 {
+    SC_HAS_PROCESS(core_complex);// NOLINT
     initiator.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
         if (lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
@@ -282,7 +286,7 @@ void core_complex::trace(sc_trace_file *trf) const {}
 
 void core_complex::before_end_of_elaboration() {
     cpu = scc::make_unique<core_wrapper>(this);
-    vm = llvm::create<arch::rv32imac>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
+    vm = llvm::create<core_type>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
 #ifdef WITH_SCV
     vm->setDisassEnabled(enable_disass.get_value() || m_db != nullptr);
 #else

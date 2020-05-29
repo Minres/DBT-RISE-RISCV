@@ -30,7 +30,7 @@
  *
  *******************************************************************************/
 
-#include <iss/arch/rv64i.h>
+#include <iss/arch/mnrv32.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
@@ -49,17 +49,15 @@
 namespace iss {
 namespace llvm {
 namespace fp_impl {
-void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
-}
+void add_fp_functions_2_module(::llvm::Module *, unsigned, unsigned);
 }
 
-namespace rv64i {
+namespace mnrv32 {
+using namespace ::llvm;
 using namespace iss::arch;
-using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::llvm;
 
-template <typename ARCH> class vm_impl : public vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::llvm::vm_base<ARCH> {
 public:
     using super = typename iss::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
@@ -189,7 +187,7 @@ private:
         compile_func op;
     };
 
-    const std::array<InstructionDesriptor, 64> instr_descr = {{
+    const std::array<InstructionDesriptor, 52> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -240,11 +238,11 @@ private:
         /* instruction ANDI */
         {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
         /* instruction SLLI */
-        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
+        {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
         /* instruction SRLI */
-        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
+        {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
         /* instruction SRAI */
-        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
+        {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
         /* instruction ADD */
         {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
         /* instruction SUB */
@@ -295,30 +293,6 @@ private:
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
         /* instruction CSRRCI */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
-        /* instruction LWU */
-        {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
-        /* instruction LD */
-        {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
-        /* instruction SD */
-        {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
-        /* instruction ADDIW */
-        {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
-        /* instruction SLLIW */
-        {32, 0b00000000000000000001000000011011, 0b11111110000000000111000001111111, &this_class::__slliw},
-        /* instruction SRLIW */
-        {32, 0b00000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__srliw},
-        /* instruction SRAIW */
-        {32, 0b01000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__sraiw},
-        /* instruction ADDW */
-        {32, 0b00000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__addw},
-        /* instruction SUBW */
-        {32, 0b01000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__subw},
-        /* instruction SLLW */
-        {32, 0b00000000000000000001000000111011, 0b11111110000000000111000001111111, &this_class::__sllw},
-        /* instruction SRLW */
-        {32, 0b00000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__srlw},
-        /* instruction SRAW */
-        {32, 0b01000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__sraw},
     }};
  
     /* instruction definitions */
@@ -343,11 +317,11 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_const(64U, imm);
+    	    Value* Xtmp0_val = this->gen_const(32U, imm);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -378,15 +352,15 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm));
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -417,22 +391,22 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4));
+    	        this->gen_const(32U, 4));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	Value* PC_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        cur_pc_val,
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 2);
     	this->gen_trap_check(this->leave_blk);
@@ -461,17 +435,17 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* new_pc_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	Value* align_val = this->builder.CreateAnd(
     	    new_pc_val,
-    	    this->gen_const(64U, 0x2));
+    	    this->gen_const(32U, 0x2));
     	{
     	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
     	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
@@ -480,7 +454,7 @@ private:
     	    this->gen_cond_branch(this->builder.CreateICmp(
     	        ICmpInst::ICMP_NE,
     	        align_val,
-    	        this->gen_const(64U, 0)),
+    	        this->gen_const(32U, 0)),
     	        bb_then,
     	        bb_else);
     	    this->builder.SetInsertPoint(bb_then);
@@ -493,12 +467,12 @@ private:
     	        if(rd != 0){
     	            Value* Xtmp0_val = this->builder.CreateAdd(
     	                cur_pc_val,
-    	                this->gen_const(64U, 4));
+    	                this->gen_const(32U, 4));
     	            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	        }
     	        Value* PC_val = this->builder.CreateAnd(
     	            new_pc_val,
-    	            this->builder.CreateNot(this->gen_const(64U, 0x1)));
+    	            this->builder.CreateNot(this->gen_const(32U, 0x1)));
     	        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	        this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	    }
@@ -533,7 +507,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -544,14 +518,14 @@ private:
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 4);
     	this->gen_trap_check(this->leave_blk);
@@ -580,7 +554,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -591,14 +565,14 @@ private:
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 5);
     	this->gen_trap_check(this->leave_blk);
@@ -627,7 +601,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -635,21 +609,21 @@ private:
     	        ICmpInst::ICMP_SLT,
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
+    	            32, true),
     	        this->gen_ext(
     	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            64, true)),
+    	            32, true)),
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 6);
     	this->gen_trap_check(this->leave_blk);
@@ -678,7 +652,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -686,21 +660,21 @@ private:
     	        ICmpInst::ICMP_SGE,
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
+    	            32, true),
     	        this->gen_ext(
     	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            64, true)),
+    	            32, true)),
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 7);
     	this->gen_trap_check(this->leave_blk);
@@ -729,7 +703,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -740,14 +714,14 @@ private:
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 8);
     	this->gen_trap_check(this->leave_blk);
@@ -776,7 +750,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* PC_val = this->gen_choose(
@@ -787,14 +761,14 @@ private:
     	    this->builder.CreateAdd(
     	        this->gen_ext(
     	            cur_pc_val,
-    	            64, true),
-    	        this->gen_const(64U, imm)),
+    	            32, true),
+    	        this->gen_const(32U, imm)),
     	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        this->gen_const(64U, 4)),
-    	    64);
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(64U, pc.val), "is_cont_v");
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 9);
     	this->gen_trap_check(this->leave_blk);
@@ -823,18 +797,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
-    	        64,
+    	        32,
     	        true);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
@@ -867,18 +841,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
-    	        64,
+    	        32,
     	        true);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
@@ -911,18 +885,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	        64,
+    	        32,
     	        true);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
@@ -955,18 +929,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
-    	        64,
+    	        32,
     	        false);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
@@ -999,18 +973,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_ext(
     	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
-    	        64,
+    	        32,
     	        false);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
@@ -1043,14 +1017,14 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
@@ -1085,14 +1059,14 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
@@ -1127,14 +1101,14 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
+    	        32, true),
+    	    this->gen_const(32U, imm));
     	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
@@ -1169,15 +1143,15 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateAdd(
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
-    	        this->gen_const(64U, imm));
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1209,7 +1183,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1218,11 +1192,11 @@ private:
     	            ICmpInst::ICMP_SLT,
     	            this->gen_ext(
     	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                64, true),
-    	            this->gen_const(64U, imm)),
-    	        this->gen_const(64U, 1),
-    	        this->gen_const(64U, 0),
-    	        64);
+    	                32, true),
+    	            this->gen_const(32U, imm)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1254,19 +1228,19 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	int64_t full_imm_val = imm;
+    	int32_t full_imm_val = imm;
     	if(rd != 0){
     	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
     	            ICmpInst::ICMP_ULT,
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this->gen_const(64U, full_imm_val)),
-    	        this->gen_const(64U, 1),
-    	        this->gen_const(64U, 0),
-    	        64);
+    	            this->gen_const(32U, full_imm_val)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1298,15 +1272,15 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateXor(
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
-    	        this->gen_const(64U, imm));
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1338,15 +1312,15 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateOr(
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
-    	        this->gen_const(64U, imm));
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1378,15 +1352,15 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
     	    Value* Xtmp0_val = this->builder.CreateAnd(
     	        this->gen_ext(
     	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            64, true),
-    	        this->gen_const(64U, imm));
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1404,7 +1378,7 @@ private:
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,6>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
@@ -1418,14 +1392,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateShl(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_const(64U, shamt));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateShl(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 24);
@@ -1442,7 +1420,7 @@ private:
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,6>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
@@ -1456,14 +1434,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateLShr(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_const(64U, shamt));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateLShr(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 25);
@@ -1480,7 +1462,7 @@ private:
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,6>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
@@ -1494,14 +1476,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAShr(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_const(64U, shamt));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateAShr(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 26);
@@ -1532,7 +1518,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1570,7 +1556,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1608,7 +1594,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1617,8 +1603,8 @@ private:
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
     	            this->builder.CreateSub(
-    	                 this->gen_const(64U, 64),
-    	                 this->gen_const(64U, 1))));
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1650,7 +1636,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1659,13 +1645,13 @@ private:
     	            ICmpInst::ICMP_SLT,
     	            this->gen_ext(
     	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                64, true),
+    	                32, true),
     	            this->gen_ext(
     	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	                64, true)),
-    	        this->gen_const(64U, 1),
-    	        this->gen_const(64U, 0),
-    	        64);
+    	                32, true)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1697,7 +1683,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1706,15 +1692,15 @@ private:
     	            ICmpInst::ICMP_ULT,
     	            this->gen_ext(
     	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                64,
+    	                32,
     	                false),
     	            this->gen_ext(
     	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	                64,
+    	                32,
     	                false)),
-    	        this->gen_const(64U, 1),
-    	        this->gen_const(64U, 0),
-    	        64);
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1746,7 +1732,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1784,7 +1770,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1793,8 +1779,8 @@ private:
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
     	            this->builder.CreateSub(
-    	                 this->gen_const(64U, 64),
-    	                 this->gen_const(64U, 1))));
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1826,7 +1812,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1835,8 +1821,8 @@ private:
     	        this->builder.CreateAnd(
     	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
     	            this->builder.CreateSub(
-    	                 this->gen_const(64U, 64),
-    	                 this->gen_const(64U, 1))));
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
@@ -1868,7 +1854,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1906,7 +1892,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
@@ -1942,18 +1928,18 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* FENCEtmp0_val = this->builder.CreateOr(
     	    this->builder.CreateShl(
-    	        this->gen_const(64U, pred),
-    	        this->gen_const(64U, 4)),
-    	    this->gen_const(64U, succ));
+    	        this->gen_const(32U, pred),
+    	        this->gen_const(32U, 4)),
+    	    this->gen_const(32U, succ));
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 0),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(64)));
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 37);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1980,14 +1966,14 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* FENCEtmp0_val = this->gen_const(64U, imm);
+    	Value* FENCEtmp0_val = this->gen_const(32U, imm);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 1),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(64)));
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 38);
@@ -2011,7 +1997,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_raise_trap(0, 11);
@@ -2036,7 +2022,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_raise_trap(0, 3);
@@ -2061,7 +2047,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_leave_trap(0);
@@ -2086,7 +2072,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_leave_trap(1);
@@ -2111,7 +2097,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_leave_trap(3);
@@ -2136,7 +2122,7 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	this->gen_wait(1);
@@ -2165,19 +2151,19 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* FENCEtmp0_val = this->gen_const(64U, rs1);
+    	Value* FENCEtmp0_val = this->gen_const(32U, rs1);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 2),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(64)));
-    	Value* FENCEtmp1_val = this->gen_const(64U, rs2);
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	Value* FENCEtmp1_val = this->gen_const(32U, rs2);
     	this->gen_write_mem(
     	    traits<ARCH>::FENCE,
     	    this->gen_const(64U, 3),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(64)));
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 45);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2207,17 +2193,17 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	Value* rs_val_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	if(rd != 0){
-    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	    Value* CSRtmp0_val = rs_val_val;
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
     	    Value* Xtmp1_val = csr_val_val;
     	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	} else {
@@ -2225,7 +2211,7 @@ private:
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp2_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp2_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 46);
@@ -2256,10 +2242,10 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	if(rd != 0){
     	    Value* Xtmp0_val = xrd_val;
@@ -2272,7 +2258,7 @@ private:
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 47);
@@ -2303,10 +2289,10 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	if(rd != 0){
     	    Value* Xtmp0_val = xrd_val;
@@ -2319,7 +2305,7 @@ private:
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 48);
@@ -2350,21 +2336,21 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	    Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	Value* CSRtmp1_val = this->gen_ext(
-    	    this->gen_const(64U, zimm),
-    	    64,
+    	    this->gen_const(32U, zimm),
+    	    32,
     	    false);
     	this->gen_write_mem(
     	    traits<ARCH>::CSR,
     	    this->gen_const(16U, csr),
-    	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(64)));
+    	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 49);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -2394,21 +2380,21 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	if(zimm != 0){
     	    Value* CSRtmp0_val = this->builder.CreateOr(
     	        res_val,
     	        this->gen_ext(
-    	            this->gen_const(64U, zimm),
-    	            64,
+    	            this->gen_const(32U, zimm),
+    	            32,
     	            false));
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
     	}
     	if(rd != 0){
     	    Value* Xtmp1_val = res_val;
@@ -2443,10 +2429,10 @@ private:
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 64/8);
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
     	if(rd != 0){
     	    Value* Xtmp0_val = res_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
@@ -2455,574 +2441,16 @@ private:
     	    Value* CSRtmp1_val = this->builder.CreateAnd(
     	        res_val,
     	        this->builder.CreateNot(this->gen_ext(
-    	            this->gen_const(64U, zimm),
-    	            64,
+    	            this->gen_const(32U, zimm),
+    	            32,
     	            false)));
     	    this->gen_write_mem(
     	        traits<ARCH>::CSR,
     	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(64)));
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 51);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 52: LWU */
-    std::tuple<continuation_e, BasicBlock*> __lwu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LWU");
-    	
-    	this->gen_sync(PRE_SYNC, 52);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lwu"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	        64,
-    	        false);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 52);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 53: LD */
-    std::tuple<continuation_e, BasicBlock*> __ld(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LD");
-    	
-    	this->gen_sync(PRE_SYNC, 53);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "ld"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 64/8),
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 53);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 54: SD */
-    std::tuple<continuation_e, BasicBlock*> __sd(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SD");
-    	
-    	this->gen_sync(PRE_SYNC, 54);
-    	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sd"),
-    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        64, true),
-    	    this->gen_const(64U, imm));
-    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(64)));
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 54);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 55: ADDIW */
-    std::tuple<continuation_e, BasicBlock*> __addiw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ADDIW");
-    	
-    	this->gen_sync(PRE_SYNC, 55);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addiw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* res_val = this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            this->builder.CreateTrunc(
-    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                this-> get_type(32) 
-    	            ),
-    	            32, true),
-    	        this->gen_const(32U, imm));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        res_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 55);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 56: SLLIW */
-    std::tuple<continuation_e, BasicBlock*> __slliw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLLIW");
-    	
-    	this->gen_sync(PRE_SYNC, 56);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slliw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* sh_val_val = this->builder.CreateShl(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, shamt));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 56);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 57: SRLIW */
-    std::tuple<continuation_e, BasicBlock*> __srliw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRLIW");
-    	
-    	this->gen_sync(PRE_SYNC, 57);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srliw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* sh_val_val = this->builder.CreateLShr(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, shamt));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 57);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 58: SRAIW */
-    std::tuple<continuation_e, BasicBlock*> __sraiw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRAIW");
-    	
-    	this->gen_sync(PRE_SYNC, 58);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "sraiw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* sh_val_val = this->builder.CreateAShr(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, shamt));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 58);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 59: ADDW */
-    std::tuple<continuation_e, BasicBlock*> __addw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ADDW");
-    	
-    	this->gen_sync(PRE_SYNC, 59);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("addw"),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* res_val = this->builder.CreateAdd(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        res_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 59);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 60: SUBW */
-    std::tuple<continuation_e, BasicBlock*> __subw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SUBW");
-    	
-    	this->gen_sync(PRE_SYNC, 60);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("subw"),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* res_val = this->builder.CreateSub(
-    	         this->builder.CreateTrunc(
-    	             this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	             this-> get_type(32) 
-    	         ),
-    	         this->builder.CreateTrunc(
-    	             this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	             this-> get_type(32) 
-    	         ));
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        res_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 60);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 61: SLLW */
-    std::tuple<continuation_e, BasicBlock*> __sllw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLLW");
-    	
-    	this->gen_sync(PRE_SYNC, 61);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sllw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    uint32_t mask_val = 0x1f;
-    	    Value* count_val = this->builder.CreateAnd(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, mask_val));
-    	    Value* sh_val_val = this->builder.CreateShl(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        count_val);
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 61);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 62: SRLW */
-    std::tuple<continuation_e, BasicBlock*> __srlw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRLW");
-    	
-    	this->gen_sync(PRE_SYNC, 62);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srlw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    uint32_t mask_val = 0x1f;
-    	    Value* count_val = this->builder.CreateAnd(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, mask_val));
-    	    Value* sh_val_val = this->builder.CreateLShr(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        count_val);
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 62);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 63: SRAW */
-    std::tuple<continuation_e, BasicBlock*> __sraw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRAW");
-    	
-    	this->gen_sync(PRE_SYNC, 63);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sraw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(64, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    uint32_t mask_val = 0x1f;
-    	    Value* count_val = this->builder.CreateAnd(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        this->gen_const(32U, mask_val));
-    	    Value* sh_val_val = this->builder.CreateAShr(
-    	        this->builder.CreateTrunc(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this-> get_type(32) 
-    	        ),
-    	        count_val);
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        sh_val_val,
-    	        64,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 63);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
@@ -3142,13 +2570,13 @@ template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(BasicBlock *b
                           bb, this->trap_blk, 1);
 }
 
-} // namespace rv64i
+} // namespace mnrv32
 
 template <>
-std::unique_ptr<vm_if> create<arch::rv64i>(arch::rv64i *core, unsigned short port, bool dump) {
-    auto ret = new rv64i::vm_impl<arch::rv64i>(*core, dump);
+std::unique_ptr<vm_if> create<arch::mnrv32>(arch::mnrv32 *core, unsigned short port, bool dump) {
+    auto ret = new mnrv32::vm_impl<arch::mnrv32>(*core, dump);
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-
+} // namespace llvm
 } // namespace iss

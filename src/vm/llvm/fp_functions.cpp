@@ -44,10 +44,11 @@ extern "C" {
 #include <limits>
 
 namespace iss {
-namespace vm {
+namespace llvm {
 namespace fp_impl {
 
 using namespace std;
+using namespace ::llvm;
 
 #define INT_TYPE(L)   Type::getIntNTy(mod->getContext(), L)
 #define FLOAT_TYPE    Type::getFloatTy(mod->getContext())
@@ -65,10 +66,9 @@ using namespace std;
 
 #define FDECL(NAME, RET, ...)                                                                                          \
     std::vector<Type *> NAME##_args{__VA_ARGS__};                                                                      \
-    FunctionType *NAME##_type = llvm::FunctionType::get(RET, NAME##_args, false);                                      \
+    FunctionType *NAME##_type = FunctionType::get(RET, NAME##_args, false);                                      \
     mod->getOrInsertFunction(#NAME, NAME##_type);
 
-using namespace llvm;
 
 void add_fp_functions_2_module(Module *mod, uint32_t flen, uint32_t xlen) {
     if(flen){

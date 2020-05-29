@@ -164,7 +164,7 @@ InsructionSet RV32IC extends RISCVBase{
             val offs[XLEN] <= X[2] + uimm;
             MEM[offs]{32} <= X[rs2];
         }
-        DII {
+        DII(no_cont) { // Defined Illegal Instruction
             encoding:b000 | b0 | b00000 | b00000 | b00;
             raise(0, 2);
         }

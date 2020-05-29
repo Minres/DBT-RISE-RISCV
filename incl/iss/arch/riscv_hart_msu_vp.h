@@ -657,10 +657,12 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
         const uint64_t addr, const unsigned length, uint8_t *const data) {
 #ifndef NDEBUG
     if (access && iss::access_type::DEBUG) {
-        LOG(TRACE) << "debug read of " << length << " bytes @addr " << addr;
+        LOG(TRACEALL) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
+    } else if(access && iss::access_type::FETCH){
+        LOG(TRACEALL) << "fetch of " << length << " bytes  @addr 0x" << std::hex << addr;
     } else {
-        LOG(TRACE) << "read of " << length << " bytes  @addr " << addr;
-    }
+        LOG(TRACE) << "read of " << length << " bytes  @addr 0x" << std::hex << addr;
+   }
 #endif
     try {
         switch (space) {
@@ -738,19 +740,19 @@ iss::status riscv_hart_msu_vp<BASE>::write(const address_type type, const access
     switch (length) {
     case 8:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 4:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 2:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t *)&data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     case 1:
         LOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec
-                   << ") @addr " << addr;
+                   << ") @addr 0x" << std::hex << addr;
         break;
     default:
         LOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;
@@ -1082,7 +1084,10 @@ iss::status riscv_hart_msu_vp<BASE>::write_mem(phys_addr_t paddr, unsigned lengt
                             LOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
                                       << "), stopping simulation";
                         }
-                        throw(iss::simulation_stopped(hostvar));
+                        this->reg.trap_state=std::numeric_limits<uint32_t>::max();
+                        this->interrupt_sim=hostvar;
+                        break;
+                        //throw(iss::simulation_stopped(hostvar));
                     case 0x0101: {
                         char c = static_cast<char>(hostvar & 0xff);
                         if (c == '\n' || c == 0) {
@@ -1313,8 +1318,9 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     this->reg.trap_state = 0;
     std::array<char, 32> buffer;
     sprintf(buffer.data(), "0x%016lx", addr);
+    if((flags&0xffffffff) != 0xffffffff)
     CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                       << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << trap_id << ")"
+                       << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << cause << ")"
                        << " at address " << buffer.data() << " occurred, changing privilege level from "
                        << lvl[cur_priv] << " to " << lvl[new_priv];
     update_vm_info();

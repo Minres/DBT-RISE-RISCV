@@ -35,7 +35,7 @@
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <iss/tcc/vm_base.h>
+#include <iss/interp/vm_base.h>
 #include <util/logging.h>
 #include <sstream>
 
@@ -48,19 +48,20 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
-namespace tcc {
+namespace interp {
 namespace ${coreDef.name.toLowerCase()} {
 using namespace iss::arch;
 using namespace iss::debugger;
 
-template <typename ARCH> class vm_impl : public iss::tcc::vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::interp::vm_base<ARCH> {
 public:
-    using super       = typename iss::tcc::vm_base<ARCH>;
+    using super = typename iss::interp::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
-    using addr_t      = typename super::addr_t;
-    using tu_builder  = typename super::tu_builder;
+    using addr_t = typename super::addr_t;
+    using reg_t = typename traits<ARCH>::reg_t;
+    using iss::interp::vm_base<ARCH>::get_reg;
 
     vm_impl();
 
@@ -70,54 +71,19 @@ public:
 
     target_adapter_if *accquire_target_adapter(server_if *srv) override {
         debugger_if::dbg_enabled = true;
-        if (vm_base<ARCH>::tgt_adapter == nullptr)
-            vm_base<ARCH>::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
-        return vm_base<ARCH>::tgt_adapter;
+        if (super::tgt_adapter == nullptr)
+            super::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
+        return super::tgt_adapter;
     }
 
 protected:
-    using vm_base<ARCH>::get_reg_ptr;
-
     using this_class = vm_impl<ARCH>;
-    using compile_ret_t = std::tuple<continuation_e>;
-    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, tu_builder&);
+    using compile_ret_t = virt_addr_t;
+    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
 
-    void setup_module(std::string m) override {
-        super::setup_module(m);
-    }
-
-    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, tu_builder&) override;
-
-    void gen_trap_behavior(tu_builder& tu) override;
-
-    void gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause);
-
-    void gen_leave_trap(tu_builder& tu, unsigned lvl);
-
-    void gen_wait(tu_builder& tu, unsigned type);
-
-    inline void gen_trap_check(tu_builder& tu) {
-        tu("if(*trap_state!=0) goto trap_entry;");
-    }
-
-    inline void gen_set_pc(tu_builder& tu, virt_addr_t pc, unsigned reg_num) {
-        switch(reg_num){
-        case traits<ARCH>::NEXT_PC:
-            tu("*next_pc = {:#x};", pc.val);
-            break;
-        case traits<ARCH>::PC:
-            tu("*pc = {:#x};", pc.val);
-            break;
-        default:
-            if(!tu.defined_regs[reg_num]){
-                tu("reg_t* reg{:02d} = (reg_t*){:#x};", reg_num, reinterpret_cast<uintptr_t>(get_reg_ptr(reg_num)));
-            tu.defined_regs[reg_num]=true;
-            }
-            tu("*reg{:02d} = {:#x};", reg_num, pc.val);
-        }
-    }
+    virt_addr_t execute_inst(virt_addr_t start, std::function<bool(void)> pred) override;
 
     // some compile time constants
     // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
@@ -171,6 +137,24 @@ protected:
         return lut_val;
     }
 
+    void raise_trap(uint16_t trap_id, uint16_t cause){
+        auto trap_val =  0x80ULL << 24 | (cause << 16) | trap_id;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE) = trap_val;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::NEXT_PC) = std::numeric_limits<uint32_t>::max();
+    }
+
+    void leave_trap(unsigned lvl){
+        this->core.leave_trap(lvl);
+        auto pc_val = super::template read_mem<reg_t>(traits<ARCH>::CSR, (lvl << 8) + 0x41);
+        this->template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = pc_val;
+        this->template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
+    }
+
+    void wait(unsigned type){
+        this->core.wait_until(type);
+    }
+
+
 private:
     /****************************************************************************
      * start opcode definitions
@@ -190,20 +174,16 @@ private:
  
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
-    compile_ret_t __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, tu_builder& tu){<%instr.code.eachLine{%>
+    compile_ret_t __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr){<%instr.code.eachLine{%>
         ${it}<%}%>
     }
     <%}%>
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, tu_builder& tu) {
-        vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
+    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr) {
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        gen_raise_trap(tu, 0, 2);     // illegal instruction trap
-        vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
-        vm_impl::gen_trap_check(tu);
-        return BRANCH;
+        return pc;
     }
 };
 
@@ -228,55 +208,30 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 template <typename ARCH>
-std::tuple<continuation_e>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, tu_builder& tu) {
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(virt_addr_t start, std::function<bool(void)> pred) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
-    code_word_t insn = 0;
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
-    phys_addr_t paddr(pc);
+    code_word_t insn = 0;
     auto *const data = (uint8_t *)&insn;
-    paddr = this->core.v2p(pc);
-    if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-        auto res = this->core.read(paddr, 2, data);
-        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
-        if ((insn & 0x3) == 0x3) { // this is a 32bit instruction
-            res = this->core.read(this->core.v2p(pc + 2), 2, data + 2);
+    auto pc=start;
+    while(pred){
+        auto paddr = this->core.v2p(pc);
+        if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
+            if (this->core.read(paddr, 2, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+            if ((insn & 0x3) == 0x3) // this is a 32bit instruction
+                if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+        } else {
+            if (this->core.read(paddr, 4, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
         }
-    } else {
-        auto res = this->core.read(paddr, 4, data);
-        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
+        if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+        auto lut_val = extract_fields(insn);
+        auto f = qlut[insn & 0x3][lut_val];
+        if (!f)
+            f = &this_class::illegal_intruction;
+        pc = (this->*f)(pc, insn);
     }
-    if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-    // curr pc on stack
-    ++inst_cnt;
-    auto lut_val = extract_fields(insn);
-    auto f = qlut[insn & 0x3][lut_val];
-    if (f == nullptr) {
-        f = &this_class::illegal_intruction;
-    }
-    return (this->*f)(pc, insn, tu);
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause) {
-    tu("  *trap_state = {:#x};", 0x80 << 24 | (cause << 16) | trap_id);
-    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(tu_builder& tu, unsigned lvl) {
-    tu("leave_trap(core_ptr, {});", lvl);
-    tu.store(tu.read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN),traits<ARCH>::NEXT_PC);
-    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned type) {
-}
-
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
-    tu("trap_entry:");
-    tu("enter_trap(core_ptr, *trap_state, *pc);");
-    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(),32),traits<ARCH>::LAST_BRANCH);
-    tu("return *next_pc;");
+    return pc;
 }
 
 } // namespace mnrv32
@@ -287,5 +242,5 @@ std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreD
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-}
+} // namespace interp
 } // namespace iss
