@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
         ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
+        ("backend", po::value<std::string>()->default_value("tcc"), "the memory input file")
         ("isa", po::value<std::string>()->default_value("rv32gc"), "isa to use for simulation");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
@@ -82,6 +83,8 @@ int main(int argc, char *argv[]) {
     }
     std::vector<std::string> args = collect_unrecognized(parsed.options, po::include_positional);
 
+    LOGGER(DEFAULT)::print_time() = false;
+    LOGGER(connection)::print_time() = false;
     if (clim.count("verbose")) {
         auto l = logging::as_log_level(clim["verbose"].as<int>());
         LOGGER(DEFAULT)::reporting_level() = l;
@@ -105,9 +108,12 @@ int main(int argc, char *argv[]) {
         std::unique_ptr<iss::arch_if> cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
         iss::arch::mnrv32* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::mnrv32>();
-        //vm = iss::interp::create(lcpu, clim["gdb-port"].as<unsigned>());
-        //vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-        vm = iss::tcc::create(lcpu, clim["gdb-port"].as<unsigned>());
+        if(clim["backend"].as<std::string>() == "interp")
+            vm = iss::interp::create(lcpu, clim["gdb-port"].as<unsigned>());
+        if(clim["backend"].as<std::string>() == "llvm")
+            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
+        if(clim["backend"].as<std::string>() == "tcc")
+            vm = iss::tcc::create(lcpu, clim["gdb-port"].as<unsigned>());
         cpu.reset(lcpu);
         if (clim.count("plugin")) {
             for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
@@ -135,10 +141,10 @@ int main(int argc, char *argv[]) {
         if (clim.count("disass")) {
             vm->setDisassEnabled(true);
             LOGGER(disass)::reporting_level() = logging::INFO;
+            LOGGER(disass)::print_time() = false;
             auto file_name = clim["disass"].as<std::string>();
             if (file_name.length() > 0) {
                 LOG_OUTPUT(disass)::stream() = fopen(file_name.c_str(), "w");
-                LOGGER(disass)::print_time() = false;
                 LOGGER(disass)::print_severity() = false;
             }
         }

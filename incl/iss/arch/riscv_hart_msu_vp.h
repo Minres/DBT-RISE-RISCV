@@ -657,10 +657,12 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
         const uint64_t addr, const unsigned length, uint8_t *const data) {
 #ifndef NDEBUG
     if (access && iss::access_type::DEBUG) {
-        LOG(TRACE) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
+        LOG(TRACEALL) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
+    } else if(access && iss::access_type::FETCH){
+        LOG(TRACEALL) << "fetch of " << length << " bytes  @addr 0x" << std::hex << addr;
     } else {
         LOG(TRACE) << "read of " << length << " bytes  @addr 0x" << std::hex << addr;
-    }
+   }
 #endif
     try {
         switch (space) {
@@ -1318,7 +1320,7 @@ template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t f
     sprintf(buffer.data(), "0x%016lx", addr);
     if((flags&0xffffffff) != 0xffffffff)
     CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                       << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << trap_id << ")"
+                       << (trap_id ? irq_str[cause] : trap_str[cause]) << "' (" << cause << ")"
                        << " at address " << buffer.data() << " occurred, changing privilege level from "
                        << lvl[cur_priv] << " to " << lvl[new_priv];
     update_vm_info();

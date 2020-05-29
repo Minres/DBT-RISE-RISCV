@@ -360,14 +360,13 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_const(32U, imm), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 32U), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 0);
@@ -388,18 +387,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-                tu.gen_ext(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                    32, false),
+                tu.constant(imm, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 1);
@@ -420,25 +418,25 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                tu.constant(4, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_add(
-            tu.gen_ext(
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
                 cur_pc_val,
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 2);
         gen_trap_check(tu);
@@ -459,28 +457,25 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto new_pc_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto new_pc_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                tu.constant(4, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_and(
+        auto PC_val_v = tu.assignment("PC_val", tu.l_and(
             new_pc_val,
-            tu.create_not(tu.gen_const(32U, 0x1))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        tu.create_store(tu.gen_const(32U, std::numeric_limits<uint32_t>::max()), traits<ARCH>::LAST_BRANCH);
-        ;
+            tu.l_not(tu.constant(0x1, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 3);
         gen_trap_check(tu);
@@ -501,26 +496,27 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_EQ,
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 4);
         gen_trap_check(tu);
@@ -541,26 +537,27 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_NE,
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 5);
         gen_trap_check(tu);
@@ -581,30 +578,31 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_SLT,
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_ext(
-                    tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                    32, true)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32, false)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 6);
         gen_trap_check(tu);
@@ -625,30 +623,31 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_SGE,
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_ext(
-                    tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                    32, true)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32, false)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 7);
         gen_trap_check(tu);
@@ -669,26 +668,27 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_ULT,
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 8);
         gen_trap_check(tu);
@@ -709,26 +709,27 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_UGE,
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 4))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(4, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 9);
         gen_trap_check(tu);
@@ -749,23 +750,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-                tu.create_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 8),
                 32,
-                true), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                false), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 10);
@@ -787,23 +786,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-                tu.create_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 16),
                 32,
-                true), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                false), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 11);
@@ -825,23 +822,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-                tu.create_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
                 32,
-                true), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                false), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 12);
@@ -863,23 +858,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-                tu.create_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 8),
                 32,
-                false), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                true), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 13);
@@ -901,23 +894,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-                tu.create_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 16),
                 32,
-                false), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                true), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 14);
@@ -939,20 +930,19 @@ private:
             	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
-        auto MEMtmp0_val_v = tu.create_assignment("MEMtmp0_val", tu.create_load(rs2 + traits<ARCH>::X0, 0), 8);
-        tu.create_write_mem(
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 8);
+        tu.write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            MEMtmp0_val_v);;
+            MEMtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 15);
@@ -974,20 +964,19 @@ private:
             	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
-        auto MEMtmp0_val_v = tu.create_assignment("MEMtmp0_val", tu.create_load(rs2 + traits<ARCH>::X0, 0), 16);
-        tu.create_write_mem(
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 16);
+        tu.write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            MEMtmp0_val_v);;
+            MEMtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 16);
@@ -1009,20 +998,19 @@ private:
             	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm));
-        ;
-        auto MEMtmp0_val_v = tu.create_assignment("MEMtmp0_val", tu.create_load(rs2 + traits<ARCH>::X0, 0), 32);
-        tu.create_write_mem(
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            MEMtmp0_val_v);;
+            MEMtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 17);
@@ -1044,18 +1032,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_const(32U, imm)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.constant(imm, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 18);
@@ -1077,22 +1064,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_choose(
-                tu.create_icmp(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
                     ICmpInst::ICMP_SLT,
-                    tu.gen_ext(
-                        tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                        32, true),
-                    tu.gen_const(32U, imm)),
-                tu.gen_const(32U, 1),
-                tu.gen_const(32U, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32, false),
+                    tu.constant(imm, 32U)),
+                tu.constant(1, 32U),
+                tu.constant(0, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 19);
@@ -1114,22 +1100,20 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         int32_t full_imm_val = imm;
-        ;
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_choose(
-                tu.create_icmp(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
                     ICmpInst::ICMP_ULT,
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    tu.gen_const(32U, full_imm_val)),
-                tu.gen_const(32U, 1),
-                tu.gen_const(32U, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(full_imm_val, 32U)),
+                tu.constant(1, 32U),
+                tu.constant(0, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 20);
@@ -1151,18 +1135,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_xor(
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_const(32U, imm)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.constant(imm, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 21);
@@ -1184,18 +1167,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_or(
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_const(32U, imm)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.constant(imm, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 22);
@@ -1217,18 +1199,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_and(
-                tu.gen_ext(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    32, true),
-                tu.gen_const(32U, imm)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32, false),
+                tu.constant(imm, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 23);
@@ -1250,20 +1231,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(shamt > 31){
             this->gen_raise_trap(tu, 0, 0);
         } else {
             if(rd != 0){
-                auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_shl(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    tu.gen_const(32U, shamt)), 32);
-                tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 32U)), 32);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
             }
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 24);
@@ -1285,20 +1265,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(shamt > 31){
             this->gen_raise_trap(tu, 0, 0);
         } else {
             if(rd != 0){
-                auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_lshr(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    tu.gen_const(32U, shamt)), 32);
-                tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 32U)), 32);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
             }
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 25);
@@ -1320,20 +1299,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(shamt > 31){
             this->gen_raise_trap(tu, 0, 0);
         } else {
             if(rd != 0){
-                auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_ashr(
-                    tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                    tu.gen_const(32U, shamt)), 32);
-                tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 32U)), 32);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
             }
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 26);
@@ -1355,16 +1333,15 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 27);
@@ -1386,16 +1363,15 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_sub(
-                 tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                 tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.sub(
+                 tu.load(rs1 + traits<ARCH>::X0, 0),
+                 tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 28);
@@ -1417,20 +1393,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_shl(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_and(
-                    tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                    tu.create_sub(
-                         tu.gen_const(32U, 32),
-                         tu.gen_const(32U, 1)))), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(32, 32U),
+                         tu.constant(1, 32U)))), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 29);
@@ -1452,24 +1427,23 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_choose(
-                tu.create_icmp(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
                     ICmpInst::ICMP_SLT,
-                    tu.gen_ext(
-                        tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                        32, true),
-                    tu.gen_ext(
-                        tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                        32, true)),
-                tu.gen_const(32U, 1),
-                tu.gen_const(32U, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32, false),
+                    tu.ext(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        32, false)),
+                tu.constant(1, 32U),
+                tu.constant(0, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 30);
@@ -1491,26 +1465,25 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_choose(
-                tu.create_icmp(
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
                     ICmpInst::ICMP_ULT,
-                    tu.gen_ext(
-                        tu.create_load(rs1 + traits<ARCH>::X0, 0),
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
                         32,
-                        false),
-                    tu.gen_ext(
-                        tu.create_load(rs2 + traits<ARCH>::X0, 0),
+                        true),
+                    tu.ext(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
                         32,
-                        false)),
-                tu.gen_const(32U, 1),
-                tu.gen_const(32U, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+                        true)),
+                tu.constant(1, 32U),
+                tu.constant(0, 32U)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 31);
@@ -1532,16 +1505,15 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_xor(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 32);
@@ -1563,20 +1535,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_lshr(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_and(
-                    tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                    tu.create_sub(
-                         tu.gen_const(32U, 32),
-                         tu.gen_const(32U, 1)))), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(32, 32U),
+                         tu.constant(1, 32U)))), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 33);
@@ -1598,20 +1569,19 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_ashr(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_and(
-                    tu.create_load(rs2 + traits<ARCH>::X0, 0),
-                    tu.create_sub(
-                         tu.gen_const(32U, 32),
-                         tu.gen_const(32U, 1)))), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(32, 32U),
+                         tu.constant(1, 32U)))), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 34);
@@ -1633,16 +1603,15 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_or(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 35);
@@ -1664,16 +1633,15 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_and(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 36);
@@ -1693,18 +1661,18 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "fence");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto FENCEtmp0_val_v = tu.create_assignment("FENCEtmp0_val", tu.create_or(
-            tu.create_shl(
-                tu.gen_const(32U, pred),
-                tu.gen_const(32U, 4)),
-            tu.gen_const(32U, succ)), 32);
-        tu.create_write_mem(
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.l_or(
+            tu.shl(
+                tu.constant(pred, 32U),
+                tu.constant(4, 32U)),
+            tu.constant(succ, 32U)), 32);
+        tu.write_mem(
             traits<ARCH>::FENCE,
-            tu.gen_const(64U, 0),
-            FENCEtmp0_val_v);;
+            tu.constant(0, 64U),
+            FENCEtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 37);
@@ -1723,16 +1691,16 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "fence_i");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto FENCEtmp0_val_v = tu.create_assignment("FENCEtmp0_val", tu.gen_const(32U, imm), 32);
-        tu.create_write_mem(
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.constant(imm, 32U), 32);
+        tu.write_mem(
             traits<ARCH>::FENCE,
-            tu.gen_const(64U, 1),
-            FENCEtmp0_val_v);;
+            tu.constant(1, 64U),
+            FENCEtmp0_val_v);
         tu.close_scope();
-        tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 38);
         gen_trap_check(tu);
@@ -1747,10 +1715,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ecall");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_raise_trap(tu, 0, 11);;
+        this->gen_raise_trap(tu, 0, 11);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 39);
         gen_trap_check(tu);
@@ -1765,10 +1733,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ebreak");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_raise_trap(tu, 0, 3);;
+        this->gen_raise_trap(tu, 0, 3);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 40);
         gen_trap_check(tu);
@@ -1783,10 +1751,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "uret");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_leave_trap(tu, 0);;
+        this->gen_leave_trap(tu, 0);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 41);
         gen_trap_check(tu);
@@ -1801,10 +1769,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "sret");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_leave_trap(tu, 1);;
+        this->gen_leave_trap(tu, 1);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 42);
         gen_trap_check(tu);
@@ -1819,10 +1787,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "mret");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_leave_trap(tu, 3);;
+        this->gen_leave_trap(tu, 3);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 43);
         gen_trap_check(tu);
@@ -1837,10 +1805,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "wfi");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        this->gen_wait(tu, 1);;
+        this->gen_wait(tu, 1);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 44);
@@ -1858,19 +1826,19 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "sfence.vma");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto FENCEtmp0_val_v = tu.create_assignment("FENCEtmp0_val", tu.gen_const(32U, rs1), 32);
-        tu.create_write_mem(
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.constant(rs1, 32U), 32);
+        tu.write_mem(
             traits<ARCH>::FENCE,
-            tu.gen_const(64U, 2),
-            FENCEtmp0_val_v);;
-        auto FENCEtmp1_val_v = tu.create_assignment("FENCEtmp1_val", tu.gen_const(32U, rs2), 32);
-        tu.create_write_mem(
+            tu.constant(2, 64U),
+            FENCEtmp0_val_v);
+        auto FENCEtmp1_val_v = tu.assignment("FENCEtmp1_val", tu.constant(rs2, 32U), 32);
+        tu.write_mem(
             traits<ARCH>::FENCE,
-            tu.gen_const(64U, 3),
-            FENCEtmp1_val_v);;
+            tu.constant(3, 64U),
+            FENCEtmp1_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 45);
@@ -1892,28 +1860,26 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto rs_val_val = tu.create_load(rs1 + traits<ARCH>::X0, 0);
-        ;
+        auto rs_val_val = tu.load(rs1 + traits<ARCH>::X0, 0);
         if(rd != 0){
-            auto csr_val_val = tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8);
-            auto CSRtmp0_val_v = tu.create_assignment("CSRtmp0_val", rs_val_val, 32);
-            tu.create_write_mem(
+            auto csr_val_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32);
+            auto CSRtmp0_val_v = tu.assignment("CSRtmp0_val", rs_val_val, 32);
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp0_val_v);
-            auto Xtmp1_val_v = tu.create_assignment("Xtmp1_val", csr_val_val, 32);
-            tu.create_store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", csr_val_val, 32);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
         } else {
-            auto CSRtmp2_val_v = tu.create_assignment("CSRtmp2_val", rs_val_val, 32);
-            tu.create_write_mem(
+            auto CSRtmp2_val_v = tu.assignment("CSRtmp2_val", rs_val_val, 32);
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp2_val_v);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 46);
@@ -1935,28 +1901,24 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto xrd_val = tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8);
-        ;
-        auto xrs1_val = tu.create_load(rs1 + traits<ARCH>::X0, 0);
-        ;
+        auto xrd_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32);
+        auto xrs1_val = tu.load(rs1 + traits<ARCH>::X0, 0);
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", xrd_val, 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", xrd_val, 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         if(rs1 != 0){
-            auto CSRtmp1_val_v = tu.create_assignment("CSRtmp1_val", tu.create_or(
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_or(
                 xrd_val,
                 xrs1_val), 32);
-            tu.create_write_mem(
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp1_val_v);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 47);
@@ -1978,28 +1940,24 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto xrd_val = tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8);
-        ;
-        auto xrs1_val = tu.create_load(rs1 + traits<ARCH>::X0, 0);
-        ;
+        auto xrd_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32);
+        auto xrs1_val = tu.load(rs1 + traits<ARCH>::X0, 0);
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", xrd_val, 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", xrd_val, 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         if(rs1 != 0){
-            auto CSRtmp1_val_v = tu.create_assignment("CSRtmp1_val", tu.create_and(
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_and(
                 xrd_val,
-                tu.create_not(xrs1_val)), 32);
-            tu.create_write_mem(
+                tu.l_not(xrs1_val)), 32);
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp1_val_v);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 48);
@@ -2021,22 +1979,21 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8), 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32), 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
-        auto CSRtmp1_val_v = tu.create_assignment("CSRtmp1_val", tu.gen_ext(
-            tu.gen_const(32U, zimm),
+        auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.ext(
+            tu.constant(zimm, 32U),
             32,
-            false), 32);
-        tu.create_write_mem(
+            true), 32);
+        tu.write_mem(
             traits<ARCH>::CSR,
-            tu.gen_const(16U, csr),
-            CSRtmp1_val_v);;
+            tu.constant(csr, 16U),
+            CSRtmp1_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 49);
@@ -2058,29 +2015,26 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto res_val = tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8);
-        ;
+        auto res_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32);
         if(zimm != 0){
-            auto CSRtmp0_val_v = tu.create_assignment("CSRtmp0_val", tu.create_or(
+            auto CSRtmp0_val_v = tu.assignment("CSRtmp0_val", tu.l_or(
                 res_val,
-                tu.gen_ext(
-                    tu.gen_const(32U, zimm),
+                tu.ext(
+                    tu.constant(zimm, 32U),
                     32,
-                    false)), 32);
-            tu.create_write_mem(
+                    true)), 32);
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp0_val_v);
         }
-        ;
         if(rd != 0){
-            auto Xtmp1_val_v = tu.create_assignment("Xtmp1_val", res_val, 32);
-            tu.create_store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", res_val, 32);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 50);
@@ -2102,29 +2056,26 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        auto res_val = tu.create_read_mem(traits<ARCH>::CSR, tu.gen_const(16U, csr), 32/8);
-        ;
+        auto res_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 32);
         if(rd != 0){
-            auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", res_val, 32);
-            tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 32);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         }
-        ;
         if(zimm != 0){
-            auto CSRtmp1_val_v = tu.create_assignment("CSRtmp1_val", tu.create_and(
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_and(
                 res_val,
-                tu.create_not(tu.gen_ext(
-                    tu.gen_const(32U, zimm),
+                tu.l_not(tu.ext(
+                    tu.constant(zimm, 32U),
                     32,
-                    false))), 32);
-            tu.create_write_mem(
+                    true))), 32);
+            tu.write_mem(
                 traits<ARCH>::CSR,
-                tu.gen_const(16U, csr),
+                tu.constant(csr, 16U),
                 CSRtmp1_val_v);
         }
-        ;
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 51);
@@ -2145,18 +2096,16 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         if(imm == 0){
             this->gen_raise_trap(tu, 0, 2);
         }
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-            tu.create_load(2 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(imm, 32U)), 32);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 52);
@@ -2178,19 +2127,17 @@ private:
             	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.create_load(rs1 + 8 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, uimm));
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-            tu.create_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 32U));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
             32,
-            true), 32);
-        tu.create_store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
-        ;
+            false), 32);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 53);
@@ -2212,18 +2159,17 @@ private:
             	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.create_load(rs1 + 8 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, uimm));
-        ;
-        auto MEMtmp0_val_v = tu.create_assignment("MEMtmp0_val", tu.create_load(rs2 + 8 + traits<ARCH>::X0, 0), 32);
-        tu.create_write_mem(
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 32U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + 8 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            MEMtmp0_val_v);;
+            MEMtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 54);
@@ -2244,16 +2190,15 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-            tu.gen_ext(
-                tu.create_load(rs1 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 55);
@@ -2269,7 +2214,7 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "c.nop");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         tu.close_scope();
@@ -2292,23 +2237,23 @@ private:
             	fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
             cur_pc_val,
-            tu.gen_const(32U, 2)), 32);
-        tu.create_store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
-        ;
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_add(
-            tu.gen_ext(
+            tu.constant(2, 32U)), 32);
+        tu.store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
                 cur_pc_val,
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 57);
         gen_trap_check(tu);
@@ -2328,16 +2273,14 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         if(rd == 0){
             this->gen_raise_trap(tu, 0, 2);
         }
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_const(32U, imm), 32);
-        tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 32U), 32);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 58);
@@ -2358,20 +2301,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         if(rd == 0){
             this->gen_raise_trap(tu, 0, 2);
         }
-        ;
         if(imm == 0){
             this->gen_raise_trap(tu, 0, 2);
         }
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_const(32U, imm), 32);
-        tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 32U), 32);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 59);
@@ -2391,16 +2331,15 @@ private:
             	fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-            tu.gen_ext(
-                tu.create_load(2 + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(Xtmp0_val_v, 2 + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.ext(
+                tu.load(2 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(Xtmp0_val_v, 2 + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 60);
@@ -2421,16 +2360,14 @@ private:
             	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rs1_idx_val = rs1 + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_lshr(
-            tu.create_load(rs1_idx_val + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, shamt)), 32);
-        tu.create_store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+            tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 32U)), 32);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 61);
@@ -2451,16 +2388,14 @@ private:
             	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rs1_idx_val = rs1 + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_ashr(
-            tu.create_load(rs1_idx_val + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, shamt)), 32);
-        tu.create_store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+            tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 32U)), 32);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 62);
@@ -2481,18 +2416,16 @@ private:
             	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rs1_idx_val = rs1 + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_and(
-            tu.gen_ext(
-                tu.create_load(rs1_idx_val + traits<ARCH>::X0, 0),
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+            tu.ext(
+                tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 63);
@@ -2513,16 +2446,14 @@ private:
             	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rd_idx_val = rd + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_sub(
-             tu.create_load(rd_idx_val + traits<ARCH>::X0, 0),
-             tu.create_load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
-        tu.create_store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.sub(
+             tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+             tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 64);
@@ -2543,16 +2474,14 @@ private:
             	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rd_idx_val = rd + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_xor(
-            tu.create_load(rd_idx_val + traits<ARCH>::X0, 0),
-            tu.create_load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
-        tu.create_store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 65);
@@ -2573,16 +2502,14 @@ private:
             	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rd_idx_val = rd + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_or(
-            tu.create_load(rd_idx_val + traits<ARCH>::X0, 0),
-            tu.create_load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
-        tu.create_store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 66);
@@ -2603,16 +2530,14 @@ private:
             	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         uint8_t rd_idx_val = rd + 8;
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_and(
-            tu.create_load(rd_idx_val + traits<ARCH>::X0, 0),
-            tu.create_load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
-        tu.create_store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 32);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 67);
@@ -2632,18 +2557,19 @@ private:
             	fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_add(
-            tu.gen_ext(
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
                 cur_pc_val,
-                32, true),
-            tu.gen_const(32U, imm)), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 68);
         gen_trap_check(tu);
@@ -2663,26 +2589,27 @@ private:
             	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_EQ,
-                tu.create_load(rs1 + 8 + traits<ARCH>::X0, 0),
-                tu.gen_const(32U, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+                tu.constant(0, 32U)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 2))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(2, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 69);
         gen_trap_check(tu);
@@ -2702,26 +2629,27 @@ private:
             	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_choose(
-            tu.create_icmp(
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
                 ICmpInst::ICMP_NE,
-                tu.create_load(rs1 + 8 + traits<ARCH>::X0, 0),
-                tu.gen_const(32U, 0)),
-            tu.create_add(
-                tu.gen_ext(
+                tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+                tu.constant(0, 32U)),
+            tu.add(
+                tu.ext(
                     cur_pc_val,
-                    32, true),
-                tu.gen_const(32U, imm)),
-            tu.create_add(
+                    32, false),
+                tu.constant(imm, 32U)),
+            tu.add(
                 cur_pc_val,
-                tu.gen_const(32U, 2))), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        auto is_cont_v = tu.create_assignment("is_cont", tu.create_icmp(ICmpInst::ICMP_NE, PC_val_v, tu.create_zext_or_trunc(PC_val_v, 32U)), 1);
-        tu.create_store(is_cont_v, traits<ARCH>::LAST_BRANCH);
-        ;
+                tu.constant(2, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 32U, true), tu.constant(pc.val, 32U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 70);
         gen_trap_check(tu);
@@ -2741,18 +2669,16 @@ private:
             	fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
         if(rs1 == 0){
             this->gen_raise_trap(tu, 0, 2);
         }
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_shl(
-            tu.create_load(rs1 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, shamt)), 32);
-        tu.create_store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+            tu.load(rs1 + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 32U)), 32);
+        tu.store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 71);
@@ -2773,19 +2699,17 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.create_load(2 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, uimm));
-        ;
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.gen_ext(
-            tu.create_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 32U));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
             32,
-            true), 32);
-        tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
-        ;
+            false), 32);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 72);
@@ -2806,12 +2730,11 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_load(rs2 + traits<ARCH>::X0, 0), 32);
-        tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 73);
@@ -2831,13 +2754,12 @@ private:
             	fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_load(rs1 + traits<ARCH>::X0, 0), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        tu.create_store(tu.gen_const(32U, std::numeric_limits<uint32_t>::max()), traits<ARCH>::LAST_BRANCH);
-        ;
+        auto PC_val_v = tu.assignment("PC_val", tu.load(rs1 + traits<ARCH>::X0, 0), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 74);
         gen_trap_check(tu);
@@ -2857,14 +2779,13 @@ private:
             	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
-            tu.create_load(rd + traits<ARCH>::X0, 0),
-            tu.create_load(rs2 + traits<ARCH>::X0, 0)), 32);
-        tu.create_store(Xtmp0_val_v, rd + traits<ARCH>::X0);
-        ;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.load(rd + traits<ARCH>::X0, 0),
+            tu.load(rs2 + traits<ARCH>::X0, 0)), 32);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 75);
@@ -2884,18 +2805,16 @@ private:
             	fmt::arg("rs1", name(rs1)));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto Xtmp0_val_v = tu.create_assignment("Xtmp0_val", tu.create_add(
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
             cur_pc_val,
-            tu.gen_const(32U, 2)), 32);
-        tu.create_store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
-        ;
-        auto PC_val_v = tu.create_assignment("PC_val", tu.create_load(rs1 + traits<ARCH>::X0, 0), 32);
-        tu.create_store(PC_val_v, traits<ARCH>::NEXT_PC);
-        tu.create_store(tu.gen_const(32U, std::numeric_limits<uint32_t>::max()), traits<ARCH>::LAST_BRANCH);
-        ;
+            tu.constant(2, 32U)), 32);
+        tu.store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
+        auto PC_val_v = tu.assignment("PC_val", tu.load(rs1 + traits<ARCH>::X0, 0), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 76);
         gen_trap_check(tu);
@@ -2910,10 +2829,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "c.ebreak");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        this->gen_raise_trap(tu, 0, 3);;
+        this->gen_raise_trap(tu, 0, 3);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 77);
         gen_trap_check(tu);
@@ -2933,18 +2852,17 @@ private:
             	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        auto offs_val = tu.create_add(
-            tu.create_load(2 + traits<ARCH>::X0, 0),
-            tu.gen_const(32U, uimm));
-        ;
-        auto MEMtmp0_val_v = tu.create_assignment("MEMtmp0_val", tu.create_load(rs2 + traits<ARCH>::X0, 0), 32);
-        tu.create_write_mem(
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 32U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
             traits<ARCH>::MEM,
             offs_val,
-            MEMtmp0_val_v);;
+            MEMtmp0_val_v);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 78);
@@ -2960,10 +2878,10 @@ private:
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "dii");
         }
-        auto cur_pc_val = tu.gen_const(arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC], pc.val);
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+2;
         tu.open_scope();
-        this->gen_raise_trap(tu, 0, 2);;
+        this->gen_raise_trap(tu, 0, 2);
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC, 79);
         gen_trap_check(tu);
@@ -3036,13 +2954,13 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause) {
     tu("  *trap_state = {:#x};", 0x80 << 24 | (cause << 16) | trap_id);
-    tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(tu_builder& tu, unsigned lvl) {
     tu("leave_trap(core_ptr, {});", lvl);
-    tu.create_store(tu.create_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8),traits<ARCH>::NEXT_PC);
-    tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
+    tu.store(tu.read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN),traits<ARCH>::NEXT_PC);
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned type) {
@@ -3051,7 +2969,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned t
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
     tu("trap_entry:");
     tu("enter_trap(core_ptr, *trap_state, *pc);");
-    tu.create_store(tu.gen_const(32, std::numeric_limits<uint32_t>::max()),traits<ARCH>::LAST_BRANCH);
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(),32),traits<ARCH>::LAST_BRANCH);
     tu("return *next_pc;");
 }
 
