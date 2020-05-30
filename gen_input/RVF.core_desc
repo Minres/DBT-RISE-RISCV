@@ -376,7 +376,7 @@ InsructionSet RV64F extends RV32F{
         FCVT.S.L { // 64bit signed int to to fp 
             encoding: b1101000 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
             args_disass:"f{rd}, x{rs1}";
-            val res[32] <= fdispatch_fcvt_64_32(X[rs1], zext(2, 32));
+            val res[32] <= fdispatch_fcvt_64_32(X[rs1], zext(2, 32), rm{8});
             if(FLEN==32)
                 F[rd] <= res;
             else { // NaN boxing
@@ -387,7 +387,7 @@ InsructionSet RV64F extends RV32F{
         FCVT.S.LU { // 64bit unsigned int to to fp 
             encoding: b1101000 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
             args_disass:"f{rd}, x{rs1}";
-            val res[32] <=fdispatch_fcvt_64_32(X[rs1], zext(3,32));
+            val res[32] <=fdispatch_fcvt_64_32(X[rs1], zext(3,32), rm{8});
             if(FLEN==32)
                 F[rd] <= res;
             else { // NaN boxing

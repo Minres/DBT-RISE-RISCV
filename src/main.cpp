@@ -36,6 +36,10 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/rv32imac.h>
+#include <iss/arch/rv32gc.h>
+#include <iss/arch/rv64gc.h>
+#include <iss/arch/rv64i.h>
 #include <iss/arch/mnrv32.h>
 #include <iss/llvm/jit_helper.h>
 #include <iss/log_categories.h>
@@ -43,6 +47,21 @@
 #include <iss/plugin/instruction_count.h>
 
 namespace po = boost::program_options;
+
+using cpu_ptr = std::unique_ptr<iss::arch_if>;
+using vm_ptr= std::unique_ptr<iss::vm_if>;
+
+template<typename CORE>
+std::tuple<cpu_ptr, vm_ptr> create_cpu(std::string const& backend, unsigned gdb_port){
+    CORE* lcpu = new iss::arch::riscv_hart_msu_vp<CORE>();
+    if(backend == "interp")
+        return {cpu_ptr{lcpu}, vm_ptr{iss::interp::create(lcpu, gdb_port)}};
+    if(backend == "llvm")
+        return {cpu_ptr{lcpu}, vm_ptr{iss::llvm::create(lcpu, gdb_port)}};
+    if(backend == "tcc")
+        return {cpu_ptr{lcpu}, vm_ptr{iss::tcc::create(lcpu, gdb_port)}};
+    return {nullptr, nullptr};
+}
 
 int main(int argc, char *argv[]) {
     /*
@@ -104,17 +123,23 @@ int main(int argc, char *argv[]) {
         iss::init_jit_debug(argc, argv);
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
-        std::unique_ptr<iss::vm_if> vm{nullptr};
-        std::unique_ptr<iss::arch_if> cpu{nullptr};
+        vm_ptr vm{nullptr};
+        cpu_ptr cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-        iss::arch::mnrv32* lcpu = new iss::arch::riscv_hart_msu_vp<iss::arch::mnrv32>();
-        if(clim["backend"].as<std::string>() == "interp")
-            vm = iss::interp::create(lcpu, clim["gdb-port"].as<unsigned>());
-        if(clim["backend"].as<std::string>() == "llvm")
-            vm = iss::llvm::create(lcpu, clim["gdb-port"].as<unsigned>());
-        if(clim["backend"].as<std::string>() == "tcc")
-            vm = iss::tcc::create(lcpu, clim["gdb-port"].as<unsigned>());
-        cpu.reset(lcpu);
+        if (isa_opt=="mnrv32") {
+            std::tie(cpu, vm) = create_cpu<iss::arch::mnrv32>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+        } else if (isa_opt=="rv64i") {
+            std::tie(cpu, vm) = create_cpu<iss::arch::rv64i>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+//        } else if (isa_opt=="rv64gc") {
+//            std::tie(cpu, vm) = create_cpu<iss::arch::rv64gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+//        } else if (isa_opt=="rv32imac") {
+//            std::tie(cpu, vm) = create_cpu<iss::arch::rv32imac>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+//        } else if (isa_opt=="rv32gc") {
+//            std::tie(cpu, vm) = create_cpu<iss::arch::rv32gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+        } else {
+            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
+            return 127;
+        }
         if (clim.count("plugin")) {
             for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
                 std::string plugin_name{opt_val};

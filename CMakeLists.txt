@@ -44,19 +44,28 @@ add_subdirectory(softfloat)
 FILE(GLOB RiscVSCHeaders ${CMAKE_CURRENT_SOURCE_DIR}/incl/sysc/*.h ${CMAKE_CURRENT_SOURCE_DIR}/incl/sysc/*/*.h)
 set(LIB_HEADERS ${RiscVSCHeaders} )
 set(LIB_SOURCES 
-	#src/iss/rv32gc.cpp
+	src/iss/rv32gc.cpp
 	src/iss/rv32imac.cpp
-	#src/iss/rv64i.cpp
-	#src/iss/rv64gc.cpp
+	src/iss/rv64i.cpp
+	src/iss/rv64gc.cpp
 	src/iss/mnrv32.cpp
-	src/vm/llvm/fp_functions.cpp
+	src/vm/fp_functions.cpp
+	src/vm/llvm/fp_impl.cpp
 	src/vm/llvm/vm_mnrv32.cpp
-	#src/vm/llvm/vm_rv32gc.cpp
-	#src/vm/llvm/vm_rv32imac.cpp
-	#src/vm/llvm/vm_rv64i.cpp
-	#src/vm/llvm/vm_rv64gc.cpp
+	src/vm/llvm/vm_rv32gc.cpp
+	src/vm/llvm/vm_rv32imac.cpp
+	src/vm/llvm/vm_rv64i.cpp
+	src/vm/llvm/vm_rv64gc.cpp
 	src/vm/tcc/vm_mnrv32.cpp
+	src/vm/tcc/vm_rv32gc.cpp
+	src/vm/tcc/vm_rv32imac.cpp
+	src/vm/tcc/vm_rv64i.cpp
+	src/vm/tcc/vm_rv64gc.cpp
 	src/vm/interp/vm_mnrv32.cpp
+	src/vm/interp/vm_rv32gc.cpp
+	src/vm/interp/vm_rv32imac.cpp
+	src/vm/interp/vm_rv64i.cpp
+	src/vm/interp/vm_rv64gc.cpp
     src/plugin/instruction_count.cpp
     src/plugin/cycle_estimate.cpp)
 

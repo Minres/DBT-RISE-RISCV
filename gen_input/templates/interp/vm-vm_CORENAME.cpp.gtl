@@ -30,6 +30,7 @@
  *
  *******************************************************************************/
 
+#include "../fp_functions.h"
 #include <iss/arch/${coreDef.name.toLowerCase()}.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/debugger/gdb_session.h>

@@ -31,7 +31,7 @@
  *******************************************************************************/
 
 #include "../fp_functions.h"
-#include <iss/arch/mnrv32.h>
+#include <iss/arch/rv64i.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
@@ -50,7 +50,7 @@
 
 namespace iss {
 namespace interp {
-namespace mnrv32 {
+namespace rv64i {
 using namespace iss::arch;
 using namespace iss::debugger;
 
@@ -167,7 +167,7 @@ private:
         compile_func op;
     };
 
-    const std::array<InstructionDesriptor, 80> instr_descr = {{
+    const std::array<InstructionDesriptor, 64> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -218,11 +218,11 @@ private:
         /* instruction ANDI */
         {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
         /* instruction SLLI */
-        {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
+        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
         /* instruction SRLI */
-        {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
+        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
         /* instruction SRAI */
-        {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
+        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
         /* instruction ADD */
         {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
         /* instruction SUB */
@@ -273,62 +273,30 @@ private:
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
         /* instruction CSRRCI */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
-        /* instruction C.ADDI4SPN */
-        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
-        /* instruction C.LW */
-        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
-        /* instruction C.SW */
-        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
-        /* instruction C.ADDI */
-        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
-        /* instruction C.NOP */
-        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
-        /* instruction C.JAL */
-        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
-        /* instruction C.LI */
-        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
-        /* instruction C.LUI */
-        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
-        /* instruction C.ADDI16SP */
-        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
-        /* instruction C.SRLI */
-        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
-        /* instruction C.SRAI */
-        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
-        /* instruction C.ANDI */
-        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
-        /* instruction C.SUB */
-        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
-        /* instruction C.XOR */
-        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
-        /* instruction C.OR */
-        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
-        /* instruction C.AND */
-        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
-        /* instruction C.J */
-        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
-        /* instruction C.BEQZ */
-        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
-        /* instruction C.BNEZ */
-        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
-        /* instruction C.SLLI */
-        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
-        /* instruction C.LWSP */
-        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
-        /* instruction C.MV */
-        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
-        /* instruction C.JR */
-        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
-        /* instruction C.ADD */
-        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
-        /* instruction C.JALR */
-        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
-        /* instruction C.EBREAK */
-        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
-        /* instruction C.SWSP */
-        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
-        /* instruction DII */
-        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
+        /* instruction LWU */
+        {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
+        /* instruction LD */
+        {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
+        /* instruction SD */
+        {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
+        /* instruction ADDIW */
+        {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
+        /* instruction SLLIW */
+        {32, 0b00000000000000000001000000011011, 0b11111110000000000111000001111111, &this_class::__slliw},
+        /* instruction SRLIW */
+        {32, 0b00000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__srliw},
+        /* instruction SRAIW */
+        {32, 0b01000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__sraiw},
+        /* instruction ADDW */
+        {32, 0b00000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__addw},
+        /* instruction SUBW */
+        {32, 0b01000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__subw},
+        /* instruction SLLW */
+        {32, 0b00000000000000000001000000111011, 0b11111110000000000111000001111111, &this_class::__sllw},
+        /* instruction SRLW */
+        {32, 0b00000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__srlw},
+        /* instruction SRAW */
+        {32, 0b01000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__sraw},
     }};
  
     /* instruction definitions */
@@ -381,7 +349,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(cur_pc_val) + (imm));
+            auto Xtmp0_val = (static_cast<int64_t>(cur_pc_val) + (imm));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 1);
@@ -416,7 +384,7 @@ private:
             auto Xtmp0_val = (cur_pc_val + 4);
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
-        auto PC_val = (static_cast<int32_t>(cur_pc_val) + (imm));
+        auto PC_val = (static_cast<int64_t>(cur_pc_val) + (imm));
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
         super::template get_reg(traits<ARCH>::LAST_BRANCH) = is_cont_v?1:0;
@@ -449,14 +417,22 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto new_pc_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
-        if(rd != 0){
-            auto Xtmp0_val = (cur_pc_val + 4);
-            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        auto new_pc_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto align_val = (new_pc_val & 0x2);
+        {
+            if((align_val != 0)) {
+                raise_trap(0, 0);
+            }
+            else {
+                if(rd != 0){
+                    auto Xtmp0_val = (cur_pc_val + 4);
+                    super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+                }
+                auto PC_val = (new_pc_val & ~(0x1));
+                super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
+                super::template get_reg(traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
+            }
         }
-        auto PC_val = (new_pc_val & ~(0x1));
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
         this->do_sync(POST_SYNC, 3);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -487,7 +463,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto PC_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0) == super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -522,7 +498,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto PC_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0) != super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -556,8 +532,8 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto PC_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < static_cast<int32_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+        auto PC_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < static_cast<int64_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -591,8 +567,8 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto PC_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) >= static_cast<int32_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+        auto PC_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) >= static_cast<int64_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -627,7 +603,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto PC_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0) < super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -662,7 +638,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto PC_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0) >= super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0))?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
+            (static_cast<int64_t>(cur_pc_val) + (imm)):
             (cur_pc_val + 4);
         super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
         auto is_cont_v = PC_val !=pc.val;
@@ -696,9 +672,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         if(rd != 0){
-            auto Xtmp0_val = super::template sext<int32_t>(super::template read_mem<uint8_t>(traits<ARCH>::MEM, offs_val));
+            auto Xtmp0_val = super::template sext<int64_t>(super::template read_mem<uint8_t>(traits<ARCH>::MEM, offs_val));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 10);
@@ -730,9 +706,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         if(rd != 0){
-            auto Xtmp0_val = super::template sext<int32_t>(super::template read_mem<uint16_t>(traits<ARCH>::MEM, offs_val));
+            auto Xtmp0_val = super::template sext<int64_t>(super::template read_mem<uint16_t>(traits<ARCH>::MEM, offs_val));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 11);
@@ -764,9 +740,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         if(rd != 0){
-            auto Xtmp0_val = super::template sext<int32_t>(super::template read_mem<uint32_t>(traits<ARCH>::MEM, offs_val));
+            auto Xtmp0_val = super::template sext<int64_t>(super::template read_mem<uint32_t>(traits<ARCH>::MEM, offs_val));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 12);
@@ -798,9 +774,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         if(rd != 0){
-            auto Xtmp0_val = super::template zext<uint32_t>(super::template read_mem<uint8_t>(traits<ARCH>::MEM, offs_val));
+            auto Xtmp0_val = super::template zext<uint64_t>(super::template read_mem<uint8_t>(traits<ARCH>::MEM, offs_val));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 13);
@@ -832,9 +808,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         if(rd != 0){
-            auto Xtmp0_val = super::template zext<uint32_t>(super::template read_mem<uint16_t>(traits<ARCH>::MEM, offs_val));
+            auto Xtmp0_val = super::template zext<uint64_t>(super::template read_mem<uint16_t>(traits<ARCH>::MEM, offs_val));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 14);
@@ -866,7 +842,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
         super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint8_t>(MEMtmp0_val));
         this->do_sync(POST_SYNC, 15);
@@ -898,7 +874,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
         super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint16_t>(MEMtmp0_val));
         this->do_sync(POST_SYNC, 16);
@@ -930,7 +906,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto offs_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
         auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
         super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint32_t>(MEMtmp0_val));
         this->do_sync(POST_SYNC, 17);
@@ -963,7 +939,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 18);
@@ -996,7 +972,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < (imm))?
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < (imm))?
                 1:
                 0;
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
@@ -1030,7 +1006,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        int32_t full_imm_val = imm;
+        int64_t full_imm_val = imm;
         if(rd != 0){
             auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0) < full_imm_val)?
                 1:
@@ -1067,7 +1043,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) ^ (imm));
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) ^ (imm));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 21);
@@ -1100,7 +1076,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) | (imm));
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) | (imm));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 22);
@@ -1133,7 +1109,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) & (imm));
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) & (imm));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 23);
@@ -1154,7 +1130,7 @@ private:
         
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1165,13 +1141,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        if(shamt > 31){
-            raise_trap(0, 0);
-        } else {
-            if(rd != 0){
-                auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)<<(shamt));
-                super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-            }
+        if(rd != 0){
+            auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)<<(shamt));
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 24);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1191,7 +1163,7 @@ private:
         
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1202,13 +1174,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        if(shamt > 31){
-            raise_trap(0, 0);
-        } else {
-            if(rd != 0){
-                auto Xtmp0_val = (static_cast<uint32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(shamt));
-                super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-            }
+        if(rd != 0){
+            auto Xtmp0_val = (static_cast<uint64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(shamt));
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 25);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1228,7 +1196,7 @@ private:
         
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1239,13 +1207,9 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        if(shamt > 31){
-            raise_trap(0, 0);
-        } else {
-            if(rd != 0){
-                auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(shamt));
-                super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-            }
+        if(rd != 0){
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(shamt));
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 26);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1343,7 +1307,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)<<(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((32) - 1)));
+            auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)<<(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((64) - 1)));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 29);
@@ -1376,7 +1340,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < static_cast<int32_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < static_cast<int64_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
                 1:
                 0;
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
@@ -1411,7 +1375,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (super::template zext<uint32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < super::template zext<uint32_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
+            auto Xtmp0_val = (super::template zext<uint64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) < super::template zext<uint64_t>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)))?
                 1:
                 0;
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
@@ -1479,7 +1443,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<uint32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((32) - 1)));
+            auto Xtmp0_val = (static_cast<uint64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((64) - 1)));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 33);
@@ -1512,7 +1476,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((32) - 1)));
+            auto Xtmp0_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0))>>(super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0) & ((64) - 1)));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         this->do_sync(POST_SYNC, 34);
@@ -1609,7 +1573,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto FENCEtmp0_val = (((pred) << 4) | (succ));
-        super::write_mem(traits<ARCH>::FENCE, (0), static_cast<uint32_t>(FENCEtmp0_val));
+        super::write_mem(traits<ARCH>::FENCE, (0), static_cast<uint64_t>(FENCEtmp0_val));
         this->do_sync(POST_SYNC, 37);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -1637,7 +1601,7 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto FENCEtmp0_val = (imm);
-        super::write_mem(traits<ARCH>::FENCE, (1), static_cast<uint32_t>(FENCEtmp0_val));
+        super::write_mem(traits<ARCH>::FENCE, (1), static_cast<uint64_t>(FENCEtmp0_val));
         this->do_sync(POST_SYNC, 38);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -1808,9 +1772,9 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto FENCEtmp0_val = (rs1);
-        super::write_mem(traits<ARCH>::FENCE, (2), static_cast<uint32_t>(FENCEtmp0_val));
+        super::write_mem(traits<ARCH>::FENCE, (2), static_cast<uint64_t>(FENCEtmp0_val));
         auto FENCEtmp1_val = (rs2);
-        super::write_mem(traits<ARCH>::FENCE, (3), static_cast<uint32_t>(FENCEtmp1_val));
+        super::write_mem(traits<ARCH>::FENCE, (3), static_cast<uint64_t>(FENCEtmp1_val));
         this->do_sync(POST_SYNC, 45);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -1842,14 +1806,14 @@ private:
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         auto rs_val_val = super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0);
         if(rd != 0){
-            auto csr_val_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+            auto csr_val_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
             auto CSRtmp0_val = rs_val_val;
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp0_val));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp0_val));
             auto Xtmp1_val = csr_val_val;
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp1_val;
         } else {
             auto CSRtmp2_val = rs_val_val;
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp2_val));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp2_val));
         }
         this->do_sync(POST_SYNC, 46);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1880,7 +1844,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto xrd_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+        auto xrd_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
         auto xrs1_val = super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0);
         if(rd != 0){
             auto Xtmp0_val = xrd_val;
@@ -1888,7 +1852,7 @@ private:
         }
         if(rs1 != 0){
             auto CSRtmp1_val = (xrd_val | xrs1_val);
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp1_val));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp1_val));
         }
         this->do_sync(POST_SYNC, 47);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1919,7 +1883,7 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto xrd_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+        auto xrd_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
         auto xrs1_val = super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0);
         if(rd != 0){
             auto Xtmp0_val = xrd_val;
@@ -1927,7 +1891,7 @@ private:
         }
         if(rs1 != 0){
             auto CSRtmp1_val = (xrd_val & ~(xrs1_val));
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp1_val));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp1_val));
         }
         this->do_sync(POST_SYNC, 48);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -1959,11 +1923,11 @@ private:
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
         if(rd != 0){
-            auto Xtmp0_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+            auto Xtmp0_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
-        auto CSRtmp1_val = super::template zext<uint32_t>((zimm));
-        super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp1_val));
+        auto CSRtmp1_val = super::template zext<uint64_t>((zimm));
+        super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp1_val));
         this->do_sync(POST_SYNC, 49);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -1993,10 +1957,10 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto res_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+        auto res_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
         if(zimm != 0){
-            auto CSRtmp0_val = (res_val | super::template zext<uint32_t>((zimm)));
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp0_val));
+            auto CSRtmp0_val = (res_val | super::template zext<uint64_t>((zimm)));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp0_val));
         }
         if(rd != 0){
             auto Xtmp1_val = res_val;
@@ -2031,14 +1995,14 @@ private:
         
         auto cur_pc_val = pc.val;
         super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
-        auto res_val = super::template read_mem<uint32_t>(traits<ARCH>::CSR, (csr));
+        auto res_val = super::template read_mem<uint64_t>(traits<ARCH>::CSR, (csr));
         if(rd != 0){
             auto Xtmp0_val = res_val;
             super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
         if(zimm != 0){
-            auto CSRtmp1_val = (res_val & ~(super::template zext<uint32_t>((zimm))));
-            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint32_t>(CSRtmp1_val));
+            auto CSRtmp1_val = (res_val & ~(super::template zext<uint64_t>((zimm))));
+            super::write_mem(traits<ARCH>::CSR, (csr), static_cast<uint64_t>(CSRtmp1_val));
         }
         this->do_sync(POST_SYNC, 51);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
@@ -2052,27 +2016,28 @@ private:
         return pc;
     }
     
-    /* instruction 52: C.ADDI4SPN */
-    compile_ret_t __c_addi4spn(virt_addr_t& pc, code_word_t instr){
+    /* instruction 52: LWU */
+    compile_ret_t __lwu(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 52);
         
-        uint8_t rd = ((bit_sub<2,3>(instr)));
-        uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
-            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lwu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        if(imm == 0){
-            raise_trap(0, 2);
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        if(rd != 0){
+            auto Xtmp0_val = super::template zext<uint64_t>(super::template read_mem<uint32_t>(traits<ARCH>::MEM, offs_val));
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
-        auto Xtmp0_val = (super::template get_reg<reg_t>(2 + traits<ARCH>::X0) + (imm));
-        super::template get_reg<reg_t>(rd + 8 + traits<ARCH>::X0)=Xtmp0_val;
         this->do_sync(POST_SYNC, 52);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2085,26 +2050,28 @@ private:
         return pc;
     }
     
-    /* instruction 53: C.LW */
-    compile_ret_t __c_lw(virt_addr_t& pc, code_word_t instr){
+    /* instruction 53: LD */
+    compile_ret_t __ld(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 53);
         
-        uint8_t rd = ((bit_sub<2,3>(instr)));
-        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
-            	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "ld"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto offs_val = (super::template get_reg<reg_t>(rs1 + 8 + traits<ARCH>::X0) + (uimm));
-        auto Xtmp0_val = super::template sext<int32_t>(super::template read_mem<uint32_t>(traits<ARCH>::MEM, offs_val));
-        super::template get_reg<reg_t>(rd + 8 + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        if(rd != 0){
+            auto Xtmp0_val = super::template sext<int64_t>(super::template read_mem<uint64_t>(traits<ARCH>::MEM, offs_val));
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 53);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2117,26 +2084,26 @@ private:
         return pc;
     }
     
-    /* instruction 54: C.SW */
-    compile_ret_t __c_sw(virt_addr_t& pc, code_word_t instr){
+    /* instruction 54: SD */
+    compile_ret_t __sd(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 54);
         
-        uint8_t rs2 = ((bit_sub<2,3>(instr)));
-        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
-            	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+                "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sd"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto offs_val = (super::template get_reg<reg_t>(rs1 + 8 + traits<ARCH>::X0) + (uimm));
-        auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + 8 + traits<ARCH>::X0);
-        super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint32_t>(MEMtmp0_val));
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        auto offs_val = (static_cast<int64_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
+        auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
+        super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint64_t>(MEMtmp0_val));
         this->do_sync(POST_SYNC, 54);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2149,24 +2116,30 @@ private:
         return pc;
     }
     
-    /* instruction 55: C.ADDI */
-    compile_ret_t __c_addi(virt_addr_t& pc, code_word_t instr){
+    /* instruction 55: ADDIW */
+    compile_ret_t __addiw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 55);
         
-        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
-        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
-            	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addiw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)) + (imm));
-        super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto res_val = (static_cast<int32_t>(static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            )) + (imm));
+            auto Xtmp0_val = super::template sext<int64_t>(res_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 55);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2179,18 +2152,30 @@ private:
         return pc;
     }
     
-    /* instruction 56: C.NOP */
-    compile_ret_t __c_nop(virt_addr_t& pc, code_word_t instr){
+    /* instruction 56: SLLIW */
+    compile_ret_t __slliw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 56);
         
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            this->core.disass_output(pc.val, "c.nop");
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slliw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        /* TODO: describe operations for C.NOP ! */
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto sh_val_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            )<<(shamt));
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 56);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2203,27 +2188,30 @@ private:
         return pc;
     }
     
-    /* instruction 57: C.JAL */
-    compile_ret_t __c_jal(virt_addr_t& pc, code_word_t instr){
+    /* instruction 57: SRLIW */
+    compile_ret_t __srliw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 57);
         
-        int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
-            	fmt::arg("imm", imm));
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srliw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = (cur_pc_val + 2);
-        super::template get_reg<reg_t>(1 + traits<ARCH>::X0)=Xtmp0_val;
-        auto PC_val = (static_cast<int32_t>(cur_pc_val) + (imm));
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        auto is_cont_v = PC_val !=pc.val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = is_cont_v?1:0;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto sh_val_val = (static_cast<uint32_t>(static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ))>>(shamt));
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 57);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2236,27 +2224,30 @@ private:
         return pc;
     }
     
-    /* instruction 58: C.LI */
-    compile_ret_t __c_li(virt_addr_t& pc, code_word_t instr){
+    /* instruction 58: SRAIW */
+    compile_ret_t __sraiw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 58);
         
-        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
-            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "sraiw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        if(rd == 0){
-            raise_trap(0, 2);
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto sh_val_val = (static_cast<int32_t>(static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ))>>(shamt));
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
-        auto Xtmp0_val = (imm);
-        super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         this->do_sync(POST_SYNC, 58);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2269,30 +2260,29 @@ private:
         return pc;
     }
     
-    /* instruction 59: C.LUI */
-    compile_ret_t __c_lui(virt_addr_t& pc, code_word_t instr){
+    /* instruction 59: ADDW */
+    compile_ret_t __addw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 59);
         
-        int32_t imm = signextend<int32_t,18>((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
-            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-            this->core.disass_output(pc.val, mnemonic);
+            this->core.disass_output(pc.val, "addw");
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        if(rd == 0){
-            raise_trap(0, 2);
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto res_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ) + static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)
+            ));
+            auto Xtmp0_val = super::template sext<int64_t>(res_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         }
-        if(imm == 0){
-            raise_trap(0, 2);
-        }
-        auto Xtmp0_val = (imm);
-        super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
         this->do_sync(POST_SYNC, 59);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2305,23 +2295,29 @@ private:
         return pc;
     }
     
-    /* instruction 60: C.ADDI16SP */
-    compile_ret_t __c_addi16sp(virt_addr_t& pc, code_word_t instr){
+    /* instruction 60: SUBW */
+    compile_ret_t __subw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 60);
         
-        int16_t imm = signextend<int16_t,10>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
-            	fmt::arg("imm", imm));
-            this->core.disass_output(pc.val, mnemonic);
+            this->core.disass_output(pc.val, "subw");
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(2 + traits<ARCH>::X0)) + (imm));
-        super::template get_reg<reg_t>(2 + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            auto res_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ) - static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)
+            ));
+            auto Xtmp0_val = super::template sext<int64_t>(res_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 60);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2334,25 +2330,34 @@ private:
         return pc;
     }
     
-    /* instruction 61: C.SRLI */
-    compile_ret_t __c_srli(virt_addr_t& pc, code_word_t instr){
+    /* instruction 61: SLLW */
+    compile_ret_t __sllw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 61);
         
-        uint8_t shamt = ((bit_sub<2,5>(instr)));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
-            	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sllw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rs1_idx_val = rs1 + 8;
-        auto Xtmp0_val = (static_cast<uint32_t>(super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0))>>(shamt));
-        super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)
+            ) & mask_val);
+            auto sh_val_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            )<<count_val);
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 61);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2365,25 +2370,34 @@ private:
         return pc;
     }
     
-    /* instruction 62: C.SRAI */
-    compile_ret_t __c_srai(virt_addr_t& pc, code_word_t instr){
+    /* instruction 62: SRLW */
+    compile_ret_t __srlw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 62);
         
-        uint8_t shamt = ((bit_sub<2,5>(instr)));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
-            	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srlw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rs1_idx_val = rs1 + 8;
-        auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0))>>(shamt));
-        super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)
+            ) & mask_val);
+            auto sh_val_val = (static_cast<uint32_t>(static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ))>>count_val);
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 62);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
@@ -2396,514 +2410,35 @@ private:
         return pc;
     }
     
-    /* instruction 63: C.ANDI */
-    compile_ret_t __c_andi(virt_addr_t& pc, code_word_t instr){
+    /* instruction 63: SRAW */
+    compile_ret_t __sraw(virt_addr_t& pc, code_word_t instr){
         this->do_sync(PRE_SYNC, 63);
         
-        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
-            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sraw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
             this->core.disass_output(pc.val, mnemonic);
         }
         
         auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rs1_idx_val = rs1 + 8;
-        auto Xtmp0_val = (static_cast<int32_t>(super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0)) & (imm));
-        super::template get_reg<reg_t>(rs1_idx_val + traits<ARCH>::X0)=Xtmp0_val;
+        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 4;
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = (static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0)
+            ) & mask_val);
+            auto sh_val_val = (static_cast<int32_t>(static_cast<uint32_t>(
+                super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)
+            ))>>count_val);
+            auto Xtmp0_val = super::template sext<int64_t>(sh_val_val);
+            super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
+        }
         this->do_sync(POST_SYNC, 63);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 64: C.SUB */
-    compile_ret_t __c_sub(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 64);
-        
-        uint8_t rs2 = ((bit_sub<2,3>(instr)));
-        uint8_t rd = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
-            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rd_idx_val = rd + 8;
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0) - super::template get_reg<reg_t>(rs2 + 8 + traits<ARCH>::X0));
-        super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 64);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 65: C.XOR */
-    compile_ret_t __c_xor(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 65);
-        
-        uint8_t rs2 = ((bit_sub<2,3>(instr)));
-        uint8_t rd = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
-            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rd_idx_val = rd + 8;
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0) ^ super::template get_reg<reg_t>(rs2 + 8 + traits<ARCH>::X0));
-        super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 65);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 66: C.OR */
-    compile_ret_t __c_or(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 66);
-        
-        uint8_t rs2 = ((bit_sub<2,3>(instr)));
-        uint8_t rd = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
-            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rd_idx_val = rd + 8;
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0) | super::template get_reg<reg_t>(rs2 + 8 + traits<ARCH>::X0));
-        super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 66);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 67: C.AND */
-    compile_ret_t __c_and(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 67);
-        
-        uint8_t rs2 = ((bit_sub<2,3>(instr)));
-        uint8_t rd = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
-            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        uint8_t rd_idx_val = rd + 8;
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0) & super::template get_reg<reg_t>(rs2 + 8 + traits<ARCH>::X0));
-        super::template get_reg<reg_t>(rd_idx_val + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 67);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 68: C.J */
-    compile_ret_t __c_j(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 68);
-        
-        int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
-            	fmt::arg("imm", imm));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto PC_val = (static_cast<int32_t>(cur_pc_val) + (imm));
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        auto is_cont_v = PC_val !=pc.val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = is_cont_v?1:0;
-        this->do_sync(POST_SYNC, 68);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 69: C.BEQZ */
-    compile_ret_t __c_beqz(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 69);
-        
-        int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
-            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto PC_val = (super::template get_reg<reg_t>(rs1 + 8 + traits<ARCH>::X0) == 0)?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
-            (cur_pc_val + 2);
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        auto is_cont_v = PC_val !=pc.val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = is_cont_v?1:0;
-        this->do_sync(POST_SYNC, 69);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 70: C.BNEZ */
-    compile_ret_t __c_bnez(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 70);
-        
-        int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
-        uint8_t rs1 = ((bit_sub<7,3>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
-            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto PC_val = (super::template get_reg<reg_t>(rs1 + 8 + traits<ARCH>::X0) != 0)?
-            (static_cast<int32_t>(cur_pc_val) + (imm)):
-            (cur_pc_val + 2);
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        auto is_cont_v = PC_val !=pc.val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = is_cont_v?1:0;
-        this->do_sync(POST_SYNC, 70);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 71: C.SLLI */
-    compile_ret_t __c_slli(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 71);
-        
-        uint8_t shamt = ((bit_sub<2,5>(instr)));
-        uint8_t rs1 = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
-            	fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        if(rs1 == 0){
-            raise_trap(0, 2);
-        }
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)<<(shamt));
-        super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 71);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 72: C.LWSP */
-    compile_ret_t __c_lwsp(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 72);
-        
-        uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
-            	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto offs_val = (super::template get_reg<reg_t>(2 + traits<ARCH>::X0) + (uimm));
-        auto Xtmp0_val = super::template sext<int32_t>(super::template read_mem<uint32_t>(traits<ARCH>::MEM, offs_val));
-        super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 72);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 73: C.MV */
-    compile_ret_t __c_mv(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 73);
-        
-        uint8_t rs2 = ((bit_sub<2,5>(instr)));
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
-            	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
-        super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 73);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 74: C.JR */
-    compile_ret_t __c_jr(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 74);
-        
-        uint8_t rs1 = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
-            	fmt::arg("rs1", name(rs1)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto PC_val = super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0);
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
-        this->do_sync(POST_SYNC, 74);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 75: C.ADD */
-    compile_ret_t __c_add(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 75);
-        
-        uint8_t rs2 = ((bit_sub<2,5>(instr)));
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
-            	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = (super::template get_reg<reg_t>(rd + traits<ARCH>::X0) + super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0));
-        super::template get_reg<reg_t>(rd + traits<ARCH>::X0)=Xtmp0_val;
-        this->do_sync(POST_SYNC, 75);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 76: C.JALR */
-    compile_ret_t __c_jalr(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 76);
-        
-        uint8_t rs1 = ((bit_sub<7,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
-            	fmt::arg("rs1", name(rs1)));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto Xtmp0_val = (cur_pc_val + 2);
-        super::template get_reg<reg_t>(1 + traits<ARCH>::X0)=Xtmp0_val;
-        auto PC_val = super::template get_reg<reg_t>(rs1 + traits<ARCH>::X0);
-        super::template get_reg(traits<ARCH>::NEXT_PC) = PC_val;
-        super::template get_reg(traits<ARCH>::LAST_BRANCH) = std::numeric_limits<uint32_t>::max();
-        this->do_sync(POST_SYNC, 76);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 77: C.EBREAK */
-    compile_ret_t __c_ebreak(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 77);
-        
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            this->core.disass_output(pc.val, "c.ebreak");
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        raise_trap(0, 3);
-        this->do_sync(POST_SYNC, 77);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 78: C.SWSP */
-    compile_ret_t __c_swsp(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 78);
-        
-        uint8_t rs2 = ((bit_sub<2,5>(instr)));
-        uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
-            	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
-            this->core.disass_output(pc.val, mnemonic);
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        auto offs_val = (super::template get_reg<reg_t>(2 + traits<ARCH>::X0) + (uimm));
-        auto MEMtmp0_val = super::template get_reg<reg_t>(rs2 + traits<ARCH>::X0);
-        super::write_mem(traits<ARCH>::MEM, offs_val, static_cast<uint32_t>(MEMtmp0_val));
-        this->do_sync(POST_SYNC, 78);
-        auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
-        // trap check
-        if(trap_state!=0){
-            auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
-            last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
-        }
-        pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
-        return pc;
-    }
-    
-    /* instruction 79: DII */
-    compile_ret_t __dii(virt_addr_t& pc, code_word_t instr){
-        this->do_sync(PRE_SYNC, 79);
-        
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            this->core.disass_output(pc.val, "dii");
-        }
-        
-        auto cur_pc_val = pc.val;
-        super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC) = cur_pc_val + 2;
-        raise_trap(0, 2);
-        this->do_sync(POST_SYNC, 79);
         auto& trap_state = super::template get_reg<uint32_t>(arch::traits<ARCH>::TRAP_STATE);
         // trap check
         if(trap_state!=0){
@@ -2974,8 +2509,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(virt_addr_t star
 } // namespace mnrv32
 
 template <>
-std::unique_ptr<vm_if> create<arch::mnrv32>(arch::mnrv32 *core, unsigned short port, bool dump) {
-    auto ret = new mnrv32::vm_impl<arch::mnrv32>(*core, dump);
+std::unique_ptr<vm_if> create<arch::rv64i>(arch::rv64i *core, unsigned short port, bool dump) {
+    auto ret = new rv64i::vm_impl<arch::rv64i>(*core, dump);
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }

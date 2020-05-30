@@ -215,6 +215,8 @@ struct rv32gc: public arch_if {
 
     inline bool should_stop() { return interrupt_sim; }
 
+    inline uint64_t stop_code() { return interrupt_sim; }
+
     inline phys_addr_t v2p(const iss::addr_t& addr){
         if (addr.space != traits<rv32gc>::MEM || addr.type == iss::address_type::PHYSICAL ||
                 addr_mode[static_cast<uint16_t>(addr.access)&0x3]==address_type::PHYSICAL) {
@@ -304,7 +306,7 @@ protected:
 
     std::array<address_type, 4> addr_mode;
     
-    bool interrupt_sim=false;
+    uint64_t interrupt_sim=0;
 
 	uint32_t get_fcsr(){return reg.FCSR;}
 	void set_fcsr(uint32_t val){reg.FCSR = val;}		

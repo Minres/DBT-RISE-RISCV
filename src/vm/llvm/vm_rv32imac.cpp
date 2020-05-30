@@ -49,19 +49,17 @@
 namespace iss {
 namespace llvm {
 namespace fp_impl {
-void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
-}
+void add_fp_functions_2_module(::llvm::Module *, unsigned, unsigned);
 }
 
 namespace rv32imac {
+using namespace ::llvm;
 using namespace iss::arch;
-using namespace llvm;
 using namespace iss::debugger;
-using namespace iss::vm::llvm;
 
-template <typename ARCH> class vm_impl : public vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::llvm::vm_base<ARCH> {
 public:
-    using super = typename iss::vm::llvm::vm_base<ARCH>;
+    using super = typename iss::llvm::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
@@ -191,108 +189,14 @@ private:
 
     const std::array<InstructionDesriptor, 99> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
-        /* instruction JALR */
-        {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
-        /* instruction C.ADDI4SPN */
-        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
-        /* instruction C.LW */
-        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
-        /* instruction C.SW */
-        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
-        /* instruction C.ADDI */
-        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
-        /* instruction C.NOP */
-        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
-        /* instruction C.JAL */
-        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
-        /* instruction C.LI */
-        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
-        /* instruction C.LUI */
-        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
-        /* instruction C.ADDI16SP */
-        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
-        /* instruction C.SRLI */
-        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
-        /* instruction C.SRAI */
-        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
-        /* instruction C.ANDI */
-        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
-        /* instruction C.SUB */
-        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
-        /* instruction C.XOR */
-        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
-        /* instruction C.OR */
-        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
-        /* instruction C.AND */
-        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
-        /* instruction C.J */
-        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
-        /* instruction C.BEQZ */
-        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
-        /* instruction C.BNEZ */
-        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
-        /* instruction C.SLLI */
-        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
-        /* instruction C.LWSP */
-        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
-        /* instruction C.MV */
-        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
-        /* instruction C.JR */
-        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
-        /* instruction C.ADD */
-        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
-        /* instruction C.JALR */
-        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
-        /* instruction C.EBREAK */
-        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
-        /* instruction C.SWSP */
-        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
-        /* instruction DII */
-        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
-        /* instruction LR.W */
-        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
-        /* instruction SC.W */
-        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
-        /* instruction AMOSWAP.W */
-        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
-        /* instruction AMOADD.W */
-        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
-        /* instruction AMOXOR.W */
-        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
-        /* instruction AMOAND.W */
-        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
-        /* instruction AMOOR.W */
-        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
-        /* instruction AMOMIN.W */
-        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
-        /* instruction AMOMAX.W */
-        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
-        /* instruction AMOMINU.W */
-        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
-        /* instruction AMOMAXU.W */
-        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
-        /* instruction MUL */
-        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
-        /* instruction MULH */
-        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
-        /* instruction MULHSU */
-        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
-        /* instruction MULHU */
-        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
-        /* instruction DIV */
-        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
-        /* instruction DIVU */
-        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
-        /* instruction REM */
-        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
-        /* instruction REMU */
-        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
         /* instruction LUI */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
         /* instruction AUIPC */
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
         /* instruction JAL */
         {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
+        /* instruction JALR */
+        {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
         /* instruction BEQ */
         {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
         /* instruction BNE */
@@ -389,14 +293,225 @@ private:
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
         /* instruction CSRRCI */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
+        /* instruction MUL */
+        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
+        /* instruction MULH */
+        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
+        /* instruction MULHSU */
+        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
+        /* instruction MULHU */
+        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
+        /* instruction DIV */
+        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
+        /* instruction DIVU */
+        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
+        /* instruction REM */
+        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
+        /* instruction REMU */
+        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
+        /* instruction LR.W */
+        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
+        /* instruction SC.W */
+        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
+        /* instruction AMOSWAP.W */
+        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
+        /* instruction AMOADD.W */
+        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
+        /* instruction AMOXOR.W */
+        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
+        /* instruction AMOAND.W */
+        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
+        /* instruction AMOOR.W */
+        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
+        /* instruction AMOMIN.W */
+        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
+        /* instruction AMOMAX.W */
+        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
+        /* instruction AMOMINU.W */
+        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
+        /* instruction AMOMAXU.W */
+        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
+        /* instruction C.ADDI4SPN */
+        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
+        /* instruction C.LW */
+        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
+        /* instruction C.SW */
+        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
+        /* instruction C.ADDI */
+        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
+        /* instruction C.NOP */
+        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
+        /* instruction C.JAL */
+        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
+        /* instruction C.LI */
+        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
+        /* instruction C.LUI */
+        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
+        /* instruction C.ADDI16SP */
+        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
+        /* instruction C.SRLI */
+        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
+        /* instruction C.SRAI */
+        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
+        /* instruction C.ANDI */
+        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
+        /* instruction C.SUB */
+        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
+        /* instruction C.XOR */
+        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
+        /* instruction C.OR */
+        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
+        /* instruction C.AND */
+        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
+        /* instruction C.J */
+        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
+        /* instruction C.BEQZ */
+        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
+        /* instruction C.BNEZ */
+        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
+        /* instruction C.SLLI */
+        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
+        /* instruction C.LWSP */
+        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
+        /* instruction C.MV */
+        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
+        /* instruction C.JR */
+        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
+        /* instruction C.ADD */
+        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
+        /* instruction C.JALR */
+        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
+        /* instruction C.EBREAK */
+        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
+        /* instruction C.SWSP */
+        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
+        /* instruction DII */
+        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
     }};
  
     /* instruction definitions */
-    /* instruction 0: JALR */
+    /* instruction 0: LUI */
+    std::tuple<continuation_e, BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LUI");
+    	
+    	this->gen_sync(PRE_SYNC, 0);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "lui"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_const(32U, imm);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 0);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 1: AUIPC */
+    std::tuple<continuation_e, BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AUIPC");
+    	
+    	this->gen_sync(PRE_SYNC, 1);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 1);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 2: JAL */
+    std::tuple<continuation_e, BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("JAL");
+    	
+    	this->gen_sync(PRE_SYNC, 2);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	int32_t imm = signextend<int32_t,21>((bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (bit_sub<31,1>(instr) << 20));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {imm:#0x}", fmt::arg("mnemonic", "jal"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	Value* PC_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    	this->gen_sync(POST_SYNC, 2);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 3: JALR */
     std::tuple<continuation_e, BasicBlock*> __jalr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("JALR");
     	
-    	this->gen_sync(PRE_SYNC, 0);
+    	this->gen_sync(PRE_SYNC, 3);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -422,179 +537,36 @@ private:
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
     	        32, true),
     	    this->gen_const(32U, imm));
-    	Value* align_val = this->builder.CreateAnd(
-    	    new_pc_val,
-    	    this->gen_const(32U, 0x2));
-    	{
-    	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    BasicBlock* bb_else = BasicBlock::Create(this->mod->getContext(), "elsebr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        align_val,
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bb_else);
-    	    this->builder.SetInsertPoint(bb_then);
-    	    {
-    	        this->gen_raise_trap(0, 0);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    this->builder.SetInsertPoint(bb_else);
-    	    {
-    	        if(rd != 0){
-    	            Value* Xtmp0_val = this->builder.CreateAdd(
-    	                cur_pc_val,
-    	                this->gen_const(32U, 4));
-    	            this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	        }
-    	        Value* PC_val = this->builder.CreateAnd(
-    	            new_pc_val,
-    	            this->builder.CreateNot(this->gen_const(32U, 0x1)));
-    	        this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	        this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	this->builder.SetInsertPoint(bb);
-    	this->gen_sync(POST_SYNC, 0);
+    	Value* PC_val = this->builder.CreateAnd(
+    	    new_pc_val,
+    	    this->builder.CreateNot(this->gen_const(32U, 0x1)));
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    	this->gen_sync(POST_SYNC, 3);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 1: C.ADDI4SPN */
-    std::tuple<continuation_e, BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.ADDI4SPN");
-    	
-    	this->gen_sync(PRE_SYNC, 1);
-    	
-    	uint8_t rd = ((bit_sub<2,3>(instr)));
-    	uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	if(imm == 0){
-    	    this->gen_raise_trap(0, 2);
-    	}
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + 8 + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 1);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 2: C.LW */
-    std::tuple<continuation_e, BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.LW");
-    	
-    	this->gen_sync(PRE_SYNC, 2);
-    	
-    	uint8_t rd = ((bit_sub<2,3>(instr)));
-    	uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
-    	    	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, uimm));
-    	Value* Xtmp0_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + 8 + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 2);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 3: C.SW */
-    std::tuple<continuation_e, BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SW");
-    	
-    	this->gen_sync(PRE_SYNC, 3);
-    	
-    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
-    	uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
-    	    	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, uimm));
-    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0);
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 3);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 4: C.ADDI */
-    std::tuple<continuation_e, BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.ADDI");
+    /* instruction 4: BEQ */
+    std::tuple<continuation_e, BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BEQ");
     	
     	this->gen_sync(PRE_SYNC, 4);
     	
-    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
-    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "beq"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -604,60 +576,44 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    this->gen_ext(
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_EQ,
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1 + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 4);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 5: C.NOP */
-    std::tuple<continuation_e, BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.NOP");
+    /* instruction 5: BNE */
+    std::tuple<continuation_e, BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BNE");
     	
     	this->gen_sync(PRE_SYNC, 5);
     	
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("c.nop"),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	/* TODO: describe operations for C.NOP ! */
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 5);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 6: C.JAL */
-    std::tuple<continuation_e, BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.JAL");
-    	
-    	this->gen_sync(PRE_SYNC, 6);
-    	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
-    	    	fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bne"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -667,17 +623,73 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    cur_pc_val,
-    	    this->gen_const(32U, 2));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
-    	Value* PC_val = this->builder.CreateAdd(
-    	    this->gen_ext(
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_NE,
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
     	        cur_pc_val,
-    	        32, true),
-    	    this->gen_const(32U, imm));
+    	        this->gen_const(32U, 4)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    	this->gen_sync(POST_SYNC, 5);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 6: BLT */
+    std::tuple<continuation_e, BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BLT");
+    	
+    	this->gen_sync(PRE_SYNC, 6);
+    	
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "blt"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_SLT,
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            32, true)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4)),
+    	    32);
     	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
     	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
     	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
@@ -686,19 +698,20 @@ private:
     	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 7: C.LI */
-    std::tuple<continuation_e, BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.LI");
+    /* instruction 7: BGE */
+    std::tuple<continuation_e, BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BGE");
     	
     	this->gen_sync(PRE_SYNC, 7);
     	
-    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bge"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -708,33 +721,48 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	if(rd == 0){
-    	    this->gen_raise_trap(0, 2);
-    	}
-    	Value* Xtmp0_val = this->gen_const(32U, imm);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_SGE,
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            32, true)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 7);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 8: C.LUI */
-    std::tuple<continuation_e, BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.LUI");
+    /* instruction 8: BLTU */
+    std::tuple<continuation_e, BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BLTU");
     	
     	this->gen_sync(PRE_SYNC, 8);
     	
-    	int32_t imm = signextend<int32_t,18>((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bltu"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -744,35 +772,44 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	if(rd == 0){
-    	    this->gen_raise_trap(0, 2);
-    	}
-    	if(imm == 0){
-    	    this->gen_raise_trap(0, 2);
-    	}
-    	Value* Xtmp0_val = this->gen_const(32U, imm);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_ULT,
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 8);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 9: C.ADDI16SP */
-    std::tuple<continuation_e, BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.ADDI16SP");
+    /* instruction 9: BGEU */
+    std::tuple<continuation_e, BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("BGEU");
     	
     	this->gen_sync(PRE_SYNC, 9);
     	
-    	int16_t imm = signextend<int16_t,10>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
+    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
-    	    	fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bgeu"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -782,34 +819,44 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(2 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(2 + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_UGE,
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 4)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 9);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 10: C.SRLI */
-    std::tuple<continuation_e, BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SRLI");
+    /* instruction 10: LB */
+    std::tuple<continuation_e, BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LB");
     	
     	this->gen_sync(PRE_SYNC, 10);
     	
-    	uint8_t shamt = ((bit_sub<2,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
-    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lb"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -819,13 +866,20 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rs1_idx_val = rs1 + 8;
-    	Value* Xtmp0_val = this->builder.CreateLShr(
-    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, shamt));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
+    	        32,
+    	        true);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 10);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -833,19 +887,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 11: C.SRAI */
-    std::tuple<continuation_e, BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SRAI");
+    /* instruction 11: LH */
+    std::tuple<continuation_e, BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LH");
     	
     	this->gen_sync(PRE_SYNC, 11);
     	
-    	uint8_t shamt = ((bit_sub<2,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
-    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lh"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -855,13 +910,20 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rs1_idx_val = rs1 + 8;
-    	Value* Xtmp0_val = this->builder.CreateAShr(
-    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, shamt));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
+    	        32,
+    	        true);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 11);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -869,19 +931,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 12: C.ANDI */
-    std::tuple<continuation_e, BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.ANDI");
+    /* instruction 12: LW */
+    std::tuple<continuation_e, BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LW");
     	
     	this->gen_sync(PRE_SYNC, 12);
     	
-    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
-    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lw"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -891,15 +954,20 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rs1_idx_val = rs1 + 8;
-    	Value* Xtmp0_val = this->builder.CreateAnd(
+    	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
-    	        this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
     	        32, true),
     	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	        32,
+    	        true);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 12);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -907,19 +975,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 13: C.SUB */
-    std::tuple<continuation_e, BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SUB");
+    /* instruction 13: LBU */
+    std::tuple<continuation_e, BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LBU");
     	
     	this->gen_sync(PRE_SYNC, 13);
     	
-    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
-    	uint8_t rd = ((bit_sub<7,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
-    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lbu"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -929,13 +998,20 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rd_idx_val = rd + 8;
-    	Value* Xtmp0_val = this->builder.CreateSub(
-    	     this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	     this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
+    	        32,
+    	        false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 13);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -943,19 +1019,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 14: C.XOR */
-    std::tuple<continuation_e, BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.XOR");
+    /* instruction 14: LHU */
+    std::tuple<continuation_e, BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LHU");
     	
     	this->gen_sync(PRE_SYNC, 14);
     	
-    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
-    	uint8_t rd = ((bit_sub<7,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
-    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lhu"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -965,13 +1042,20 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rd_idx_val = rd + 8;
-    	Value* Xtmp0_val = this->builder.CreateXor(
-    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
+    	        32,
+    	        false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 14);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -979,19 +1063,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 15: C.OR */
-    std::tuple<continuation_e, BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.OR");
+    /* instruction 15: SB */
+    std::tuple<continuation_e, BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SB");
     	
     	this->gen_sync(PRE_SYNC, 15);
     	
-    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
-    	uint8_t rd = ((bit_sub<7,3>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
-    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sb"),
+    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1001,13 +1086,18 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rd_idx_val = rd + 8;
-    	Value* Xtmp0_val = this->builder.CreateOr(
-    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(8)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 15);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1015,19 +1105,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 16: C.AND */
-    std::tuple<continuation_e, BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.AND");
+    /* instruction 16: SH */
+    std::tuple<continuation_e, BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SH");
     	
     	this->gen_sync(PRE_SYNC, 16);
     	
-    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
-    	uint8_t rd = ((bit_sub<7,3>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
-    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sh"),
+    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1037,13 +1128,18 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	uint8_t rd_idx_val = rd + 8;
-    	Value* Xtmp0_val = this->builder.CreateAnd(
-    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(16)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 16);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1051,18 +1147,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 17: C.J */
-    std::tuple<continuation_e, BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.J");
+    /* instruction 17: SW */
+    std::tuple<continuation_e, BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SW");
     	
     	this->gen_sync(PRE_SYNC, 17);
     	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
-    	    	fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sw"),
+    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1072,430 +1170,39 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
+    	pc=pc+4;
     	
-    	Value* PC_val = this->builder.CreateAdd(
+    	Value* offs_val = this->builder.CreateAdd(
     	    this->gen_ext(
-    	        cur_pc_val,
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
     	        32, true),
     	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 17);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 18: C.BEQZ */
-    std::tuple<continuation_e, BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.BEQZ");
-    	
-    	this->gen_sync(PRE_SYNC, 18);
-    	
-    	int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
-    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_EQ,
-    	        this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 2)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 18);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 19: C.BNEZ */
-    std::tuple<continuation_e, BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.BNEZ");
-    	
-    	this->gen_sync(PRE_SYNC, 19);
-    	
-    	int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
-    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
-    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
-    	        this->gen_const(32U, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 2)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 19);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 20: C.SLLI */
-    std::tuple<continuation_e, BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SLLI");
-    	
-    	this->gen_sync(PRE_SYNC, 20);
-    	
-    	uint8_t shamt = ((bit_sub<2,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	if(rs1 == 0){
-    	    this->gen_raise_trap(0, 2);
-    	}
-    	Value* Xtmp0_val = this->builder.CreateShl(
-    	    this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, shamt));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1 + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 20);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 21: C.LWSP */
-    std::tuple<continuation_e, BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.LWSP");
-    	
-    	this->gen_sync(PRE_SYNC, 21);
-    	
-    	uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, uimm));
-    	Value* Xtmp0_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 21);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 22: C.MV */
-    std::tuple<continuation_e, BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.MV");
-    	
-    	this->gen_sync(PRE_SYNC, 22);
-    	
-    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* Xtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 22);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 23: C.JR */
-    std::tuple<continuation_e, BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.JR");
-    	
-    	this->gen_sync(PRE_SYNC, 23);
-    	
-    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
-    	    	fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* PC_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 23);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 24: C.ADD */
-    std::tuple<continuation_e, BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.ADD");
-    	
-    	this->gen_sync(PRE_SYNC, 24);
-    	
-    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(rd + traits<ARCH>::X0, 0),
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 24);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 25: C.JALR */
-    std::tuple<continuation_e, BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.JALR");
-    	
-    	this->gen_sync(PRE_SYNC, 25);
-    	
-    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
-    	    	fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* Xtmp0_val = this->builder.CreateAdd(
-    	    cur_pc_val,
-    	    this->gen_const(32U, 2));
-    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
-    	Value* PC_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 25);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 26: C.EBREAK */
-    std::tuple<continuation_e, BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.EBREAK");
-    	
-    	this->gen_sync(PRE_SYNC, 26);
-    	
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("c.ebreak"),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	this->gen_raise_trap(0, 3);
-    	this->gen_sync(POST_SYNC, 26);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 27: C.SWSP */
-    std::tuple<continuation_e, BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("C.SWSP");
-    	
-    	this->gen_sync(PRE_SYNC, 27);
-    	
-    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
-    	uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
-    	    	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
-    	    this->gen_const(32U, uimm));
     	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
     	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 27);
+    	this->gen_sync(POST_SYNC, 17);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 28: DII */
-    std::tuple<continuation_e, BasicBlock*> __dii(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("DII");
+    /* instruction 18: ADDI */
+    std::tuple<continuation_e, BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("ADDI");
     	
-    	this->gen_sync(PRE_SYNC, 28);
-    	
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("dii"),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+2;
-    	
-    	this->gen_raise_trap(0, 2);
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 28);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 29: LR.W */
-    std::tuple<continuation_e, BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LR.W");
-    	
-    	this->gen_sync(PRE_SYNC, 29);
+    	this->gen_sync(PRE_SYNC, 18);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "lr.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addi"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1508,43 +1215,368 @@ private:
     	pc=pc+4;
     	
     	if(rd != 0){
-    	    Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	        32,
-    	        true);
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_const(32U, imm));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	    Value* REStmp1_val = this->gen_ext(
-    	        this->builder.CreateNeg(this->gen_const(8U, 1)),
-    	        32,
-    	        true);
-    	    this->gen_write_mem(
-    	        traits<ARCH>::RES,
-    	        offs_val,
-    	        this->builder.CreateZExtOrTrunc(REStmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 29);
+    	this->gen_sync(POST_SYNC, 18);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 30: SC.W */
-    std::tuple<continuation_e, BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SC.W");
+    /* instruction 19: SLTI */
+    std::tuple<continuation_e, BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLTI");
     	
-    	this->gen_sync(PRE_SYNC, 30);
+    	this->gen_sync(PRE_SYNC, 19);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "slti"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_choose(
+    	        this->builder.CreateICmp(
+    	            ICmpInst::ICMP_SLT,
+    	            this->gen_ext(
+    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	                32, true),
+    	            this->gen_const(32U, imm)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 19);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 20: SLTIU */
+    std::tuple<continuation_e, BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLTIU");
+    	
+    	this->gen_sync(PRE_SYNC, 20);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "sltiu"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	int32_t full_imm_val = imm;
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_choose(
+    	        this->builder.CreateICmp(
+    	            ICmpInst::ICMP_ULT,
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, full_imm_val)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 20);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 21: XORI */
+    std::tuple<continuation_e, BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("XORI");
+    	
+    	this->gen_sync(PRE_SYNC, 21);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "xori"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateXor(
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_const(32U, imm));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 21);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 22: ORI */
+    std::tuple<continuation_e, BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("ORI");
+    	
+    	this->gen_sync(PRE_SYNC, 22);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "ori"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateOr(
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_const(32U, imm));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 22);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 23: ANDI */
+    std::tuple<continuation_e, BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("ANDI");
+    	
+    	this->gen_sync(PRE_SYNC, 23);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "andi"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateAnd(
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            32, true),
+    	        this->gen_const(32U, imm));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 23);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 24: SLLI */
+    std::tuple<continuation_e, BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLLI");
+    	
+    	this->gen_sync(PRE_SYNC, 24);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slli"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateShl(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 24);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 25: SRLI */
+    std::tuple<continuation_e, BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SRLI");
+    	
+    	this->gen_sync(PRE_SYNC, 25);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srli"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateLShr(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 25);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 26: SRAI */
+    std::tuple<continuation_e, BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SRAI");
+    	
+    	this->gen_sync(PRE_SYNC, 26);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srai"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(shamt > 31){
+    	    this->gen_raise_trap(0, 0);
+    	} else {
+    	    if(rd != 0){
+    	        Value* Xtmp0_val = this->builder.CreateAShr(
+    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	            this->gen_const(32U, shamt));
+    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    }
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 26);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 27: ADD */
+    std::tuple<continuation_e, BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("ADD");
+    	
+    	this->gen_sync(PRE_SYNC, 27);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sc.w"),
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "add"),
     	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
@@ -1557,43 +1589,138 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
-    	{
-    	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
-    	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
-    	    // this->builder.SetInsertPoint(bb);
-    	    this->gen_cond_branch(this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        res1_val,
-    	        this->gen_const(32U, 0)),
-    	        bb_then,
-    	        bbnext);
-    	    this->builder.SetInsertPoint(bb_then);
-    	    {
-    	        Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 1);
-    	        this->gen_write_mem(
-    	            traits<ARCH>::MEM,
-    	            offs_val,
-    	            this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
-    	    }
-    	    this->builder.CreateBr(bbnext);
-    	    bb=bbnext;
-    	}
-    	this->builder.SetInsertPoint(bb);
     	if(rd != 0){
-    	    Value* Xtmp1_val = this->gen_choose(
+    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 27);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 28: SUB */
+    std::tuple<continuation_e, BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SUB");
+    	
+    	this->gen_sync(PRE_SYNC, 28);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sub"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateSub(
+    	         this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	         this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 28);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 29: SLL */
+    std::tuple<continuation_e, BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLL");
+    	
+    	this->gen_sync(PRE_SYNC, 29);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sll"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->builder.CreateShl(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->builder.CreateAnd(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            this->builder.CreateSub(
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 29);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 30: SLT */
+    std::tuple<continuation_e, BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLT");
+    	
+    	this->gen_sync(PRE_SYNC, 30);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "slt"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_choose(
     	        this->builder.CreateICmp(
-    	            ICmpInst::ICMP_NE,
-    	            res1_val,
+    	            ICmpInst::ICMP_SLT,
     	            this->gen_ext(
-    	                this->gen_const(32U, 0),
-    	                32,
-    	                false)),
-    	        this->gen_const(32U, 0),
+    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	                32, true),
+    	            this->gen_ext(
+    	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	                32, true)),
     	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
     	        32);
-    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 30);
@@ -1602,22 +1729,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 31: AMOSWAP.W */
-    std::tuple<continuation_e, BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOSWAP.W");
+    /* instruction 31: SLTU */
+    std::tuple<continuation_e, BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SLTU");
     	
     	this->gen_sync(PRE_SYNC, 31);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoswap.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sltu"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1629,19 +1754,23 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	        32,
-    	        true);
+    	    Value* Xtmp0_val = this->gen_choose(
+    	        this->builder.CreateICmp(
+    	            ICmpInst::ICMP_ULT,
+    	            this->gen_ext(
+    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	                32,
+    	                false),
+    	            this->gen_ext(
+    	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	                32,
+    	                false)),
+    	        this->gen_const(32U, 1),
+    	        this->gen_const(32U, 0),
+    	        32);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* MEMtmp1_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 31);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1649,22 +1778,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 32: AMOADD.W */
-    std::tuple<continuation_e, BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOADD.W");
+    /* instruction 32: XOR */
+    std::tuple<continuation_e, BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("XOR");
     	
     	this->gen_sync(PRE_SYNC, 32);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoadd.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "xor"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1676,23 +1803,12 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
+    	    Value* Xtmp0_val = this->builder.CreateXor(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* res2_val = this->builder.CreateAdd(
-    	    res1_val,
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 32);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1700,22 +1816,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 33: AMOXOR.W */
-    std::tuple<continuation_e, BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOXOR.W");
+    /* instruction 33: SRL */
+    std::tuple<continuation_e, BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SRL");
     	
     	this->gen_sync(PRE_SYNC, 33);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoxor.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srl"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1727,23 +1841,16 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
+    	    Value* Xtmp0_val = this->builder.CreateLShr(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->builder.CreateAnd(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            this->builder.CreateSub(
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* res2_val = this->builder.CreateXor(
-    	    res1_val,
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 33);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1751,22 +1858,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 34: AMOAND.W */
-    std::tuple<continuation_e, BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOAND.W");
+    /* instruction 34: SRA */
+    std::tuple<continuation_e, BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SRA");
     	
     	this->gen_sync(PRE_SYNC, 34);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoand.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sra"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1778,23 +1883,16 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
+    	    Value* Xtmp0_val = this->builder.CreateAShr(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->builder.CreateAnd(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            this->builder.CreateSub(
+    	                 this->gen_const(32U, 32),
+    	                 this->gen_const(32U, 1))));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* res2_val = this->builder.CreateAnd(
-    	    res1_val,
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 34);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1802,22 +1900,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 35: AMOOR.W */
-    std::tuple<continuation_e, BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOOR.W");
+    /* instruction 35: OR */
+    std::tuple<continuation_e, BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("OR");
     	
     	this->gen_sync(PRE_SYNC, 35);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoor.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "or"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1829,23 +1925,12 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
+    	    Value* Xtmp0_val = this->builder.CreateOr(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* res2_val = this->builder.CreateOr(
-    	    res1_val,
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 35);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1853,22 +1938,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 36: AMOMIN.W */
-    std::tuple<continuation_e, BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOMIN.W");
+    /* instruction 36: AND */
+    std::tuple<continuation_e, BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AND");
     	
     	this->gen_sync(PRE_SYNC, 36);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomin.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "and"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -1880,32 +1963,12 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
+    	    Value* Xtmp0_val = this->builder.CreateAnd(
+    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
-    	Value* res2_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_SGT,
-    	        this->gen_ext(
-    	            res1_val,
-    	            32, true),
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            32, true)),
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	    res1_val,
-    	    32);
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 36);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1913,26 +1976,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 37: AMOMAX.W */
-    std::tuple<continuation_e, BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOMAX.W");
+    /* instruction 37: FENCE */
+    std::tuple<continuation_e, BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("FENCE");
     	
     	this->gen_sync(PRE_SYNC, 37);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
+    	uint8_t succ = ((bit_sub<20,4>(instr)));
+    	uint8_t pred = ((bit_sub<24,4>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomax.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	        this->builder.CreateGlobalStringPtr("fence"),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
@@ -1940,32 +1999,15 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
-    	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	Value* res2_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_SLT,
-    	        this->gen_ext(
-    	            res1_val,
-    	            32, true),
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            32, true)),
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	    res1_val,
-    	    32);
-    	Value* MEMtmp1_val = res2_val;
+    	Value* FENCEtmp0_val = this->builder.CreateOr(
+    	    this->builder.CreateShl(
+    	        this->gen_const(32U, pred),
+    	        this->gen_const(32U, 4)),
+    	    this->gen_const(32U, succ));
     	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
+    	    traits<ARCH>::FENCE,
+    	    this->gen_const(64U, 0),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 37);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -1973,26 +2015,21 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 38: AMOMINU.W */
-    std::tuple<continuation_e, BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOMINU.W");
+    /* instruction 38: FENCE_I */
+    std::tuple<continuation_e, BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("FENCE_I");
     	
     	this->gen_sync(PRE_SYNC, 38);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
+    	uint16_t imm = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amominu.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	        this->builder.CreateGlobalStringPtr("fence_i"),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
@@ -2000,51 +2037,222 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
-    	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	Value* res2_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_UGT,
-    	        res1_val,
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	    res1_val,
-    	    32);
-    	Value* MEMtmp1_val = res2_val;
+    	Value* FENCEtmp0_val = this->gen_const(32U, imm);
     	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
+    	    traits<ARCH>::FENCE,
+    	    this->gen_const(64U, 1),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 38);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(FLUSH, nullptr);
     }
     
-    /* instruction 39: AMOMAXU.W */
-    std::tuple<continuation_e, BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AMOMAXU.W");
+    /* instruction 39: ECALL */
+    std::tuple<continuation_e, BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("ECALL");
     	
     	this->gen_sync(PRE_SYNC, 39);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("ecall"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_raise_trap(0, 11);
+    	this->gen_sync(POST_SYNC, 39);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 40: EBREAK */
+    std::tuple<continuation_e, BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("EBREAK");
+    	
+    	this->gen_sync(PRE_SYNC, 40);
+    	
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("ebreak"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_raise_trap(0, 3);
+    	this->gen_sync(POST_SYNC, 40);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 41: URET */
+    std::tuple<continuation_e, BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("URET");
+    	
+    	this->gen_sync(PRE_SYNC, 41);
+    	
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("uret"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_leave_trap(0);
+    	this->gen_sync(POST_SYNC, 41);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 42: SRET */
+    std::tuple<continuation_e, BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SRET");
+    	
+    	this->gen_sync(PRE_SYNC, 42);
+    	
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("sret"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_leave_trap(1);
+    	this->gen_sync(POST_SYNC, 42);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 43: MRET */
+    std::tuple<continuation_e, BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("MRET");
+    	
+    	this->gen_sync(PRE_SYNC, 43);
+    	
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("mret"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_leave_trap(3);
+    	this->gen_sync(POST_SYNC, 43);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
+    }
+    
+    /* instruction 44: WFI */
+    std::tuple<continuation_e, BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("WFI");
+    	
+    	this->gen_sync(PRE_SYNC, 44);
+    	
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("wfi"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	this->gen_wait(1);
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 44);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 45: SFENCE.VMA */
+    std::tuple<continuation_e, BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SFENCE.VMA");
+    	
+    	this->gen_sync(PRE_SYNC, 45);
+    	
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	uint8_t rl = ((bit_sub<25,1>(instr)));
-    	uint8_t aq = ((bit_sub<26,1>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr("sfence.vma"),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* FENCEtmp0_val = this->gen_const(32U, rs1);
+    	this->gen_write_mem(
+    	    traits<ARCH>::FENCE,
+    	    this->gen_const(64U, 2),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	Value* FENCEtmp1_val = this->gen_const(32U, rs2);
+    	this->gen_write_mem(
+    	    traits<ARCH>::FENCE,
+    	    this->gen_const(64U, 3),
+    	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(32)));
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 45);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 46: CSRRW */
+    std::tuple<continuation_e, BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRW");
+    	
+    	this->gen_sync(PRE_SYNC, 46);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomaxu.w"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrw"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -2056,40 +2264,271 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	Value* res1_val = this->gen_ext(
-    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	    32,
-    	    true);
+    	Value* rs_val_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	if(rd != 0){
-    	    Value* Xtmp0_val = res1_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	    Value* CSRtmp0_val = rs_val_val;
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
+    	    Value* Xtmp1_val = csr_val_val;
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	} else {
+    	    Value* CSRtmp2_val = rs_val_val;
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp2_val,this->get_type(32)));
     	}
-    	Value* res2_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_ULT,
-    	        res1_val,
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	    res1_val,
-    	    32);
-    	Value* MEMtmp1_val = res2_val;
-    	this->gen_write_mem(
-    	    traits<ARCH>::MEM,
-    	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 39);
+    	this->gen_sync(POST_SYNC, 46);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 40: MUL */
+    /* instruction 47: CSRRS */
+    std::tuple<continuation_e, BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRS");
+    	
+    	this->gen_sync(PRE_SYNC, 47);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrs"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = xrd_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	if(rs1 != 0){
+    	    Value* CSRtmp1_val = this->builder.CreateOr(
+    	        xrd_val,
+    	        xrs1_val);
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 47);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 48: CSRRC */
+    std::tuple<continuation_e, BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRC");
+    	
+    	this->gen_sync(PRE_SYNC, 48);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrc"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = xrd_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	if(rs1 != 0){
+    	    Value* CSRtmp1_val = this->builder.CreateAnd(
+    	        xrd_val,
+    	        this->builder.CreateNot(xrs1_val));
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 48);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 49: CSRRWI */
+    std::tuple<continuation_e, BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRWI");
+    	
+    	this->gen_sync(PRE_SYNC, 49);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t zimm = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrwi"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	Value* CSRtmp1_val = this->gen_ext(
+    	    this->gen_const(32U, zimm),
+    	    32,
+    	    false);
+    	this->gen_write_mem(
+    	    traits<ARCH>::CSR,
+    	    this->gen_const(16U, csr),
+    	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 49);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 50: CSRRSI */
+    std::tuple<continuation_e, BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRSI");
+    	
+    	this->gen_sync(PRE_SYNC, 50);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t zimm = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrsi"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	if(zimm != 0){
+    	    Value* CSRtmp0_val = this->builder.CreateOr(
+    	        res_val,
+    	        this->gen_ext(
+    	            this->gen_const(32U, zimm),
+    	            32,
+    	            false));
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
+    	}
+    	if(rd != 0){
+    	    Value* Xtmp1_val = res_val;
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 50);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 51: CSRRCI */
+    std::tuple<continuation_e, BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("CSRRCI");
+    	
+    	this->gen_sync(PRE_SYNC, 51);
+    	
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
+    	uint8_t zimm = ((bit_sub<15,5>(instr)));
+    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	if(this->disass_enabled){
+    	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrci"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+    	    std::vector<Value*> args {
+    	        this->core_ptr,
+    	        this->gen_const(64, pc.val),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	    };
+    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+    	}
+    	
+    	Value* cur_pc_val = this->gen_const(32, pc.val);
+    	pc=pc+4;
+    	
+    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = res_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	if(zimm != 0){
+    	    Value* CSRtmp1_val = this->builder.CreateAnd(
+    	        res_val,
+    	        this->builder.CreateNot(this->gen_ext(
+    	            this->gen_const(32U, zimm),
+    	            32,
+    	            false)));
+    	    this->gen_write_mem(
+    	        traits<ARCH>::CSR,
+    	        this->gen_const(16U, csr),
+    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
+    	}
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_sync(POST_SYNC, 51);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
+    }
+    
+    /* instruction 52: MUL */
     std::tuple<continuation_e, BasicBlock*> __mul(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MUL");
     	
-    	this->gen_sync(PRE_SYNC, 40);
+    	this->gen_sync(PRE_SYNC, 52);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2127,17 +2566,17 @@ private:
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 40);
+    	this->gen_sync(POST_SYNC, 52);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 41: MULH */
+    /* instruction 53: MULH */
     std::tuple<continuation_e, BasicBlock*> __mulh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULH");
     	
-    	this->gen_sync(PRE_SYNC, 41);
+    	this->gen_sync(PRE_SYNC, 53);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2177,17 +2616,17 @@ private:
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 41);
+    	this->gen_sync(POST_SYNC, 53);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 42: MULHSU */
+    /* instruction 54: MULHSU */
     std::tuple<continuation_e, BasicBlock*> __mulhsu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULHSU");
     	
-    	this->gen_sync(PRE_SYNC, 42);
+    	this->gen_sync(PRE_SYNC, 54);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2227,17 +2666,17 @@ private:
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 42);
+    	this->gen_sync(POST_SYNC, 54);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 43: MULHU */
+    /* instruction 55: MULHU */
     std::tuple<continuation_e, BasicBlock*> __mulhu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("MULHU");
     	
-    	this->gen_sync(PRE_SYNC, 43);
+    	this->gen_sync(PRE_SYNC, 55);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2277,17 +2716,17 @@ private:
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 43);
+    	this->gen_sync(POST_SYNC, 55);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 44: DIV */
+    /* instruction 56: DIV */
     std::tuple<continuation_e, BasicBlock*> __div(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("DIV");
     	
-    	this->gen_sync(PRE_SYNC, 44);
+    	this->gen_sync(PRE_SYNC, 56);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2376,17 +2815,17 @@ private:
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 44);
+    	this->gen_sync(POST_SYNC, 56);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 45: DIVU */
+    /* instruction 57: DIVU */
     std::tuple<continuation_e, BasicBlock*> __divu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("DIVU");
     	
-    	this->gen_sync(PRE_SYNC, 45);
+    	this->gen_sync(PRE_SYNC, 57);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2438,17 +2877,17 @@ private:
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 45);
+    	this->gen_sync(POST_SYNC, 57);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 46: REM */
+    /* instruction 58: REM */
     std::tuple<continuation_e, BasicBlock*> __rem(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("REM");
     	
-    	this->gen_sync(PRE_SYNC, 46);
+    	this->gen_sync(PRE_SYNC, 58);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2537,17 +2976,17 @@ private:
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 46);
+    	this->gen_sync(POST_SYNC, 58);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 47: REMU */
+    /* instruction 59: REMU */
     std::tuple<continuation_e, BasicBlock*> __remu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
     	bb->setName("REMU");
     	
-    	this->gen_sync(PRE_SYNC, 47);
+    	this->gen_sync(PRE_SYNC, 59);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -2599,565 +3038,27 @@ private:
     	    this->builder.SetInsertPoint(bb);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 47);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 48: LUI */
-    std::tuple<continuation_e, BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LUI");
-    	
-    	this->gen_sync(PRE_SYNC, 48);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "lui"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_const(32U, imm);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 48);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 49: AUIPC */
-    std::tuple<continuation_e, BasicBlock*> __auipc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AUIPC");
-    	
-    	this->gen_sync(PRE_SYNC, 49);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 49);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 50: JAL */
-    std::tuple<continuation_e, BasicBlock*> __jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("JAL");
-    	
-    	this->gen_sync(PRE_SYNC, 50);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	int32_t imm = signextend<int32_t,21>((bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (bit_sub<31,1>(instr) << 20));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm:#0x}", fmt::arg("mnemonic", "jal"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	Value* PC_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        cur_pc_val,
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 50);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 51: BEQ */
-    std::tuple<continuation_e, BasicBlock*> __beq(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BEQ");
-    	
-    	this->gen_sync(PRE_SYNC, 51);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "beq"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_EQ,
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 51);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 52: BNE */
-    std::tuple<continuation_e, BasicBlock*> __bne(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BNE");
-    	
-    	this->gen_sync(PRE_SYNC, 52);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bne"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_NE,
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 52);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 53: BLT */
-    std::tuple<continuation_e, BasicBlock*> __blt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BLT");
-    	
-    	this->gen_sync(PRE_SYNC, 53);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "blt"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_SLT,
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            32, true)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 53);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 54: BGE */
-    std::tuple<continuation_e, BasicBlock*> __bge(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BGE");
-    	
-    	this->gen_sync(PRE_SYNC, 54);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bge"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_SGE,
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            32, true)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 54);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 55: BLTU */
-    std::tuple<continuation_e, BasicBlock*> __bltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BLTU");
-    	
-    	this->gen_sync(PRE_SYNC, 55);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bltu"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_ULT,
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 55);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 56: BGEU */
-    std::tuple<continuation_e, BasicBlock*> __bgeu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("BGEU");
-    	
-    	this->gen_sync(PRE_SYNC, 56);
-    	
-    	int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bgeu"),
-    	    	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* PC_val = this->gen_choose(
-    	    this->builder.CreateICmp(
-    	        ICmpInst::ICMP_UGE,
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
-    	    this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            cur_pc_val,
-    	            32, true),
-    	        this->gen_const(32U, imm)),
-    	    this->builder.CreateAdd(
-    	        cur_pc_val,
-    	        this->gen_const(32U, 4)),
-    	    32);
-    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
-    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    	this->gen_sync(POST_SYNC, 56);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
-    }
-    
-    /* instruction 57: LB */
-    std::tuple<continuation_e, BasicBlock*> __lb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LB");
-    	
-    	this->gen_sync(PRE_SYNC, 57);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lb"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
-    	        32,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 57);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 58: LH */
-    std::tuple<continuation_e, BasicBlock*> __lh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LH");
-    	
-    	this->gen_sync(PRE_SYNC, 58);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lh"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
-    	        32,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
-    	this->gen_sync(POST_SYNC, 58);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
-    }
-    
-    /* instruction 59: LW */
-    std::tuple<continuation_e, BasicBlock*> __lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LW");
-    	
-    	this->gen_sync(PRE_SYNC, 59);
-    	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-    	if(this->disass_enabled){
-    	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
-    	    std::vector<Value*> args {
-    	        this->core_ptr,
-    	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
-    	    };
-    	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-    	}
-    	
-    	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
-    	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
-    	        32,
-    	        true);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 59);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
     	this->gen_trap_check(bb);
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 60: LBU */
-    std::tuple<continuation_e, BasicBlock*> __lbu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LBU");
+    /* instruction 60: LR.W */
+    std::tuple<continuation_e, BasicBlock*> __lr_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("LR.W");
     	
     	this->gen_sync(PRE_SYNC, 60);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lbu"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "lr.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3169,17 +3070,21 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
     	if(rd != 0){
+    	    Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
     	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 8/8),
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
     	        32,
-    	        false);
+    	        true);
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    Value* REStmp1_val = this->gen_ext(
+    	        this->builder.CreateNeg(this->gen_const(8U, 1)),
+    	        32,
+    	        true);
+    	    this->gen_write_mem(
+    	        traits<ARCH>::RES,
+    	        offs_val,
+    	        this->builder.CreateZExtOrTrunc(REStmp1_val,this->get_type(32)));
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 60);
@@ -3188,20 +3093,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 61: LHU */
-    std::tuple<continuation_e, BasicBlock*> __lhu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("LHU");
+    /* instruction 61: SC.W */
+    std::tuple<continuation_e, BasicBlock*> __sc_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("SC.W");
     	
     	this->gen_sync(PRE_SYNC, 61);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lhu"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sc.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3213,17 +3120,43 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_read_mem(traits<ARCH>::RES, offs_val, 32/8);
+    	{
+    	    BasicBlock* bbnext = BasicBlock::Create(this->mod->getContext(), "endif", this->func, this->leave_blk);
+    	    BasicBlock* bb_then = BasicBlock::Create(this->mod->getContext(), "thenbr", this->func, bbnext);
+    	    // this->builder.SetInsertPoint(bb);
+    	    this->gen_cond_branch(this->builder.CreateICmp(
+    	        ICmpInst::ICMP_NE,
+    	        res1_val,
+    	        this->gen_const(32U, 0)),
+    	        bb_then,
+    	        bbnext);
+    	    this->builder.SetInsertPoint(bb_then);
+    	    {
+    	        Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 1);
+    	        this->gen_write_mem(
+    	            traits<ARCH>::MEM,
+    	            offs_val,
+    	            this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
+    	    }
+    	    this->builder.CreateBr(bbnext);
+    	    bb=bbnext;
+    	}
+    	this->builder.SetInsertPoint(bb);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_ext(
-    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 16/8),
-    	        32,
-    	        false);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	    Value* Xtmp1_val = this->gen_choose(
+    	        this->builder.CreateICmp(
+    	            ICmpInst::ICMP_NE,
+    	            res1_val,
+    	            this->gen_ext(
+    	                this->gen_const(32U, 0),
+    	                32,
+    	                false)),
+    	        this->gen_const(32U, 0),
+    	        this->gen_const(32U, 1),
+    	        32);
+    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 61);
@@ -3232,20 +3165,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 62: SB */
-    std::tuple<continuation_e, BasicBlock*> __sb(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SB");
+    /* instruction 62: AMOSWAP.W */
+    std::tuple<continuation_e, BasicBlock*> __amoswap_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOSWAP.W");
     	
     	this->gen_sync(PRE_SYNC, 62);
     	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sb"),
-    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoswap.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3257,16 +3192,19 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = this->gen_ext(
+    	        this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	        32,
+    	        true);
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	Value* MEMtmp1_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(8)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 62);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3274,20 +3212,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 63: SH */
-    std::tuple<continuation_e, BasicBlock*> __sh(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SH");
+    /* instruction 63: AMOADD.W */
+    std::tuple<continuation_e, BasicBlock*> __amoadd_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOADD.W");
     	
     	this->gen_sync(PRE_SYNC, 63);
     	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sh"),
-    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoadd.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3299,16 +3239,23 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	Value* res2_val = this->builder.CreateAdd(
+    	    res1_val,
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(16)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 63);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3316,20 +3263,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 64: SW */
-    std::tuple<continuation_e, BasicBlock*> __sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SW");
+    /* instruction 64: AMOXOR.W */
+    std::tuple<continuation_e, BasicBlock*> __amoxor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOXOR.W");
     	
     	this->gen_sync(PRE_SYNC, 64);
     	
-    	int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
     	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sw"),
-    	    	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoxor.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3341,16 +3290,23 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	Value* offs_val = this->builder.CreateAdd(
-    	    this->gen_ext(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        32, true),
-    	    this->gen_const(32U, imm));
-    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
+    	if(rd != 0){
+    	    Value* Xtmp0_val = res1_val;
+    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	}
+    	Value* res2_val = this->builder.CreateXor(
+    	    res1_val,
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	Value* MEMtmp1_val = res2_val;
     	this->gen_write_mem(
     	    traits<ARCH>::MEM,
     	    offs_val,
-    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 64);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3358,20 +3314,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 65: ADDI */
-    std::tuple<continuation_e, BasicBlock*> __addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ADDI");
+    /* instruction 65: AMOAND.W */
+    std::tuple<continuation_e, BasicBlock*> __amoand_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOAND.W");
     	
     	this->gen_sync(PRE_SYNC, 65);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addi"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoand.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3383,14 +3341,23 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAdd(
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_const(32U, imm));
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->builder.CreateAnd(
+    	    res1_val,
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 65);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3398,20 +3365,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 66: SLTI */
-    std::tuple<continuation_e, BasicBlock*> __slti(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLTI");
+    /* instruction 66: AMOOR.W */
+    std::tuple<continuation_e, BasicBlock*> __amoor_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOOR.W");
     	
     	this->gen_sync(PRE_SYNC, 66);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "slti"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoor.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3423,19 +3392,23 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_choose(
-    	        this->builder.CreateICmp(
-    	            ICmpInst::ICMP_SLT,
-    	            this->gen_ext(
-    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                32, true),
-    	            this->gen_const(32U, imm)),
-    	        this->gen_const(32U, 1),
-    	        this->gen_const(32U, 0),
-    	        32);
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->builder.CreateOr(
+    	    res1_val,
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 66);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3443,20 +3416,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 67: SLTIU */
-    std::tuple<continuation_e, BasicBlock*> __sltiu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLTIU");
+    /* instruction 67: AMOMIN.W */
+    std::tuple<continuation_e, BasicBlock*> __amomin_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOMIN.W");
     	
     	this->gen_sync(PRE_SYNC, 67);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "sltiu"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomin.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3468,18 +3443,32 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
-    	int32_t full_imm_val = imm;
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_choose(
-    	        this->builder.CreateICmp(
-    	            ICmpInst::ICMP_ULT,
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, full_imm_val)),
-    	        this->gen_const(32U, 1),
-    	        this->gen_const(32U, 0),
-    	        32);
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_SGT,
+    	        this->gen_ext(
+    	            res1_val,
+    	            32, true),
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            32, true)),
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	    res1_val,
+    	    32);
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 67);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3487,20 +3476,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 68: XORI */
-    std::tuple<continuation_e, BasicBlock*> __xori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("XORI");
+    /* instruction 68: AMOMAX.W */
+    std::tuple<continuation_e, BasicBlock*> __amomax_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOMAX.W");
     	
     	this->gen_sync(PRE_SYNC, 68);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "xori"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomax.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3512,14 +3503,32 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateXor(
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_const(32U, imm));
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_SLT,
+    	        this->gen_ext(
+    	            res1_val,
+    	            32, true),
+    	        this->gen_ext(
+    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	            32, true)),
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	    res1_val,
+    	    32);
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 68);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3527,20 +3536,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 69: ORI */
-    std::tuple<continuation_e, BasicBlock*> __ori(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ORI");
+    /* instruction 69: AMOMINU.W */
+    std::tuple<continuation_e, BasicBlock*> __amominu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOMINU.W");
     	
     	this->gen_sync(PRE_SYNC, 69);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "ori"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amominu.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3552,14 +3563,28 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateOr(
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_const(32U, imm));
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_UGT,
+    	        res1_val,
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	    res1_val,
+    	    32);
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 69);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3567,20 +3592,22 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 70: ANDI */
-    std::tuple<continuation_e, BasicBlock*> __andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ANDI");
+    /* instruction 70: AMOMAXU.W */
+    std::tuple<continuation_e, BasicBlock*> __amomaxu_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("AMOMAXU.W");
     	
     	this->gen_sync(PRE_SYNC, 70);
     	
     	uint8_t rd = ((bit_sub<7,5>(instr)));
     	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rl = ((bit_sub<25,1>(instr)));
+    	uint8_t aq = ((bit_sub<26,1>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "andi"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+    	        "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomaxu.w"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3592,14 +3619,28 @@ private:
     	Value* cur_pc_val = this->gen_const(32, pc.val);
     	pc=pc+4;
     	
+    	Value* offs_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	Value* res1_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
     	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAnd(
-    	        this->gen_ext(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            32, true),
-    	        this->gen_const(32U, imm));
+    	    Value* Xtmp0_val = res1_val;
     	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	}
+    	Value* res2_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_ULT,
+    	        res1_val,
+    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0)),
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
+    	    res1_val,
+    	    32);
+    	Value* MEMtmp1_val = res2_val;
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp1_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 70);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3607,20 +3648,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 71: SLLI */
-    std::tuple<continuation_e, BasicBlock*> __slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLLI");
+    /* instruction 71: C.ADDI4SPN */
+    std::tuple<continuation_e, BasicBlock*> __c_addi4spn(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.ADDI4SPN");
     	
     	this->gen_sync(PRE_SYNC, 71);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	uint8_t rd = ((bit_sub<2,3>(instr)));
+    	uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slli"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3630,18 +3670,15 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(shamt > 31){
-    	    this->gen_raise_trap(0, 0);
-    	} else {
-    	    if(rd != 0){
-    	        Value* Xtmp0_val = this->builder.CreateShl(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, shamt));
-    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	    }
+    	if(imm == 0){
+    	    this->gen_raise_trap(0, 2);
     	}
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 71);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3649,20 +3686,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 72: SRLI */
-    std::tuple<continuation_e, BasicBlock*> __srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRLI");
+    /* instruction 72: C.LW */
+    std::tuple<continuation_e, BasicBlock*> __c_lw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.LW");
     	
     	this->gen_sync(PRE_SYNC, 72);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	uint8_t rd = ((bit_sub<2,3>(instr)));
+    	uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srli"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	        "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
+    	    	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3672,18 +3709,16 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(shamt > 31){
-    	    this->gen_raise_trap(0, 0);
-    	} else {
-    	    if(rd != 0){
-    	        Value* Xtmp0_val = this->builder.CreateLShr(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, shamt));
-    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	    }
-    	}
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, uimm));
+    	Value* Xtmp0_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + 8 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 72);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3691,20 +3726,20 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 73: SRAI */
-    std::tuple<continuation_e, BasicBlock*> __srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRAI");
+    /* instruction 73: C.SW */
+    std::tuple<continuation_e, BasicBlock*> __c_sw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SW");
     	
     	this->gen_sync(PRE_SYNC, 73);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t shamt = ((bit_sub<20,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
+    	uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srai"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+    	        "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
+    	    	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3714,18 +3749,16 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(shamt > 31){
-    	    this->gen_raise_trap(0, 0);
-    	} else {
-    	    if(rd != 0){
-    	        Value* Xtmp0_val = this->builder.CreateAShr(
-    	            this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	            this->gen_const(32U, shamt));
-    	        this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	    }
-    	}
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, uimm));
+    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0);
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 73);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3733,20 +3766,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 74: ADD */
-    std::tuple<continuation_e, BasicBlock*> __add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ADD");
+    /* instruction 74: C.ADDI */
+    std::tuple<continuation_e, BasicBlock*> __c_addi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.ADDI");
     	
     	this->gen_sync(PRE_SYNC, 74);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "add"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3756,14 +3788,14 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAdd(
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    this->gen_ext(
     	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 74);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3771,37 +3803,26 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 75: SUB */
-    std::tuple<continuation_e, BasicBlock*> __sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SUB");
+    /* instruction 75: C.NOP */
+    std::tuple<continuation_e, BasicBlock*> __c_nop(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.NOP");
     	
     	this->gen_sync(PRE_SYNC, 75);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sub"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	        this->builder.CreateGlobalStringPtr("c.nop"),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateSub(
-    	         this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	         this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	/* TODO: describe operations for C.NOP ! */
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 75);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3809,20 +3830,18 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 76: SLL */
-    std::tuple<continuation_e, BasicBlock*> __sll(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLL");
+    /* instruction 76: C.JAL */
+    std::tuple<continuation_e, BasicBlock*> __c_jal(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.JAL");
     	
     	this->gen_sync(PRE_SYNC, 76);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sll"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
+    	    	fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3832,39 +3851,38 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateShl(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->builder.CreateAnd(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this->builder.CreateSub(
-    	                 this->gen_const(32U, 32),
-    	                 this->gen_const(32U, 1))));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    cur_pc_val,
+    	    this->gen_const(32U, 2));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
+    	Value* PC_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 76);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 77: SLT */
-    std::tuple<continuation_e, BasicBlock*> __slt(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLT");
+    /* instruction 77: C.LI */
+    std::tuple<continuation_e, BasicBlock*> __c_li(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.LI");
     	
     	this->gen_sync(PRE_SYNC, 77);
     	
+    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
     	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "slt"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3874,23 +3892,13 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_choose(
-    	        this->builder.CreateICmp(
-    	            ICmpInst::ICMP_SLT,
-    	            this->gen_ext(
-    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                32, true),
-    	            this->gen_ext(
-    	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	                32, true)),
-    	        this->gen_const(32U, 1),
-    	        this->gen_const(32U, 0),
-    	        32);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	if(rd == 0){
+    	    this->gen_raise_trap(0, 2);
     	}
+    	Value* Xtmp0_val = this->gen_const(32U, imm);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 77);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3898,20 +3906,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 78: SLTU */
-    std::tuple<continuation_e, BasicBlock*> __sltu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SLTU");
+    /* instruction 78: C.LUI */
+    std::tuple<continuation_e, BasicBlock*> __c_lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.LUI");
     	
     	this->gen_sync(PRE_SYNC, 78);
     	
+    	int32_t imm = signextend<int32_t,18>((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
     	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sltu"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3921,25 +3928,16 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_choose(
-    	        this->builder.CreateICmp(
-    	            ICmpInst::ICMP_ULT,
-    	            this->gen_ext(
-    	                this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	                32,
-    	                false),
-    	            this->gen_ext(
-    	                this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	                32,
-    	                false)),
-    	        this->gen_const(32U, 1),
-    	        this->gen_const(32U, 0),
-    	        32);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
+    	if(rd == 0){
+    	    this->gen_raise_trap(0, 2);
     	}
+    	if(imm == 0){
+    	    this->gen_raise_trap(0, 2);
+    	}
+    	Value* Xtmp0_val = this->gen_const(32U, imm);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 78);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3947,20 +3945,18 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 79: XOR */
-    std::tuple<continuation_e, BasicBlock*> __xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("XOR");
+    /* instruction 79: C.ADDI16SP */
+    std::tuple<continuation_e, BasicBlock*> __c_addi16sp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.ADDI16SP");
     	
     	this->gen_sync(PRE_SYNC, 79);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	int16_t imm = signextend<int16_t,10>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "xor"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
+    	    	fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -3970,14 +3966,14 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateXor(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(2 + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(2 + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 79);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -3985,20 +3981,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 80: SRL */
-    std::tuple<continuation_e, BasicBlock*> __srl(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRL");
+    /* instruction 80: C.SRLI */
+    std::tuple<continuation_e, BasicBlock*> __c_srli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SRLI");
     	
     	this->gen_sync(PRE_SYNC, 80);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t shamt = ((bit_sub<2,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srl"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
+    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4008,18 +4003,13 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateLShr(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->builder.CreateAnd(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this->builder.CreateSub(
-    	                 this->gen_const(32U, 32),
-    	                 this->gen_const(32U, 1))));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	uint8_t rs1_idx_val = rs1 + 8;
+    	Value* Xtmp0_val = this->builder.CreateLShr(
+    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, shamt));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 80);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4027,20 +4017,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 81: SRA */
-    std::tuple<continuation_e, BasicBlock*> __sra(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRA");
+    /* instruction 81: C.SRAI */
+    std::tuple<continuation_e, BasicBlock*> __c_srai(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SRAI");
     	
     	this->gen_sync(PRE_SYNC, 81);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t shamt = ((bit_sub<2,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sra"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
+    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4050,18 +4039,13 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAShr(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->builder.CreateAnd(
-    	            this->gen_reg_load(rs2 + traits<ARCH>::X0, 0),
-    	            this->builder.CreateSub(
-    	                 this->gen_const(32U, 32),
-    	                 this->gen_const(32U, 1))));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	uint8_t rs1_idx_val = rs1 + 8;
+    	Value* Xtmp0_val = this->builder.CreateAShr(
+    	    this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, shamt));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 81);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4069,20 +4053,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 82: OR */
-    std::tuple<continuation_e, BasicBlock*> __or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("OR");
+    /* instruction 82: C.ANDI */
+    std::tuple<continuation_e, BasicBlock*> __c_andi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.ANDI");
     	
     	this->gen_sync(PRE_SYNC, 82);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "or"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
+    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4092,14 +4075,15 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateOr(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	uint8_t rs1_idx_val = rs1 + 8;
+    	Value* Xtmp0_val = this->builder.CreateAnd(
+    	    this->gen_ext(
+    	        this->gen_reg_load(rs1_idx_val + traits<ARCH>::X0, 0),
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 82);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4107,20 +4091,19 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 83: AND */
-    std::tuple<continuation_e, BasicBlock*> __and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("AND");
+    /* instruction 83: C.SUB */
+    std::tuple<continuation_e, BasicBlock*> __c_sub(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SUB");
     	
     	this->gen_sync(PRE_SYNC, 83);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "and"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
+    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4130,14 +4113,13 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->builder.CreateAnd(
-    	        this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
-    	        this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	uint8_t rd_idx_val = rd + 8;
+    	Value* Xtmp0_val = this->builder.CreateSub(
+    	     this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
+    	     this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 83);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4145,38 +4127,35 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 84: FENCE */
-    std::tuple<continuation_e, BasicBlock*> __fence(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("FENCE");
+    /* instruction 84: C.XOR */
+    std::tuple<continuation_e, BasicBlock*> __c_xor(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.XOR");
     	
     	this->gen_sync(PRE_SYNC, 84);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t succ = ((bit_sub<20,4>(instr)));
-    	uint8_t pred = ((bit_sub<24,4>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
+    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("fence"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* FENCEtmp0_val = this->builder.CreateOr(
-    	    this->builder.CreateShl(
-    	        this->gen_const(32U, pred),
-    	        this->gen_const(32U, 4)),
-    	    this->gen_const(32U, succ));
-    	this->gen_write_mem(
-    	    traits<ARCH>::FENCE,
-    	    this->gen_const(64U, 0),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
+    	uint8_t rd_idx_val = rd + 8;
+    	Value* Xtmp0_val = this->builder.CreateXor(
+    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 84);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4184,185 +4163,276 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 85: FENCE_I */
-    std::tuple<continuation_e, BasicBlock*> __fence_i(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("FENCE_I");
+    /* instruction 85: C.OR */
+    std::tuple<continuation_e, BasicBlock*> __c_or(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.OR");
     	
     	this->gen_sync(PRE_SYNC, 85);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint16_t imm = ((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
+    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("fence_i"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* FENCEtmp0_val = this->gen_const(32U, imm);
-    	this->gen_write_mem(
-    	    traits<ARCH>::FENCE,
-    	    this->gen_const(64U, 1),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
-    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+    	uint8_t rd_idx_val = rd + 8;
+    	Value* Xtmp0_val = this->builder.CreateOr(
+    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 85);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(FLUSH, nullptr);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 86: ECALL */
-    std::tuple<continuation_e, BasicBlock*> __ecall(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("ECALL");
+    /* instruction 86: C.AND */
+    std::tuple<continuation_e, BasicBlock*> __c_and(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.AND");
     	
     	this->gen_sync(PRE_SYNC, 86);
     	
+    	uint8_t rs2 = ((bit_sub<2,3>(instr)));
+    	uint8_t rd = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
+    	    	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("ecall"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_raise_trap(0, 11);
+    	uint8_t rd_idx_val = rd + 8;
+    	Value* Xtmp0_val = this->builder.CreateAnd(
+    	    this->gen_reg_load(rd_idx_val + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(rs2 + 8 + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd_idx_val + traits<ARCH>::X0), false);
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 86);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 87: EBREAK */
-    std::tuple<continuation_e, BasicBlock*> __ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("EBREAK");
+    /* instruction 87: C.J */
+    std::tuple<continuation_e, BasicBlock*> __c_j(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.J");
     	
     	this->gen_sync(PRE_SYNC, 87);
     	
+    	int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
+    	    	fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("ebreak"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_raise_trap(0, 3);
+    	Value* PC_val = this->builder.CreateAdd(
+    	    this->gen_ext(
+    	        cur_pc_val,
+    	        32, true),
+    	    this->gen_const(32U, imm));
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 87);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 88: URET */
-    std::tuple<continuation_e, BasicBlock*> __uret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("URET");
+    /* instruction 88: C.BEQZ */
+    std::tuple<continuation_e, BasicBlock*> __c_beqz(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.BEQZ");
     	
     	this->gen_sync(PRE_SYNC, 88);
     	
+    	int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
+    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("uret"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_leave_trap(0);
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_EQ,
+    	        this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
+    	        this->gen_const(32U, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 2)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 88);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 89: SRET */
-    std::tuple<continuation_e, BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SRET");
+    /* instruction 89: C.BNEZ */
+    std::tuple<continuation_e, BasicBlock*> __c_bnez(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.BNEZ");
     	
     	this->gen_sync(PRE_SYNC, 89);
     	
+    	int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+    	uint8_t rs1 = ((bit_sub<7,3>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
+    	    	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("sret"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_leave_trap(1);
+    	Value* PC_val = this->gen_choose(
+    	    this->builder.CreateICmp(
+    	        ICmpInst::ICMP_NE,
+    	        this->gen_reg_load(rs1 + 8 + traits<ARCH>::X0, 0),
+    	        this->gen_const(32U, 0)),
+    	    this->builder.CreateAdd(
+    	        this->gen_ext(
+    	            cur_pc_val,
+    	            32, true),
+    	        this->gen_const(32U, imm)),
+    	    this->builder.CreateAdd(
+    	        cur_pc_val,
+    	        this->gen_const(32U, 2)),
+    	    32);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	Value* is_cont_v = this->builder.CreateICmp(ICmpInst::ICMP_NE, PC_val, this->gen_const(32U, pc.val), "is_cont_v");
+    	this->builder.CreateStore(this->gen_ext(is_cont_v, 32U, false),	get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 89);
     	this->gen_trap_check(this->leave_blk);
     	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 90: MRET */
-    std::tuple<continuation_e, BasicBlock*> __mret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("MRET");
+    /* instruction 90: C.SLLI */
+    std::tuple<continuation_e, BasicBlock*> __c_slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SLLI");
     	
     	this->gen_sync(PRE_SYNC, 90);
     	
+    	uint8_t shamt = ((bit_sub<2,5>(instr)));
+    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
+    	    	fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("mret"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_leave_trap(3);
+    	if(rs1 == 0){
+    	    this->gen_raise_trap(0, 2);
+    	}
+    	Value* Xtmp0_val = this->builder.CreateShl(
+    	    this->gen_reg_load(rs1 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, shamt));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rs1 + traits<ARCH>::X0), false);
+    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 90);
-    	this->gen_trap_check(this->leave_blk);
-    	return std::make_tuple(BRANCH, nullptr);
+    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
+    	this->gen_trap_check(bb);
+    	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 91: WFI */
-    std::tuple<continuation_e, BasicBlock*> __wfi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("WFI");
+    /* instruction 91: C.LWSP */
+    std::tuple<continuation_e, BasicBlock*> __c_lwsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.LWSP");
     	
     	this->gen_sync(PRE_SYNC, 91);
     	
+    	uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("wfi"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	this->gen_wait(1);
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, uimm));
+    	Value* Xtmp0_val = this->gen_ext(
+    	    this->gen_read_mem(traits<ARCH>::MEM, offs_val, 32/8),
+    	    32,
+    	    true);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 91);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4370,37 +4440,32 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 92: SFENCE.VMA */
-    std::tuple<continuation_e, BasicBlock*> __sfence_vma(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("SFENCE.VMA");
+    /* instruction 92: C.MV */
+    std::tuple<continuation_e, BasicBlock*> __c_mv(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.MV");
     	
     	this->gen_sync(PRE_SYNC, 92);
     	
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint8_t rs2 = ((bit_sub<20,5>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
+    	uint8_t rd = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
+    	    auto mnemonic = fmt::format(
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr("sfence.vma"),
+    	        this->builder.CreateGlobalStringPtr(mnemonic),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* FENCEtmp0_val = this->gen_const(32U, rs1);
-    	this->gen_write_mem(
-    	    traits<ARCH>::FENCE,
-    	    this->gen_const(64U, 2),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp0_val,this->get_type(32)));
-    	Value* FENCEtmp1_val = this->gen_const(32U, rs2);
-    	this->gen_write_mem(
-    	    traits<ARCH>::FENCE,
-    	    this->gen_const(64U, 3),
-    	    this->builder.CreateZExtOrTrunc(FENCEtmp1_val,this->get_type(32)));
+    	Value* Xtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 92);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4408,20 +4473,18 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 93: CSRRW */
-    std::tuple<continuation_e, BasicBlock*> __csrrw(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRW");
+    /* instruction 93: C.JR */
+    std::tuple<continuation_e, BasicBlock*> __c_jr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.JR");
     	
     	this->gen_sync(PRE_SYNC, 93);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrw"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
+    	    	fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4431,46 +4494,29 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* rs_val_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	if(rd != 0){
-    	    Value* csr_val_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	    Value* CSRtmp0_val = rs_val_val;
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
-    	    Value* Xtmp1_val = csr_val_val;
-    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	} else {
-    	    Value* CSRtmp2_val = rs_val_val;
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp2_val,this->get_type(32)));
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* PC_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 93);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 94: CSRRS */
-    std::tuple<continuation_e, BasicBlock*> __csrrs(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRS");
+    /* instruction 94: C.ADD */
+    std::tuple<continuation_e, BasicBlock*> __c_add(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.ADD");
     	
     	this->gen_sync(PRE_SYNC, 94);
     	
+    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
     	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrs"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
+    	    	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4480,23 +4526,12 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	if(rd != 0){
-    	    Value* Xtmp0_val = xrd_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	if(rs1 != 0){
-    	    Value* CSRtmp1_val = this->builder.CreateOr(
-    	        xrd_val,
-    	        xrs1_val);
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
-    	}
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(rd + traits<ARCH>::X0, 0),
+    	    this->gen_reg_load(rs2 + traits<ARCH>::X0, 0));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 94);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4504,20 +4539,18 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 95: CSRRC */
-    std::tuple<continuation_e, BasicBlock*> __csrrc(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRC");
+    /* instruction 95: C.JALR */
+    std::tuple<continuation_e, BasicBlock*> __c_jalr(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.JALR");
     	
     	this->gen_sync(PRE_SYNC, 95);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t rs1 = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	uint8_t rs1 = ((bit_sub<7,5>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrc"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+    	        "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
+    	    	fmt::arg("rs1", name(rs1)));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4527,88 +4560,58 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* xrd_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	Value* xrs1_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
-    	if(rd != 0){
-    	    Value* Xtmp0_val = xrd_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	if(rs1 != 0){
-    	    Value* CSRtmp1_val = this->builder.CreateAnd(
-    	        xrd_val,
-    	        this->builder.CreateNot(xrs1_val));
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	Value* Xtmp0_val = this->builder.CreateAdd(
+    	    cur_pc_val,
+    	    this->gen_const(32U, 2));
+    	this->builder.CreateStore(Xtmp0_val, get_reg_ptr(1 + traits<ARCH>::X0), false);
+    	Value* PC_val = this->gen_reg_load(rs1 + traits<ARCH>::X0, 0);
+    	this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
+    	this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
     	this->gen_sync(POST_SYNC, 95);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 96: CSRRWI */
-    std::tuple<continuation_e, BasicBlock*> __csrrwi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRWI");
+    /* instruction 96: C.EBREAK */
+    std::tuple<continuation_e, BasicBlock*> __c_ebreak(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.EBREAK");
     	
     	this->gen_sync(PRE_SYNC, 96);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t zimm = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrwi"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	        this->builder.CreateGlobalStringPtr("c.ebreak"),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	if(rd != 0){
-    	    Value* Xtmp0_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	Value* CSRtmp1_val = this->gen_ext(
-    	    this->gen_const(32U, zimm),
-    	    32,
-    	    false);
-    	this->gen_write_mem(
-    	    traits<ARCH>::CSR,
-    	    this->gen_const(16U, csr),
-    	    this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_raise_trap(0, 3);
     	this->gen_sync(POST_SYNC, 96);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
-    /* instruction 97: CSRRSI */
-    std::tuple<continuation_e, BasicBlock*> __csrrsi(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRSI");
+    /* instruction 97: C.SWSP */
+    std::tuple<continuation_e, BasicBlock*> __c_swsp(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("C.SWSP");
     	
     	this->gen_sync(PRE_SYNC, 97);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t zimm = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
+    	uint8_t rs2 = ((bit_sub<2,5>(instr)));
+    	uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
     	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrsi"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+    	        "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
+    	    	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
@@ -4618,25 +4621,16 @@ private:
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	if(zimm != 0){
-    	    Value* CSRtmp0_val = this->builder.CreateOr(
-    	        res_val,
-    	        this->gen_ext(
-    	            this->gen_const(32U, zimm),
-    	            32,
-    	            false));
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp0_val,this->get_type(32)));
-    	}
-    	if(rd != 0){
-    	    Value* Xtmp1_val = res_val;
-    	    this->builder.CreateStore(Xtmp1_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
+    	Value* offs_val = this->builder.CreateAdd(
+    	    this->gen_reg_load(2 + traits<ARCH>::X0, 0),
+    	    this->gen_const(32U, uimm));
+    	Value* MEMtmp0_val = this->gen_reg_load(rs2 + traits<ARCH>::X0, 0);
+    	this->gen_write_mem(
+    	    traits<ARCH>::MEM,
+    	    offs_val,
+    	    this->builder.CreateZExtOrTrunc(MEMtmp0_val,this->get_type(32)));
     	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
     	this->gen_sync(POST_SYNC, 97);
     	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
@@ -4644,53 +4638,29 @@ private:
     	return std::make_tuple(CONT, bb);
     }
     
-    /* instruction 98: CSRRCI */
-    std::tuple<continuation_e, BasicBlock*> __csrrci(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-    	bb->setName("CSRRCI");
+    /* instruction 98: DII */
+    std::tuple<continuation_e, BasicBlock*> __dii(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    	bb->setName("DII");
     	
     	this->gen_sync(PRE_SYNC, 98);
     	
-    	uint8_t rd = ((bit_sub<7,5>(instr)));
-    	uint8_t zimm = ((bit_sub<15,5>(instr)));
-    	uint16_t csr = ((bit_sub<20,12>(instr)));
     	if(this->disass_enabled){
     	    /* generate console output when executing the command */
-    	    auto mnemonic = fmt::format(
-    	        "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrci"),
-    	    	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
     	    std::vector<Value*> args {
     	        this->core_ptr,
     	        this->gen_const(64, pc.val),
-    	        this->builder.CreateGlobalStringPtr(mnemonic),
+    	        this->builder.CreateGlobalStringPtr("dii"),
     	    };
     	    this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
     	}
     	
     	Value* cur_pc_val = this->gen_const(32, pc.val);
-    	pc=pc+4;
+    	pc=pc+2;
     	
-    	Value* res_val = this->gen_read_mem(traits<ARCH>::CSR, this->gen_const(16U, csr), 32/8);
-    	if(rd != 0){
-    	    Value* Xtmp0_val = res_val;
-    	    this->builder.CreateStore(Xtmp0_val, get_reg_ptr(rd + traits<ARCH>::X0), false);
-    	}
-    	if(zimm != 0){
-    	    Value* CSRtmp1_val = this->builder.CreateAnd(
-    	        res_val,
-    	        this->builder.CreateNot(this->gen_ext(
-    	            this->gen_const(32U, zimm),
-    	            32,
-    	            false)));
-    	    this->gen_write_mem(
-    	        traits<ARCH>::CSR,
-    	        this->gen_const(16U, csr),
-    	        this->builder.CreateZExtOrTrunc(CSRtmp1_val,this->get_type(32)));
-    	}
-    	this->gen_set_pc(pc, traits<ARCH>::NEXT_PC);
+    	this->gen_raise_trap(0, 2);
     	this->gen_sync(POST_SYNC, 98);
-    	bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk); /* create next BasicBlock in chain */
-    	this->gen_trap_check(bb);
-    	return std::make_tuple(CONT, bb);
+    	this->gen_trap_check(this->leave_blk);
+    	return std::make_tuple(BRANCH, nullptr);
     }
     
     /****************************************************************************
@@ -4815,5 +4785,5 @@ std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned sho
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
-
+} // namespace llvm
 } // namespace iss

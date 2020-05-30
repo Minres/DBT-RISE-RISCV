@@ -17,7 +17,7 @@ Core MNRV32 provides RV32I, RV32IC {
         PGMASK := 0xfff; //PGSIZE-1
     }
 }
-/*
+
 Core RV32IMAC provides RV32I, RV32M, RV32A, RV32IC {
     constants {
         XLEN:=32;
@@ -67,4 +67,4 @@ Core RV64GC provides RV64I, RV64M, RV64A, RV64F, RV64D, RV64IC, RV32FC, RV32DC {
         PGMASK := 0xfff; //PGSIZE-1
     }
 }
-*/
+

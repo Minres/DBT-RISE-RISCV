@@ -35,8 +35,9 @@
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
-#include <iss/llvm/vm_base.h>
+#include <iss/tcc/vm_base.h>
 #include <util/logging.h>
+#include <sstream>
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -47,25 +48,19 @@
 #include <iss/debugger/riscv_target_adapter.h>
 
 namespace iss {
-namespace vm {
-namespace fp_impl {
-void add_fp_functions_2_module(llvm::Module *, unsigned, unsigned);
-}
-}
-
 namespace tcc {
 namespace rv64gc {
 using namespace iss::arch;
 using namespace iss::debugger;
-using namespace iss::vm::llvm;
 
-template <typename ARCH> class vm_impl : public vm_base<ARCH> {
+template <typename ARCH> class vm_impl : public iss::tcc::vm_base<ARCH> {
 public:
-    using super = typename iss::vm::llvm::vm_base<ARCH>;
+    using super       = typename iss::tcc::vm_base<ARCH>;
     using virt_addr_t = typename super::virt_addr_t;
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
-    using addr_t = typename super::addr_t;
+    using addr_t      = typename super::addr_t;
+    using tu_builder  = typename super::tu_builder;
 
     vm_impl();
 
@@ -85,45 +80,43 @@ protected:
 
     using this_class = vm_impl<ARCH>;
     using compile_ret_t = std::tuple<continuation_e>;
-    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, std::ostringstream&);
+    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, tu_builder&);
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
 
-    template <typename T> inline ConstantInt *size(T type) {
-        return ConstantInt::get(getContext(), APInt(32, type->getType()->getScalarSizeInBits()));
-    }
-
-    void setup_module(Module* m) override {
+    void setup_module(std::string m) override {
         super::setup_module(m);
-        iss::vm::fp_impl::add_fp_functions_2_module(m, traits<ARCH>::FP_REGS_SIZE, traits<ARCH>::XLEN);
     }
 
-    inline Value *gen_choose(Value *cond, Value *trueVal, Value *falseVal, unsigned size) {
-        return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
+    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, tu_builder&) override;
+
+    void gen_trap_behavior(tu_builder& tu) override;
+
+    void gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause);
+
+    void gen_leave_trap(tu_builder& tu, unsigned lvl);
+
+    void gen_wait(tu_builder& tu, unsigned type);
+
+    inline void gen_trap_check(tu_builder& tu) {
+        tu("if(*trap_state!=0) goto trap_entry;");
     }
 
-    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, std::ostringstream&) override;
-
-    void gen_leave_behavior(BasicBlock *leave_blk) override;
-
-    void gen_raise_trap(uint16_t trap_id, uint16_t cause);
-
-    void gen_leave_trap(unsigned lvl);
-
-    void gen_wait(unsigned type);
-
-    void gen_trap_behavior(BasicBlock *) override;
-
-    void gen_trap_check(BasicBlock *bb);
-
-    inline Value *gen_reg_load(unsigned i, unsigned level = 0) {
-        return this->builder.CreateLoad(get_reg_ptr(i), false);
-    }
-
-    inline void gen_set_pc(virt_addr_t pc, unsigned reg_num) {
-        Value *next_pc_v = this->builder.CreateSExtOrTrunc(this->gen_const(traits<ARCH>::XLEN, pc.val),
-                                                           this->get_type(traits<ARCH>::XLEN));
-        this->builder.CreateStore(next_pc_v, get_reg_ptr(reg_num), true);
+    inline void gen_set_pc(tu_builder& tu, virt_addr_t pc, unsigned reg_num) {
+        switch(reg_num){
+        case traits<ARCH>::NEXT_PC:
+            tu("*next_pc = {:#x};", pc.val);
+            break;
+        case traits<ARCH>::PC:
+            tu("*pc = {:#x};", pc.val);
+            break;
+        default:
+            if(!tu.defined_regs[reg_num]){
+                tu("reg_t* reg{:02d} = (reg_t*){:#x};", reg_num, reinterpret_cast<uintptr_t>(get_reg_ptr(reg_num)));
+            tu.defined_regs[reg_num]=true;
+            }
+            tu("*reg{:02d} = {:#x};", reg_num, pc.val);
+        }
     }
 
     // some compile time constants
@@ -137,9 +130,9 @@ protected:
     std::array<compile_func, LUT_SIZE_C> lut_00, lut_01, lut_10;
     std::array<compile_func, LUT_SIZE> lut_11;
 
-	std::array<compile_func *, 4> qlut;
+    std::array<compile_func *, 4> qlut;
 
-	std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
+    std::array<const uint32_t, 4> lutmasks = {{EXTR_MASK16, EXTR_MASK16, EXTR_MASK16, EXTR_MASK32}};
 
     void expand_bit_mask(int pos, uint32_t mask, uint32_t value, uint32_t valid, uint32_t idx, compile_func lut[],
                          compile_func f) {
@@ -191,94 +184,264 @@ private:
 
     const std::array<InstructionDesriptor, 204> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
+        /* instruction LUI */
+        {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
+        /* instruction AUIPC */
+        {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
+        /* instruction JAL */
+        {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
         /* instruction JALR */
         {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
-        /* instruction C.ADDI4SPN */
-        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
-        /* instruction C.LW */
-        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
-        /* instruction C.SW */
-        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
-        /* instruction C.ADDI */
-        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
-        /* instruction C.NOP */
-        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
-        /* instruction C.JAL */
-        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
-        /* instruction C.LI */
-        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
-        /* instruction C.LUI */
-        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
-        /* instruction C.ADDI16SP */
-        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
-        /* instruction C.SRLI */
-        {16, 0b1000000000000001, 0b1110110000000011, &this_class::__c_srli},
-        /* instruction C.SRAI */
-        {16, 0b1000010000000001, 0b1110110000000011, &this_class::__c_srai},
-        /* instruction C.ANDI */
-        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
-        /* instruction C.SUB */
-        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
-        /* instruction C.XOR */
-        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
-        /* instruction C.OR */
-        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
-        /* instruction C.AND */
-        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
-        /* instruction C.J */
-        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
-        /* instruction C.BEQZ */
-        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
-        /* instruction C.BNEZ */
-        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
-        /* instruction C.SLLI */
-        {16, 0b0000000000000010, 0b1110000000000011, &this_class::__c_slli},
-        /* instruction C.LWSP */
-        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
-        /* instruction C.MV */
-        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
-        /* instruction C.JR */
-        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
-        /* instruction C.ADD */
-        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
-        /* instruction C.JALR */
-        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
-        /* instruction C.EBREAK */
-        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
-        /* instruction C.SWSP */
-        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
-        /* instruction DII */
-        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
-        /* instruction C.FLD */
-        {16, 0b0010000000000000, 0b1110000000000011, &this_class::__c_fld},
-        /* instruction C.FSD */
-        {16, 0b1010000000000000, 0b1110000000000011, &this_class::__c_fsd},
-        /* instruction C.FLDSP */
-        {16, 0b0010000000000010, 0b1110000000000011, &this_class::__c_fldsp},
-        /* instruction C.FSDSP */
-        {16, 0b1010000000000010, 0b1110000000000011, &this_class::__c_fsdsp},
-        /* instruction C.FLW */
-        {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c_flw},
-        /* instruction C.FSW */
-        {16, 0b1110000000000000, 0b1110000000000011, &this_class::__c_fsw},
-        /* instruction C.FLWSP */
-        {16, 0b0110000000000010, 0b1110000000000011, &this_class::__c_flwsp},
-        /* instruction C.FSWSP */
-        {16, 0b1110000000000010, 0b1110000000000011, &this_class::__c_fswsp},
-        /* instruction C.LD */
-        {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c_ld},
-        /* instruction C.SD */
-        {16, 0b1110000000000000, 0b1110000000000011, &this_class::__c_sd},
-        /* instruction C.SUBW */
-        {16, 0b1001110000000001, 0b1111110001100011, &this_class::__c_subw},
-        /* instruction C.ADDW */
-        {16, 0b1001110000100001, 0b1111110001100011, &this_class::__c_addw},
-        /* instruction C.ADDIW */
-        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_addiw},
-        /* instruction C.LDSP */
-        {16, 0b0110000000000010, 0b1110000000000011, &this_class::__c_ldsp},
-        /* instruction C.SDSP */
-        {16, 0b1110000000000010, 0b1110000000000011, &this_class::__c_sdsp},
+        /* instruction BEQ */
+        {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
+        /* instruction BNE */
+        {32, 0b00000000000000000001000001100011, 0b00000000000000000111000001111111, &this_class::__bne},
+        /* instruction BLT */
+        {32, 0b00000000000000000100000001100011, 0b00000000000000000111000001111111, &this_class::__blt},
+        /* instruction BGE */
+        {32, 0b00000000000000000101000001100011, 0b00000000000000000111000001111111, &this_class::__bge},
+        /* instruction BLTU */
+        {32, 0b00000000000000000110000001100011, 0b00000000000000000111000001111111, &this_class::__bltu},
+        /* instruction BGEU */
+        {32, 0b00000000000000000111000001100011, 0b00000000000000000111000001111111, &this_class::__bgeu},
+        /* instruction LB */
+        {32, 0b00000000000000000000000000000011, 0b00000000000000000111000001111111, &this_class::__lb},
+        /* instruction LH */
+        {32, 0b00000000000000000001000000000011, 0b00000000000000000111000001111111, &this_class::__lh},
+        /* instruction LW */
+        {32, 0b00000000000000000010000000000011, 0b00000000000000000111000001111111, &this_class::__lw},
+        /* instruction LBU */
+        {32, 0b00000000000000000100000000000011, 0b00000000000000000111000001111111, &this_class::__lbu},
+        /* instruction LHU */
+        {32, 0b00000000000000000101000000000011, 0b00000000000000000111000001111111, &this_class::__lhu},
+        /* instruction SB */
+        {32, 0b00000000000000000000000000100011, 0b00000000000000000111000001111111, &this_class::__sb},
+        /* instruction SH */
+        {32, 0b00000000000000000001000000100011, 0b00000000000000000111000001111111, &this_class::__sh},
+        /* instruction SW */
+        {32, 0b00000000000000000010000000100011, 0b00000000000000000111000001111111, &this_class::__sw},
+        /* instruction ADDI */
+        {32, 0b00000000000000000000000000010011, 0b00000000000000000111000001111111, &this_class::__addi},
+        /* instruction SLTI */
+        {32, 0b00000000000000000010000000010011, 0b00000000000000000111000001111111, &this_class::__slti},
+        /* instruction SLTIU */
+        {32, 0b00000000000000000011000000010011, 0b00000000000000000111000001111111, &this_class::__sltiu},
+        /* instruction XORI */
+        {32, 0b00000000000000000100000000010011, 0b00000000000000000111000001111111, &this_class::__xori},
+        /* instruction ORI */
+        {32, 0b00000000000000000110000000010011, 0b00000000000000000111000001111111, &this_class::__ori},
+        /* instruction ANDI */
+        {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
+        /* instruction SLLI */
+        {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
+        /* instruction SRLI */
+        {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
+        /* instruction SRAI */
+        {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
+        /* instruction ADD */
+        {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
+        /* instruction SUB */
+        {32, 0b01000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__sub},
+        /* instruction SLL */
+        {32, 0b00000000000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__sll},
+        /* instruction SLT */
+        {32, 0b00000000000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__slt},
+        /* instruction SLTU */
+        {32, 0b00000000000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__sltu},
+        /* instruction XOR */
+        {32, 0b00000000000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__xor},
+        /* instruction SRL */
+        {32, 0b00000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__srl},
+        /* instruction SRA */
+        {32, 0b01000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__sra},
+        /* instruction OR */
+        {32, 0b00000000000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__or},
+        /* instruction AND */
+        {32, 0b00000000000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__and},
+        /* instruction FENCE */
+        {32, 0b00000000000000000000000000001111, 0b11110000000000000111000001111111, &this_class::__fence},
+        /* instruction FENCE_I */
+        {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
+        /* instruction ECALL */
+        {32, 0b00000000000000000000000001110011, 0b11111111111111111111111111111111, &this_class::__ecall},
+        /* instruction EBREAK */
+        {32, 0b00000000000100000000000001110011, 0b11111111111111111111111111111111, &this_class::__ebreak},
+        /* instruction URET */
+        {32, 0b00000000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__uret},
+        /* instruction SRET */
+        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
+        /* instruction MRET */
+        {32, 0b00110000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__mret},
+        /* instruction WFI */
+        {32, 0b00010000010100000000000001110011, 0b11111111111111111111111111111111, &this_class::__wfi},
+        /* instruction SFENCE.VMA */
+        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence_vma},
+        /* instruction CSRRW */
+        {32, 0b00000000000000000001000001110011, 0b00000000000000000111000001111111, &this_class::__csrrw},
+        /* instruction CSRRS */
+        {32, 0b00000000000000000010000001110011, 0b00000000000000000111000001111111, &this_class::__csrrs},
+        /* instruction CSRRC */
+        {32, 0b00000000000000000011000001110011, 0b00000000000000000111000001111111, &this_class::__csrrc},
+        /* instruction CSRRWI */
+        {32, 0b00000000000000000101000001110011, 0b00000000000000000111000001111111, &this_class::__csrrwi},
+        /* instruction CSRRSI */
+        {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
+        /* instruction CSRRCI */
+        {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
+        /* instruction LWU */
+        {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
+        /* instruction LD */
+        {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
+        /* instruction SD */
+        {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
+        /* instruction ADDIW */
+        {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
+        /* instruction SLLIW */
+        {32, 0b00000000000000000001000000011011, 0b11111110000000000111000001111111, &this_class::__slliw},
+        /* instruction SRLIW */
+        {32, 0b00000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__srliw},
+        /* instruction SRAIW */
+        {32, 0b01000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__sraiw},
+        /* instruction ADDW */
+        {32, 0b00000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__addw},
+        /* instruction SUBW */
+        {32, 0b01000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__subw},
+        /* instruction SLLW */
+        {32, 0b00000000000000000001000000111011, 0b11111110000000000111000001111111, &this_class::__sllw},
+        /* instruction SRLW */
+        {32, 0b00000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__srlw},
+        /* instruction SRAW */
+        {32, 0b01000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__sraw},
+        /* instruction MUL */
+        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
+        /* instruction MULH */
+        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
+        /* instruction MULHSU */
+        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
+        /* instruction MULHU */
+        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
+        /* instruction DIV */
+        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
+        /* instruction DIVU */
+        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
+        /* instruction REM */
+        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
+        /* instruction REMU */
+        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
+        /* instruction MULW */
+        {32, 0b00000010000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__mulw},
+        /* instruction DIVW */
+        {32, 0b00000010000000000100000000111011, 0b11111110000000000111000001111111, &this_class::__divw},
+        /* instruction DIVUW */
+        {32, 0b00000010000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__divuw},
+        /* instruction REMW */
+        {32, 0b00000010000000000110000000111011, 0b11111110000000000111000001111111, &this_class::__remw},
+        /* instruction REMUW */
+        {32, 0b00000010000000000111000000111011, 0b11111110000000000111000001111111, &this_class::__remuw},
+        /* instruction LR.W */
+        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
+        /* instruction SC.W */
+        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
+        /* instruction AMOSWAP.W */
+        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
+        /* instruction AMOADD.W */
+        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
+        /* instruction AMOXOR.W */
+        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
+        /* instruction AMOAND.W */
+        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
+        /* instruction AMOOR.W */
+        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
+        /* instruction AMOMIN.W */
+        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
+        /* instruction AMOMAX.W */
+        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
+        /* instruction AMOMINU.W */
+        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
+        /* instruction AMOMAXU.W */
+        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
+        /* instruction LR.D */
+        {32, 0b00010000000000000011000000101111, 0b11111001111100000111000001111111, &this_class::__lr_d},
+        /* instruction SC.D */
+        {32, 0b00011000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__sc_d},
+        /* instruction AMOSWAP.D */
+        {32, 0b00001000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_d},
+        /* instruction AMOADD.D */
+        {32, 0b00000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_d},
+        /* instruction AMOXOR.D */
+        {32, 0b00100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_d},
+        /* instruction AMOAND.D */
+        {32, 0b01100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_d},
+        /* instruction AMOOR.D */
+        {32, 0b01000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_d},
+        /* instruction AMOMIN.D */
+        {32, 0b10000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_d},
+        /* instruction AMOMAX.D */
+        {32, 0b10100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_d},
+        /* instruction AMOMINU.D */
+        {32, 0b11000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_d},
+        /* instruction AMOMAXU.D */
+        {32, 0b11100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_d},
+        /* instruction FLW */
+        {32, 0b00000000000000000010000000000111, 0b00000000000000000111000001111111, &this_class::__flw},
+        /* instruction FSW */
+        {32, 0b00000000000000000010000000100111, 0b00000000000000000111000001111111, &this_class::__fsw},
+        /* instruction FMADD.S */
+        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd_s},
+        /* instruction FMSUB.S */
+        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub_s},
+        /* instruction FNMADD.S */
+        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd_s},
+        /* instruction FNMSUB.S */
+        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub_s},
+        /* instruction FADD.S */
+        {32, 0b00000000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd_s},
+        /* instruction FSUB.S */
+        {32, 0b00001000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub_s},
+        /* instruction FMUL.S */
+        {32, 0b00010000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul_s},
+        /* instruction FDIV.S */
+        {32, 0b00011000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv_s},
+        /* instruction FSQRT.S */
+        {32, 0b01011000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt_s},
+        /* instruction FSGNJ.S */
+        {32, 0b00100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj_s},
+        /* instruction FSGNJN.S */
+        {32, 0b00100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn_s},
+        /* instruction FSGNJX.S */
+        {32, 0b00100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx_s},
+        /* instruction FMIN.S */
+        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin_s},
+        /* instruction FMAX.S */
+        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax_s},
+        /* instruction FCVT.W.S */
+        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_w_s},
+        /* instruction FCVT.WU.S */
+        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_wu_s},
+        /* instruction FEQ.S */
+        {32, 0b10100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq_s},
+        /* instruction FLT.S */
+        {32, 0b10100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt_s},
+        /* instruction FLE.S */
+        {32, 0b10100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle_s},
+        /* instruction FCLASS.S */
+        {32, 0b11100000000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass_s},
+        /* instruction FCVT.S.W */
+        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_w},
+        /* instruction FCVT.S.WU */
+        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_wu},
+        /* instruction FMV.X.W */
+        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_x_w},
+        /* instruction FMV.W.X */
+        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_w_x},
+        /* instruction FCVT.L.S */
+        {32, 0b11000000001000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_l_s},
+        /* instruction FCVT.LU.S */
+        {32, 0b11000000001100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_lu_s},
+        /* instruction FCVT.S.L */
+        {32, 0b11010000001000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_l},
+        /* instruction FCVT.S.LU */
+        {32, 0b11010000001100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_lu},
         /* instruction FLD */
         {32, 0b00000000000000000011000000000111, 0b00000000000000000111000001111111, &this_class::__fld},
         /* instruction FSD */
@@ -343,1096 +506,8877 @@ private:
         {32, 0b11100010000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_x_d},
         /* instruction FMV.D.X */
         {32, 0b11110010000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_d_x},
-        /* instruction LUI */
-        {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
-        /* instruction AUIPC */
-        {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
-        /* instruction JAL */
-        {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
-        /* instruction BEQ */
-        {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
-        /* instruction BNE */
-        {32, 0b00000000000000000001000001100011, 0b00000000000000000111000001111111, &this_class::__bne},
-        /* instruction BLT */
-        {32, 0b00000000000000000100000001100011, 0b00000000000000000111000001111111, &this_class::__blt},
-        /* instruction BGE */
-        {32, 0b00000000000000000101000001100011, 0b00000000000000000111000001111111, &this_class::__bge},
-        /* instruction BLTU */
-        {32, 0b00000000000000000110000001100011, 0b00000000000000000111000001111111, &this_class::__bltu},
-        /* instruction BGEU */
-        {32, 0b00000000000000000111000001100011, 0b00000000000000000111000001111111, &this_class::__bgeu},
-        /* instruction LB */
-        {32, 0b00000000000000000000000000000011, 0b00000000000000000111000001111111, &this_class::__lb},
-        /* instruction LH */
-        {32, 0b00000000000000000001000000000011, 0b00000000000000000111000001111111, &this_class::__lh},
-        /* instruction LW */
-        {32, 0b00000000000000000010000000000011, 0b00000000000000000111000001111111, &this_class::__lw},
-        /* instruction LBU */
-        {32, 0b00000000000000000100000000000011, 0b00000000000000000111000001111111, &this_class::__lbu},
-        /* instruction LHU */
-        {32, 0b00000000000000000101000000000011, 0b00000000000000000111000001111111, &this_class::__lhu},
-        /* instruction SB */
-        {32, 0b00000000000000000000000000100011, 0b00000000000000000111000001111111, &this_class::__sb},
-        /* instruction SH */
-        {32, 0b00000000000000000001000000100011, 0b00000000000000000111000001111111, &this_class::__sh},
-        /* instruction SW */
-        {32, 0b00000000000000000010000000100011, 0b00000000000000000111000001111111, &this_class::__sw},
-        /* instruction ADDI */
-        {32, 0b00000000000000000000000000010011, 0b00000000000000000111000001111111, &this_class::__addi},
-        /* instruction SLTI */
-        {32, 0b00000000000000000010000000010011, 0b00000000000000000111000001111111, &this_class::__slti},
-        /* instruction SLTIU */
-        {32, 0b00000000000000000011000000010011, 0b00000000000000000111000001111111, &this_class::__sltiu},
-        /* instruction XORI */
-        {32, 0b00000000000000000100000000010011, 0b00000000000000000111000001111111, &this_class::__xori},
-        /* instruction ORI */
-        {32, 0b00000000000000000110000000010011, 0b00000000000000000111000001111111, &this_class::__ori},
-        /* instruction ANDI */
-        {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
-        /* instruction SLLI */
-        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
-        /* instruction SRLI */
-        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
-        /* instruction SRAI */
-        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
-        /* instruction ADD */
-        {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
-        /* instruction SUB */
-        {32, 0b01000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__sub},
-        /* instruction SLL */
-        {32, 0b00000000000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__sll},
-        /* instruction SLT */
-        {32, 0b00000000000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__slt},
-        /* instruction SLTU */
-        {32, 0b00000000000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__sltu},
-        /* instruction XOR */
-        {32, 0b00000000000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__xor},
-        /* instruction SRL */
-        {32, 0b00000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__srl},
-        /* instruction SRA */
-        {32, 0b01000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__sra},
-        /* instruction OR */
-        {32, 0b00000000000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__or},
-        /* instruction AND */
-        {32, 0b00000000000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__and},
-        /* instruction FENCE */
-        {32, 0b00000000000000000000000000001111, 0b11110000000000000111000001111111, &this_class::__fence},
-        /* instruction FENCE_I */
-        {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
-        /* instruction ECALL */
-        {32, 0b00000000000000000000000001110011, 0b11111111111111111111111111111111, &this_class::__ecall},
-        /* instruction EBREAK */
-        {32, 0b00000000000100000000000001110011, 0b11111111111111111111111111111111, &this_class::__ebreak},
-        /* instruction URET */
-        {32, 0b00000000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__uret},
-        /* instruction SRET */
-        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
-        /* instruction MRET */
-        {32, 0b00110000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__mret},
-        /* instruction WFI */
-        {32, 0b00010000010100000000000001110011, 0b11111111111111111111111111111111, &this_class::__wfi},
-        /* instruction SFENCE.VMA */
-        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence_vma},
-        /* instruction CSRRW */
-        {32, 0b00000000000000000001000001110011, 0b00000000000000000111000001111111, &this_class::__csrrw},
-        /* instruction CSRRS */
-        {32, 0b00000000000000000010000001110011, 0b00000000000000000111000001111111, &this_class::__csrrs},
-        /* instruction CSRRC */
-        {32, 0b00000000000000000011000001110011, 0b00000000000000000111000001111111, &this_class::__csrrc},
-        /* instruction CSRRWI */
-        {32, 0b00000000000000000101000001110011, 0b00000000000000000111000001111111, &this_class::__csrrwi},
-        /* instruction CSRRSI */
-        {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
-        /* instruction CSRRCI */
-        {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
-        /* instruction FLW */
-        {32, 0b00000000000000000010000000000111, 0b00000000000000000111000001111111, &this_class::__flw},
-        /* instruction FSW */
-        {32, 0b00000000000000000010000000100111, 0b00000000000000000111000001111111, &this_class::__fsw},
-        /* instruction FMADD.S */
-        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd_s},
-        /* instruction FMSUB.S */
-        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub_s},
-        /* instruction FNMADD.S */
-        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd_s},
-        /* instruction FNMSUB.S */
-        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub_s},
-        /* instruction FADD.S */
-        {32, 0b00000000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd_s},
-        /* instruction FSUB.S */
-        {32, 0b00001000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub_s},
-        /* instruction FMUL.S */
-        {32, 0b00010000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul_s},
-        /* instruction FDIV.S */
-        {32, 0b00011000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv_s},
-        /* instruction FSQRT.S */
-        {32, 0b01011000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt_s},
-        /* instruction FSGNJ.S */
-        {32, 0b00100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj_s},
-        /* instruction FSGNJN.S */
-        {32, 0b00100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn_s},
-        /* instruction FSGNJX.S */
-        {32, 0b00100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx_s},
-        /* instruction FMIN.S */
-        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin_s},
-        /* instruction FMAX.S */
-        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax_s},
-        /* instruction FCVT.W.S */
-        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_w_s},
-        /* instruction FCVT.WU.S */
-        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_wu_s},
-        /* instruction FEQ.S */
-        {32, 0b10100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq_s},
-        /* instruction FLT.S */
-        {32, 0b10100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt_s},
-        /* instruction FLE.S */
-        {32, 0b10100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle_s},
-        /* instruction FCLASS.S */
-        {32, 0b11100000000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass_s},
-        /* instruction FCVT.S.W */
-        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_w},
-        /* instruction FCVT.S.WU */
-        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_wu},
-        /* instruction FMV.X.W */
-        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_x_w},
-        /* instruction FMV.W.X */
-        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv_w_x},
-        /* instruction FCVT.L.S */
-        {32, 0b11000000001000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_l_s},
-        /* instruction FCVT.LU.S */
-        {32, 0b11000000001100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_lu_s},
-        /* instruction FCVT.S.L */
-        {32, 0b11010000001000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_l},
-        /* instruction FCVT.S.LU */
-        {32, 0b11010000001100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_lu},
-        /* instruction LR.W */
-        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
-        /* instruction SC.W */
-        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
-        /* instruction AMOSWAP.W */
-        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
-        /* instruction AMOADD.W */
-        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
-        /* instruction AMOXOR.W */
-        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
-        /* instruction AMOAND.W */
-        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
-        /* instruction AMOOR.W */
-        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
-        /* instruction AMOMIN.W */
-        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
-        /* instruction AMOMAX.W */
-        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
-        /* instruction AMOMINU.W */
-        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
-        /* instruction AMOMAXU.W */
-        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
-        /* instruction LR.D */
-        {32, 0b00010000000000000011000000101111, 0b11111001111100000111000001111111, &this_class::__lr_d},
-        /* instruction SC.D */
-        {32, 0b00011000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__sc_d},
-        /* instruction AMOSWAP.D */
-        {32, 0b00001000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_d},
-        /* instruction AMOADD.D */
-        {32, 0b00000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_d},
-        /* instruction AMOXOR.D */
-        {32, 0b00100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_d},
-        /* instruction AMOAND.D */
-        {32, 0b01100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_d},
-        /* instruction AMOOR.D */
-        {32, 0b01000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_d},
-        /* instruction AMOMIN.D */
-        {32, 0b10000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_d},
-        /* instruction AMOMAX.D */
-        {32, 0b10100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_d},
-        /* instruction AMOMINU.D */
-        {32, 0b11000000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_d},
-        /* instruction AMOMAXU.D */
-        {32, 0b11100000000000000011000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_d},
-        /* instruction MUL */
-        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
-        /* instruction MULH */
-        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
-        /* instruction MULHSU */
-        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
-        /* instruction MULHU */
-        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
-        /* instruction DIV */
-        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
-        /* instruction DIVU */
-        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
-        /* instruction REM */
-        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
-        /* instruction REMU */
-        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
-        /* instruction MULW */
-        {32, 0b00000010000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__mulw},
-        /* instruction DIVW */
-        {32, 0b00000010000000000100000000111011, 0b11111110000000000111000001111111, &this_class::__divw},
-        /* instruction DIVUW */
-        {32, 0b00000010000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__divuw},
-        /* instruction REMW */
-        {32, 0b00000010000000000110000000111011, 0b11111110000000000111000001111111, &this_class::__remw},
-        /* instruction REMUW */
-        {32, 0b00000010000000000111000000111011, 0b11111110000000000111000001111111, &this_class::__remuw},
-        /* instruction LWU */
-        {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
-        /* instruction LD */
-        {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
-        /* instruction SD */
-        {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
-        /* instruction ADDIW */
-        {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
-        /* instruction SLLIW */
-        {32, 0b00000000000000000001000000011011, 0b11111110000000000111000001111111, &this_class::__slliw},
-        /* instruction SRLIW */
-        {32, 0b00000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__srliw},
-        /* instruction SRAIW */
-        {32, 0b01000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__sraiw},
-        /* instruction ADDW */
-        {32, 0b00000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__addw},
-        /* instruction SUBW */
-        {32, 0b01000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__subw},
-        /* instruction SLLW */
-        {32, 0b00000000000000000001000000111011, 0b11111110000000000111000001111111, &this_class::__sllw},
-        /* instruction SRLW */
-        {32, 0b00000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__srlw},
-        /* instruction SRAW */
-        {32, 0b01000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__sraw},
+        /* instruction C.ADDI4SPN */
+        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
+        /* instruction C.LW */
+        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
+        /* instruction C.SW */
+        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
+        /* instruction C.ADDI */
+        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
+        /* instruction C.NOP */
+        {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
+        /* instruction C.JAL */
+        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
+        /* instruction C.LI */
+        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
+        /* instruction C.LUI */
+        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
+        /* instruction C.ADDI16SP */
+        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
+        /* instruction C.SRLI */
+        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
+        /* instruction C.SRAI */
+        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
+        /* instruction C.ANDI */
+        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
+        /* instruction C.SUB */
+        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
+        /* instruction C.XOR */
+        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
+        /* instruction C.OR */
+        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
+        /* instruction C.AND */
+        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
+        /* instruction C.J */
+        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
+        /* instruction C.BEQZ */
+        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
+        /* instruction C.BNEZ */
+        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
+        /* instruction C.SLLI */
+        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
+        /* instruction C.LWSP */
+        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
+        /* instruction C.MV */
+        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
+        /* instruction C.JR */
+        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
+        /* instruction C.ADD */
+        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
+        /* instruction C.JALR */
+        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
+        /* instruction C.EBREAK */
+        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
+        /* instruction C.SWSP */
+        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
+        /* instruction DII */
+        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
+        /* instruction C.LD */
+        {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c_ld},
+        /* instruction C.SD */
+        {16, 0b1110000000000000, 0b1110000000000011, &this_class::__c_sd},
+        /* instruction C.SUBW */
+        {16, 0b1001110000000001, 0b1111110001100011, &this_class::__c_subw},
+        /* instruction C.ADDW */
+        {16, 0b1001110000100001, 0b1111110001100011, &this_class::__c_addw},
+        /* instruction C.ADDIW */
+        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_addiw},
+        /* instruction C.LDSP */
+        {16, 0b0110000000000010, 0b1110000000000011, &this_class::__c_ldsp},
+        /* instruction C.SDSP */
+        {16, 0b1110000000000010, 0b1110000000000011, &this_class::__c_sdsp},
+        /* instruction C.FLW */
+        {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c_flw},
+        /* instruction C.FSW */
+        {16, 0b1110000000000000, 0b1110000000000011, &this_class::__c_fsw},
+        /* instruction C.FLWSP */
+        {16, 0b0110000000000010, 0b1110000000000011, &this_class::__c_flwsp},
+        /* instruction C.FSWSP */
+        {16, 0b1110000000000010, 0b1110000000000011, &this_class::__c_fswsp},
+        /* instruction C.FLD */
+        {16, 0b0010000000000000, 0b1110000000000011, &this_class::__c_fld},
+        /* instruction C.FSD */
+        {16, 0b1010000000000000, 0b1110000000000011, &this_class::__c_fsd},
+        /* instruction C.FLDSP */
+        {16, 0b0010000000000010, 0b1110000000000011, &this_class::__c_fldsp},
+        /* instruction C.FSDSP */
+        {16, 0b1010000000000010, 0b1110000000000011, &this_class::__c_fsdsp},
     }};
  
     /* instruction definitions */
-    /* instruction 0: JALR */
-    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 1: C.ADDI4SPN */
-    compile_ret_t __c_addi4spn(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 2: C.LW */
-    compile_ret_t __c_lw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 3: C.SW */
-    compile_ret_t __c_sw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 4: C.ADDI */
-    compile_ret_t __c_addi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 5: C.NOP */
-    compile_ret_t __c_nop(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 6: C.JAL */
-    compile_ret_t __c_jal(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 7: C.LI */
-    compile_ret_t __c_li(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 8: C.LUI */
-    compile_ret_t __c_lui(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 9: C.ADDI16SP */
-    compile_ret_t __c_addi16sp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 10: C.SRLI */
-    compile_ret_t __c_srli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 11: C.SRAI */
-    compile_ret_t __c_srai(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 12: C.ANDI */
-    compile_ret_t __c_andi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 13: C.SUB */
-    compile_ret_t __c_sub(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 14: C.XOR */
-    compile_ret_t __c_xor(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 15: C.OR */
-    compile_ret_t __c_or(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 16: C.AND */
-    compile_ret_t __c_and(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 17: C.J */
-    compile_ret_t __c_j(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 18: C.BEQZ */
-    compile_ret_t __c_beqz(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 19: C.BNEZ */
-    compile_ret_t __c_bnez(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 20: C.SLLI */
-    compile_ret_t __c_slli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 21: C.LWSP */
-    compile_ret_t __c_lwsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 22: C.MV */
-    compile_ret_t __c_mv(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 23: C.JR */
-    compile_ret_t __c_jr(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 24: C.ADD */
-    compile_ret_t __c_add(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 25: C.JALR */
-    compile_ret_t __c_jalr(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 26: C.EBREAK */
-    compile_ret_t __c_ebreak(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 27: C.SWSP */
-    compile_ret_t __c_swsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 28: DII */
-    compile_ret_t __dii(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 29: C.FLD */
-    compile_ret_t __c_fld(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 30: C.FSD */
-    compile_ret_t __c_fsd(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 31: C.FLDSP */
-    compile_ret_t __c_fldsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 32: C.FSDSP */
-    compile_ret_t __c_fsdsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 33: C.FLW */
-    compile_ret_t __c_flw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 34: C.FSW */
-    compile_ret_t __c_fsw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 35: C.FLWSP */
-    compile_ret_t __c_flwsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 36: C.FSWSP */
-    compile_ret_t __c_fswsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 37: C.LD */
-    compile_ret_t __c_ld(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 38: C.SD */
-    compile_ret_t __c_sd(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 39: C.SUBW */
-    compile_ret_t __c_subw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 40: C.ADDW */
-    compile_ret_t __c_addw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 41: C.ADDIW */
-    compile_ret_t __c_addiw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 42: C.LDSP */
-    compile_ret_t __c_ldsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 43: C.SDSP */
-    compile_ret_t __c_sdsp(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 44: FLD */
-    compile_ret_t __fld(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 45: FSD */
-    compile_ret_t __fsd(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 46: FMADD.D */
-    compile_ret_t __fmadd_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 47: FMSUB.D */
-    compile_ret_t __fmsub_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 48: FNMADD.D */
-    compile_ret_t __fnmadd_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 49: FNMSUB.D */
-    compile_ret_t __fnmsub_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 50: FADD.D */
-    compile_ret_t __fadd_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 51: FSUB.D */
-    compile_ret_t __fsub_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 52: FMUL.D */
-    compile_ret_t __fmul_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 53: FDIV.D */
-    compile_ret_t __fdiv_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 54: FSQRT.D */
-    compile_ret_t __fsqrt_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 55: FSGNJ.D */
-    compile_ret_t __fsgnj_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 56: FSGNJN.D */
-    compile_ret_t __fsgnjn_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 57: FSGNJX.D */
-    compile_ret_t __fsgnjx_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 58: FMIN.D */
-    compile_ret_t __fmin_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 59: FMAX.D */
-    compile_ret_t __fmax_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 60: FCVT.S.D */
-    compile_ret_t __fcvt_s_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 61: FCVT.D.S */
-    compile_ret_t __fcvt_d_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 62: FEQ.D */
-    compile_ret_t __feq_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 63: FLT.D */
-    compile_ret_t __flt_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 64: FLE.D */
-    compile_ret_t __fle_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 65: FCLASS.D */
-    compile_ret_t __fclass_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 66: FCVT.W.D */
-    compile_ret_t __fcvt_w_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 67: FCVT.WU.D */
-    compile_ret_t __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 68: FCVT.D.W */
-    compile_ret_t __fcvt_d_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 69: FCVT.D.WU */
-    compile_ret_t __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 70: FCVT.L.D */
-    compile_ret_t __fcvt_l_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 71: FCVT.LU.D */
-    compile_ret_t __fcvt_lu_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 72: FCVT.D.L */
-    compile_ret_t __fcvt_d_l(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 73: FCVT.D.LU */
-    compile_ret_t __fcvt_d_lu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 74: FMV.X.D */
-    compile_ret_t __fmv_x_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 75: FMV.D.X */
-    compile_ret_t __fmv_d_x(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 76: LUI */
-    compile_ret_t __lui(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 77: AUIPC */
-    compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 78: JAL */
-    compile_ret_t __jal(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 79: BEQ */
-    compile_ret_t __beq(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 80: BNE */
-    compile_ret_t __bne(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 81: BLT */
-    compile_ret_t __blt(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 82: BGE */
-    compile_ret_t __bge(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 83: BLTU */
-    compile_ret_t __bltu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 84: BGEU */
-    compile_ret_t __bgeu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 85: LB */
-    compile_ret_t __lb(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 86: LH */
-    compile_ret_t __lh(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 87: LW */
-    compile_ret_t __lw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 88: LBU */
-    compile_ret_t __lbu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 89: LHU */
-    compile_ret_t __lhu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 90: SB */
-    compile_ret_t __sb(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 91: SH */
-    compile_ret_t __sh(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 92: SW */
-    compile_ret_t __sw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 93: ADDI */
-    compile_ret_t __addi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 94: SLTI */
-    compile_ret_t __slti(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 95: SLTIU */
-    compile_ret_t __sltiu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 96: XORI */
-    compile_ret_t __xori(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 97: ORI */
-    compile_ret_t __ori(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 98: ANDI */
-    compile_ret_t __andi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 99: SLLI */
-    compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 100: SRLI */
-    compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 101: SRAI */
-    compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 102: ADD */
-    compile_ret_t __add(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 103: SUB */
-    compile_ret_t __sub(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 104: SLL */
-    compile_ret_t __sll(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 105: SLT */
-    compile_ret_t __slt(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 106: SLTU */
-    compile_ret_t __sltu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 107: XOR */
-    compile_ret_t __xor(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 108: SRL */
-    compile_ret_t __srl(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 109: SRA */
-    compile_ret_t __sra(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 110: OR */
-    compile_ret_t __or(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 111: AND */
-    compile_ret_t __and(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 112: FENCE */
-    compile_ret_t __fence(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 113: FENCE_I */
-    compile_ret_t __fence_i(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 114: ECALL */
-    compile_ret_t __ecall(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 115: EBREAK */
-    compile_ret_t __ebreak(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 116: URET */
-    compile_ret_t __uret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 117: SRET */
-    compile_ret_t __sret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 118: MRET */
-    compile_ret_t __mret(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 119: WFI */
-    compile_ret_t __wfi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 120: SFENCE.VMA */
-    compile_ret_t __sfence_vma(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 121: CSRRW */
-    compile_ret_t __csrrw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 122: CSRRS */
-    compile_ret_t __csrrs(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 123: CSRRC */
-    compile_ret_t __csrrc(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 124: CSRRWI */
-    compile_ret_t __csrrwi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 125: CSRRSI */
-    compile_ret_t __csrrsi(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 126: CSRRCI */
-    compile_ret_t __csrrci(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 127: FLW */
-    compile_ret_t __flw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 128: FSW */
-    compile_ret_t __fsw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 129: FMADD.S */
-    compile_ret_t __fmadd_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 130: FMSUB.S */
-    compile_ret_t __fmsub_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 131: FNMADD.S */
-    compile_ret_t __fnmadd_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 132: FNMSUB.S */
-    compile_ret_t __fnmsub_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 133: FADD.S */
-    compile_ret_t __fadd_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 134: FSUB.S */
-    compile_ret_t __fsub_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 135: FMUL.S */
-    compile_ret_t __fmul_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 136: FDIV.S */
-    compile_ret_t __fdiv_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 137: FSQRT.S */
-    compile_ret_t __fsqrt_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 138: FSGNJ.S */
-    compile_ret_t __fsgnj_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 139: FSGNJN.S */
-    compile_ret_t __fsgnjn_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 140: FSGNJX.S */
-    compile_ret_t __fsgnjx_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 141: FMIN.S */
-    compile_ret_t __fmin_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 142: FMAX.S */
-    compile_ret_t __fmax_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 143: FCVT.W.S */
-    compile_ret_t __fcvt_w_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 144: FCVT.WU.S */
-    compile_ret_t __fcvt_wu_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 145: FEQ.S */
-    compile_ret_t __feq_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 146: FLT.S */
-    compile_ret_t __flt_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 147: FLE.S */
-    compile_ret_t __fle_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 148: FCLASS.S */
-    compile_ret_t __fclass_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 149: FCVT.S.W */
-    compile_ret_t __fcvt_s_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 150: FCVT.S.WU */
-    compile_ret_t __fcvt_s_wu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 151: FMV.X.W */
-    compile_ret_t __fmv_x_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 152: FMV.W.X */
-    compile_ret_t __fmv_w_x(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 153: FCVT.L.S */
-    compile_ret_t __fcvt_l_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 154: FCVT.LU.S */
-    compile_ret_t __fcvt_lu_s(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 155: FCVT.S.L */
-    compile_ret_t __fcvt_s_l(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 156: FCVT.S.LU */
-    compile_ret_t __fcvt_s_lu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 157: LR.W */
-    compile_ret_t __lr_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 158: SC.W */
-    compile_ret_t __sc_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 159: AMOSWAP.W */
-    compile_ret_t __amoswap_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 160: AMOADD.W */
-    compile_ret_t __amoadd_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 161: AMOXOR.W */
-    compile_ret_t __amoxor_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 162: AMOAND.W */
-    compile_ret_t __amoand_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 163: AMOOR.W */
-    compile_ret_t __amoor_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 164: AMOMIN.W */
-    compile_ret_t __amomin_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 165: AMOMAX.W */
-    compile_ret_t __amomax_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 166: AMOMINU.W */
-    compile_ret_t __amominu_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 167: AMOMAXU.W */
-    compile_ret_t __amomaxu_w(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 168: LR.D */
-    compile_ret_t __lr_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 169: SC.D */
-    compile_ret_t __sc_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 170: AMOSWAP.D */
-    compile_ret_t __amoswap_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 171: AMOADD.D */
-    compile_ret_t __amoadd_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 172: AMOXOR.D */
-    compile_ret_t __amoxor_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 173: AMOAND.D */
-    compile_ret_t __amoand_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 174: AMOOR.D */
-    compile_ret_t __amoor_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 175: AMOMIN.D */
-    compile_ret_t __amomin_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 176: AMOMAX.D */
-    compile_ret_t __amomax_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 177: AMOMINU.D */
-    compile_ret_t __amominu_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 178: AMOMAXU.D */
-    compile_ret_t __amomaxu_d(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 179: MUL */
-    compile_ret_t __mul(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 180: MULH */
-    compile_ret_t __mulh(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 181: MULHSU */
-    compile_ret_t __mulhsu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 182: MULHU */
-    compile_ret_t __mulhu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 183: DIV */
-    compile_ret_t __div(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 184: DIVU */
-    compile_ret_t __divu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 185: REM */
-    compile_ret_t __rem(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 186: REMU */
-    compile_ret_t __remu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 187: MULW */
-    compile_ret_t __mulw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 188: DIVW */
-    compile_ret_t __divw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 189: DIVUW */
-    compile_ret_t __divuw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 190: REMW */
-    compile_ret_t __remw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 191: REMUW */
-    compile_ret_t __remuw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 192: LWU */
-    compile_ret_t __lwu(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 193: LD */
-    compile_ret_t __ld(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 194: SD */
-    compile_ret_t __sd(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 195: ADDIW */
-    compile_ret_t __addiw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 196: SLLIW */
-    compile_ret_t __slliw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 197: SRLIW */
-    compile_ret_t __srliw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 198: SRAIW */
-    compile_ret_t __sraiw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 199: ADDW */
-    compile_ret_t __addw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 200: SUBW */
-    compile_ret_t __subw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 201: SLLW */
-    compile_ret_t __sllw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 202: SRLW */
-    compile_ret_t __srlw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
-    }
-    
-    /* instruction 203: SRAW */
-    compile_ret_t __sraw(virt_addr_t& pc, code_word_t instr, std::ostringstream& os){
+    /* instruction 0: LUI */
+    compile_ret_t __lui(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LUI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 0);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "lui"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 64U), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 0);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 1: AUIPC */
+    compile_ret_t __auipc(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AUIPC_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 1);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,32>((bit_sub<12,20>(instr) << 12));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#08x}", fmt::arg("mnemonic", "auipc"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 1);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 2: JAL */
+    compile_ret_t __jal(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("JAL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 2);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        int32_t imm = signextend<int32_t,21>((bit_sub<12,8>(instr) << 12) | (bit_sub<20,1>(instr) << 11) | (bit_sub<21,10>(instr) << 1) | (bit_sub<31,1>(instr) << 20));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#0x}", fmt::arg("mnemonic", "jal"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
+                cur_pc_val,
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 2);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 3: JALR */
+    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("JALR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 3);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm:#0x}", fmt::arg("mnemonic", "jalr"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto new_pc_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto PC_val_v = tu.assignment("PC_val", tu.l_and(
+            new_pc_val,
+            tu.l_not(tu.constant(0x1, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 3);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 4: BEQ */
+    compile_ret_t __beq(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BEQ_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 4);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "beq"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_EQ,
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 4);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 5: BNE */
+    compile_ret_t __bne(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BNE_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 5);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bne"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 5);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 6: BLT */
+    compile_ret_t __blt(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BLT_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 6);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "blt"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SLT,
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 6);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 7: BGE */
+    compile_ret_t __bge(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BGE_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 7);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bge"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SGE,
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 7);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 8: BLTU */
+    compile_ret_t __bltu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BLTU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 8);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bltu"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_ULT,
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 8);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 9: BGEU */
+    compile_ret_t __bgeu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("BGEU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 9);
+        int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {rs2}, {imm:#0x}", fmt::arg("mnemonic", "bgeu"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_UGE,
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(4, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 9);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 10: LB */
+    compile_ret_t __lb(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LB_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 10);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lb"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 8),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 10);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 11: LH */
+    compile_ret_t __lh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LH_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 11);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lh"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 16),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 11);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 12: LW */
+    compile_ret_t __lw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 12);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 12);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 13: LBU */
+    compile_ret_t __lbu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LBU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 13);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lbu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 8),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 13);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 14: LHU */
+    compile_ret_t __lhu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LHU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 14);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lhu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 16),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 14);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 15: SB */
+    compile_ret_t __sb(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SB_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 15);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sb"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 8);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 15);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 16: SH */
+    compile_ret_t __sh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SH_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 16);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sh"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 16);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 16);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 17: SW */
+    compile_ret_t __sw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 17);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sw"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 17);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 18: ADDI */
+    compile_ret_t __addi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ADDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 18);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addi"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.constant(imm, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 18);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 19: SLTI */
+    compile_ret_t __slti(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLTI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 19);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "slti"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_SLT,
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        64, false),
+                    tu.constant(imm, 64U)),
+                tu.constant(1, 64U),
+                tu.constant(0, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 19);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 20: SLTIU */
+    compile_ret_t __sltiu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLTIU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 20);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "sltiu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        int64_t full_imm_val = imm;
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(full_imm_val, 64U)),
+                tu.constant(1, 64U),
+                tu.constant(0, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 20);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 21: XORI */
+    compile_ret_t __xori(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("XORI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 21);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "xori"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.constant(imm, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 21);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 22: ORI */
+    compile_ret_t __ori(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ORI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 22);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "ori"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.constant(imm, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 22);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 23: ANDI */
+    compile_ret_t __andi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ANDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 23);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "andi"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.constant(imm, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 23);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 24: SLLI */
+    compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 24);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slli"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), 64);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            }
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 24);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 25: SRLI */
+    compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 25);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srli"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), 64);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            }
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 25);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 26: SRAI */
+    compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRAI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 26);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srai"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), 64);
+                tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            }
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 26);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 27: ADD */
+    compile_ret_t __add(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ADD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 27);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "add"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 27);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 28: SUB */
+    compile_ret_t __sub(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SUB_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 28);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sub"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.sub(
+                 tu.load(rs1 + traits<ARCH>::X0, 0),
+                 tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 28);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 29: SLL */
+    compile_ret_t __sll(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 29);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sll"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(64, 64U),
+                         tu.constant(1, 64U)))), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 29);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 30: SLT */
+    compile_ret_t __slt(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLT_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 30);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "slt"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_SLT,
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        64, false),
+                    tu.ext(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        64, false)),
+                tu.constant(1, 64U),
+                tu.constant(0, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 30);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 31: SLTU */
+    compile_ret_t __sltu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLTU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 31);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sltu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.ext(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        64,
+                        true),
+                    tu.ext(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        64,
+                        true)),
+                tu.constant(1, 64U),
+                tu.constant(0, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 31);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 32: XOR */
+    compile_ret_t __xor(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("XOR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 32);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "xor"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 32);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 33: SRL */
+    compile_ret_t __srl(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 33);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srl"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(64, 64U),
+                         tu.constant(1, 64U)))), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 33);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 34: SRA */
+    compile_ret_t __sra(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRA_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 34);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sra"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.sub(
+                         tu.constant(64, 64U),
+                         tu.constant(1, 64U)))), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 34);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 35: OR */
+    compile_ret_t __or(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("OR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 35);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "or"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 35);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 36: AND */
+    compile_ret_t __and(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AND_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 36);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "and"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 36);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 37: FENCE */
+    compile_ret_t __fence(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FENCE_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 37);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t succ = ((bit_sub<20,4>(instr)));
+        uint8_t pred = ((bit_sub<24,4>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "fence");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.l_or(
+            tu.shl(
+                tu.constant(pred, 64U),
+                tu.constant(4, 64U)),
+            tu.constant(succ, 64U)), 64);
+        tu.write_mem(
+            traits<ARCH>::FENCE,
+            tu.constant(0, 64U),
+            FENCEtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 37);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 38: FENCE_I */
+    compile_ret_t __fence_i(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FENCE_I_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 38);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint16_t imm = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "fence_i");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.constant(imm, 64U), 64);
+        tu.write_mem(
+            traits<ARCH>::FENCE,
+            tu.constant(1, 64U),
+            FENCEtmp0_val_v);
+        tu.close_scope();
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 38);
+        gen_trap_check(tu);
+        return std::make_tuple(FLUSH);
+    }
+    
+    /* instruction 39: ECALL */
+    compile_ret_t __ecall(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ECALL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 39);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ecall");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_raise_trap(tu, 0, 11);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 39);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 40: EBREAK */
+    compile_ret_t __ebreak(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("EBREAK_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 40);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ebreak");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_raise_trap(tu, 0, 3);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 40);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 41: URET */
+    compile_ret_t __uret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("URET_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 41);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "uret");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_leave_trap(tu, 0);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 41);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 42: SRET */
+    compile_ret_t __sret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRET_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 42);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "sret");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_leave_trap(tu, 1);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 42);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 43: MRET */
+    compile_ret_t __mret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MRET_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 43);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "mret");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_leave_trap(tu, 3);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 43);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 44: WFI */
+    compile_ret_t __wfi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("WFI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 44);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "wfi");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        this->gen_wait(tu, 1);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 44);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 45: SFENCE.VMA */
+    compile_ret_t __sfence_vma(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SFENCE_VMA_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 45);
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "sfence.vma");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto FENCEtmp0_val_v = tu.assignment("FENCEtmp0_val", tu.constant(rs1, 64U), 64);
+        tu.write_mem(
+            traits<ARCH>::FENCE,
+            tu.constant(2, 64U),
+            FENCEtmp0_val_v);
+        auto FENCEtmp1_val_v = tu.assignment("FENCEtmp1_val", tu.constant(rs2, 64U), 64);
+        tu.write_mem(
+            traits<ARCH>::FENCE,
+            tu.constant(3, 64U),
+            FENCEtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 45);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 46: CSRRW */
+    compile_ret_t __csrrw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 46);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto rs_val_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        if(rd != 0){
+            auto csr_val_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64);
+            auto CSRtmp0_val_v = tu.assignment("CSRtmp0_val", rs_val_val, 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp0_val_v);
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", csr_val_val, 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto CSRtmp2_val_v = tu.assignment("CSRtmp2_val", rs_val_val, 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp2_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 46);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 47: CSRRS */
+    compile_ret_t __csrrs(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRS_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 47);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrs"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto xrd_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64);
+        auto xrs1_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", xrd_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        if(rs1 != 0){
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_or(
+                xrd_val,
+                xrs1_val), 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp1_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 47);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 48: CSRRC */
+    compile_ret_t __csrrc(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRC_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 48);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {rs1}", fmt::arg("mnemonic", "csrrc"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto xrd_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64);
+        auto xrs1_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", xrd_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        if(rs1 != 0){
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_and(
+                xrd_val,
+                tu.l_not(xrs1_val)), 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp1_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 48);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 49: CSRRWI */
+    compile_ret_t __csrrwi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRWI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 49);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t zimm = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrwi"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.ext(
+            tu.constant(zimm, 64U),
+            64,
+            true), 64);
+        tu.write_mem(
+            traits<ARCH>::CSR,
+            tu.constant(csr, 16U),
+            CSRtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 49);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 50: CSRRSI */
+    compile_ret_t __csrrsi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRSI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 50);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t zimm = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrsi"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64);
+        if(zimm != 0){
+            auto CSRtmp0_val_v = tu.assignment("CSRtmp0_val", tu.l_or(
+                res_val,
+                tu.ext(
+                    tu.constant(zimm, 64U),
+                    64,
+                    true)), 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp0_val_v);
+        }
+        if(rd != 0){
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", res_val, 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 50);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 51: CSRRCI */
+    compile_ret_t __csrrci(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("CSRRCI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 51);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t zimm = ((bit_sub<15,5>(instr)));
+        uint16_t csr = ((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {csr}, {zimm:#0x}", fmt::arg("mnemonic", "csrrci"),
+            	fmt::arg("rd", name(rd)), fmt::arg("csr", csr), fmt::arg("zimm", zimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.read_mem(traits<ARCH>::CSR, tu.constant(csr, 16U), 64);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        if(zimm != 0){
+            auto CSRtmp1_val_v = tu.assignment("CSRtmp1_val", tu.l_and(
+                res_val,
+                tu.l_not(tu.ext(
+                    tu.constant(zimm, 64U),
+                    64,
+                    true))), 64);
+            tu.write_mem(
+                traits<ARCH>::CSR,
+                tu.constant(csr, 16U),
+                CSRtmp1_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 51);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 52: LWU */
+    compile_ret_t __lwu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LWU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 52);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "lwu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 52);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 53: LD */
+    compile_ret_t __ld(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 53);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm}({rs1})", fmt::arg("mnemonic", "ld"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 53);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 54: SD */
+    compile_ret_t __sd(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 54);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "sd"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 54);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 55: ADDIW */
+    compile_ret_t __addiw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ADDIW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 55);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm}", fmt::arg("mnemonic", "addiw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.add(
+                tu.ext(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    32, false),
+                tu.constant(imm, 32U));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                res_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 55);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 56: SLLIW */
+    compile_ret_t __slliw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLLIW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 56);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slliw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto sh_val_val = tu.shl(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(shamt, 32U));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 56);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 57: SRLIW */
+    compile_ret_t __srliw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRLIW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 57);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srliw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto sh_val_val = tu.lshr(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(shamt, 32U));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 57);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 58: SRAIW */
+    compile_ret_t __sraiw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRAIW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 58);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "sraiw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto sh_val_val = tu.ashr(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(shamt, 32U));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 58);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 59: ADDW */
+    compile_ret_t __addw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("ADDW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 59);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "addw");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.add(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                res_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 59);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 60: SUBW */
+    compile_ret_t __subw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SUBW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 60);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "subw");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.sub(
+                 tu.trunc(
+                     tu.load(rs1 + traits<ARCH>::X0, 0),
+                     32 
+                 ),
+                 tu.trunc(
+                     tu.load(rs2 + traits<ARCH>::X0, 0),
+                     32 
+                 ));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                res_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 60);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 61: SLLW */
+    compile_ret_t __sllw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLLW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 61);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sllw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = tu.l_and(
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(mask_val, 32U));
+            auto sh_val_val = tu.shl(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                count_val);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 61);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 62: SRLW */
+    compile_ret_t __srlw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRLW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 62);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "srlw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = tu.l_and(
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(mask_val, 32U));
+            auto sh_val_val = tu.lshr(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                count_val);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 62);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 63: SRAW */
+    compile_ret_t __sraw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRAW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 63);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sraw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            uint32_t mask_val = 0x1f;
+            auto count_val = tu.l_and(
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(mask_val, 32U));
+            auto sh_val_val = tu.ashr(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                count_val);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                sh_val_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 63);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 64: MUL */
+    compile_ret_t __mul(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MUL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 64);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mul"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.mul(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    128,
+                    true),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    128,
+                    true));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                res_val,
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 64);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 65: MULH */
+    compile_ret_t __mulh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULH_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 65);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulh"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.mul(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    128,
+                    false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    128,
+                    false));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.lshr(
+                    res_val,
+                    tu.constant(64, 64U)),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 65);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 66: MULHSU */
+    compile_ret_t __mulhsu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULHSU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 66);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhsu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.mul(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    128,
+                    false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    128,
+                    true));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.lshr(
+                    res_val,
+                    tu.constant(64, 64U)),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 66);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 67: MULHU */
+    compile_ret_t __mulhu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULHU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 67);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto res_val = tu.mul(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    128,
+                    true),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    128,
+                    true));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.lshr(
+                    res_val,
+                    tu.constant(64, 64U)),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 67);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 68: DIV */
+    compile_ret_t __div(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIV_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 68);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "div"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            uint64_t M1_val = - 1;
+            uint8_t XLM1_val = 64 - 1;
+            uint64_t ONE_val = 1;
+            uint64_t MMIN_val = ONE_val << XLM1_val;
+            tu(  " if({}) {{", tu.b_and(
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(MMIN_val, 64U)),
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.constant(M1_val, 64U))));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(MMIN_val, 64U), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.sdiv(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+            tu("  } else {");
+            auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.neg(tu.constant(1, 64U)), 64);
+            tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 68);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 69: DIVU */
+    compile_ret_t __divu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIVU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 69);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "divu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.udiv(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.neg(tu.constant(1, 64U)), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 69);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 70: REM */
+    compile_ret_t __rem(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REM_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 70);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "rem"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            uint64_t M1_val = - 1;
+            uint32_t XLM1_val = 64 - 1;
+            uint64_t ONE_val = 1;
+            uint64_t MMIN_val = ONE_val << XLM1_val;
+            tu(  " if({}) {{", tu.b_and(
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(MMIN_val, 64U)),
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.constant(M1_val, 64U))));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(0, 64U), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.srem(
+                tu.ext(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+            tu("  } else {");
+            auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.load(rs1 + traits<ARCH>::X0, 0), 64);
+            tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 70);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 71: REMU */
+    compile_ret_t __remu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REMU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 71);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "remu"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.urem(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.load(rs1 + traits<ARCH>::X0, 0), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 71);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 72: MULW */
+    compile_ret_t __mulw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 72);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.mul(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.trunc(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        32 
+                    )),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 72);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 73: DIVW */
+    compile_ret_t __divw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIVW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 73);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "divw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            uint32_t M1_val = - 1;
+            uint32_t ONE_val = 1;
+            uint32_t MMIN_val = ONE_val << 31;
+            tu(  " if({}) {{", tu.b_and(
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.constant(MMIN_val, 32U)),
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.trunc(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.constant(M1_val, 32U))));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+                tu.neg(tu.constant(1, 64U)),
+                tu.constant(31, 64U)), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.sdiv(
+                    tu.ext(
+                        tu.trunc(
+                            tu.load(rs1 + traits<ARCH>::X0, 0),
+                            32 
+                        ),
+                        64, false),
+                    tu.ext(
+                        tu.trunc(
+                            tu.load(rs2 + traits<ARCH>::X0, 0),
+                            32 
+                        ),
+                        64, false)),
+                64,
+                false), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+            tu("  } else {");
+            auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.neg(tu.constant(1, 64U)), 64);
+            tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 73);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 74: DIVUW */
+    compile_ret_t __divuw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIVUW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 74);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "divuw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(0, 32U)));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.udiv(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.trunc(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        32 
+                    )),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.neg(tu.constant(1, 64U)), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 74);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 75: REMW */
+    compile_ret_t __remw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REMW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 75);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "remw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs2 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)));
+            uint32_t M1_val = - 1;
+            uint32_t ONE_val = 1;
+            uint32_t MMIN_val = ONE_val << 31;
+            tu(  " if({}) {{", tu.b_and(
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.constant(MMIN_val, 32U)),
+                tu.icmp(
+                    ICmpInst::ICMP_EQ,
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    tu.constant(M1_val, 64U))));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(0, 64U), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.srem(
+                    tu.ext(
+                        tu.trunc(
+                            tu.load(rs1 + traits<ARCH>::X0, 0),
+                            32 
+                        ),
+                        64, false),
+                    tu.ext(
+                        tu.trunc(
+                            tu.load(rs2 + traits<ARCH>::X0, 0),
+                            32 
+                        ),
+                        64, false)),
+                64,
+                false), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+            tu("  } else {");
+            auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.ext(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 75);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 76: REMUW */
+    compile_ret_t __remuw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REMUW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 76);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "remuw"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu(  " if({}) {{", tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                tu.constant(0, 32U)));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.urem(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    tu.trunc(
+                        tu.load(rs2 + traits<ARCH>::X0, 0),
+                        32 
+                    )),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            tu("  } else {");
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+            tu.close_scope();
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 76);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 77: LR.W */
+    compile_ret_t __lr_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LR_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 77);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "lr.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto REStmp1_val_v = tu.assignment("REStmp1_val", tu.ext(
+                tu.neg(tu.constant(1, 8U)),
+                32,
+                false), 32);
+            tu.write_mem(
+                traits<ARCH>::RES,
+                offs_val,
+                REStmp1_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 77);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 78: SC.W */
+    compile_ret_t __sc_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SC_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 78);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sc.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.read_mem(traits<ARCH>::RES, offs_val, 32);
+        tu(  " if({}) {{", tu.icmp(
+            ICmpInst::ICMP_NE,
+            res1_val,
+            tu.constant(0, 32U)));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        if(rd != 0){
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_NE,
+                    res1_val,
+                    tu.ext(
+                        tu.constant(0, 64U),
+                        32,
+                        true)),
+                tu.constant(0, 64U),
+                tu.constant(1, 64U)), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 78);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 79: AMOSWAP.W */
+    compile_ret_t __amoswap_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOSWAP_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 79);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoswap.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 79);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 80: AMOADD.W */
+    compile_ret_t __amoadd_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOADD_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 80);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoadd.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.add(
+            res1_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 80);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 81: AMOXOR.W */
+    compile_ret_t __amoxor_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOXOR_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 81);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoxor.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_xor(
+            res1_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 81);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 82: AMOAND.W */
+    compile_ret_t __amoand_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOAND_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 82);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoand.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_and(
+            res1_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 82);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 83: AMOOR.W */
+    compile_ret_t __amoor_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOOR_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 83);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoor.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_or(
+            res1_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 83);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 84: AMOMIN.W */
+    compile_ret_t __amomin_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMIN_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 84);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomin.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SGT,
+                tu.ext(
+                    res1_val,
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 84);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 85: AMOMAX.W */
+    compile_ret_t __amomax_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMAX_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 85);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomax.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SLT,
+                tu.ext(
+                    res1_val,
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 85);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 86: AMOMINU.W */
+    compile_ret_t __amominu_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMINU_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 86);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amominu.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_UGT,
+                res1_val,
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 86);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 87: AMOMAXU.W */
+    compile_ret_t __amomaxu_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMAXU_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 87);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomaxu.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_ULT,
+                res1_val,
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 87);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 88: LR.D */
+    compile_ret_t __lr_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("LR_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 88);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "lr.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+            auto REStmp1_val_v = tu.assignment("REStmp1_val", tu.ext(
+                tu.neg(tu.constant(1, 8U)),
+                64,
+                false), 64);
+            tu.write_mem(
+                traits<ARCH>::RES,
+                offs_val,
+                REStmp1_val_v);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 88);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 89: SC.D */
+    compile_ret_t __sc_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SC_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 89);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "sc.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.read_mem(traits<ARCH>::RES, offs_val, 8);
+        tu(  " if({}) {{", tu.icmp(
+            ICmpInst::ICMP_NE,
+            res_val,
+            tu.constant(0, 64U)));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);if(rd != 0){
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.constant(0, 64U), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        tu("  } else {");
+        if(rd != 0){
+            auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.constant(1, 64U), 64);
+            tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 89);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 90: AMOSWAP.D */
+    compile_ret_t __amoswap_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOSWAP_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 90);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoswap.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", tu.load(rs2 + traits<ARCH>::X0, 0), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 90);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 91: AMOADD.D */
+    compile_ret_t __amoadd_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOADD_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 91);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoadd.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.add(
+            res_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 91);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 92: AMOXOR.D */
+    compile_ret_t __amoxor_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOXOR_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 92);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoxor.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_xor(
+            res_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 92);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 93: AMOAND.D */
+    compile_ret_t __amoand_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOAND_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 93);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoand.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_and(
+            res_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 93);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 94: AMOOR.D */
+    compile_ret_t __amoor_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOOR_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 94);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amoor.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.l_or(
+            res_val,
+            tu.load(rs2 + traits<ARCH>::X0, 0));
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 94);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 95: AMOMIN.D */
+    compile_ret_t __amomin_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMIN_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 95);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomin.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SGT,
+                tu.ext(
+                    res1_val,
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 95);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 96: AMOMAX.D */
+    compile_ret_t __amomax_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMAX_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 96);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomax.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_SLT,
+                tu.ext(
+                    res_val,
+                    64, false),
+                tu.ext(
+                    tu.load(rs2 + traits<ARCH>::X0, 0),
+                    64, false)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 96);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 97: AMOMINU.D */
+    compile_ret_t __amominu_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMINU_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 97);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amominu.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_UGT,
+                res_val,
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 97);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 98: AMOMAXU.D */
+    compile_ret_t __amomaxu_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("AMOMAXU_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 98);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu={aq},rel={rl})", fmt::arg("mnemonic", "amomaxu.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.load(rs1 + traits<ARCH>::X0, 0);
+        auto res1_val = tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false);
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", res1_val, 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        auto res2_val = tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_ULT,
+                res1_val,
+                tu.load(rs2 + traits<ARCH>::X0, 0)),
+            tu.load(rs2 + traits<ARCH>::X0, 0),
+            res1_val);
+        auto MEMtmp1_val_v = tu.assignment("MEMtmp1_val", res2_val, 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp1_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 98);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 99: FLW */
+    compile_ret_t __flw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 99);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {imm}(x{rs1})", fmt::arg("mnemonic", "flw"),
+            	fmt::arg("rd", rd), fmt::arg("imm", imm), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 32);
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 99);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 100: FSW */
+    compile_ret_t __fsw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 100);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rs2}, {imm}(x{rs1})", fmt::arg("mnemonic", "fsw"),
+            	fmt::arg("rs2", rs2), fmt::arg("imm", imm), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + traits<ARCH>::F0, 0),
+            32 
+        ), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 100);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 101: FMADD.S */
+    compile_ret_t __fmadd_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMADD_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 101);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fmadd.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fmadd_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.load(rs3 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto frs3_val = tu.callf("unbox_s",
+                tu.load(rs3 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fmadd_s",
+                frs1_val, 
+                frs2_val, 
+                frs3_val, 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 101);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 102: FMSUB.S */
+    compile_ret_t __fmsub_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMSUB_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 102);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fmsub.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fmadd_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.load(rs3 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto frs3_val = tu.callf("unbox_s",
+                tu.load(rs3 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fmadd_s",
+                frs1_val, 
+                frs2_val, 
+                frs3_val, 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 102);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 103: FNMADD.S */
+    compile_ret_t __fnmadd_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FNMADD_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 103);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fnmadd.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fmadd_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.load(rs3 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(2LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto frs3_val = tu.callf("unbox_s",
+                tu.load(rs3 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fmadd_s",
+                frs1_val, 
+                frs2_val, 
+                frs3_val, 
+                tu.ext(
+                    tu.constant(2LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 103);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 104: FNMSUB.S */
+    compile_ret_t __fnmsub_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FNMSUB_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 104);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fnmsub.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fmadd_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.load(rs3 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(3LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto frs3_val = tu.callf("unbox_s",
+                tu.load(rs3 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fmadd_s",
+                frs1_val, 
+                frs2_val, 
+                frs3_val, 
+                tu.ext(
+                    tu.constant(3LL, 64U),
+                    32,
+                    true), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 104);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 105: FADD.S */
+    compile_ret_t __fadd_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FADD_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 105);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fadd.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fadd_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fadd_s",
+                frs1_val, 
+                frs2_val, 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 105);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 106: FSUB.S */
+    compile_ret_t __fsub_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSUB_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 106);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsub.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fsub_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fsub_s",
+                frs1_val, 
+                frs2_val, 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 106);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 107: FMUL.S */
+    compile_ret_t __fmul_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMUL_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 107);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmul.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fmul_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fmul_s",
+                frs1_val, 
+                frs2_val, 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 107);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 108: FDIV.S */
+    compile_ret_t __fdiv_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FDIV_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 108);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fdiv.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fdiv_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fdiv_s",
+                frs1_val, 
+                frs2_val, 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 108);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 109: FSQRT.S */
+    compile_ret_t __fsqrt_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSQRT_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 109);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}", fmt::arg("mnemonic", "fsqrt.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fsqrt_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fsqrt_s",
+                frs1_val, 
+                tu.choose(
+                    tu.icmp(
+                        ICmpInst::ICMP_ULT,
+                        tu.constant(rm, 8U),
+                        tu.constant(7, 8U)),
+                    tu.constant(rm, 8U),
+                    tu.trunc(
+                        tu.load(traits<ARCH>::FCSR, 0),
+                        8 
+                    ))
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 109);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 110: FSGNJ.S */
+    compile_ret_t __fsgnj_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJ_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 110);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnj.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.l_or(
+                tu.l_and(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    tu.constant(0x7fffffff, 64U)),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    tu.constant(0x80000000, 64U))), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.l_or(
+                tu.l_and(
+                    frs1_val,
+                    tu.constant(0x7fffffff, 32U)),
+                tu.l_and(
+                    frs2_val,
+                    tu.constant(0x80000000, 32U)));
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 110);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 111: FSGNJN.S */
+    compile_ret_t __fsgnjn_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJN_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 111);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.l_or(
+                tu.l_and(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    tu.constant(0x7fffffff, 64U)),
+                tu.l_and(
+                    tu.l_not(tu.load(rs2 + traits<ARCH>::F0, 0)),
+                    tu.constant(0x80000000, 64U))), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.l_or(
+                tu.l_and(
+                    frs1_val,
+                    tu.constant(0x7fffffff, 32U)),
+                tu.l_and(
+                    tu.l_not(frs2_val),
+                    tu.constant(0x80000000, 32U)));
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 111);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 112: FSGNJX.S */
+    compile_ret_t __fsgnjx_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJX_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 112);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.l_xor(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                tu.l_and(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    tu.constant(0x80000000, 64U))), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.l_xor(
+                frs1_val,
+                tu.l_and(
+                    frs2_val,
+                    tu.constant(0x80000000, 32U)));
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 112);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 113: FMIN.S */
+    compile_ret_t __fmin_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMIN_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 113);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmin.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fsel_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true)
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fsel_s",
+                frs1_val, 
+                frs2_val, 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true)
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 113);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 114: FMAX.S */
+    compile_ret_t __fmax_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMAX_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 114);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmax.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fsel_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0), 
+                tu.load(rs2 + traits<ARCH>::F0, 0), 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true)
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto res_val = tu.callf("fsel_s",
+                frs1_val, 
+                frs2_val, 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true)
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 114);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 115: FCVT.W.S */
+    compile_ret_t __fcvt_w_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_W_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 115);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.w.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.callf("fcvt_s",
+                    tu.load(rs1 + traits<ARCH>::F0, 0), 
+                    tu.ext(
+                        tu.constant(0LL, 64U),
+                        32,
+                        true), 
+                    tu.constant(rm, 8U)
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.callf("fcvt_s",
+                    frs1_val, 
+                    tu.ext(
+                        tu.constant(0LL, 64U),
+                        32,
+                        true), 
+                    tu.constant(rm, 8U)
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 115);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 116: FCVT.WU.S */
+    compile_ret_t __fcvt_wu_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_WU_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 116);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.callf("fcvt_s",
+                    tu.load(rs1 + traits<ARCH>::F0, 0), 
+                    tu.ext(
+                        tu.constant(1LL, 64U),
+                        32,
+                        true), 
+                    tu.constant(rm, 8U)
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.callf("fcvt_s",
+                    frs1_val, 
+                    tu.ext(
+                        tu.constant(1LL, 64U),
+                        32,
+                        true), 
+                    tu.constant(rm, 8U)
+                ),
+                64,
+                false), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 116);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 117: FEQ.S */
+    compile_ret_t __feq_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FEQ_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 117);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "feq.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.callf("fcmp_s",
+                    tu.load(rs1 + traits<ARCH>::F0, 0), 
+                    tu.load(rs2 + traits<ARCH>::F0, 0), 
+                    tu.ext(
+                        tu.constant(0LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.callf("fcmp_s",
+                    frs1_val, 
+                    frs2_val, 
+                    tu.ext(
+                        tu.constant(0LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 117);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 118: FLT.S */
+    compile_ret_t __flt_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLT_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 118);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "flt.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.callf("fcmp_s",
+                    tu.load(rs1 + traits<ARCH>::F0, 0), 
+                    tu.load(rs2 + traits<ARCH>::F0, 0), 
+                    tu.ext(
+                        tu.constant(2LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.callf("fcmp_s",
+                    frs1_val, 
+                    frs2_val, 
+                    tu.ext(
+                        tu.constant(2LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        auto Xtmp2_val_v = tu.assignment("Xtmp2_val", tu.callf("fcmp_s",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                32 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                32 
+            ), 
+            tu.ext(
+                tu.constant(2LL, 64U),
+                32,
+                true)
+        ), 64);
+        tu.store(Xtmp2_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 118);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 119: FLE.S */
+    compile_ret_t __fle_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLE_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 119);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fle.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.callf("fcmp_s",
+                    tu.load(rs1 + traits<ARCH>::F0, 0), 
+                    tu.load(rs2 + traits<ARCH>::F0, 0), 
+                    tu.ext(
+                        tu.constant(1LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        } else {
+            auto frs1_val = tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            );
+            auto frs2_val = tu.callf("unbox_s",
+                tu.load(rs2 + traits<ARCH>::F0, 0)
+            );
+            auto Xtmp1_val_v = tu.assignment("Xtmp1_val", tu.ext(
+                tu.callf("fcmp_s",
+                    frs1_val, 
+                    frs2_val, 
+                    tu.ext(
+                        tu.constant(1LL, 64U),
+                        32,
+                        true)
+                ),
+                64,
+                true), 64);
+            tu.store(Xtmp1_val_v, rd + traits<ARCH>::X0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 119);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 120: FCLASS.S */
+    compile_ret_t __fclass_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCLASS_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 120);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fclass.s"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.callf("fclass_s",
+            tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            )
+        ), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 120);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 121: FCVT.S.W */
+    compile_ret_t __fcvt_s_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_S_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 121);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.w"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fcvt_s",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ), 
+                tu.ext(
+                    tu.constant(2LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto res_val = tu.callf("fcvt_s",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ), 
+                tu.ext(
+                    tu.constant(2LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 121);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 122: FCVT.S.WU */
+    compile_ret_t __fcvt_s_wu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_S_WU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 122);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.wu"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.callf("fcvt_s",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ), 
+                tu.ext(
+                    tu.constant(3LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            auto res_val = tu.callf("fcvt_s",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ), 
+                tu.ext(
+                    tu.constant(3LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            );
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 122);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 123: FMV.X.W */
+    compile_ret_t __fmv_x_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMV_X_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 123);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fmv.x.w"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                32 
+            ),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 123);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 124: FMV.W.X */
+    compile_ret_t __fmv_w_x(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMV_W_X_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 124);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.trunc(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32 
+            ), 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 124);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 125: FCVT.L.S */
+    compile_ret_t __fcvt_l_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_L_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 125);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.l.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_32_64",
+            tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            ), 
+            tu.ext(
+                tu.constant(0LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            res_val,
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 125);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 126: FCVT.LU.S */
+    compile_ret_t __fcvt_lu_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_LU_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 126);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} x{rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.lu.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_32_64",
+            tu.callf("unbox_s",
+                tu.load(rs1 + traits<ARCH>::F0, 0)
+            ), 
+            tu.ext(
+                tu.constant(1LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            res_val,
+            64,
+            true), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 126);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 127: FCVT.S.L */
+    compile_ret_t __fcvt_s_l(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_S_L_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 127);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, x{rs1}", fmt::arg("mnemonic", "fcvt.s.l"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_64_32",
+            tu.load(rs1 + traits<ARCH>::X0, 0), 
+            tu.ext(
+                tu.constant(2LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 127);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 128: FCVT.S.LU */
+    compile_ret_t __fcvt_s_lu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_S_LU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 128);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, x{rs1}", fmt::arg("mnemonic", "fcvt.s.lu"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_64_32",
+            tu.load(rs1 + traits<ARCH>::X0, 0), 
+            tu.ext(
+                tu.constant(3LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 128);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 129: FLD */
+    compile_ret_t __fld(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 129);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {imm}({rs1})", fmt::arg("mnemonic", "fld"),
+            	fmt::arg("rd", rd), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 64);
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 129);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 130: FSD */
+    compile_ret_t __fsd(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 130);
+        int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rs2}, {imm}({rs1})", fmt::arg("mnemonic", "fsd"),
+            	fmt::arg("rs2", rs2), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + traits<ARCH>::F0, 0),
+            64 
+        ), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 130);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 131: FMADD.D */
+    compile_ret_t __fmadd_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMADD_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 131);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fmadd.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fmadd_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs3 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(0LL, 64U),
+                64,
+                true), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 131);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 132: FMSUB.D */
+    compile_ret_t __fmsub_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMSUB_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 132);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fmsub.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fmadd_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs3 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(1LL, 64U),
+                32,
+                true), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 132);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 133: FNMADD.D */
+    compile_ret_t __fnmadd_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FNMADD_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 133);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fnmadd.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fmadd_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs3 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(2LL, 64U),
+                32,
+                true), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 133);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 134: FNMSUB.D */
+    compile_ret_t __fnmsub_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FNMSUB_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 134);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}, f{rs3}", fmt::arg("mnemonic", "fnmsub.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fmadd_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs3 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(3LL, 64U),
+                32,
+                true), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 134);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 135: FADD.D */
+    compile_ret_t __fadd_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FADD_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 135);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fadd.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fadd_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 135);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 136: FSUB.D */
+    compile_ret_t __fsub_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSUB_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 136);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsub.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fsub_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 136);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 137: FMUL.D */
+    compile_ret_t __fmul_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMUL_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 137);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmul.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fmul_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 137);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 138: FDIV.D */
+    compile_ret_t __fdiv_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FDIV_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 138);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fdiv.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fdiv_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 138);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 139: FSQRT.D */
+    compile_ret_t __fsqrt_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSQRT_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 139);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fsqrt.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fsqrt_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.choose(
+                tu.icmp(
+                    ICmpInst::ICMP_ULT,
+                    tu.constant(rm, 8U),
+                    tu.constant(7, 8U)),
+                tu.constant(rm, 8U),
+                tu.trunc(
+                    tu.load(traits<ARCH>::FCSR, 0),
+                    8 
+                ))
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 139);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 140: FSGNJ.D */
+    compile_ret_t __fsgnj_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJ_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 140);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnj.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        uint64_t ONE_val = 1;
+        uint64_t MSK1_val = ONE_val << 63;
+        uint64_t MSK2_val = MSK1_val - 1;
+        auto res_val = tu.l_or(
+            tu.l_and(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ),
+                tu.constant(MSK2_val, 64U)),
+            tu.l_and(
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                ),
+                tu.constant(MSK1_val, 64U)));
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 140);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 141: FSGNJN.D */
+    compile_ret_t __fsgnjn_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJN_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 141);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnjn.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        uint64_t ONE_val = 1;
+        uint64_t MSK1_val = ONE_val << 63;
+        uint64_t MSK2_val = MSK1_val - 1;
+        auto res_val = tu.l_or(
+            tu.l_and(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ),
+                tu.constant(MSK2_val, 64U)),
+            tu.l_and(
+                tu.l_not(tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                )),
+                tu.constant(MSK1_val, 64U)));
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 141);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 142: FSGNJX.D */
+    compile_ret_t __fsgnjx_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FSGNJX_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 142);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fsgnjx.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        uint64_t ONE_val = 1;
+        uint64_t MSK1_val = ONE_val << 63;
+        auto res_val = tu.l_xor(
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ),
+            tu.l_and(
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                ),
+                tu.constant(MSK1_val, 64U)));
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 142);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 143: FMIN.D */
+    compile_ret_t __fmin_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMIN_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 143);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmin.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fsel_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(0LL, 64U),
+                32,
+                true)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 143);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 144: FMAX.D */
+    compile_ret_t __fmax_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMAX_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 144);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fmax.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fsel_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.trunc(
+                tu.load(rs2 + traits<ARCH>::F0, 0),
+                64 
+            ), 
+            tu.ext(
+                tu.constant(1LL, 64U),
+                32,
+                true)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 144);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 145: FCVT.S.D */
+    compile_ret_t __fcvt_s_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_S_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 145);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.s.d"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fconv_d2f",
+            tu.load(rs1 + traits<ARCH>::F0, 0), 
+            tu.constant(rm, 8U)
+        );
+        uint64_t upper_val = - 1;
+        auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.l_or(
+            tu.shl(
+                tu.constant(upper_val, 64U),
+                tu.constant(32, 64U)),
+            tu.ext(
+                res_val,
+                64,
+                true)), 64);
+        tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 145);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 146: FCVT.D.S */
+    compile_ret_t __fcvt_d_s(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_D_S_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 146);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.d.s"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fconv_f2d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                32 
+            ), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 146);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 147: FEQ.D */
+    compile_ret_t __feq_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FEQ_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 147);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "feq.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcmp_d",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true)
+            ),
+            64,
+            true), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 147);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 148: FLT.D */
+    compile_ret_t __flt_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLT_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 148);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "flt.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcmp_d",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(2LL, 64U),
+                    32,
+                    true)
+            ),
+            64,
+            true), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 148);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 149: FLE.D */
+    compile_ret_t __fle_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FLE_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 149);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}, f{rs2}", fmt::arg("mnemonic", "fle.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcmp_d",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.trunc(
+                    tu.load(rs2 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true)
+            ),
+            64,
+            true), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 149);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 150: FCLASS.D */
+    compile_ret_t __fclass_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCLASS_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 150);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fclass.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.callf("fclass_d",
+            tu.trunc(
+                tu.load(rs1 + traits<ARCH>::F0, 0),
+                64 
+            )
+        ), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 150);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 151: FCVT.W.D */
+    compile_ret_t __fcvt_w_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_W_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 151);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.w.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcvt_64_32",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 151);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 152: FCVT.WU.D */
+    compile_ret_t __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_WU_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 152);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.wu.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcvt_64_32",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 152);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 153: FCVT.D.W */
+    compile_ret_t __fcvt_d_w(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_D_W_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 153);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.w"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_32_64",
+            tu.ext(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                64,
+                false), 
+            tu.ext(
+                tu.constant(2LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 153);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 154: FCVT.D.WU */
+    compile_ret_t __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_D_WU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 154);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.wu"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_32_64",
+            tu.ext(
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    32 
+                ),
+                64,
+                true), 
+            tu.ext(
+                tu.constant(3LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 154);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 155: FCVT.L.D */
+    compile_ret_t __fcvt_l_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_L_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 155);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.l.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcvt_d",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(0LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 155);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 156: FCVT.LU.D */
+    compile_ret_t __fcvt_lu_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_LU_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 156);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fcvt.lu.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.callf("fcvt_d",
+                tu.trunc(
+                    tu.load(rs1 + traits<ARCH>::F0, 0),
+                    64 
+                ), 
+                tu.ext(
+                    tu.constant(1LL, 64U),
+                    32,
+                    true), 
+                tu.constant(rm, 8U)
+            ),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        auto flags_val = tu.callf("fget_flags"
+        );
+        auto FCSR_val_v = tu.assignment("FCSR_val", tu.add(
+            tu.l_and(
+                tu.load(traits<ARCH>::FCSR, 0),
+                tu.l_not(tu.constant(0x1f, 32U))),
+            flags_val), 32);
+        tu.store(FCSR_val_v, traits<ARCH>::FCSR);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 156);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 157: FCVT.D.L */
+    compile_ret_t __fcvt_d_l(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_D_L_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 157);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.l"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_d",
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64,
+                false), 
+            tu.ext(
+                tu.constant(2LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 157);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 158: FCVT.D.LU */
+    compile_ret_t __fcvt_d_lu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FCVT_D_LU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 158);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.lu"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto res_val = tu.callf("fcvt_d",
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64,
+                true), 
+            tu.ext(
+                tu.constant(3LL, 64U),
+                32,
+                true), 
+            tu.constant(rm, 8U)
+        );
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 158);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 159: FMV.X.D */
+    compile_ret_t __fmv_x_d(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMV_X_D_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 159);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, f{rs1}", fmt::arg("mnemonic", "fmv.x.d"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.load(rs1 + traits<ARCH>::F0, 0),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 159);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 160: FMV.D.X */
+    compile_ret_t __fmv_d_x(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("FMV_D_X_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 160);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {rs1}", fmt::arg("mnemonic", "fmv.d.x"),
+            	fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto Ftmp0_val_v = tu.assignment("Ftmp0_val", tu.ext(
+            tu.load(rs1 + traits<ARCH>::X0, 0),
+            64,
+            true), 64);
+        tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 160);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 161: C.ADDI4SPN */
+    compile_ret_t __c_addi4spn(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADDI4SPN_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 161);
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        if(imm == 0){
+            this->gen_raise_trap(tu, 0, 2);
+        }
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(imm, 64U)), 64);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 161);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 162: C.LW */
+    compile_ret_t __c_lw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 162);
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 162);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 163: C.SW */
+    compile_ret_t __c_sw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 163);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
+            	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + 8 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 163);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 164: C.ADDI */
+    compile_ret_t __c_addi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 164);
+        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 164);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 165: C.NOP */
+    compile_ret_t __c_nop(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_NOP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 165);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "c.nop");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        tu.close_scope();
+        /* TODO: describe operations for C.NOP ! */
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 165);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 166: C.JAL */
+    compile_ret_t __c_jal(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_JAL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 166);
+        int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
+            	fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            cur_pc_val,
+            tu.constant(2, 64U)), 64);
+        tu.store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
+                cur_pc_val,
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 166);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 167: C.LI */
+    compile_ret_t __c_li(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 167);
+        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        if(rd == 0){
+            this->gen_raise_trap(tu, 0, 2);
+        }
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 64U), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 167);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 168: C.LUI */
+    compile_ret_t __c_lui(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LUI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 168);
+        int32_t imm = signextend<int32_t,18>((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
+            	fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        if(rd == 0){
+            this->gen_raise_trap(tu, 0, 2);
+        }
+        if(imm == 0){
+            this->gen_raise_trap(tu, 0, 2);
+        }
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.constant(imm, 64U), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 168);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 169: C.ADDI16SP */
+    compile_ret_t __c_addi16sp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADDI16SP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 169);
+        int16_t imm = signextend<int16_t,10>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
+            	fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.ext(
+                tu.load(2 + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(Xtmp0_val_v, 2 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 169);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 170: C.SRLI */
+    compile_ret_t __c_srli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SRLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 170);
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
+            	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rs1_idx_val = rs1 + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.lshr(
+            tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 64U)), 64);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 170);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 171: C.SRAI */
+    compile_ret_t __c_srai(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SRAI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 171);
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
+            	fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rs1_idx_val = rs1 + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ashr(
+            tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 64U)), 64);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 171);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 172: C.ANDI */
+    compile_ret_t __c_andi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ANDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 172);
+        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
+            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rs1_idx_val = rs1 + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+            tu.ext(
+                tu.load(rs1_idx_val + traits<ARCH>::X0, 0),
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(Xtmp0_val_v, rs1_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 172);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 173: C.SUB */
+    compile_ret_t __c_sub(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SUB_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 173);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rd_idx_val = rd + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.sub(
+             tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+             tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 64);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 173);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 174: C.XOR */
+    compile_ret_t __c_xor(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_XOR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 174);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rd_idx_val = rd + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_xor(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 64);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 174);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 175: C.OR */
+    compile_ret_t __c_or(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_OR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 175);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rd_idx_val = rd + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_or(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 64);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 175);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 176: C.AND */
+    compile_ret_t __c_and(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_AND_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 176);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        uint8_t rd_idx_val = rd + 8;
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.l_and(
+            tu.load(rd_idx_val + traits<ARCH>::X0, 0),
+            tu.load(rs2 + 8 + traits<ARCH>::X0, 0)), 64);
+        tu.store(Xtmp0_val_v, rd_idx_val + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 176);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 177: C.J */
+    compile_ret_t __c_j(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_J_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 177);
+        int16_t imm = signextend<int16_t,12>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
+            	fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.add(
+            tu.ext(
+                cur_pc_val,
+                64, false),
+            tu.constant(imm, 64U)), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 177);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 178: C.BEQZ */
+    compile_ret_t __c_beqz(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_BEQZ_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 178);
+        int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
+            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_EQ,
+                tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(2, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 178);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 179: C.BNEZ */
+    compile_ret_t __c_bnez(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_BNEZ_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 179);
+        int16_t imm = signextend<int16_t,9>((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
+            	fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.choose(
+            tu.icmp(
+                ICmpInst::ICMP_NE,
+                tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+                tu.constant(0, 64U)),
+            tu.add(
+                tu.ext(
+                    cur_pc_val,
+                    64, false),
+                tu.constant(imm, 64U)),
+            tu.add(
+                cur_pc_val,
+                tu.constant(2, 64U))), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        auto is_cont_v = tu.choose(
+            tu.icmp(ICmpInst::ICMP_NE, tu.ext(PC_val_v, 64U, true), tu.constant(pc.val, 64U)),
+            tu.constant(0U, 32), tu.constant(1U, 32));
+        tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 179);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 180: C.SLLI */
+    compile_ret_t __c_slli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SLLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 180);
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        if(rs1 == 0){
+            this->gen_raise_trap(tu, 0, 2);
+        }
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.shl(
+            tu.load(rs1 + traits<ARCH>::X0, 0),
+            tu.constant(shamt, 64U)), 64);
+        tu.store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 180);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 181: C.LWSP */
+    compile_ret_t __c_lwsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 181);
+        uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+            	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 32),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 181);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 182: C.MV */
+    compile_ret_t __c_mv(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_MV_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 182);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 182);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 183: C.JR */
+    compile_ret_t __c_jr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_JR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 183);
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
+            	fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto PC_val_v = tu.assignment("PC_val", tu.load(rs1 + traits<ARCH>::X0, 0), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 183);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 184: C.ADD */
+    compile_ret_t __c_add(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 184);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            tu.load(rd + traits<ARCH>::X0, 0),
+            tu.load(rs2 + traits<ARCH>::X0, 0)), 64);
+        tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 184);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 185: C.JALR */
+    compile_ret_t __c_jalr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_JALR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 185);
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
+            	fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.add(
+            cur_pc_val,
+            tu.constant(2, 64U)), 64);
+        tu.store(Xtmp0_val_v, 1 + traits<ARCH>::X0);
+        auto PC_val_v = tu.assignment("PC_val", tu.load(rs1 + traits<ARCH>::X0, 0), 64);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 185);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 186: C.EBREAK */
+    compile_ret_t __c_ebreak(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_EBREAK_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 186);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "c.ebreak");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        this->gen_raise_trap(tu, 0, 3);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 186);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 187: C.SWSP */
+    compile_ret_t __c_swsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 187);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 187);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 188: DII */
+    compile_ret_t __dii(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DII_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 188);
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "dii");
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        this->gen_raise_trap(tu, 0, 2);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 188);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
+    }
+    
+    /* instruction 189: C.LD */
+    compile_ret_t __c_ld(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 189);
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,2>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {uimm},({rs1})", fmt::arg("mnemonic", "c.ld"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 189);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 190: C.SD */
+    compile_ret_t __c_sd(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 190);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,2>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm},({rs1})", fmt::arg("mnemonic", "c.sd"),
+            	fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + 8 + traits<ARCH>::X0, 0), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 190);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 191: C.SUBW */
+    compile_ret_t __c_subw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SUBW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 191);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rd}, {rs2}", fmt::arg("mnemonic", "c.subw"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto res_val = tu.sub(
+             tu.trunc(
+                 tu.load(rd + 8 + traits<ARCH>::X0, 0),
+                 32 
+             ),
+             tu.trunc(
+                 tu.load(rs2 + 8 + traits<ARCH>::X0, 0),
+                 32 
+             ));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            res_val,
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 191);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 192: C.ADDW */
+    compile_ret_t __c_addw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADDW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 192);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rd}, {rs2}", fmt::arg("mnemonic", "c.addw"),
+            	fmt::arg("rd", name(8+rd)), fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto res_val = tu.add(
+            tu.trunc(
+                tu.load(rd + 8 + traits<ARCH>::X0, 0),
+                32 
+            ),
+            tu.trunc(
+                tu.load(rs2 + 8 + traits<ARCH>::X0, 0),
+                32 
+            ));
+        auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+            res_val,
+            64,
+            false), 64);
+        tu.store(Xtmp0_val_v, rd + 8 + traits<ARCH>::X0);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 192);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 193: C.ADDIW */
+    compile_ret_t __c_addiw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_ADDIW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 193);
+        int8_t imm = signextend<int8_t,6>((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addiw"),
+            	fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        if(rs1 != 0){
+            auto res_val = tu.add(
+                tu.ext(
+                    tu.trunc(
+                        tu.load(rs1 + traits<ARCH>::X0, 0),
+                        32 
+                    ),
+                    32, false),
+                tu.constant(imm, 32U));
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                res_val,
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rs1 + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 193);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 194: C.LDSP */
+    compile_ret_t __c_ldsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_LDSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 194);
+        uint16_t uimm = ((bit_sub<2,3>(instr) << 6) | (bit_sub<5,2>(instr) << 3) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {uimm}(sp)", fmt::arg("mnemonic", "c.ldsp"),
+            	fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        if(rd != 0){
+            auto Xtmp0_val_v = tu.assignment("Xtmp0_val", tu.ext(
+                tu.read_mem(traits<ARCH>::MEM, offs_val, 64),
+                64,
+                false), 64);
+            tu.store(Xtmp0_val_v, rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 194);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 195: C.SDSP */
+    compile_ret_t __c_sdsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_SDSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 195);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint16_t uimm = ((bit_sub<7,3>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm}(sp)", fmt::arg("mnemonic", "c.sdsp"),
+            	fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.load(rs2 + traits<ARCH>::X0, 0), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 195);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 196: C.FLW */
+    compile_ret_t __c_flw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FLW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 196);
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f(8+{rd}), {uimm}({rs1})", fmt::arg("mnemonic", "c.flw"),
+            	fmt::arg("rd", rd), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 32);
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + 8 + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + 8 + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 196);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 197: C.FSW */
+    compile_ret_t __c_fsw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FSW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 197);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f(8+{rs2}), {uimm}({rs1})", fmt::arg("mnemonic", "c.fsw"),
+            	fmt::arg("rs2", rs2), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + 8 + traits<ARCH>::F0, 0),
+            32 
+        ), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 197);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 198: C.FLWSP */
+    compile_ret_t __c_flwsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FLWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 198);
+        uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {uimm}(x2)", fmt::arg("mnemonic", "c.flwsp"),
+            	fmt::arg("rd", rd), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 32);
+        if(64 == 32){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(32, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 198);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 199: C.FSWSP */
+    compile_ret_t __c_fswsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FSWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 199);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rs2}, {uimm}(x2), ", fmt::arg("mnemonic", "c.fswsp"),
+            	fmt::arg("rs2", rs2), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + traits<ARCH>::F0, 0),
+            32 
+        ), 32);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 199);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 200: C.FLD */
+    compile_ret_t __c_fld(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FLD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 200);
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,2>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f(8+{rd}), {uimm}({rs1})", fmt::arg("mnemonic", "c.fld"),
+            	fmt::arg("rd", rd), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 64);
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + 8 + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                res_val), 64);
+            tu.store(Ftmp1_val_v, rd + 8 + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 200);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 201: C.FSD */
+    compile_ret_t __c_fsd(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FSD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 201);
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,2>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f(8+{rs2}), {uimm}({rs1})", fmt::arg("mnemonic", "c.fsd"),
+            	fmt::arg("rs2", rs2), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(rs1 + 8 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + 8 + traits<ARCH>::F0, 0),
+            64 
+        ), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 201);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 202: C.FLDSP */
+    compile_ret_t __c_fldsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FLDSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 202);
+        uint16_t uimm = ((bit_sub<2,3>(instr) << 6) | (bit_sub<5,2>(instr) << 3) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rd}, {uimm}(x2)", fmt::arg("mnemonic", "c.fldsp"),
+            	fmt::arg("rd", rd), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto res_val = tu.read_mem(traits<ARCH>::MEM, offs_val, 64);
+        if(64 == 64){
+            auto Ftmp0_val_v = tu.assignment("Ftmp0_val", res_val, 64);
+            tu.store(Ftmp0_val_v, rd + traits<ARCH>::F0);
+        } else {
+            uint64_t upper_val = - 1;
+            auto Ftmp1_val_v = tu.assignment("Ftmp1_val", tu.l_or(
+                tu.shl(
+                    tu.constant(upper_val, 64U),
+                    tu.constant(64, 64U)),
+                tu.ext(
+                    res_val,
+                    64,
+                    true)), 64);
+            tu.store(Ftmp1_val_v, rd + traits<ARCH>::F0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 202);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 203: C.FSDSP */
+    compile_ret_t __c_fsdsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C_FSDSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 203);
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint16_t uimm = ((bit_sub<7,3>(instr) << 6) | (bit_sub<10,3>(instr) << 3));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} f{rs2}, {uimm}(x2), ", fmt::arg("mnemonic", "c.fsdsp"),
+            	fmt::arg("rs2", rs2), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+2;
+        tu.open_scope();
+        auto offs_val = tu.add(
+            tu.load(2 + traits<ARCH>::X0, 0),
+            tu.constant(uimm, 64U));
+        auto MEMtmp0_val_v = tu.assignment("MEMtmp0_val", tu.trunc(
+            tu.load(rs2 + traits<ARCH>::F0, 0),
+            64 
+        ), 64);
+        tu.write_mem(
+            traits<ARCH>::MEM,
+            offs_val,
+            MEMtmp0_val_v);
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 203);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
     }
     
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, std::stringstream& os) {
-		this->gen_sync(iss::PRE_SYNC, instr_descr.size());
-        this->builder.CreateStore(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), true),
-                                   get_reg_ptr(traits<ARCH>::PC), true);
-        this->builder.CreateStore(
-            this->builder.CreateAdd(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::ICOUNT), true),
-                                     this->gen_const(64U, 1)),
-            get_reg_ptr(traits<ARCH>::ICOUNT), true);
+    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, tu_builder& tu) {
+        vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        this->gen_raise_trap(0, 2);     // illegal instruction trap
-		this->gen_sync(iss::POST_SYNC, instr_descr.size());
-        this->gen_trap_check(this->leave_blk);
+        gen_raise_trap(tu, 0, 2);     // illegal instruction trap
+        vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
+        vm_impl::gen_trap_check(tu);
         return BRANCH;
     }
 };
@@ -1459,7 +9403,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 
 template <typename ARCH>
 std::tuple<continuation_e>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, std::ostringstrem& os) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, tu_builder& tu) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t insn = 0;
@@ -1485,53 +9429,31 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     if (f == nullptr) {
         f = &this_class::illegal_intruction;
     }
-    return (this->*f)(pc, insn, this_block);
+    return (this->*f)(pc, insn, tu);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_behavior(BasicBlock *leave_blk) {
-    this->builder.SetInsertPoint(leave_blk);
-    this->builder.CreateRet(this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::NEXT_PC), false));
+template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause) {
+    tu("  *trap_state = {:#x};", 0x80 << 24 | (cause << 16) | trap_id);
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
-    auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
-    this->builder.CreateStore(TRAP_val, get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(tu_builder& tu, unsigned lvl) {
+    tu("leave_trap(core_ptr, {});", lvl);
+    tu.store(tu.read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN),traits<ARCH>::NEXT_PC);
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(unsigned lvl) {
-    std::vector<Value *> args{ this->core_ptr, ConstantInt::get(getContext(), APInt(64, lvl)) };
-    this->builder.CreateCall(this->mod->getFunction("leave_trap"), args);
-    auto *PC_val = this->gen_read_mem(traits<ARCH>::CSR, (lvl << 8) + 0x41, traits<ARCH>::XLEN / 8);
-    this->builder.CreateStore(PC_val, get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()), get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
+template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned type) {
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_wait(unsigned type) {
-    std::vector<Value *> args{ this->core_ptr, ConstantInt::get(getContext(), APInt(64, type)) };
-    this->builder.CreateCall(this->mod->getFunction("wait"), args);
+template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
+    tu("trap_entry:");
+    tu("enter_trap(core_ptr, *trap_state, *pc);");
+    tu.store(tu.constant(std::numeric_limits<uint32_t>::max(),32),traits<ARCH>::LAST_BRANCH);
+    tu("return *next_pc;");
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(BasicBlock *trap_blk) {
-    this->builder.SetInsertPoint(trap_blk);
-    auto *trap_state_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::TRAP_STATE), true);
-    this->builder.CreateStore(this->gen_const(32U, std::numeric_limits<uint32_t>::max()),
-                              get_reg_ptr(traits<ARCH>::LAST_BRANCH), false);
-    std::vector<Value *> args{this->core_ptr, this->adj_to64(trap_state_val),
-                              this->adj_to64(this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::PC), false))};
-    this->builder.CreateCall(this->mod->getFunction("enter_trap"), args);
-    auto *trap_addr_val = this->builder.CreateLoad(get_reg_ptr(traits<ARCH>::NEXT_PC), false);
-    this->builder.CreateRet(trap_addr_val);
-}
-
-template <typename ARCH> inline void vm_impl<ARCH>::gen_trap_check(BasicBlock *bb) {
-    auto *v = this->builder.CreateLoad(get_reg_ptr(arch::traits<ARCH>::TRAP_STATE), true);
-    this->gen_cond_branch(this->builder.CreateICmp(
-                              ICmpInst::ICMP_EQ, v,
-                              ConstantInt::get(getContext(), APInt(v->getType()->getIntegerBitWidth(), 0))),
-                          bb, this->trap_blk, 1);
-}
-} // namespace rv64gc
+} // namespace mnrv32
 
 template <>
 std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short port, bool dump) {
