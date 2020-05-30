@@ -35,16 +35,8 @@
 #include "util/ities.h"
 #include <util/logging.h>
 
-#include <elfio/elfio.hpp>
 #include <iss/arch/rv64gc.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <ihex.h>
-#ifdef __cplusplus
-}
-#endif
 #include <cstdio>
 #include <cstring>
 #include <fstream>

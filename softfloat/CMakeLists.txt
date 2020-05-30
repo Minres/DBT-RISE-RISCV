@@ -2,30 +2,16 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../cmake) # main (top) cmake dir
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake) # project specific cmake dir
 
-# CMake useful variables
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib") 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-
 # Set the name of your project here
-project("sotfloat")
+project("sotfloat" VERSION 3.0.0)
 
 # Set the version number of your project here (format is MAJOR.MINOR.PATCHLEVEL - e.g. 1.0.0)
 set(VERSION "3e")
 
 include(Common)
+include(GNUInstallDirs)
 
 set(SPECIALIZATION RISCV)
-
-add_definitions(
-	-DSOFTFLOAT_ROUND_ODD 
-	-DINLINE_LEVEL=5 
-	-DSOFTFLOAT_FAST_DIV32TO16
-  	-DSOFTFLOAT_FAST_DIV64TO32
-  	-DSOFTFLOAT_FAST_INT64
-#  	-DTHREAD_LOCAL=__thread
-)
-
 
 set(LIB_HEADERS source/include/softfloat.h source/include/softfloat_types.h)
 set(PRIMITIVES
@@ -341,32 +327,29 @@ set(OTHERS
 
 set(LIB_SOURCES ${PRIMITIVES} ${SPECIALIZE} ${OTHERS})
 
-# Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME softfloat)
-
-# Define the library
-add_library(${LIBRARY_NAME} ${LIB_SOURCES})
-set_property(TARGET ${LIBRARY_NAME} PROPERTY C_STANDARD 99)
-target_include_directories(${LIBRARY_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/build/Linux-x86_64-GCC)
-target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source/include ${CMAKE_CURRENT_SOURCE_DIR}/source/${SPECIALIZATION})
-# Set the build version. It will be used in the name of the lib, with corresponding
-# symlinks created. SOVERSION could also be specified for api version. 
-set_target_properties(${LIBRARY_NAME} PROPERTIES
+add_library(softfloat ${LIB_SOURCES})
+set_property(TARGET softfloat PROPERTY C_STANDARD 99)
+target_compile_definitions(softfloat PRIVATE 
+	SOFTFLOAT_ROUND_ODD 
+	INLINE_LEVEL=5 
+	SOFTFLOAT_FAST_DIV32TO16
+  	SOFTFLOAT_FAST_DIV64TO32
+  	SOFTFLOAT_FAST_INT64
+#  	THREAD_LOCAL=__thread
+)
+target_include_directories(softfloat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/build/Linux-x86_64-GCC)
+target_include_directories(softfloat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source/include ${CMAKE_CURRENT_SOURCE_DIR}/source/${SPECIALIZATION})
+set_target_properties(softfloat PROPERTIES
   VERSION ${VERSION}
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}"
 )
 
-# Says how and where to install software
-# Targets:
-#   * <prefix>/lib/<libraries>
-#   * header location after install: <prefix>/include/<project>/*.h
-#   * headers can be included by C++ code `#<project>/Bar.hpp>`
-install(TARGETS ${LIBRARY_NAME}
+install(TARGETS softfloat
   EXPORT ${PROJECT_NAME}Targets            # for downstream dependencies
-  ARCHIVE DESTINATION lib COMPONENT libs   # static lib
-  LIBRARY DESTINATION lib COMPONENT libs   # shared lib
-  FRAMEWORK DESTINATION bin COMPONENT libs # for mac
-  PUBLIC_HEADER DESTINATION include COMPONENT devel   # headers for mac (note the different component -> different package)
-  INCLUDES DESTINATION include             # headers
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # static lib
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # shared lib
+  FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs # for mac
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT devel   # headers for mac (note the different component -> different package)
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}                # headers
 )

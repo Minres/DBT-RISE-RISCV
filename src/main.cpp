@@ -41,7 +41,9 @@
 #include <iss/arch/rv64gc.h>
 #include <iss/arch/rv64i.h>
 #include <iss/arch/mnrv32.h>
+#ifdef WITH_LLVM
 #include <iss/llvm/jit_helper.h>
+#endif
 #include <iss/log_categories.h>
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
@@ -56,8 +58,10 @@ std::tuple<cpu_ptr, vm_ptr> create_cpu(std::string const& backend, unsigned gdb_
     CORE* lcpu = new iss::arch::riscv_hart_msu_vp<CORE>();
     if(backend == "interp")
         return {cpu_ptr{lcpu}, vm_ptr{iss::interp::create(lcpu, gdb_port)}};
+#ifdef WITH_LLVM
     if(backend == "llvm")
         return {cpu_ptr{lcpu}, vm_ptr{iss::llvm::create(lcpu, gdb_port)}};
+#endif
     if(backend == "tcc")
         return {cpu_ptr{lcpu}, vm_ptr{iss::tcc::create(lcpu, gdb_port)}};
     return {nullptr, nullptr};
@@ -119,8 +123,10 @@ int main(int argc, char *argv[]) {
     std::vector<iss::vm_plugin *> plugin_list;
     auto res = 0;
     try {
+#ifdef WITH_LLVM
         // application code comes here //
         iss::init_jit_debug(argc, argv);
+#endif
         bool dump = clim.count("dump-ir");
         // instantiate the simulator
         vm_ptr vm{nullptr};
@@ -130,19 +136,19 @@ int main(int argc, char *argv[]) {
             std::tie(cpu, vm) = create_cpu<iss::arch::mnrv32>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
         } else if (isa_opt=="rv64i") {
             std::tie(cpu, vm) = create_cpu<iss::arch::rv64i>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-//        } else if (isa_opt=="rv64gc") {
-//            std::tie(cpu, vm) = create_cpu<iss::arch::rv64gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-//        } else if (isa_opt=="rv32imac") {
-//            std::tie(cpu, vm) = create_cpu<iss::arch::rv32imac>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-//        } else if (isa_opt=="rv32gc") {
-//            std::tie(cpu, vm) = create_cpu<iss::arch::rv32gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+        } else if (isa_opt=="rv64gc") {
+            std::tie(cpu, vm) = create_cpu<iss::arch::rv64gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+        } else if (isa_opt=="rv32imac") {
+            std::tie(cpu, vm) = create_cpu<iss::arch::rv32imac>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
+        } else if (isa_opt=="rv32gc") {
+            std::tie(cpu, vm) = create_cpu<iss::arch::rv32gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
         } else {
             LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;
         }
         if (clim.count("plugin")) {
-            for (std::string opt_val : clim["plugin"].as<std::vector<std::string>>()) {
-                std::string plugin_name{opt_val};
+            for (std::string const& opt_val : clim["plugin"].as<std::vector<std::string>>()) {
+                std::string plugin_name=opt_val;
                 std::string filename{"cycles.txt"};
                 std::size_t found = opt_val.find('=');
                 if (found != std::string::npos) {

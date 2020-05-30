@@ -1,42 +1,28 @@
 cmake_minimum_required(VERSION 3.12)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../cmake) # main (top) cmake dir
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake) # project specific cmake dir
 
-# CMake useful variables
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib") 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+project("riscv" VERSION 1.0.0)
 
-# Set the name of your project here
-project("riscv")
-
-include(Common)
+include(GNUInstallDirs)
 
 conan_basic_setup()
 
 find_package(Boost COMPONENTS program_options system thread filesystem REQUIRED)
+if(WITH_LLVM)
+	if(DEFINED ENV{LLVM_HOME})
+		find_path (LLVM_DIR LLVM-Config.cmake $ENV{LLVM_HOME}/lib/cmake/llvm)
+	endif(DEFINED ENV{LLVM_HOME})
+	find_package(LLVM REQUIRED CONFIG)
+	message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+	message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+	llvm_map_components_to_libnames(llvm_libs support core mcjit x86codegen x86asmparser)
+endif()
 
-# This sets the include directory for the reference project. This is the -I flag in gcc.
-include_directories(
-    ${PROJECT_SOURCE_DIR}/incl
-	${SOFTFLOAT_INCLUDE_DIRS}
-    ${LLVM_INCLUDE_DIRS}
-)
-add_dependent_subproject(dbt-core)
-include_directories(
-    ${PROJECT_SOURCE_DIR}/incl
-    ${PROJECT_SOURCE_DIR}/../external/elfio
-    ${PROJECT_SOURCE_DIR}/../external/libGIS
-    ${Boost_INCLUDE_DIRS}
-)
-
-
-# Mac needed variables (adapt for your needs - http://www.cmake.org/Wiki/CMake_RPATH_handling#Mac_OS_X_and_the_RPATH)
-set(CMAKE_MACOSX_RPATH ON)
-set(CMAKE_SKIP_BUILD_RPATH FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+#Mac needed variables (adapt for your needs - http://www.cmake.org/Wiki/CMake_RPATH_handling#Mac_OS_X_and_the_RPATH)
+#set(CMAKE_MACOSX_RPATH ON)
+#set(CMAKE_SKIP_BUILD_RPATH FALSE)
+#set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+#set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+#set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_subdirectory(softfloat)
 
@@ -50,12 +36,6 @@ set(LIB_SOURCES
 	src/iss/rv64gc.cpp
 	src/iss/mnrv32.cpp
 	src/vm/fp_functions.cpp
-	src/vm/llvm/fp_impl.cpp
-	src/vm/llvm/vm_mnrv32.cpp
-	src/vm/llvm/vm_rv32gc.cpp
-	src/vm/llvm/vm_rv32imac.cpp
-	src/vm/llvm/vm_rv64i.cpp
-	src/vm/llvm/vm_rv64gc.cpp
 	src/vm/tcc/vm_mnrv32.cpp
 	src/vm/tcc/vm_rv32gc.cpp
 	src/vm/tcc/vm_rv32imac.cpp
@@ -67,78 +47,78 @@ set(LIB_SOURCES
 	src/vm/interp/vm_rv64i.cpp
 	src/vm/interp/vm_rv64gc.cpp
     src/plugin/instruction_count.cpp
-    src/plugin/cycle_estimate.cpp)
-
-# Define two variables in order not to repeat ourselves.
-set(LIBRARY_NAME riscv)
+    src/plugin/cycle_estimate.cpp
+)
+if(WITH_LLVM)
+set(LIB_SOURCES ${LIB_SOURCES}
+	src/vm/llvm/fp_impl.cpp
+	src/vm/llvm/vm_mnrv32.cpp
+	src/vm/llvm/vm_rv32gc.cpp
+	src/vm/llvm/vm_rv32imac.cpp
+	src/vm/llvm/vm_rv64i.cpp
+	src/vm/llvm/vm_rv64gc.cpp
+)
+endif()
 
 # Define the library
-add_library(${LIBRARY_NAME} ${LIB_SOURCES})
-SET(${LIBRARY_NAME} -Wl,-whole-archive -l${LIBRARY_NAME} -Wl,-no-whole-archive)
-target_link_libraries(${LIBRARY_NAME} softfloat dbt-core scc-util)
-set_target_properties(${LIBRARY_NAME} PROPERTIES
-  VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
+add_library(riscv ${LIB_SOURCES})
+SET(riscv -Wl,-whole-archive -lriscv -Wl,-no-whole-archive)
+target_compile_options(riscv PRIVATE -Wno-shift-count-overflow)
+target_include_directories(riscv PUBLIC incl ../external/elfio)
+target_link_libraries(riscv PUBLIC softfloat dbt-core scc-util)
+set_target_properties(riscv PROPERTIES
+  VERSION ${PROJECT_VERSION}
   FRAMEWORK FALSE
   PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
 )
 
 if(SystemC_FOUND)
-	set(SC_LIBRARY_NAME riscv_sc)
-	add_library(${SC_LIBRARY_NAME} src/sysc/core_complex.cpp)
-	add_definitions(-DWITH_SYSTEMC) 
-	include_directories(${SystemC_INCLUDE_DIRS})
-	
-	include_directories(${CCI_INCLUDE_DIRS})
+	add_library(riscv_sc src/sysc/core_complex.cpp)
+	target_compile_definitions(riscv_sc PUBLIC WITH_SYSTEMC) 
+	target_include_directories(riscv_sc PUBLIC ../incl ${SystemC_INCLUDE_DIRS} ${CCI_INCLUDE_DIRS})
 	
 	if(SCV_FOUND)   
-	    add_definitions(-DWITH_SCV)
-	    include_directories(${SCV_INCLUDE_DIRS})
+	    target_compile_definitions(riscv_sc PUBLIC WITH_SCV)
+	    target_include_directories(riscv_sc PUBLIC ${SCV_INCLUDE_DIRS})
 	endif()
-	target_link_libraries(${SC_LIBRARY_NAME} ${LIBRARY_NAME})
-	target_link_libraries(${SC_LIBRARY_NAME} dbt-core)
-	target_link_libraries(${SC_LIBRARY_NAME} softfloat)
-	target_link_libraries(${SC_LIBRARY_NAME} scc)
-	target_link_libraries(${SC_LIBRARY_NAME} external)
-	target_link_libraries(${SC_LIBRARY_NAME} ${llvm_libs})
-	target_link_libraries(${SC_LIBRARY_NAME} ${Boost_LIBRARIES} )
-	set_target_properties(${SC_LIBRARY_NAME} PROPERTIES
-	  VERSION ${VERSION}  # ${VERSION} was defined in the main CMakeLists.
+	target_link_libraries(riscv_sc PUBLIC riscv scc )
+	if(WITH_LLVM)
+		target_link_libraries(riscv_sc PUBLIC ${llvm_libs})
+	endif()
+	target_link_libraries(riscv_sc PUBLIC ${Boost_LIBRARIES} )
+	set_target_properties(riscv_sc PROPERTIES
+	  VERSION ${PROJECT_VERSION}
 	  FRAMEWORK FALSE
 	  PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
 	)
 endif()
 
 project("riscv-sim")
-
-# This is a make target, so you can do a "make riscv-sc"
-set(APPLICATION_NAME riscv-sim)
-
-add_executable(${APPLICATION_NAME} src/main.cpp)
-
+add_executable(riscv-sim src/main.cpp)
+# This sets the include directory for the reference project. This is the -I flag in gcc.
+target_include_directories(riscv-sim PRIVATE ../external/libGIS)
+if(WITH_LLVM)
+	target_compile_definitions(riscv-sim PRIVATE WITH_LLVM)
+	target_link_libraries(riscv-sim PUBLIC ${llvm_libs})
+endif()
 # Links the target exe against the libraries
-target_link_libraries(${APPLICATION_NAME} ${LIBRARY_NAME})
-target_link_libraries(${APPLICATION_NAME} jsoncpp)
-target_link_libraries(${APPLICATION_NAME} dbt-core)
-target_link_libraries(${APPLICATION_NAME} external)
-target_link_libraries(${APPLICATION_NAME} ${llvm_libs})
-target_link_libraries(${APPLICATION_NAME} ${Boost_LIBRARIES} )
+target_link_libraries(riscv-sim riscv)
+target_link_libraries(riscv-sim jsoncpp)
+target_link_libraries(riscv-sim dbt-core)
+target_link_libraries(riscv-sim external)
+target_link_libraries(riscv-sim ${Boost_LIBRARIES} )
 if (Tcmalloc_FOUND)
-    target_link_libraries(${APPLICATION_NAME} ${Tcmalloc_LIBRARIES})
+    target_link_libraries(riscv-sim ${Tcmalloc_LIBRARIES})
 endif(Tcmalloc_FOUND)
 
-# Says how and where to install software
-# Targets:
-#   * <prefix>/lib/<libraries>
-#   * header location after install: <prefix>/include/<project>/*.h
-#   * headers can be included by C++ code `#<project>/Bar.hpp>`
-install(TARGETS ${LIBRARY_NAME} ${APPLICATION_NAME}
+install(TARGETS riscv riscv-sim
   EXPORT ${PROJECT_NAME}Targets            # for downstream dependencies
-  ARCHIVE DESTINATION lib COMPONENT libs   # static lib
-  RUNTIME DESTINATION bin COMPONENT libs   # binaries
-  LIBRARY DESTINATION lib COMPONENT libs   # shared lib
-  FRAMEWORK DESTINATION bin COMPONENT libs # for mac
-  PUBLIC_HEADER DESTINATION incl/${PROJECT_NAME} COMPONENT devel   # headers for mac (note the different component -> different package)
-  INCLUDES DESTINATION incl             # headers
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # static lib
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT libs   # binaries
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # shared lib
+  FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs # for mac
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} COMPONENT devel   # headers for mac (note the different component -> different package)
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}             # headers
 )
 
 

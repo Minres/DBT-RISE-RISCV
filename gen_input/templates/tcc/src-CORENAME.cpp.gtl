@@ -70,17 +70,7 @@ def getRegisterAliasNames(){
 %>
 #include "util/ities.h"
 #include <util/logging.h>
-
-#include <elfio/elfio.hpp>
 #include <iss/arch/${coreDef.name.toLowerCase()}.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <ihex.h>
-#ifdef __cplusplus
-}
-#endif
 #include <cstdio>
 #include <cstring>
 #include <fstream>
