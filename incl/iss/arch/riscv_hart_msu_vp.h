@@ -857,6 +857,8 @@ iss::status riscv_hart_msu_vp<BASE>::write(const address_type type, const access
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_csr(unsigned addr, reg_t &val) {
     if (addr >= csr.size()) return iss::Err;
+    auto req_priv_lvl = (addr >> 8) & 0x3;
+    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     auto it = csr_rd_cb.find(addr);
     if (it == csr_rd_cb.end()) {
         val = csr[addr & csr.page_addr_mask];
@@ -869,6 +871,11 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_csr(unsigned 
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_csr(unsigned addr, reg_t val) {
     if (addr >= csr.size()) return iss::Err;
+    auto req_priv_lvl = (addr >> 8) & 0x3;
+    if (this->reg.machine_state < req_priv_lvl)
+        throw illegal_instruction_fault(this->fault_data);
+    if((addr&0xc00)==0xc00)
+        throw illegal_instruction_fault(this->fault_data);
     auto it = csr_wr_cb.find(addr);
     if (it == csr_wr_cb.end()) {
         csr[addr & csr.page_addr_mask] = val;
@@ -902,15 +909,13 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_status(unsigned addr, reg_t &val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
+    auto req_priv_lvl = (addr >> 8) & 0x3;
     val = state.mstatus & hart_state<reg_t>::get_mask(req_priv_lvl);
     return iss::Ok;
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_status(unsigned addr, reg_t val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
+    auto req_priv_lvl = (addr >> 8) & 0x3;
     state.write_mstatus(val, req_priv_lvl);
     check_interrupt();
     update_vm_info();
@@ -918,8 +923,6 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_status(unsig
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_ie(unsigned addr, reg_t &val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     val = csr[mie];
     if (addr < mie) val &= csr[mideleg];
     if (addr < sie) val &= csr[sideleg];
@@ -927,8 +930,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_ie(unsigned a
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_ie(unsigned addr, reg_t val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
+    auto req_priv_lvl = (addr >> 8) & 0x3;
     auto mask = get_irq_mask(req_priv_lvl);
     csr[mie] = (csr[mie] & ~mask) | (val & mask);
     check_interrupt();
@@ -936,8 +938,6 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_ie(unsigned 
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_ip(unsigned addr, reg_t &val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
     val = csr[mip];
     if (addr < mip) val &= csr[mideleg];
     if (addr < sip) val &= csr[sideleg];
@@ -945,8 +945,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_ip(unsigned a
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_ip(unsigned addr, reg_t val) {
-    auto req_priv_lvl = addr >> 8;
-    if (this->reg.machine_state < req_priv_lvl) throw illegal_instruction_fault(this->fault_data);
+    auto req_priv_lvl = (addr >> 8) & 0x3;
     auto mask = get_irq_mask(req_priv_lvl);
     mask &= ~(1 << 7); // MTIP is read only
     csr[mip] = (csr[mip] & ~mask) | (val & mask);

@@ -61,11 +61,11 @@ set(LIB_SOURCES ${LIB_SOURCES}
 endif()
 
 # Define the library
-add_library(riscv ${LIB_SOURCES})
-SET(riscv -Wl,-whole-archive -lriscv -Wl,-no-whole-archive)
+add_library(riscv SHARED ${LIB_SOURCES})
 target_compile_options(riscv PRIVATE -Wno-shift-count-overflow)
 target_include_directories(riscv PUBLIC incl ../external/elfio)
-target_link_libraries(riscv PUBLIC softfloat dbt-core scc-util)
+target_link_libraries(riscv PUBLIC softfloat scc-util)
+target_link_libraries(riscv PUBLIC -Wl,--whole-archive dbt-core -Wl,--no-whole-archive)
 set_target_properties(riscv PROPERTIES
   VERSION ${PROJECT_VERSION}
   FRAMEWORK FALSE
@@ -104,7 +104,6 @@ endif()
 # Links the target exe against the libraries
 target_link_libraries(riscv-sim riscv)
 target_link_libraries(riscv-sim jsoncpp)
-target_link_libraries(riscv-sim dbt-core)
 target_link_libraries(riscv-sim external)
 target_link_libraries(riscv-sim ${Boost_LIBRARIES} )
 if (Tcmalloc_FOUND)

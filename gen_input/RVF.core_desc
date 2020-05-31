@@ -10,7 +10,7 @@ InsructionSet RV32F extends RV32I{
     instructions{
         FLW {
             encoding: imm[11:0]s | rs1[4:0] | b010 | rd[4:0] | b0000111;
-            args_disass:"f{rd}, {imm}(x{rs1})";
+            args_disass:"f{rd}, {imm}({name(rs1)})";
             val offs[XLEN] <= X[rs1]'s + imm;
             val res[32] <= MEM[offs]{32};
             if(FLEN==32)
@@ -22,13 +22,13 @@ InsructionSet RV32F extends RV32I{
         }
         FSW {
             encoding: imm[11:5]s | rs2[4:0] | rs1[4:0] | b010 | imm[4:0]s | b0100111;
-            args_disass:"f{rs2}, {imm}(x{rs1})";
+            args_disass:"f{rs2}, {imm}({name(rs1)])";
             val offs[XLEN] <= X[rs1]'s + imm;
             MEM[offs]{32}<=F[rs2]{32};
         }
         FMADD.S {
             encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000011;
-            args_disass:"x{rd}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<= F[rs1]f * F[rs2]f + F[rs3]f;
             if(FLEN==32)
 	            F[rd] <= fdispatch_fmadd_s(F[rs1], F[rs2], F[rs3], zext(0, 32), choose(rm<7, rm{8}, FCSR{8}));
@@ -45,7 +45,7 @@ InsructionSet RV32F extends RV32I{
         }
         FMSUB.S {
             encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000111;
-            args_disass:"x{rd}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=F[rs1]f * F[rs2]f - F[rs3]f;
             if(FLEN==32)
 	            F[rd] <= fdispatch_fmadd_s(F[rs1], F[rs2], F[rs3], zext(1, 32), choose(rm<7, rm{8}, FCSR{8}));
@@ -62,7 +62,7 @@ InsructionSet RV32F extends RV32I{
         }
         FNMADD.S {
             encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001111;
-            args_disass:"x{rd}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"name(rd), f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=-F[rs1]f * F[rs2]f + F[rs3]f;
             if(FLEN==32)
                 F[rd] <= fdispatch_fmadd_s(F[rs1], F[rs2], F[rs3], zext(2, 32), choose(rm<7, rm{8}, FCSR{8}));
@@ -79,7 +79,7 @@ InsructionSet RV32F extends RV32I{
         }
         FNMSUB.S {
             encoding: rs3[4:0] | b00 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001011;
-            args_disass:"x{rd}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=-F[rs1]f * F[rs2]f - F[rs3]f;
             if(FLEN==32)
 	            F[rd] <= fdispatch_fmadd_s(F[rs1], F[rs2], F[rs3], zext(3, 32), choose(rm<7, rm{8}, FCSR{8}));
@@ -359,7 +359,7 @@ InsructionSet RV64F extends RV32F{
     instructions{
         FCVT.L.S { // fp to 64bit signed integer
             encoding: b1100000 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"x{rd}, f{rs1}";
+            args_disass:"{name(rd)}, f{rs1}";
             val res[64] <= fdispatch_fcvt_32_64(fdispatch_unbox_s(F[rs1]), zext(0, 32), rm{8});
             X[rd]<= sext(res);
             val flags[32] <= fdispatch_fget_flags();
@@ -367,7 +367,7 @@ InsructionSet RV64F extends RV32F{
         }
         FCVT.LU.S { // fp to 64bit unsigned integer
             encoding: b1100000 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"x{rd}, f{rs1}";
+            args_disass:"{name(rd)}, f{rs1}";
             val res[64] <= fdispatch_fcvt_32_64(fdispatch_unbox_s(F[rs1]), zext(1, 32), rm{8});
             X[rd]<= zext(res);
             val flags[32] <= fdispatch_fget_flags();
@@ -375,7 +375,7 @@ InsructionSet RV64F extends RV32F{
         }
         FCVT.S.L { // 64bit signed int to to fp 
             encoding: b1101000 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, x{rs1}";
+            args_disass:"f{rd}, {name(rs1)}";
             val res[32] <= fdispatch_fcvt_64_32(X[rs1], zext(2, 32), rm{8});
             if(FLEN==32)
                 F[rd] <= res;
@@ -386,7 +386,7 @@ InsructionSet RV64F extends RV32F{
         }
         FCVT.S.LU { // 64bit unsigned int to to fp 
             encoding: b1101000 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, x{rs1}";
+            args_disass:"f{rd}, {name(rs1)}";
             val res[32] <=fdispatch_fcvt_64_32(X[rs1], zext(3,32), rm{8});
             if(FLEN==32)
                 F[rd] <= res;

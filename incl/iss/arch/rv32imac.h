@@ -54,7 +54,7 @@ template <> struct traits<rv32imac> {
   	static constexpr std::array<const char*, 33> reg_aliases{
  		{"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6", "pc"}};
 
-    enum constants {XLEN=32, PCLEN=32, MISA_VAL=0b1000000000101000001000100000101, PGSIZE=0x1000, PGMASK=0xfff};
+    enum constants {XLEN=32, PCLEN=32, MUL_LEN=64, MISA_VAL=0b1000000000101000001000100000101, PGSIZE=0x1000, PGMASK=0xfff};
 
     constexpr static unsigned FP_REGS_SIZE = 0;
 

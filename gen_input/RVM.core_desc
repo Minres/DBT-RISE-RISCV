@@ -2,14 +2,14 @@ import "RISCVBase.core_desc"
 
 InsructionSet RV32M extends RISCVBase {
     constants {
-        MAXLEN:=128
+        MUL_LEN
     }
     instructions{       
         MUL{
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b000 | rd[4:0] | b0110011;
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
-                val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                val res[MUL_LEN] <= zext(X[rs1], MUL_LEN) * zext(X[rs2], MUL_LEN);
                 X[rd]<= zext(res , XLEN);
             }
         }
@@ -17,7 +17,7 @@ InsructionSet RV32M extends RISCVBase {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b001 | rd[4:0] | b0110011;
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
-                val res[MAXLEN] <= sext(X[rs1], MAXLEN) * sext(X[rs2], MAXLEN);
+                val res[MUL_LEN] <= sext(X[rs1], MUL_LEN) * sext(X[rs2], MUL_LEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
             }
         }
@@ -25,7 +25,7 @@ InsructionSet RV32M extends RISCVBase {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0110011;
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
-                val res[MAXLEN] <= sext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                val res[MUL_LEN] <= sext(X[rs1], MUL_LEN) * zext(X[rs2], MUL_LEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
             }
         }
@@ -33,7 +33,7 @@ InsructionSet RV32M extends RISCVBase {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | b011 | rd[4:0] | b0110011;
             args_disass:"{name(rd)}, {name(rs1)}, {name(rs2)}";
             if(rd != 0){
-                val res[MAXLEN] <= zext(X[rs1], MAXLEN) * zext(X[rs2], MAXLEN);
+                val res[MUL_LEN] <= zext(X[rs1], MUL_LEN) * zext(X[rs2], MUL_LEN);
                 X[rd]<= zext(res >> XLEN, XLEN);
             }
         }
