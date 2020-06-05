@@ -184,203 +184,203 @@ private:
 
     const std::array<InstructionDesriptor, 99> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
-        /* instruction LUI */
+        /* instruction LUI, encoding '.........................0110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
-        /* instruction AUIPC */
+        /* instruction AUIPC, encoding '.........................0010111' */
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
-        /* instruction JAL */
+        /* instruction JAL, encoding '.........................1101111' */
         {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
-        /* instruction JALR */
+        /* instruction JALR, encoding '.................000.....1100111' */
         {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
-        /* instruction BEQ */
+        /* instruction BEQ, encoding '.................000.....1100011' */
         {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
-        /* instruction BNE */
+        /* instruction BNE, encoding '.................001.....1100011' */
         {32, 0b00000000000000000001000001100011, 0b00000000000000000111000001111111, &this_class::__bne},
-        /* instruction BLT */
+        /* instruction BLT, encoding '.................100.....1100011' */
         {32, 0b00000000000000000100000001100011, 0b00000000000000000111000001111111, &this_class::__blt},
-        /* instruction BGE */
+        /* instruction BGE, encoding '.................101.....1100011' */
         {32, 0b00000000000000000101000001100011, 0b00000000000000000111000001111111, &this_class::__bge},
-        /* instruction BLTU */
+        /* instruction BLTU, encoding '.................110.....1100011' */
         {32, 0b00000000000000000110000001100011, 0b00000000000000000111000001111111, &this_class::__bltu},
-        /* instruction BGEU */
+        /* instruction BGEU, encoding '.................111.....1100011' */
         {32, 0b00000000000000000111000001100011, 0b00000000000000000111000001111111, &this_class::__bgeu},
-        /* instruction LB */
+        /* instruction LB, encoding '.................000.....0000011' */
         {32, 0b00000000000000000000000000000011, 0b00000000000000000111000001111111, &this_class::__lb},
-        /* instruction LH */
+        /* instruction LH, encoding '.................001.....0000011' */
         {32, 0b00000000000000000001000000000011, 0b00000000000000000111000001111111, &this_class::__lh},
-        /* instruction LW */
+        /* instruction LW, encoding '.................010.....0000011' */
         {32, 0b00000000000000000010000000000011, 0b00000000000000000111000001111111, &this_class::__lw},
-        /* instruction LBU */
+        /* instruction LBU, encoding '.................100.....0000011' */
         {32, 0b00000000000000000100000000000011, 0b00000000000000000111000001111111, &this_class::__lbu},
-        /* instruction LHU */
+        /* instruction LHU, encoding '.................101.....0000011' */
         {32, 0b00000000000000000101000000000011, 0b00000000000000000111000001111111, &this_class::__lhu},
-        /* instruction SB */
+        /* instruction SB, encoding '.................000.....0100011' */
         {32, 0b00000000000000000000000000100011, 0b00000000000000000111000001111111, &this_class::__sb},
-        /* instruction SH */
+        /* instruction SH, encoding '.................001.....0100011' */
         {32, 0b00000000000000000001000000100011, 0b00000000000000000111000001111111, &this_class::__sh},
-        /* instruction SW */
+        /* instruction SW, encoding '.................010.....0100011' */
         {32, 0b00000000000000000010000000100011, 0b00000000000000000111000001111111, &this_class::__sw},
-        /* instruction ADDI */
+        /* instruction ADDI, encoding '.................000.....0010011' */
         {32, 0b00000000000000000000000000010011, 0b00000000000000000111000001111111, &this_class::__addi},
-        /* instruction SLTI */
+        /* instruction SLTI, encoding '.................010.....0010011' */
         {32, 0b00000000000000000010000000010011, 0b00000000000000000111000001111111, &this_class::__slti},
-        /* instruction SLTIU */
+        /* instruction SLTIU, encoding '.................011.....0010011' */
         {32, 0b00000000000000000011000000010011, 0b00000000000000000111000001111111, &this_class::__sltiu},
-        /* instruction XORI */
+        /* instruction XORI, encoding '.................100.....0010011' */
         {32, 0b00000000000000000100000000010011, 0b00000000000000000111000001111111, &this_class::__xori},
-        /* instruction ORI */
+        /* instruction ORI, encoding '.................110.....0010011' */
         {32, 0b00000000000000000110000000010011, 0b00000000000000000111000001111111, &this_class::__ori},
-        /* instruction ANDI */
+        /* instruction ANDI, encoding '.................111.....0010011' */
         {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
-        /* instruction SLLI */
+        /* instruction SLLI, encoding '0000000..........001.....0010011' */
         {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
-        /* instruction SRLI */
+        /* instruction SRLI, encoding '0000000..........101.....0010011' */
         {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
-        /* instruction SRAI */
+        /* instruction SRAI, encoding '0100000..........101.....0010011' */
         {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
-        /* instruction ADD */
+        /* instruction ADD, encoding '0000000..........000.....0110011' */
         {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
-        /* instruction SUB */
+        /* instruction SUB, encoding '0100000..........000.....0110011' */
         {32, 0b01000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__sub},
-        /* instruction SLL */
+        /* instruction SLL, encoding '0000000..........001.....0110011' */
         {32, 0b00000000000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__sll},
-        /* instruction SLT */
+        /* instruction SLT, encoding '0000000..........010.....0110011' */
         {32, 0b00000000000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__slt},
-        /* instruction SLTU */
+        /* instruction SLTU, encoding '0000000..........011.....0110011' */
         {32, 0b00000000000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__sltu},
-        /* instruction XOR */
+        /* instruction XOR, encoding '0000000..........100.....0110011' */
         {32, 0b00000000000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__xor},
-        /* instruction SRL */
+        /* instruction SRL, encoding '0000000..........101.....0110011' */
         {32, 0b00000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__srl},
-        /* instruction SRA */
+        /* instruction SRA, encoding '0100000..........101.....0110011' */
         {32, 0b01000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__sra},
-        /* instruction OR */
+        /* instruction OR, encoding '0000000..........110.....0110011' */
         {32, 0b00000000000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__or},
-        /* instruction AND */
+        /* instruction AND, encoding '0000000..........111.....0110011' */
         {32, 0b00000000000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__and},
-        /* instruction FENCE */
+        /* instruction FENCE, encoding '0000.............000.....0001111' */
         {32, 0b00000000000000000000000000001111, 0b11110000000000000111000001111111, &this_class::__fence},
-        /* instruction FENCE_I */
+        /* instruction FENCE_I, encoding '.................001.....0001111' */
         {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
-        /* instruction ECALL */
+        /* instruction ECALL, encoding '00000000000000000000000001110011' */
         {32, 0b00000000000000000000000001110011, 0b11111111111111111111111111111111, &this_class::__ecall},
-        /* instruction EBREAK */
+        /* instruction EBREAK, encoding '00000000000100000000000001110011' */
         {32, 0b00000000000100000000000001110011, 0b11111111111111111111111111111111, &this_class::__ebreak},
-        /* instruction URET */
+        /* instruction URET, encoding '00000000001000000000000001110011' */
         {32, 0b00000000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__uret},
-        /* instruction SRET */
+        /* instruction SRET, encoding '00010000001000000000000001110011' */
         {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
-        /* instruction MRET */
+        /* instruction MRET, encoding '00110000001000000000000001110011' */
         {32, 0b00110000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__mret},
-        /* instruction WFI */
+        /* instruction WFI, encoding '00010000010100000000000001110011' */
         {32, 0b00010000010100000000000001110011, 0b11111111111111111111111111111111, &this_class::__wfi},
-        /* instruction SFENCE.VMA */
+        /* instruction SFENCE.VMA, encoding '0001001..........000000001110011' */
         {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence_vma},
-        /* instruction CSRRW */
+        /* instruction CSRRW, encoding '.................001.....1110011' */
         {32, 0b00000000000000000001000001110011, 0b00000000000000000111000001111111, &this_class::__csrrw},
-        /* instruction CSRRS */
+        /* instruction CSRRS, encoding '.................010.....1110011' */
         {32, 0b00000000000000000010000001110011, 0b00000000000000000111000001111111, &this_class::__csrrs},
-        /* instruction CSRRC */
+        /* instruction CSRRC, encoding '.................011.....1110011' */
         {32, 0b00000000000000000011000001110011, 0b00000000000000000111000001111111, &this_class::__csrrc},
-        /* instruction CSRRWI */
+        /* instruction CSRRWI, encoding '.................101.....1110011' */
         {32, 0b00000000000000000101000001110011, 0b00000000000000000111000001111111, &this_class::__csrrwi},
-        /* instruction CSRRSI */
+        /* instruction CSRRSI, encoding '.................110.....1110011' */
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
-        /* instruction CSRRCI */
+        /* instruction CSRRCI, encoding '.................111.....1110011' */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
-        /* instruction MUL */
+        /* instruction MUL, encoding '0000001..........000.....0110011' */
         {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
-        /* instruction MULH */
+        /* instruction MULH, encoding '0000001..........001.....0110011' */
         {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
-        /* instruction MULHSU */
+        /* instruction MULHSU, encoding '0000001..........010.....0110011' */
         {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
-        /* instruction MULHU */
+        /* instruction MULHU, encoding '0000001..........011.....0110011' */
         {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
-        /* instruction DIV */
+        /* instruction DIV, encoding '0000001..........100.....0110011' */
         {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
-        /* instruction DIVU */
+        /* instruction DIVU, encoding '0000001..........101.....0110011' */
         {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
-        /* instruction REM */
+        /* instruction REM, encoding '0000001..........110.....0110011' */
         {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
-        /* instruction REMU */
+        /* instruction REMU, encoding '0000001..........111.....0110011' */
         {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
-        /* instruction LR.W */
+        /* instruction LR.W, encoding '00010..00000.....010.....0101111' */
         {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lr_w},
-        /* instruction SC.W */
+        /* instruction SC.W, encoding '00011............010.....0101111' */
         {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__sc_w},
-        /* instruction AMOSWAP.W */
+        /* instruction AMOSWAP.W, encoding '00001............010.....0101111' */
         {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswap_w},
-        /* instruction AMOADD.W */
+        /* instruction AMOADD.W, encoding '00000............010.....0101111' */
         {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoadd_w},
-        /* instruction AMOXOR.W */
+        /* instruction AMOXOR.W, encoding '00100............010.....0101111' */
         {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxor_w},
-        /* instruction AMOAND.W */
+        /* instruction AMOAND.W, encoding '01100............010.....0101111' */
         {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoand_w},
-        /* instruction AMOOR.W */
+        /* instruction AMOOR.W, encoding '01000............010.....0101111' */
         {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoor_w},
-        /* instruction AMOMIN.W */
+        /* instruction AMOMIN.W, encoding '10000............010.....0101111' */
         {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomin_w},
-        /* instruction AMOMAX.W */
+        /* instruction AMOMAX.W, encoding '10100............010.....0101111' */
         {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomax_w},
-        /* instruction AMOMINU.W */
+        /* instruction AMOMINU.W, encoding '11000............010.....0101111' */
         {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominu_w},
-        /* instruction AMOMAXU.W */
+        /* instruction AMOMAXU.W, encoding '11100............010.....0101111' */
         {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxu_w},
-        /* instruction C.ADDI4SPN */
+        /* instruction C.ADDI4SPN, encoding '000...........00' */
         {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
-        /* instruction C.LW */
+        /* instruction C.LW, encoding '010...........00' */
         {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c_lw},
-        /* instruction C.SW */
+        /* instruction C.SW, encoding '110...........00' */
         {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c_sw},
-        /* instruction C.ADDI */
+        /* instruction C.ADDI, encoding '000...........01' */
         {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c_addi},
-        /* instruction C.NOP */
+        /* instruction C.NOP, encoding '0000000000000001' */
         {16, 0b0000000000000001, 0b1111111111111111, &this_class::__c_nop},
-        /* instruction C.JAL */
+        /* instruction C.JAL, encoding '001...........01' */
         {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c_jal},
-        /* instruction C.LI */
+        /* instruction C.LI, encoding '010...........01' */
         {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c_li},
-        /* instruction C.LUI */
+        /* instruction C.LUI, encoding '011...........01' */
         {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c_lui},
-        /* instruction C.ADDI16SP */
+        /* instruction C.ADDI16SP, encoding '011.00010.....01' */
         {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c_addi16sp},
-        /* instruction C.SRLI */
+        /* instruction C.SRLI, encoding '100000........01' */
         {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c_srli},
-        /* instruction C.SRAI */
+        /* instruction C.SRAI, encoding '100001........01' */
         {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c_srai},
-        /* instruction C.ANDI */
+        /* instruction C.ANDI, encoding '100.10........01' */
         {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c_andi},
-        /* instruction C.SUB */
+        /* instruction C.SUB, encoding '100011...00...01' */
         {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c_sub},
-        /* instruction C.XOR */
+        /* instruction C.XOR, encoding '100011...01...01' */
         {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c_xor},
-        /* instruction C.OR */
+        /* instruction C.OR, encoding '100011...10...01' */
         {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c_or},
-        /* instruction C.AND */
+        /* instruction C.AND, encoding '100011...11...01' */
         {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c_and},
-        /* instruction C.J */
+        /* instruction C.J, encoding '101...........01' */
         {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c_j},
-        /* instruction C.BEQZ */
+        /* instruction C.BEQZ, encoding '110...........01' */
         {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c_beqz},
-        /* instruction C.BNEZ */
+        /* instruction C.BNEZ, encoding '111...........01' */
         {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c_bnez},
-        /* instruction C.SLLI */
+        /* instruction C.SLLI, encoding '0000..........10' */
         {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c_slli},
-        /* instruction C.LWSP */
+        /* instruction C.LWSP, encoding '010...........10' */
         {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c_lwsp},
-        /* instruction C.MV */
+        /* instruction C.MV, encoding '1000..........10' */
         {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c_mv},
-        /* instruction C.JR */
+        /* instruction C.JR, encoding '1000.....0000010' */
         {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c_jr},
-        /* instruction C.ADD */
+        /* instruction C.ADD, encoding '1001..........10' */
         {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c_add},
-        /* instruction C.JALR */
+        /* instruction C.JALR, encoding '1001.....0000010' */
         {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c_jalr},
-        /* instruction C.EBREAK */
+        /* instruction C.EBREAK, encoding '1001000000000010' */
         {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c_ebreak},
-        /* instruction C.SWSP */
+        /* instruction C.SWSP, encoding '110...........10' */
         {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c_swsp},
-        /* instruction DII */
+        /* instruction DII, encoding '0000000000000000' */
         {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
     }};
  

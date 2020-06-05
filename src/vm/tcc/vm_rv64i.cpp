@@ -182,135 +182,141 @@ private:
         compile_func op;
     };
 
-    const std::array<InstructionDesriptor, 64> instr_descr = {{
+    const std::array<InstructionDesriptor, 67> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
-        /* instruction LUI */
+        /* instruction LUI, encoding '.........................0110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
-        /* instruction AUIPC */
+        /* instruction AUIPC, encoding '.........................0010111' */
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
-        /* instruction JAL */
+        /* instruction JAL, encoding '.........................1101111' */
         {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
-        /* instruction JALR */
+        /* instruction JALR, encoding '.................000.....1100111' */
         {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
-        /* instruction BEQ */
+        /* instruction BEQ, encoding '.................000.....1100011' */
         {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
-        /* instruction BNE */
+        /* instruction BNE, encoding '.................001.....1100011' */
         {32, 0b00000000000000000001000001100011, 0b00000000000000000111000001111111, &this_class::__bne},
-        /* instruction BLT */
+        /* instruction BLT, encoding '.................100.....1100011' */
         {32, 0b00000000000000000100000001100011, 0b00000000000000000111000001111111, &this_class::__blt},
-        /* instruction BGE */
+        /* instruction BGE, encoding '.................101.....1100011' */
         {32, 0b00000000000000000101000001100011, 0b00000000000000000111000001111111, &this_class::__bge},
-        /* instruction BLTU */
+        /* instruction BLTU, encoding '.................110.....1100011' */
         {32, 0b00000000000000000110000001100011, 0b00000000000000000111000001111111, &this_class::__bltu},
-        /* instruction BGEU */
+        /* instruction BGEU, encoding '.................111.....1100011' */
         {32, 0b00000000000000000111000001100011, 0b00000000000000000111000001111111, &this_class::__bgeu},
-        /* instruction LB */
+        /* instruction LB, encoding '.................000.....0000011' */
         {32, 0b00000000000000000000000000000011, 0b00000000000000000111000001111111, &this_class::__lb},
-        /* instruction LH */
+        /* instruction LH, encoding '.................001.....0000011' */
         {32, 0b00000000000000000001000000000011, 0b00000000000000000111000001111111, &this_class::__lh},
-        /* instruction LW */
+        /* instruction LW, encoding '.................010.....0000011' */
         {32, 0b00000000000000000010000000000011, 0b00000000000000000111000001111111, &this_class::__lw},
-        /* instruction LBU */
+        /* instruction LBU, encoding '.................100.....0000011' */
         {32, 0b00000000000000000100000000000011, 0b00000000000000000111000001111111, &this_class::__lbu},
-        /* instruction LHU */
+        /* instruction LHU, encoding '.................101.....0000011' */
         {32, 0b00000000000000000101000000000011, 0b00000000000000000111000001111111, &this_class::__lhu},
-        /* instruction SB */
+        /* instruction SB, encoding '.................000.....0100011' */
         {32, 0b00000000000000000000000000100011, 0b00000000000000000111000001111111, &this_class::__sb},
-        /* instruction SH */
+        /* instruction SH, encoding '.................001.....0100011' */
         {32, 0b00000000000000000001000000100011, 0b00000000000000000111000001111111, &this_class::__sh},
-        /* instruction SW */
+        /* instruction SW, encoding '.................010.....0100011' */
         {32, 0b00000000000000000010000000100011, 0b00000000000000000111000001111111, &this_class::__sw},
-        /* instruction ADDI */
+        /* instruction ADDI, encoding '.................000.....0010011' */
         {32, 0b00000000000000000000000000010011, 0b00000000000000000111000001111111, &this_class::__addi},
-        /* instruction SLTI */
+        /* instruction SLTI, encoding '.................010.....0010011' */
         {32, 0b00000000000000000010000000010011, 0b00000000000000000111000001111111, &this_class::__slti},
-        /* instruction SLTIU */
+        /* instruction SLTIU, encoding '.................011.....0010011' */
         {32, 0b00000000000000000011000000010011, 0b00000000000000000111000001111111, &this_class::__sltiu},
-        /* instruction XORI */
+        /* instruction XORI, encoding '.................100.....0010011' */
         {32, 0b00000000000000000100000000010011, 0b00000000000000000111000001111111, &this_class::__xori},
-        /* instruction ORI */
+        /* instruction ORI, encoding '.................110.....0010011' */
         {32, 0b00000000000000000110000000010011, 0b00000000000000000111000001111111, &this_class::__ori},
-        /* instruction ANDI */
+        /* instruction ANDI, encoding '.................111.....0010011' */
         {32, 0b00000000000000000111000000010011, 0b00000000000000000111000001111111, &this_class::__andi},
-        /* instruction SLLI */
-        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
-        /* instruction SRLI */
-        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
-        /* instruction SRAI */
-        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
-        /* instruction ADD */
+        /* instruction SLLI, encoding '0000000..........001.....0010011' */
+        {32, 0b00000000000000000001000000010011, 0b11111110000000000111000001111111, &this_class::__slli},
+        /* instruction SRLI, encoding '0000000..........101.....0010011' */
+        {32, 0b00000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srli},
+        /* instruction SRAI, encoding '0100000..........101.....0010011' */
+        {32, 0b01000000000000000101000000010011, 0b11111110000000000111000001111111, &this_class::__srai},
+        /* instruction ADD, encoding '0000000..........000.....0110011' */
         {32, 0b00000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__add},
-        /* instruction SUB */
+        /* instruction SUB, encoding '0100000..........000.....0110011' */
         {32, 0b01000000000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__sub},
-        /* instruction SLL */
+        /* instruction SLL, encoding '0000000..........001.....0110011' */
         {32, 0b00000000000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__sll},
-        /* instruction SLT */
+        /* instruction SLT, encoding '0000000..........010.....0110011' */
         {32, 0b00000000000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__slt},
-        /* instruction SLTU */
+        /* instruction SLTU, encoding '0000000..........011.....0110011' */
         {32, 0b00000000000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__sltu},
-        /* instruction XOR */
+        /* instruction XOR, encoding '0000000..........100.....0110011' */
         {32, 0b00000000000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__xor},
-        /* instruction SRL */
+        /* instruction SRL, encoding '0000000..........101.....0110011' */
         {32, 0b00000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__srl},
-        /* instruction SRA */
+        /* instruction SRA, encoding '0100000..........101.....0110011' */
         {32, 0b01000000000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__sra},
-        /* instruction OR */
+        /* instruction OR, encoding '0000000..........110.....0110011' */
         {32, 0b00000000000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__or},
-        /* instruction AND */
+        /* instruction AND, encoding '0000000..........111.....0110011' */
         {32, 0b00000000000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__and},
-        /* instruction FENCE */
+        /* instruction FENCE, encoding '0000.............000.....0001111' */
         {32, 0b00000000000000000000000000001111, 0b11110000000000000111000001111111, &this_class::__fence},
-        /* instruction FENCE_I */
+        /* instruction FENCE_I, encoding '.................001.....0001111' */
         {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
-        /* instruction ECALL */
+        /* instruction ECALL, encoding '00000000000000000000000001110011' */
         {32, 0b00000000000000000000000001110011, 0b11111111111111111111111111111111, &this_class::__ecall},
-        /* instruction EBREAK */
+        /* instruction EBREAK, encoding '00000000000100000000000001110011' */
         {32, 0b00000000000100000000000001110011, 0b11111111111111111111111111111111, &this_class::__ebreak},
-        /* instruction URET */
+        /* instruction URET, encoding '00000000001000000000000001110011' */
         {32, 0b00000000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__uret},
-        /* instruction SRET */
+        /* instruction SRET, encoding '00010000001000000000000001110011' */
         {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
-        /* instruction MRET */
+        /* instruction MRET, encoding '00110000001000000000000001110011' */
         {32, 0b00110000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__mret},
-        /* instruction WFI */
+        /* instruction WFI, encoding '00010000010100000000000001110011' */
         {32, 0b00010000010100000000000001110011, 0b11111111111111111111111111111111, &this_class::__wfi},
-        /* instruction SFENCE.VMA */
+        /* instruction SFENCE.VMA, encoding '0001001..........000000001110011' */
         {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence_vma},
-        /* instruction CSRRW */
+        /* instruction CSRRW, encoding '.................001.....1110011' */
         {32, 0b00000000000000000001000001110011, 0b00000000000000000111000001111111, &this_class::__csrrw},
-        /* instruction CSRRS */
+        /* instruction CSRRS, encoding '.................010.....1110011' */
         {32, 0b00000000000000000010000001110011, 0b00000000000000000111000001111111, &this_class::__csrrs},
-        /* instruction CSRRC */
+        /* instruction CSRRC, encoding '.................011.....1110011' */
         {32, 0b00000000000000000011000001110011, 0b00000000000000000111000001111111, &this_class::__csrrc},
-        /* instruction CSRRWI */
+        /* instruction CSRRWI, encoding '.................101.....1110011' */
         {32, 0b00000000000000000101000001110011, 0b00000000000000000111000001111111, &this_class::__csrrwi},
-        /* instruction CSRRSI */
+        /* instruction CSRRSI, encoding '.................110.....1110011' */
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
-        /* instruction CSRRCI */
+        /* instruction CSRRCI, encoding '.................111.....1110011' */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
-        /* instruction LWU */
+        /* instruction LWU, encoding '.................110.....0000011' */
         {32, 0b00000000000000000110000000000011, 0b00000000000000000111000001111111, &this_class::__lwu},
-        /* instruction LD */
+        /* instruction LD, encoding '.................011.....0000011' */
         {32, 0b00000000000000000011000000000011, 0b00000000000000000111000001111111, &this_class::__ld},
-        /* instruction SD */
+        /* instruction SD, encoding '.................011.....0100011' */
         {32, 0b00000000000000000011000000100011, 0b00000000000000000111000001111111, &this_class::__sd},
-        /* instruction ADDIW */
+        /* instruction SLLI, encoding '000000...........001.....0010011' */
+        {32, 0b00000000000000000001000000010011, 0b11111100000000000111000001111111, &this_class::__slli},
+        /* instruction SRLI, encoding '000000...........101.....0010011' */
+        {32, 0b00000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srli},
+        /* instruction SRAI, encoding '010000...........101.....0010011' */
+        {32, 0b01000000000000000101000000010011, 0b11111100000000000111000001111111, &this_class::__srai},
+        /* instruction ADDIW, encoding '.................000.....0011011' */
         {32, 0b00000000000000000000000000011011, 0b00000000000000000111000001111111, &this_class::__addiw},
-        /* instruction SLLIW */
+        /* instruction SLLIW, encoding '0000000..........001.....0011011' */
         {32, 0b00000000000000000001000000011011, 0b11111110000000000111000001111111, &this_class::__slliw},
-        /* instruction SRLIW */
+        /* instruction SRLIW, encoding '0000000..........101.....0011011' */
         {32, 0b00000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__srliw},
-        /* instruction SRAIW */
+        /* instruction SRAIW, encoding '0100000..........101.....0011011' */
         {32, 0b01000000000000000101000000011011, 0b11111110000000000111000001111111, &this_class::__sraiw},
-        /* instruction ADDW */
+        /* instruction ADDW, encoding '0000000..........000.....0111011' */
         {32, 0b00000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__addw},
-        /* instruction SUBW */
+        /* instruction SUBW, encoding '0100000..........000.....0111011' */
         {32, 0b01000000000000000000000000111011, 0b11111110000000000111000001111111, &this_class::__subw},
-        /* instruction SLLW */
+        /* instruction SLLW, encoding '0000000..........001.....0111011' */
         {32, 0b00000000000000000001000000111011, 0b11111110000000000111000001111111, &this_class::__sllw},
-        /* instruction SRLW */
+        /* instruction SRLW, encoding '0000000..........101.....0111011' */
         {32, 0b00000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__srlw},
-        /* instruction SRAW */
+        /* instruction SRAW, encoding '0100000..........101.....0111011' */
         {32, 0b01000000000000000101000000111011, 0b11111110000000000111000001111111, &this_class::__sraw},
     }};
  
@@ -1183,7 +1189,7 @@ private:
         vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 24);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1194,10 +1200,14 @@ private:
         auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        if(rd != 0){
-            tu.store(tu.shl(
-                tu.load(rs1 + traits<ARCH>::X0, 0),
-                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                tu.store(tu.shl(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+            }
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
@@ -1212,7 +1222,7 @@ private:
         vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 25);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1223,10 +1233,14 @@ private:
         auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        if(rd != 0){
-            tu.store(tu.lshr(
-                tu.load(rs1 + traits<ARCH>::X0, 0),
-                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                tu.store(tu.lshr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+            }
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
@@ -1241,7 +1255,7 @@ private:
         vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 26);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        uint8_t shamt = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
@@ -1252,10 +1266,14 @@ private:
         auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
         pc=pc+4;
         tu.open_scope();
-        if(rd != 0){
-            tu.store(tu.ashr(
-                tu.load(rs1 + traits<ARCH>::X0, 0),
-                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        if(shamt > 31){
+            this->gen_raise_trap(tu, 0, 0);
+        } else {
+            if(rd != 0){
+                tu.store(tu.ashr(
+                    tu.load(rs1 + traits<ARCH>::X0, 0),
+                    tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+            }
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
@@ -2104,10 +2122,97 @@ private:
         return std::make_tuple(CONT);
     }
     
-    /* instruction 55: ADDIW */
+    /* instruction 55: SLLI */
+    compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SLLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 55);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "slli"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu.store(tu.shl(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 55);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 56: SRLI */
+    compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 56);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srli"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu.store(tu.lshr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 56);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 57: SRAI */
+    compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("SRAI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 57);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t shamt = ((bit_sub<20,6>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {shamt}", fmt::arg("mnemonic", "srai"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        if(rd != 0){
+            tu.store(tu.ashr(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                tu.constant(shamt, 64U)), rd + traits<ARCH>::X0);
+        }
+        tu.close_scope();
+        gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 57);
+        gen_trap_check(tu);
+        return std::make_tuple(CONT);
+    }
+    
+    /* instruction 58: ADDIW */
     compile_ret_t __addiw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ADDIW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 55);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 58);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -2137,15 +2242,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 55);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 58);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 56: SLLIW */
+    /* instruction 59: SLLIW */
     compile_ret_t __slliw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLLIW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 56);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 59);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -2173,15 +2278,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 56);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 59);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 57: SRLIW */
+    /* instruction 60: SRLIW */
     compile_ret_t __srliw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRLIW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 57);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 60);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -2209,15 +2314,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 57);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 60);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 58: SRAIW */
+    /* instruction 61: SRAIW */
     compile_ret_t __sraiw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRAIW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 58);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 61);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -2245,15 +2350,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 58);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 61);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 59: ADDW */
+    /* instruction 62: ADDW */
     compile_ret_t __addw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ADDW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 59);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 62);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -2281,15 +2386,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 59);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 62);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 60: SUBW */
+    /* instruction 63: SUBW */
     compile_ret_t __subw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SUBW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 60);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 63);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -2317,15 +2422,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 60);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 63);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 61: SLLW */
+    /* instruction 64: SLLW */
     compile_ret_t __sllw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLLW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 61);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 64);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -2360,15 +2465,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 61);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 64);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 62: SRLW */
+    /* instruction 65: SRLW */
     compile_ret_t __srlw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRLW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 62);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 65);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -2403,15 +2508,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 62);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 65);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 63: SRAW */
+    /* instruction 66: SRAW */
     compile_ret_t __sraw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRAW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 63);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 66);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -2446,7 +2551,7 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 63);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 66);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
