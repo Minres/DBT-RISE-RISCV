@@ -184,8 +184,8 @@ private:
 
     const std::array<InstructionDesriptor, ${instructions.size}> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */<%instructions.each{instr -> %>
-        /* instruction ${instr.instruction.name} */
-        {${instr.length}, ${instr.value}, ${instr.mask}, &this_class::__${generator.functionName(instr.name)}},<%}%>
+        /* instruction ${instr.instruction.name}, encoding '${instr.encoding}' */
+        {${instr.length}, 0b${instr.value}, 0b${instr.mask}, &this_class::__${generator.functionName(instr.name)}},<%}%>
     }};
  
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>

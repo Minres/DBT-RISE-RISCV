@@ -190,8 +190,6 @@ private:
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, &this_class::__auipc},
         /* instruction JAL, encoding '.........................1101111' */
         {32, 0b00000000000000000000000001101111, 0b00000000000000000000000001111111, &this_class::__jal},
-        /* instruction JALR, encoding '.................000.....1100111' */
-        {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
         /* instruction BEQ, encoding '.................000.....1100011' */
         {32, 0b00000000000000000000000001100011, 0b00000000000000000111000001111111, &this_class::__beq},
         /* instruction BNE, encoding '.................001.....1100011' */
@@ -288,6 +286,8 @@ private:
         {32, 0b00000000000000000110000001110011, 0b00000000000000000111000001111111, &this_class::__csrrsi},
         /* instruction CSRRCI, encoding '.................111.....1110011' */
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
+        /* instruction JALR, encoding '.................000.....1100111' */
+        {32, 0b00000000000000000000000001100111, 0b00000000000000000111000001111111, &this_class::__jalr},
         /* instruction C.ADDI4SPN, encoding '000...........00' */
         {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c_addi4spn},
         /* instruction C.LW, encoding '010...........00' */
@@ -440,48 +440,10 @@ private:
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 3: JALR */
-    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
-        tu("JALR_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 3);
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {imm:#0x}", fmt::arg("mnemonic", "jalr"),
-            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
-            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
-        }
-        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
-        pc=pc+4;
-        tu.open_scope();
-        auto new_pc_val = tu.assignment(tu.add(
-            tu.ext(
-                tu.load(rs1 + traits<ARCH>::X0, 0),
-                32, false),
-            tu.constant(imm, 32U)), 32);
-        if(rd != 0){
-            tu.store(tu.add(
-                cur_pc_val,
-                tu.constant(4, 32U)), rd + traits<ARCH>::X0);
-        }
-        auto PC_val_v = tu.assignment("PC_val", tu.l_and(
-            new_pc_val,
-            tu.l_not(tu.constant(0x1, 32U))), 32);
-        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
-        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
-        tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 3);
-        gen_trap_check(tu);
-        return std::make_tuple(BRANCH);
-    }
-    
-    /* instruction 4: BEQ */
+    /* instruction 3: BEQ */
     compile_ret_t __beq(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BEQ_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 4);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 3);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -514,15 +476,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 4);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 3);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 5: BNE */
+    /* instruction 4: BNE */
     compile_ret_t __bne(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BNE_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 5);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 4);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -555,15 +517,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 5);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 4);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 6: BLT */
+    /* instruction 5: BLT */
     compile_ret_t __blt(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BLT_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 6);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 5);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -600,15 +562,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 6);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 5);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 7: BGE */
+    /* instruction 6: BGE */
     compile_ret_t __bge(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BGE_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 7);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 6);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -645,15 +607,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 7);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 6);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 8: BLTU */
+    /* instruction 7: BLTU */
     compile_ret_t __bltu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BLTU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 8);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 7);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -686,15 +648,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 8);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 7);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 9: BGEU */
+    /* instruction 8: BGEU */
     compile_ret_t __bgeu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("BGEU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 9);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 8);
         int16_t imm = signextend<int16_t,13>((bit_sub<7,1>(instr) << 11) | (bit_sub<8,4>(instr) << 1) | (bit_sub<25,6>(instr) << 5) | (bit_sub<31,1>(instr) << 12));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -727,15 +689,15 @@ private:
             tu.constant(0U, 32), tu.constant(1U, 32));
         tu.store(is_cont_v, traits<ARCH>::LAST_BRANCH);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 9);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 8);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 10: LB */
+    /* instruction 9: LB */
     compile_ret_t __lb(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("LB_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 10);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 9);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -762,15 +724,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 10);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 9);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 11: LH */
+    /* instruction 10: LH */
     compile_ret_t __lh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("LH_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 11);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 10);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -797,15 +759,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 11);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 10);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 12: LW */
+    /* instruction 11: LW */
     compile_ret_t __lw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("LW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 12);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 11);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -832,15 +794,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 12);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 11);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 13: LBU */
+    /* instruction 12: LBU */
     compile_ret_t __lbu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("LBU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 13);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 12);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -867,15 +829,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 13);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 12);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 14: LHU */
+    /* instruction 13: LHU */
     compile_ret_t __lhu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("LHU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 14);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 13);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -902,15 +864,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 14);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 13);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 15: SB */
+    /* instruction 14: SB */
     compile_ret_t __sb(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SB_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 15);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 14);
         int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -935,15 +897,15 @@ private:
             tu.trunc(tu.load(rs2 + traits<ARCH>::X0, 0), 8));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 15);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 14);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 16: SH */
+    /* instruction 15: SH */
     compile_ret_t __sh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SH_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 16);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 15);
         int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -968,15 +930,15 @@ private:
             tu.trunc(tu.load(rs2 + traits<ARCH>::X0, 0), 16));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 16);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 15);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 17: SW */
+    /* instruction 16: SW */
     compile_ret_t __sw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 17);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 16);
         int16_t imm = signextend<int16_t,12>((bit_sub<7,5>(instr)) | (bit_sub<25,7>(instr) << 5));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1001,15 +963,15 @@ private:
             tu.trunc(tu.load(rs2 + traits<ARCH>::X0, 0), 32));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 17);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 16);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 18: ADDI */
+    /* instruction 17: ADDI */
     compile_ret_t __addi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ADDI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 18);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 17);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1032,15 +994,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 18);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 17);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 19: SLTI */
+    /* instruction 18: SLTI */
     compile_ret_t __slti(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLTI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 19);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 18);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1067,15 +1029,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 19);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 18);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 20: SLTIU */
+    /* instruction 19: SLTIU */
     compile_ret_t __sltiu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLTIU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 20);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 19);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1101,15 +1063,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 20);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 19);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 21: XORI */
+    /* instruction 20: XORI */
     compile_ret_t __xori(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("XORI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 21);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 20);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1132,15 +1094,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 21);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 20);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 22: ORI */
+    /* instruction 21: ORI */
     compile_ret_t __ori(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ORI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 22);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 21);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1163,15 +1125,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 22);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 21);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 23: ANDI */
+    /* instruction 22: ANDI */
     compile_ret_t __andi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ANDI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 23);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 22);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
@@ -1194,15 +1156,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 23);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 22);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 24: SLLI */
+    /* instruction 23: SLLI */
     compile_ret_t __slli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLLI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 24);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 23);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -1227,15 +1189,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 24);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 23);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 25: SRLI */
+    /* instruction 24: SRLI */
     compile_ret_t __srli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRLI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 25);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 24);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -1260,15 +1222,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 25);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 24);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 26: SRAI */
+    /* instruction 25: SRAI */
     compile_ret_t __srai(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRAI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 26);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 25);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t shamt = ((bit_sub<20,5>(instr)));
@@ -1293,15 +1255,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 26);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 25);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 27: ADD */
+    /* instruction 26: ADD */
     compile_ret_t __add(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ADD_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 27);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 26);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1322,15 +1284,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 27);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 26);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 28: SUB */
+    /* instruction 27: SUB */
     compile_ret_t __sub(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SUB_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 28);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 27);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1351,15 +1313,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 28);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 27);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 29: SLL */
+    /* instruction 28: SLL */
     compile_ret_t __sll(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLL_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 29);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 28);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1384,15 +1346,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 29);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 28);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 30: SLT */
+    /* instruction 29: SLT */
     compile_ret_t __slt(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLT_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 30);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 29);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1421,15 +1383,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 30);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 29);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 31: SLTU */
+    /* instruction 30: SLTU */
     compile_ret_t __sltu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SLTU_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 31);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 30);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1460,15 +1422,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 31);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 30);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 32: XOR */
+    /* instruction 31: XOR */
     compile_ret_t __xor(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("XOR_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 32);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 31);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1489,15 +1451,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 32);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 31);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 33: SRL */
+    /* instruction 32: SRL */
     compile_ret_t __srl(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRL_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 33);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 32);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1522,15 +1484,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 33);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 32);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 34: SRA */
+    /* instruction 33: SRA */
     compile_ret_t __sra(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRA_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 34);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 33);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1555,15 +1517,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 34);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 33);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 35: OR */
+    /* instruction 34: OR */
     compile_ret_t __or(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("OR_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 35);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 34);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1584,15 +1546,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 35);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 34);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 36: AND */
+    /* instruction 35: AND */
     compile_ret_t __and(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("AND_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 36);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 35);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
@@ -1613,15 +1575,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 36);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 35);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 37: FENCE */
+    /* instruction 36: FENCE */
     compile_ret_t __fence(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("FENCE_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 37);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 36);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t succ = ((bit_sub<20,4>(instr)));
@@ -1643,15 +1605,15 @@ private:
                 tu.constant(succ, 32U)), 32));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 37);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 36);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 38: FENCE_I */
+    /* instruction 37: FENCE_I */
     compile_ret_t __fence_i(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("FENCE_I_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 38);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 37);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint16_t imm = ((bit_sub<20,12>(instr)));
@@ -1669,15 +1631,15 @@ private:
         tu.close_scope();
         tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32),traits<ARCH>::LAST_BRANCH);
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 38);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 37);
         gen_trap_check(tu);
         return std::make_tuple(FLUSH);
     }
     
-    /* instruction 39: ECALL */
+    /* instruction 38: ECALL */
     compile_ret_t __ecall(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("ECALL_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 39);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 38);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ecall");
@@ -1687,15 +1649,15 @@ private:
         tu.open_scope();
         this->gen_raise_trap(tu, 0, 11);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 39);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 38);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 40: EBREAK */
+    /* instruction 39: EBREAK */
     compile_ret_t __ebreak(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("EBREAK_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 40);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 39);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "ebreak");
@@ -1705,15 +1667,15 @@ private:
         tu.open_scope();
         this->gen_raise_trap(tu, 0, 3);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 40);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 39);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 41: URET */
+    /* instruction 40: URET */
     compile_ret_t __uret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("URET_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 41);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 40);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "uret");
@@ -1723,15 +1685,15 @@ private:
         tu.open_scope();
         this->gen_leave_trap(tu, 0);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 41);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 40);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 42: SRET */
+    /* instruction 41: SRET */
     compile_ret_t __sret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SRET_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 42);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 41);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "sret");
@@ -1741,15 +1703,15 @@ private:
         tu.open_scope();
         this->gen_leave_trap(tu, 1);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 42);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 41);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 43: MRET */
+    /* instruction 42: MRET */
     compile_ret_t __mret(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("MRET_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 43);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 42);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "mret");
@@ -1759,15 +1721,15 @@ private:
         tu.open_scope();
         this->gen_leave_trap(tu, 3);
         tu.close_scope();
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 43);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 42);
         gen_trap_check(tu);
         return std::make_tuple(BRANCH);
     }
     
-    /* instruction 44: WFI */
+    /* instruction 43: WFI */
     compile_ret_t __wfi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("WFI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 44);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 43);
         if(this->disass_enabled){
             /* generate console output when executing the command */
             tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, "wfi");
@@ -1778,15 +1740,15 @@ private:
         this->gen_wait(tu, 1);
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 44);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 43);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 45: SFENCE.VMA */
+    /* instruction 44: SFENCE.VMA */
     compile_ret_t __sfence_vma(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("SFENCE_VMA_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 45);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 44);
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
@@ -1806,15 +1768,15 @@ private:
             tu.trunc(tu.constant(rs2, 32U), 32));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 45);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 44);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 46: CSRRW */
+    /* instruction 45: CSRRW */
     compile_ret_t __csrrw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRW_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 46);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 45);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -1844,15 +1806,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 46);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 45);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 47: CSRRS */
+    /* instruction 46: CSRRS */
     compile_ret_t __csrrs(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRS_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 47);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 46);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -1881,15 +1843,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 47);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 46);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 48: CSRRC */
+    /* instruction 47: CSRRC */
     compile_ret_t __csrrc(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRC_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 48);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 47);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -1918,15 +1880,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 48);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 47);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 49: CSRRWI */
+    /* instruction 48: CSRRWI */
     compile_ret_t __csrrwi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRWI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 49);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 48);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t zimm = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -1952,15 +1914,15 @@ private:
                 true), 32));
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 49);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 48);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 50: CSRRSI */
+    /* instruction 49: CSRRSI */
     compile_ret_t __csrrsi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRSI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 50);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 49);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t zimm = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -1991,15 +1953,15 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 50);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 49);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
     }
     
-    /* instruction 51: CSRRCI */
+    /* instruction 50: CSRRCI */
     compile_ret_t __csrrci(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
         tu("CSRRCI_{:#010x}:", pc.val);
-        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 51);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 50);
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t zimm = ((bit_sub<15,5>(instr)));
         uint16_t csr = ((bit_sub<20,12>(instr)));
@@ -2030,9 +1992,47 @@ private:
         }
         tu.close_scope();
         gen_set_pc(tu, pc, traits<ARCH>::NEXT_PC);
-        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 51);
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 50);
         gen_trap_check(tu);
         return std::make_tuple(CONT);
+    }
+    
+    /* instruction 51: JALR */
+    compile_ret_t __jalr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("JALR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC, 51);
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        int16_t imm = signextend<int16_t,12>((bit_sub<20,12>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {imm:#0x}", fmt::arg("mnemonic", "jalr"),
+            	fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, arch::traits<ARCH>::reg_bit_widths[traits<ARCH>::PC]);
+        pc=pc+4;
+        tu.open_scope();
+        auto new_pc_val = tu.assignment(tu.add(
+            tu.ext(
+                tu.load(rs1 + traits<ARCH>::X0, 0),
+                32, false),
+            tu.constant(imm, 32U)), 32);
+        if(rd != 0){
+            tu.store(tu.add(
+                cur_pc_val,
+                tu.constant(4, 32U)), rd + traits<ARCH>::X0);
+        }
+        auto PC_val_v = tu.assignment("PC_val", tu.l_and(
+            new_pc_val,
+            tu.l_not(tu.constant(0x1, 32U))), 32);
+        tu.store(PC_val_v, traits<ARCH>::NEXT_PC);
+        tu.store(tu.constant(std::numeric_limits<uint32_t>::max(), 32U), traits<ARCH>::LAST_BRANCH);
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC, 51);
+        gen_trap_check(tu);
+        return std::make_tuple(BRANCH);
     }
     
     /* instruction 52: C.ADDI4SPN */

@@ -171,7 +171,7 @@ InsructionSet RV32IC extends RISCVBase{
     }
 }
 
-InsructionSet RV32FC extends RV32IC{
+InsructionSet RV32FC extends RISCVBase{
     constants {
         FLEN
     }
@@ -218,7 +218,7 @@ InsructionSet RV32FC extends RV32IC{
     }
 }
 
-InsructionSet RV32DC extends RV32IC{
+InsructionSet RV32DC extends RISCVBase{
     constants {
         FLEN
     }
@@ -302,6 +302,12 @@ InsructionSet RV64IC extends RV32IC {
         }
         C.SRLI {//(RV64)
             encoding:b100 | shamt[5:5] | b00 | rs1[2:0] | shamt[4:0] | b01;
+            args_disass: "{name(8+rs1)}, {shamt}";
+            val rs1_idx[5] <= rs1+8;
+            X[rs1_idx] <= shrl(X[rs1_idx], shamt);
+        }
+        C.SRLI64 {//(RV64)
+            encoding:b1000 | b00 | rs1[2:0] | 00000 | b01;
             args_disass: "{name(8+rs1)}, {shamt}";
             val rs1_idx[5] <= rs1+8;
             X[rs1_idx] <= shrl(X[rs1_idx], shamt);
