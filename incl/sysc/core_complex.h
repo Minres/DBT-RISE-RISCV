@@ -75,31 +75,33 @@ class core_wrapper;
 
 class core_complex : public sc_core::sc_module, public scc::traceable {
 public:
-    scc::initiator_mixin<scv4tlm::tlm_rec_initiator_socket<32>> initiator;
+    scc::initiator_mixin<scv4tlm::tlm_rec_initiator_socket<32>> initiator{"intor"};
 
-    sc_core::sc_in<sc_core::sc_time> clk_i;
+    sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
 
-    sc_core::sc_in<bool> rst_i;
+    sc_core::sc_in<bool> rst_i{"rst_i"};
 
-    sc_core::sc_in<bool> global_irq_i;
+    sc_core::sc_in<bool> global_irq_i{"global_irq_i"};
 
-    sc_core::sc_in<bool> timer_irq_i;
+    sc_core::sc_in<bool> timer_irq_i{"timer_irq_i"};
 
-    sc_core::sc_in<bool> sw_irq_i;
+    sc_core::sc_in<bool> sw_irq_i{"sw_irq_i"};
 
-    sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i;
+    sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i{"local_irq_i", 16};
 
     sc_core::sc_port<tlm::tlm_peek_if<uint64_t>, 1, sc_core::SC_ZERO_OR_MORE_BOUND> mtime_o;
 
-    cci::cci_param<std::string> elf_file;
+    cci::cci_param<std::string> elf_file{"elf_file", ""};
 
-    cci::cci_param<bool> enable_disass;
+    cci::cci_param<bool> enable_disass{"enable_disass", false};
 
-    cci::cci_param<uint64_t> reset_address;
+    cci::cci_param<uint64_t> reset_address{"reset_address", 0ULL};
 
-    cci::cci_param<unsigned short> gdb_server_port;
+    cci::cci_param<std::string> backend{"backend", "tcc"};
 
-    cci::cci_param<bool> dump_ir;
+    cci::cci_param<unsigned short> gdb_server_port{"gdb_server_port", 0};
+
+    cci::cci_param<bool> dump_ir{"dump_ir", false};
 
     core_complex(sc_core::sc_module_name name);
 
