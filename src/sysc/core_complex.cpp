@@ -234,17 +234,6 @@ int cmd_sysc(int argc, char *argv[], debugger::out_func of, debugger::data_func 
 
 core_complex::core_complex(sc_module_name name)
 : sc_module(name)
-, NAMED(initiator)
-, NAMED(clk_i)
-, NAMED(rst_i)
-, NAMED(global_irq_i)
-, NAMED(timer_irq_i)
-, NAMED(local_irq_i, 16)
-, NAMED(elf_file, "")
-, NAMED(enable_disass, false)
-, NAMED(reset_address, 0ULL)
-, NAMED(gdb_server_port, 0)
-, NAMED(dump_ir, false)
 , read_lut(tlm_dmi_ext())
 , write_lut(tlm_dmi_ext())
 , tgt_adapter(nullptr)
@@ -284,10 +273,23 @@ core_complex::~core_complex() = default;
 
 void core_complex::trace(sc_trace_file *trf) const {}
 
+using vm_ptr= std::unique_ptr<iss::vm_if>;
+vm_ptr create_cpu(core_wrapper* cpu, std::string const& backend, unsigned gdb_port){
+    if(backend == "interp")
+        return vm_ptr{iss::interp::create<core_type>(cpu, gdb_port)};
+#ifdef WITH_LLVM
+    if(backend == "llvm")
+        return vm_ptr{iss::llvm::create(lcpu, gdb_port)};
+#endif
+    if(backend == "tcc")
+        return vm_ptr{iss::tcc::create<core_type>(cpu, gdb_port)};
+    return {nullptr};
+}
+
 void core_complex::before_end_of_elaboration() {
+    SCCDEBUG(SCMOD)<<"instantiating iss::arch::mnrv32 with "<<backend.get_value()<<" backend";
     cpu = scc::make_unique<core_wrapper>(this);
-    //vm = tcc::create<core_type>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
-    vm = interp::create<core_type>(cpu.get(), gdb_server_port.get_value(), dump_ir.get_value());
+    vm = create_cpu(cpu.get(), backend.get_value(), gdb_server_port.get_value());
 #ifdef WITH_SCV
     vm->setDisassEnabled(enable_disass.get_value() || m_db != nullptr);
 #else
