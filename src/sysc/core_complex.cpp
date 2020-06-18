@@ -166,7 +166,7 @@ public:
     }
 
     void wait_until(uint64_t flags) override {
-        SCDEBUG(owner->name()) << "Sleeping until interrupt";
+        SCCDEBUG(owner->name()) << "Sleeping until interrupt";
         do {
             wait(wfi_evt);
         } while (this->reg.pending_trap == 0);
@@ -222,7 +222,7 @@ int cmd_sysc(int argc, char *argv[], debugger::out_func of, debugger::data_func 
                 return Err;
             // no check needed as it is only called if debug server is active
             tgt_adapter->add_break_condition([t]() -> unsigned {
-                SCTRACE() << "Checking condition at " << sc_time_stamp();
+                SCCTRACE() << "Checking condition at " << sc_time_stamp();
                 return sc_time_stamp() >= t ? std::numeric_limits<unsigned>::max() : 0;
             });
             return Ok;
@@ -393,7 +393,7 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t *const data,
         }
 #endif
         initiator->b_transport(gp, delay);
-        SCTRACE(this->name()) << "read_mem(0x" << std::hex << addr << ") : " << data;
+        SCCTRACE(this->name()) << "read_mem(0x" << std::hex << addr << ") : " << data;
         if (gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -440,7 +440,7 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t *cons
 #endif
         initiator->b_transport(gp, delay);
         quantum_keeper.set(delay);
-        SCTRACE() << "write_mem(0x" << std::hex << addr << ") : " << data;
+        SCCTRACE() << "write_mem(0x" << std::hex << addr << ") : " << data;
         if (gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
