@@ -184,33 +184,28 @@ status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t> &data, st
     avail.clear();
     const uint8_t *reg_base = core->get_regs_base_ptr();
     for (size_t reg_no = 0; reg_no < arch::traits<ARCH>::NUM_REGS; ++reg_no) {
-        auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
+        auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
         unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
         for (size_t j = 0; j < reg_width; ++j) {
             data.push_back(*(reg_base + offset + j));
             avail.push_back(0xff);
         }
-        // if(arch::traits<ARCH>::XLEN < 64)
-        //     for(unsigned j=0; j<4; ++j){
-        //         data.push_back(0);
-        //         avail.push_back(0xff);
-        //     }
     }
     // work around fill with F type registers
-    if (arch::traits<ARCH>::NUM_REGS < 65) {
-        auto reg_width = sizeof(typename arch::traits<ARCH>::reg_t);
-        for (size_t reg_no = 0; reg_no < 33; ++reg_no) {
-            for (size_t j = 0; j < reg_width; ++j) {
-                data.push_back(0x0);
-                avail.push_back(0x00);
-            }
-            // if(arch::traits<ARCH>::XLEN < 64)
-            //     for(unsigned j=0; j<4; ++j){
-            //         data.push_back(0x0);
-            //         avail.push_back(0x00);
-            //     }
-        }
-    }
+//    if (arch::traits<ARCH>::NUM_REGS < 65) {
+//        auto reg_width = sizeof(typename arch::traits<ARCH>::reg_t);
+//        for (size_t reg_no = 0; reg_no < 33; ++reg_no) {
+//            for (size_t j = 0; j < reg_width; ++j) {
+//                data.push_back(0x0);
+//                avail.push_back(0x00);
+//            }
+//            // if(arch::traits<ARCH>::XLEN < 64)
+//            //     for(unsigned j=0; j<4; ++j){
+//            //         data.push_back(0x0);
+//            //         avail.push_back(0x00);
+//            //     }
+//        }
+//    }
     return Ok;
 }
 
