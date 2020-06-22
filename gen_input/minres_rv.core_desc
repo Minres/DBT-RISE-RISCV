@@ -6,7 +6,7 @@ import "RVC.core_desc"
 import "RVF.core_desc"
 import "RVD.core_desc"
 
-/*
+
 Core MNRV32 provides RV32I, RV32IC {
     constants {
         XLEN:=32;
@@ -57,7 +57,7 @@ Core RV64I provides RV64I {
         PGMASK := 0xfff; //PGSIZE-1
     }
 }
-*/
+
 Core RV64GC provides RV64I, RV64M, RV64A, RV64F, RV64D, RV32FC, RV32DC, RV64IC {
     constants {
         XLEN:=64;
