@@ -5,7 +5,7 @@ InsructionSet RV32A extends RISCVBase{
     instructions{
         LR.W {
             encoding: b00010 | aq[0:0] | rl[0:0]  | b00000 | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "{name(rd)}, {name(rs1)}";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(aq)}, {name(rl)}";
             if(rd!=0){
                 val offs[XLEN] <= X[rs1];
                 X[rd]<= sext(MEM[offs]{32}, XLEN);
@@ -14,7 +14,7 @@ InsructionSet RV32A extends RISCVBase{
         }
         SC.W {
             encoding: b00011 | aq[0:0] | rl[0:0] | rs2[4:0] | rs1[4:0] | b010 | rd[4:0] | b0101111;
-            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}";
+            args_disass: "{name(rd)}, {name(rs1)}, {name(rs2)}, {name(aq)}, {name(rl)}";
             val offs[XLEN] <= X[rs1];
             val res1[32] <= RES[offs]{32};
             if(res1!=0)
