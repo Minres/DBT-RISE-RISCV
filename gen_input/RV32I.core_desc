@@ -219,10 +219,12 @@ InsructionSet RV32I extends RISCVBase{
         }
         FENCE {
             encoding: b0000 | pred[3:0] | succ[3:0] | rs1[4:0] | b000 | rd[4:0] | b0001111;
+            args_disass:"{name(pred)}, {name(succ)}, {name(rs1)}, {name(rd)}";
             FENCE[fence] <= pred<<4 | succ;
         }
         FENCE_I(flush) {
             encoding: imm[11:0] | rs1[4:0] | b001 | rd[4:0] | b0001111 ;
+            args_disass:"{name(rs1)}, {name(rd)}, {name(imm)}";
             FENCE[fencei] <= imm;
         }
         ECALL(no_cont) {
@@ -251,6 +253,7 @@ InsructionSet RV32I extends RISCVBase{
         }
         SFENCE.VMA {
             encoding: b0001001 | rs2[4:0] | rs1[4:0] | b000 | b00000 | b1110011;
+            args_disass:"{name(rs2)}, {rs1}";
             FENCE[fencevmal] <= rs1;
             FENCE[fencevmau] <= rs2;
         }

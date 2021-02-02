@@ -28,7 +28,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FMADD.D {
             encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<= F[rs1]f * F[rs2]f + F[rs3]f;
             val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(0, 64), choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -42,7 +42,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FMSUB.D {
             encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1000111;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=F[rs1]f * F[rs2]f - F[rs3]f;
             val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(1, 32), choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -56,7 +56,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FNMADD.D {
             encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001111;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=-F[rs1]f * F[rs2]f + F[rs3]f;
             val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(2, 32), choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -70,7 +70,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FNMSUB.D {
             encoding: rs3[4:0] | b01 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1001011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}, f{rs3}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}, f{rs3}";
             //F[rd]f<=-F[rs1]f * F[rs2]f - F[rs3]f;
             val res[64] <= fdispatch_fmadd_d(F[rs1]{64}, F[rs2]{64}, F[rs3]{64}, zext(3, 32), choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -84,7 +84,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FADD.D {
             encoding: b0000001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}";
             // F[rd]f <= F[rs1]f + F[rs2]f;
             val res[64] <= fdispatch_fadd_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -98,7 +98,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FSUB.D {
             encoding: b0000101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}";
             // F[rd]f <= F[rs1]f - F[rs2]f;
             val res[64] <= fdispatch_fsub_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -112,7 +112,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FMUL.D {
             encoding: b0001001 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}";
             // F[rd]f <= F[rs1]f * F[rs2]f;
             val res[64] <= fdispatch_fmul_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -126,7 +126,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FDIV.D {
             encoding: b0001101 | rs2[4:0] | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}, f{rs2}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}, f{rs2}";
             // F[rd]f <= F[rs1]f / F[rs2]f;
             val res[64] <= fdispatch_fdiv_d(F[rs1]{64}, F[rs2]{64}, choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -140,7 +140,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FSQRT.D {
             encoding: b0101101 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}";
             //F[rd]f<=sqrt(F[rs1]f);
             val res[64] <= fdispatch_fsqrt_d(F[rs1]{64}, choose(rm<7, rm{8}, FCSR{8}));
             if(FLEN==64)
@@ -223,7 +223,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FCVT.S.D {
             encoding: b0100000 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, f{rs1}";
+            args_disass:"{name(rm)}, f{rd}, f{rs1}";
             val res[32] <= fdispatch_fconv_d2f(F[rs1], rm{8});
             // NaN boxing
             val upper[FLEN] <= -1;
@@ -231,7 +231,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FCVT.D.S {
             encoding: b0100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, f{rs1}";
+            args_disass:"{name(rm)}, f{rd}, f{rs1}";
             val res[64] <= fdispatch_fconv_f2d(F[rs1]{32}, rm{8});
             if(FLEN==64){
                 F[rd] <= res;
@@ -268,14 +268,14 @@ InsructionSet RV32D extends RISCVBase{
         }
         FCVT.W.D {
             encoding: b1100001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}";
             X[rd]<= sext(fdispatch_fcvt_64_32(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FCVT.WU.D {
             encoding: b1100001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}";
             //FIXME: should be zext accodring to spec but needs to be sext according to tests
             X[rd]<= sext(fdispatch_fcvt_64_32(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
@@ -283,7 +283,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FCVT.D.W {
             encoding: b1101001 | b00000 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {name(rs1)}";
+            args_disass:"{name(rm)}, f{rd}, {name(rs1)}";
             val res[64] <= fdispatch_fcvt_32_64(sext(X[rs1]{32},64), zext(2, 32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
@@ -294,7 +294,7 @@ InsructionSet RV32D extends RISCVBase{
         }
         FCVT.D.WU {
             encoding: b1101001 | b00001 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {name(rs1)}";
+            args_disass:"{name(rm)}, f{rd}, {name(rs1)}";
             val res[64] <=fdispatch_fcvt_32_64(zext(X[rs1]{32},64), zext(3,32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
@@ -310,21 +310,21 @@ InsructionSet RV64D extends RV32D{
     instructions{
         FCVT.L.D {
             encoding: b1100001 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}";
             X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(0, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FCVT.LU.D {
             encoding: b1100001 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"{name(rd)}, f{rs1}";
+            args_disass:"{name(rm)}, {name(rd)}, f{rs1}";
             X[rd]<= sext(fdispatch_fcvt_d(F[rs1]{64}, zext(1, 32), rm{8}), XLEN);
             val flags[32] <= fdispatch_fget_flags();
             FCSR <= (FCSR & ~FFLAG_MASK) + flags{5};
         }
         FCVT.D.L {
             encoding: b1101001 | b00010 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {name(rs1)}";
+            args_disass:"{name(rm)}, f{rd}, {name(rs1)}";
             val res[64] <= fdispatch_fcvt_d(sext(X[rs1],64), zext(2, 32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
@@ -335,7 +335,7 @@ InsructionSet RV64D extends RV32D{
         }
         FCVT.D.LU {
             encoding: b1101001 | b00011 | rs1[4:0] | rm[2:0] | rd[4:0] | b1010011;
-            args_disass:"f{rd}, {name(rs1)}";
+            args_disass:"{name(rm)}, f{rd}, {name(rs1)}";
             val res[64] <=fdispatch_fcvt_d(zext(X[rs1],64), zext(3,32), rm{8});
             if(FLEN==64)
                 F[rd] <= res;
