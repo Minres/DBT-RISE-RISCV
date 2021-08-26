@@ -33,10 +33,10 @@
 #ifndef _SYSC_SIFIVE_FE310_H_
 #define _SYSC_SIFIVE_FE310_H_
 
-#include "scc/initiator_mixin.h"
+#include "tlm/scc/initiator_mixin.h"
 #include "scc/traceable.h"
 #include "scc/utilities.h"
-#include "scv4tlm/tlm_rec_initiator_socket.h"
+#include "tlm/scc/scv/tlm_rec_initiator_socket.h"
 #include <cci_configuration>
 #include <tlm>
 #include <tlm_core/tlm_1/tlm_req_rsp/tlm_1_interfaces/tlm_core_ifs.h>
@@ -75,7 +75,7 @@ class core_wrapper;
 
 class core_complex : public sc_core::sc_module, public scc::traceable {
 public:
-    scc::initiator_mixin<scv4tlm::tlm_rec_initiator_socket<32>> initiator{"intor"};
+    tlm::scc::initiator_mixin<tlm::scc::scv::tlm_rec_initiator_socket<32>> initiator{"intor"};
 
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
 
@@ -146,16 +146,14 @@ protected:
     std::unique_ptr<iss::vm_if> vm;
     sc_core::sc_time curr_clk;
     iss::debugger::target_adapter_if *tgt_adapter;
-#ifdef WITH_SCV
     //! transaction recording database
-    scv_tr_db *m_db;
+    SCVNS scv_tr_db *m_db;
     //! blocking transaction recording stream handle
-    scv_tr_stream *stream_handle;
+    SCVNS scv_tr_stream *stream_handle;
     //! transaction generator handle for blocking transactions
-    scv_tr_generator<_scv_tr_generator_default_data, _scv_tr_generator_default_data> *instr_tr_handle;
-    scv_tr_generator<uint64_t, _scv_tr_generator_default_data> *fetch_tr_handle;
-    scv_tr_handle tr_handle;
-#endif
+    SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data> *instr_tr_handle;
+    SCVNS scv_tr_generator<uint64_t, SCVNS _scv_tr_generator_default_data> *fetch_tr_handle;
+    SCVNS scv_tr_handle tr_handle;
 };
 
 } /* namespace SiFive */

@@ -64,7 +64,7 @@ endif()
 add_library(riscv SHARED ${LIB_SOURCES})
 target_compile_options(riscv PRIVATE -Wno-shift-count-overflow)
 target_include_directories(riscv PUBLIC incl ../external/elfio)
-target_link_libraries(riscv PUBLIC softfloat scc-util)
+target_link_libraries(riscv PUBLIC softfloat scc-util jsoncpp)
 target_link_libraries(riscv PUBLIC -Wl,--whole-archive dbt-core -Wl,--no-whole-archive)
 set_target_properties(riscv PROPERTIES
   VERSION ${PROJECT_VERSION}
