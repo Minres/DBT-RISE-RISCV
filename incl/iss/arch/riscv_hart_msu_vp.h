@@ -328,7 +328,7 @@ public:
 
         void write_mstatus(T val, unsigned priv_lvl) {
             auto mask = get_mask(priv_lvl);
-            auto new_val = (mstatus.st.value & ~mask) | (val & mask);
+            auto new_val = (mstatus.backing.val & ~mask) | (val & mask);
             mstatus = new_val;
         }
 

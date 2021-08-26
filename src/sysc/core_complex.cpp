@@ -168,7 +168,7 @@ public:
     void wait_until(uint64_t flags) override {
         SCCDEBUG(owner->name()) << "Sleeping until interrupt";
         do {
-            wait(wfi_evt);
+            sc_core::wait(wfi_evt);
         } while (this->reg.pending_trap == 0);
         base_type::wait_until(flags);
     }
@@ -315,27 +315,23 @@ void core_complex::start_of_simulation() {
                 reset_address.set_value(start_addr.first);
         }
     }
-#ifdef WITH_SCV
     if (m_db != nullptr && stream_handle == nullptr) {
         string basename(this->name());
-        stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", m_db);
-        instr_tr_handle = new scv_tr_generator<>("execute", *stream_handle);
-        fetch_tr_handle = new scv_tr_generator<uint64_t>("fetch", *stream_handle);
+        stream_handle = new SCVNS scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", m_db);
+        instr_tr_handle = new SCVNS scv_tr_generator<>("execute", *stream_handle);
+        fetch_tr_handle = new SCVNS scv_tr_generator<uint64_t>("fetch", *stream_handle);
     }
-#endif
 }
 
 void core_complex::disass_output(uint64_t pc, const std::string instr_str) {
-#ifdef WITH_SCV
     if (m_db == nullptr) return;
     if (tr_handle.is_active()) tr_handle.end_transaction();
     tr_handle = instr_tr_handle->begin_transaction();
     tr_handle.record_attribute("PC", pc);
     tr_handle.record_attribute("INSTR", instr_str);
     tr_handle.record_attribute("MODE", lvl[cpu->get_mode()]);
-    tr_handle.record_attribute("MSTATUS", cpu->get_state().mstatus.st.value);
+    tr_handle.record_attribute("MSTATUS", cpu->get_state().mstatus.backing.val);
     tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
-#endif
 }
 
 void core_complex::clk_cb() {
