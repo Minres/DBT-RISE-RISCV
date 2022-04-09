@@ -46,10 +46,10 @@ iss::plugin::instruction_count::instruction_count(std::string config_file_name) 
             try {
                 is >> root;
             } catch (Json::RuntimeError &e) {
-                LOG(ERROR) << "Could not parse input file " << config_file_name << ", reason: " << e.what();
+                LOG(ERR) << "Could not parse input file " << config_file_name << ", reason: " << e.what();
             }
         } else {
-            LOG(ERROR) << "Could not open input file " << config_file_name;
+            LOG(ERR) << "Could not open input file " << config_file_name;
         }
     }
 }
@@ -85,11 +85,11 @@ bool iss::plugin::instruction_count::registration(const char* const version, vm_
     	}
     	rep_counts.resize(delays.size());
     } else {
-        LOG(ERROR)<<"plugin instruction_count: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
+        LOG(ERR)<<"plugin instruction_count: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
     }
 	return true;
 }
 
-void iss::plugin::instruction_count::callback(instr_info_t instr_info) {
+void iss::plugin::instruction_count::callback(instr_info_t instr_info, exec_info const&) {
 	rep_counts[instr_info.instr_id]++;
 }

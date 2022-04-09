@@ -123,7 +123,7 @@ protected:
     // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
     enum { MASK16 = 0b1111111111111111, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
-    enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
+    enum { LUT_SIZE = 1 << util::bit_count(static_cast<uint32_t>(EXTR_MASK32)), LUT_SIZE_C = 1 << util::bit_count(static_cast<uint32_t>(EXTR_MASK16)) };
 
     std::array<compile_func, LUT_SIZE> lut;
 

@@ -54,7 +54,9 @@ rv32gc::~rv32gc(){
 }
 
 void rv32gc::reset(uint64_t address) {
-    for(size_t i=0; i<traits<rv32gc>::NUM_REGS; ++i) set_reg(i, std::vector<uint8_t>(sizeof(traits<rv32gc>::reg_t),0));
+    auto base_ptr = reinterpret_cast<traits<iss::arch::rv32gc>::reg_t*>(get_regs_base_ptr());
+    for(size_t i=0; i<traits<iss::arch::rv32gc>::NUM_REGS; ++i)
+        *(base_ptr+i)=0;
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.trap_state=0;

@@ -40,7 +40,6 @@
 #include <iss/arch/rv32gc.h>
 #include <iss/arch/rv64gc.h>
 #include <iss/arch/rv64i.h>
-#include <iss/arch/mnrv32.h>
 #ifdef WITH_LLVM
 #include <iss/llvm/jit_helper.h>
 #endif
@@ -62,8 +61,10 @@ std::tuple<cpu_ptr, vm_ptr> create_cpu(std::string const& backend, unsigned gdb_
     if(backend == "llvm")
         return {cpu_ptr{lcpu}, vm_ptr{iss::llvm::create(lcpu, gdb_port)}};
 #endif
+#ifdef HAS_TCC
     if(backend == "tcc")
         return {cpu_ptr{lcpu}, vm_ptr{iss::tcc::create(lcpu, gdb_port)}};
+#endif
     return {nullptr, nullptr};
 }
 
@@ -86,7 +87,7 @@ int main(int argc, char *argv[]) {
         ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
-        ("backend", po::value<std::string>()->default_value("tcc"), "the memory input file")
+        ("backend", po::value<std::string>()->default_value("interp"), "the memory input file")
         ("isa", po::value<std::string>()->default_value("rv32gc"), "isa to use for simulation");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
@@ -132,9 +133,7 @@ int main(int argc, char *argv[]) {
         vm_ptr vm{nullptr};
         cpu_ptr cpu{nullptr};
         std::string isa_opt(clim["isa"].as<std::string>());
-        if (isa_opt=="mnrv32") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::mnrv32>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt=="rv64i") {
+if (isa_opt=="rv64i") {
             std::tie(cpu, vm) = create_cpu<iss::arch::rv64i>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
         } else if (isa_opt=="rv64gc") {
             std::tie(cpu, vm) = create_cpu<iss::arch::rv64gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
@@ -143,7 +142,7 @@ int main(int argc, char *argv[]) {
         } else if (isa_opt=="rv32gc") {
             std::tie(cpu, vm) = create_cpu<iss::arch::rv32gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
         } else {
-            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
+            LOG(ERR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
             return 127;
         }
         if (clim.count("plugin")) {
@@ -164,7 +163,7 @@ int main(int argc, char *argv[]) {
                     vm->register_plugin(*ce_plugin);
                     plugin_list.push_back(ce_plugin);
                 } else {
-                    LOG(ERROR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'" << std::endl;
+                    LOG(ERR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'" << std::endl;
                     return 127;
                 }
             }
@@ -181,7 +180,7 @@ int main(int argc, char *argv[]) {
         }
         uint64_t start_address = 0;
         if (clim.count("mem"))
-            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::mnrv32>::MEM);
+            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::rv32imac>::MEM);
         if (clim.count("elf"))
             for (std::string input : clim["elf"].as<std::vector<std::string>>()) {
                 auto start_addr = vm->get_arch()->load_file(input);
@@ -199,7 +198,7 @@ int main(int argc, char *argv[]) {
         auto cycles = clim["instructions"].as<uint64_t>();
         res = vm->start(cycles, dump);
     } catch (std::exception &e) {
-        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
+        LOG(ERR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
                    << std::endl;
         res = 2;
     }

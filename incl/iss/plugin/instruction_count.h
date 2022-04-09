@@ -69,7 +69,7 @@ public:
 
     sync_type get_sync() override { return POST_SYNC; };
 
-    void callback(instr_info_t instr_info) override;
+    void callback(instr_info_t instr_info, exec_info const&) override;
 
 private:
     Json::Value root;

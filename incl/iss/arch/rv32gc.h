@@ -202,14 +202,6 @@ struct rv32gc: public arch_if {
     void reset(uint64_t address=0) override;
 
     uint8_t* get_regs_base_ptr() override;
-    /// deprecated
-    void get_reg(short idx, std::vector<uint8_t>& value) override {}
-    void set_reg(short idx, const std::vector<uint8_t>& value) override {}
-    /// deprecated
-    bool get_flag(int flag) override {return false;}
-    void set_flag(int, bool value) override {};
-    /// deprecated
-    void update_flags(operations op, uint64_t opr1, uint64_t opr2) override {};
 
     inline uint64_t get_icount() { return reg.icount; }
 

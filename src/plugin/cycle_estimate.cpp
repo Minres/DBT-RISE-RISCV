@@ -47,10 +47,10 @@ iss::plugin::cycle_estimate::cycle_estimate(std::string config_file_name)
             try {
                 is >> root;
             } catch (Json::RuntimeError &e) {
-                LOG(ERROR) << "Could not parse input file " << config_file_name << ", reason: " << e.what();
+                LOG(ERR) << "Could not parse input file " << config_file_name << ", reason: " << e.what();
             }
         } else {
-            LOG(ERROR) << "Could not open input file " << config_file_name;
+            LOG(ERR) << "Could not open input file " << config_file_name;
         }
     }
 }
@@ -77,13 +77,13 @@ bool iss::plugin::cycle_estimate::registration(const char* const version, vm_if&
     		}
     	}
     } else {
-        LOG(ERROR)<<"plugin cycle_estimate: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
+        LOG(ERR)<<"plugin cycle_estimate: could not find an entry for "<<core_name<<" in JSON file"<<std::endl;
     }
 	return true;
 
 }
 
-void iss::plugin::cycle_estimate::callback(instr_info_t instr_info) {
+void iss::plugin::cycle_estimate::callback(instr_info_t instr_info, exec_info const&) {
     assert(arch_instr && "No instrumentation interface available but callback executed");
 	auto entry = delays[instr_info.instr_id];
 	bool taken = (arch_instr->get_next_pc()-arch_instr->get_pc()) != (entry.size/8);

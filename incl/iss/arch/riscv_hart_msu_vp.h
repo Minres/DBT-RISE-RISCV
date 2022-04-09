@@ -478,8 +478,8 @@ public:
     iss::status write(const address_type type, const access_type access, const uint32_t space,
             const uint64_t addr, const unsigned length, const uint8_t *const data) override;
 
-    virtual uint64_t enter_trap(uint64_t flags) override { return riscv_hart_msu_vp::enter_trap(flags, fault_data); }
-    virtual uint64_t enter_trap(uint64_t flags, uint64_t addr) override;
+    virtual uint64_t enter_trap(uint64_t flags) override { return riscv_hart_msu_vp::enter_trap(flags, fault_data, fault_data); }
+    virtual uint64_t enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) override;
     virtual uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
@@ -502,11 +502,15 @@ protected:
          */
         const std::string core_type_name() const override { return traits<BASE>::core_type; }
 
-        virtual uint64_t get_pc() { return arch.get_pc(); };
+        uint64_t get_instr_count() override { return arch.get_icount(); }
 
-        virtual uint64_t get_next_pc() { return arch.get_next_pc(); };
+        uint64_t get_total_cycles() override { return arch.get_cycles(); }
 
-        virtual void set_curr_instr_cycles(unsigned cycles) { arch.cycle_offset += cycles - 1; };
+        uint64_t get_pc() override { return arch.get_pc(); }
+
+        uint64_t get_next_pc() override { return arch.get_next_pc(); }
+
+        virtual void set_curr_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
 
         riscv_hart_msu_vp<BASE> &arch;
     };
@@ -514,7 +518,8 @@ protected:
     friend struct riscv_instrumentation_if;
     addr_t get_pc() { return this->reg.PC; }
     addr_t get_next_pc() { return this->reg.NEXT_PC; }
-
+    uint64_t get_icount() { return this->reg.icount; }
+    uint64_t get_cycles() { return this->reg.icount + cycle_offset; }
     virtual iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t *const data);
     virtual iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t *const data);
 
@@ -634,7 +639,7 @@ template <typename BASE> std::pair<uint64_t, bool> riscv_hart_msu_vp<BASE>::load
                             traits<BASE>::MEM, pseg->get_physical_address(),
                             fsize, reinterpret_cast<const uint8_t *const>(seg_data));
                     if (res != iss::Ok)
-                        LOG(ERROR) << "problem writing " << fsize << "bytes to 0x" << std::hex
+                        LOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex
                                    << pseg->get_physical_address();
                 }
             }
@@ -1249,7 +1254,7 @@ typename riscv_hart_msu_vp<BASE>::phys_addr_t riscv_hart_msu_vp<BASE>::virt2phys
     }
 }
 
-template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t flags, uint64_t addr) {
+template <typename BASE> uint64_t riscv_hart_msu_vp<BASE>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
     auto cur_priv = this->reg.machine_state;
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val

@@ -32,8 +32,7 @@
 
 #include "sysc/core_complex.h"
 #include "iss/arch/riscv_hart_msu_vp.h"
-//#include "iss/arch/rv32imac.h"
-#include "iss/arch/mnrv32.h"
+#include "iss/arch/rv32imac.h"
 #include "iss/debugger/encoderdecoder.h"
 #include "iss/debugger/gdb_session.h"
 #include "iss/debugger/server.h"
@@ -61,7 +60,7 @@ iss::debugger::encoder_decoder encdec;
 }
 
 //using core_type = iss::arch::rv32imac;
-using core_type = iss::arch::mnrv32;
+using core_type = iss::arch::rv32imac;
 
 namespace {
 

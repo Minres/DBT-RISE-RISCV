@@ -84,13 +84,13 @@ protected:
 
     inline const char *name(size_t index){return traits<ARCH>::reg_aliases.at(index);}
 
-    virt_addr_t execute_inst(virt_addr_t start, std::function<bool(void)> pred) override;
+    virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
 
     // some compile time constants
     // enum { MASK16 = 0b1111110001100011, MASK32 = 0b11111111111100000111000001111111 };
     enum { MASK16 = 0b1111111111111111, MASK32 = 0b11111111111100000111000001111111 };
     enum { EXTR_MASK16 = MASK16 >> 2, EXTR_MASK32 = MASK32 >> 2 };
-    enum { LUT_SIZE = 1 << util::bit_count(EXTR_MASK32), LUT_SIZE_C = 1 << util::bit_count(EXTR_MASK16) };
+    enum { LUT_SIZE = 1 << util::bit_count(static_cast<uint32_t>(EXTR_MASK32)), LUT_SIZE_C = 1 << util::bit_count(static_cast<uint32_t>(EXTR_MASK16)) };
 
     std::array<compile_func, LUT_SIZE> lut;
 
@@ -326,7 +326,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -358,7 +358,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -394,7 +394,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -439,7 +439,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -474,7 +474,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -509,7 +509,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -544,7 +544,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -579,7 +579,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -614,7 +614,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -649,7 +649,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -683,7 +683,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -717,7 +717,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -751,7 +751,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -785,7 +785,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -819,7 +819,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -851,7 +851,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -883,7 +883,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -915,7 +915,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -948,7 +948,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -983,7 +983,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1019,7 +1019,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1052,7 +1052,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1085,7 +1085,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1118,7 +1118,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1151,7 +1151,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1184,7 +1184,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1217,7 +1217,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1250,7 +1250,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1283,7 +1283,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1316,7 +1316,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1351,7 +1351,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1386,7 +1386,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1419,7 +1419,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1452,7 +1452,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1485,7 +1485,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1518,7 +1518,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1551,7 +1551,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1580,7 +1580,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1608,7 +1608,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1632,7 +1632,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1656,7 +1656,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1680,7 +1680,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1704,7 +1704,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1728,7 +1728,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1752,7 +1752,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1781,7 +1781,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1821,7 +1821,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1860,7 +1860,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1899,7 +1899,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1934,7 +1934,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -1972,7 +1972,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2010,7 +2010,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2044,7 +2044,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2078,7 +2078,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2110,7 +2110,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2146,7 +2146,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2182,7 +2182,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2218,7 +2218,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2254,7 +2254,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2289,7 +2289,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2324,7 +2324,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2364,7 +2364,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2404,7 +2404,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2444,7 +2444,7 @@ private:
         if(trap_state!=0){
             auto& last_br = super::template get_reg<uint32_t>(arch::traits<ARCH>::LAST_BRANCH);
             last_br = std::numeric_limits<uint32_t>::max();
-            super::core.enter_trap(trap_state, cur_pc_val);
+            super::core.enter_trap(trap_state, cur_pc_val, 0);
         }
         pc.val=super::template get_reg<reg_t>(arch::traits<ARCH>::NEXT_PC);
         return pc;
@@ -2479,15 +2479,23 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
     }
 }
 
+inline bool is_count_limit_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::COUNT_LIMIT) == finish_cond_e::COUNT_LIMIT;
+}
+
+inline bool is_jump_to_self_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::JUMP_TO_SELF) == finish_cond_e::JUMP_TO_SELF;
+}
+
 template <typename ARCH>
-typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(virt_addr_t start, std::function<bool(void)> pred) {
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     const typename traits<ARCH>::addr_t upper_bits = ~traits<ARCH>::PGMASK;
     code_word_t insn = 0;
     auto *const data = (uint8_t *)&insn;
     auto pc=start;
-    while(pred){
+    while(!this->core.should_stop() && !(is_count_limit_enabled(cond) && this->core.get_icount() >= icount_limit)){
         auto paddr = this->core.v2p(pc);
         if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
             if (this->core.read(paddr, 2, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
@@ -2496,7 +2504,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(virt_addr_t star
         } else {
             if (this->core.read(paddr, 4, data) != iss::Ok) throw trap_access(TRAP_ID, pc.val);
         }
-        if (insn == 0x0000006f || (insn&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+        if (is_jump_to_self_enabled(cond) &&(insn == 0x0000006f || (insn&0xffff)==0xa001))
+            throw simulation_stopped(0); // 'J 0' or 'C.J 0'
         auto lut_val = extract_fields(insn);
         auto f = qlut[insn & 0x3][lut_val];
         if (!f)
