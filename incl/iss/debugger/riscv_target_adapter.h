@@ -120,9 +120,9 @@ public:
 
     status packetsize_query(std::string &out_buf) override;
 
-    status add_break(int type, uint64_t addr, unsigned int length) override;
+    status add_break(break_type type, uint64_t addr, unsigned int length) override;
 
-    status remove_break(int type, uint64_t addr, unsigned int length) override;
+    status remove_break(break_type type, uint64_t addr, unsigned int length) override;
 
     status resume_from_addr(bool step, int sig, uint64_t addr, rp_thread_ref thread,
                             std::function<void(unsigned)> stop_callback) override;
@@ -316,7 +316,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::packetsize_query(std
     return Ok;
 }
 
-template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(int type, uint64_t addr, unsigned int length) {
+template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(break_type type, uint64_t addr, unsigned int length) {
     auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
     auto eaddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr + length});
     target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val - saddr.val);
@@ -326,7 +326,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(int type, 
     return Ok;
 }
 
-template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(int type, uint64_t addr, unsigned int length) {
+template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(break_type type, uint64_t addr, unsigned int length) {
     auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
     unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
     if (handle) {

@@ -502,13 +502,17 @@ protected:
          */
         const std::string core_type_name() const override { return traits<BASE>::core_type; }
 
-        uint64_t get_instr_count() override { return arch.get_icount(); }
-
-        uint64_t get_total_cycles() override { return arch.get_cycles(); }
-
         uint64_t get_pc() override { return arch.get_pc(); }
 
         uint64_t get_next_pc() override { return arch.get_next_pc(); }
+
+        uint64_t get_instr_word() override { return 0; };
+
+        uint64_t get_instr_count() override { return arch.get_icount(); }
+
+        uint64_t get_pendig_traps() override { return 0; }
+
+        uint64_t get_total_cycles() override { return arch.get_cycles(); }
 
         virtual void set_curr_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
 

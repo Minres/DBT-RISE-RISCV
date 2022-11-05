@@ -3760,7 +3760,7 @@ template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned t
 
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
     tu("trap_entry:");
-    tu("enter_trap(core_ptr, *trap_state, *pc);");
+    tu("enter_trap(core_ptr, *trap_state, *pc, 0);");
     tu.store(tu.constant(std::numeric_limits<uint32_t>::max(),32),traits<ARCH>::LAST_BRANCH);
     tu("return *next_pc;");
 }

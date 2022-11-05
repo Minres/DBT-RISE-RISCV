@@ -359,7 +359,7 @@ void core_complex::run() {
             wait(clk_i.value_changed_event());
         }
         cpu->set_interrupt_execution(false);
-        vm->start();
+        vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
     } while (cpu->get_interrupt_execution());
     sc_stop();
 }
