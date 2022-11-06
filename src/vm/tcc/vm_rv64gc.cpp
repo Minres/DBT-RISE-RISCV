@@ -8890,6 +8890,7 @@ private:
     
     /* instruction 199: C.SRLI64 */
     compile_ret_t __c_srli64(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+	    return std::tuple<iss::tcc::continuation_e>();
     }
     
     /****************************************************************************
