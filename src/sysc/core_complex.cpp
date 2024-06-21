@@ -281,8 +281,10 @@ vm_ptr create_cpu(core_wrapper* cpu, std::string const& backend, unsigned gdb_po
     if(backend == "llvm")
         return vm_ptr{iss::llvm::create(lcpu, gdb_port)};
 #endif
+#ifdef HAS_TCC
     if(backend == "tcc")
         return vm_ptr{iss::tcc::create<core_type>(cpu, gdb_port)};
+#endif
     return {nullptr};
 }
 
