@@ -16,8 +16,22 @@ Last but not least an SystemC wrapper is provided which allows easy integration 
 
 Since DBT-RISE uses a generative approch other needed combinations or custom extension can be generated. For further information please contact [info@minres.com](mailto:info@minres.com).
 
+## Standalone build insructions
 
+You need to have conan newer than version 2.0 available.
+If you do not have it already it can be done in the following way (assuming you are using bash):
+
+```
+python3 -mvenv .venv
+. .venv/bin/activate
+pip3 install conan
+conan profile new default --detect
+```
+
+Building the ISS is as simple as:
+
+```
 conan install . --output-folder=. --build=missing -s compiler.cppstd=17
-cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake
 cmake --preset conan-release
- 
+cmake --build build/Release -24
+```
