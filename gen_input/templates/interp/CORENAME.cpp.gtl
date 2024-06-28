@@ -1,0 +1,389 @@
+/*******************************************************************************
+ * Copyright (C) 2021 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
+<%
+def nativeTypeSize(int size){
+    if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
+}
+%>
+// clang-format off
+#include <iss/arch/${coreDef.name.toLowerCase()}.h>
+#include <iss/debugger/gdb_session.h>
+#include <iss/debugger/server.h>
+#include <iss/iss.h>
+#include <iss/interp/vm_base.h>
+#include <vm/fp_functions.h>
+#include <util/logging.h>
+#include <boost/coroutine2/all.hpp>
+#include <functional>
+#include <exception>
+#include <vector>
+#include <sstream>
+
+#ifndef FMT_HEADER_ONLY
+#define FMT_HEADER_ONLY
+#endif
+#include <fmt/format.h>
+
+#include <array>
+#include <iss/debugger/riscv_target_adapter.h>
+
+namespace iss {
+namespace interp {
+namespace ${coreDef.name.toLowerCase()} {
+using namespace iss::arch;
+using namespace iss::debugger;
+using namespace std::placeholders;
+
+struct memory_access_exception : public std::exception{
+    memory_access_exception(){}
+};
+
+template <typename ARCH> class vm_impl : public iss::interp::vm_base<ARCH> {
+public:
+    using traits = arch::traits<ARCH>;
+    using super       = typename iss::interp::vm_base<ARCH>;
+    using virt_addr_t = typename super::virt_addr_t;
+    using phys_addr_t = typename super::phys_addr_t;
+    using code_word_t = typename super::code_word_t;
+    using addr_t      = typename super::addr_t;
+    using reg_t       = typename traits::reg_t;
+    using mem_type_e  = typename traits::mem_type_e;
+    using opcode_e    = typename traits::opcode_e;
+    
+    vm_impl();
+
+    vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
+
+    void enableDebug(bool enable) { super::sync_exec = super::ALL_SYNC; }
+
+    target_adapter_if *accquire_target_adapter(server_if *srv) override {
+        debugger_if::dbg_enabled = true;
+        if (super::tgt_adapter == nullptr)
+            super::tgt_adapter = new riscv_target_adapter<ARCH>(srv, this->get_arch());
+        return super::tgt_adapter;
+    }
+
+protected:
+    using this_class = vm_impl<ARCH>;
+    using compile_ret_t = virt_addr_t;
+    using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
+
+    inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index]:"illegal";}
+
+    virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
+
+    // some compile time constants
+
+    inline void raise(uint16_t trap_id, uint16_t cause){
+        auto trap_val =  0x80ULL << 24 | (cause << 16) | trap_id;
+        this->core.reg.trap_state = trap_val;
+        this->template get_reg<uint${addrDataWidth}_t>(traits::NEXT_PC) = std::numeric_limits<uint${addrDataWidth}_t>::max();
+    }
+
+    inline void leave(unsigned lvl){
+        this->core.leave_trap(lvl);
+    }
+
+    inline void wait(unsigned type){
+        this->core.wait_until(type);
+    }
+
+    using yield_t = boost::coroutines2::coroutine<void>::push_type;
+    using coro_t = boost::coroutines2::coroutine<void>::pull_type;
+    std::vector<coro_t> spawn_blocks;
+
+    template<unsigned W, typename U, typename S = typename std::make_signed<U>::type>
+    inline S sext(U from) {
+        auto mask = (1ULL<<W) - 1;
+        auto sign_mask = 1ULL<<(W-1);
+        return (from & mask) | ((from & sign_mask) ? ~mask : 0);
+    }
+    
+    inline void process_spawn_blocks() {
+        if(spawn_blocks.size()==0) return;
+        for(auto it = std::begin(spawn_blocks); it!=std::end(spawn_blocks);)
+             if(*it){
+                 (*it)();
+                 ++it;
+             } else
+                 spawn_blocks.erase(it);
+    }
+<%functions.each{ it.eachLine { %>
+    ${it}<%}%>
+<%}%>
+
+private:
+    /****************************************************************************
+     * start opcode definitions
+     ****************************************************************************/
+    struct instruction_descriptor {
+        size_t length;
+        uint32_t value;
+        uint32_t mask;
+        typename arch::traits<ARCH>::opcode_e op;
+    };
+    struct decoding_tree_node{
+        std::vector<instruction_descriptor> instrs;
+        std::vector<decoding_tree_node*> children;
+        uint32_t submask = std::numeric_limits<uint32_t>::max();
+        uint32_t value;
+        decoding_tree_node(uint32_t value) : value(value){}
+    };
+
+    decoding_tree_node* root {nullptr};
+    const std::array<instruction_descriptor, ${instructions.size}> instr_descr = {{
+         /* entries are: size, valid value, valid mask, function ptr */<%instructions.each{instr -> %>
+        {${instr.length}, ${instr.encoding}, ${instr.mask}, arch::traits<ARCH>::opcode_e::${instr.instruction.name}},<%}%>
+    }};
+
+    iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
+        if(this->core.has_mmu()) {
+            auto phys_pc = this->core.virt2phys(pc);
+//            if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
+//                if (this->core.read(phys_pc, 2, data) != iss::Ok) return iss::Err;
+//                if ((data[0] & 0x3) == 0x3) // this is a 32bit instruction
+//                    if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok)
+//                        return iss::Err;
+//            } else {
+                if (this->core.read(phys_pc, 4, data) != iss::Ok)
+                    return iss::Err;
+//            }
+        } else {
+            if (this->core.read(phys_addr_t(pc.access, pc.space, pc.val), 4, data) != iss::Ok)
+                return iss::Err;
+
+        }
+        return iss::Ok;
+    }
+    
+    void populate_decoding_tree(decoding_tree_node* root){
+        //create submask
+        for(auto instr: root->instrs){
+            root->submask &= instr.mask;
+        }
+        //put each instr according to submask&encoding into children
+        for(auto instr: root->instrs){
+            bool foundMatch = false;
+            for(auto child: root->children){
+                //use value as identifying trait
+                if(child->value == (instr.value&root->submask)){
+                    child->instrs.push_back(instr);
+                    foundMatch = true;
+                }
+            }
+            if(!foundMatch){
+                decoding_tree_node* child = new decoding_tree_node(instr.value&root->submask);
+                child->instrs.push_back(instr);
+                root->children.push_back(child);
+            }
+        }
+        root->instrs.clear();
+        //call populate_decoding_tree for all children
+        if(root->children.size() >1)
+            for(auto child: root->children){
+                populate_decoding_tree(child);      
+            }
+        else{
+            //sort instrs by value of the mask, this works bc we want to have the least restrictive one last
+            std::sort(root->children[0]->instrs.begin(), root->children[0]->instrs.end(), [](const instruction_descriptor& instr1, const instruction_descriptor& instr2) {
+            return instr1.mask > instr2.mask;
+            }); 
+        }
+    }
+    typename arch::traits<ARCH>::opcode_e  decode_instr(decoding_tree_node* node, code_word_t word){
+        if(!node->children.size()){
+            if(node->instrs.size() == 1) return node->instrs[0].op;
+            for(auto instr : node->instrs){
+                if((instr.mask&word) == instr.value) return instr.op;
+            }
+        }
+        else{
+            for(auto child : node->children){
+                if (child->value == (node->submask&word)){
+                    return decode_instr(child, word);
+                }  
+            }  
+        }
+        return arch::traits<ARCH>::opcode_e::MAX_OPCODE;
+    }
+};
+
+template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
+    volatile CODE_WORD x = insn;
+    insn = 2 * x;
+}
+
+template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
+
+// according to
+// https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
+#ifdef __GCC__
+constexpr size_t bit_count(uint32_t u) { return __builtin_popcount(u); }
+#elif __cplusplus < 201402L
+constexpr size_t uCount(uint32_t u) { return u - ((u >> 1) & 033333333333) - ((u >> 2) & 011111111111); }
+constexpr size_t bit_count(uint32_t u) { return ((uCount(u) + (uCount(u) >> 3)) & 030707070707) % 63; }
+#else
+constexpr size_t bit_count(uint32_t u) {
+    size_t uCount = u - ((u >> 1) & 033333333333) - ((u >> 2) & 011111111111);
+    return ((uCount + (uCount >> 3)) & 030707070707) % 63;
+}
+#endif
+
+template <typename ARCH>
+vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
+: vm_base<ARCH>(core, core_id, cluster_id) {
+    root = new decoding_tree_node(std::numeric_limits<uint32_t>::max());
+    for(auto instr:instr_descr){
+        root->instrs.push_back(instr);
+    }
+    populate_decoding_tree(root);
+}
+
+inline bool is_count_limit_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::COUNT_LIMIT) == finish_cond_e::COUNT_LIMIT;
+}
+
+inline bool is_jump_to_self_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::JUMP_TO_SELF) == finish_cond_e::JUMP_TO_SELF;
+}
+
+template <typename ARCH>
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit){
+    auto pc=start;
+    auto* PC = reinterpret_cast<uint${addrDataWidth}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::PC]);
+    auto* NEXT_PC = reinterpret_cast<uint${addrDataWidth}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::NEXT_PC]);
+    auto& trap_state = this->core.reg.trap_state;
+    auto& icount =  this->core.reg.icount;
+    auto& cycle =  this->core.reg.cycle;
+    auto& instret =  this->core.reg.instret;
+    auto& instr =  this->core.reg.instruction;
+    // we fetch at max 4 byte, alignment is 2
+    auto *const data = reinterpret_cast<uint8_t*>(&instr);
+
+    while(!this->core.should_stop() &&
+            !(is_count_limit_enabled(cond) && icount >= icount_limit)){
+        if(fetch_ins(pc, data)!=iss::Ok){
+            this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
+            pc.val = super::core.enter_trap(std::numeric_limits<uint64_t>::max(), pc.val, 0);
+        } else {
+            if (is_jump_to_self_enabled(cond) &&
+                    (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+            auto inst_id = decode_instr(root, instr);
+            // pre execution stuff
+             this->core.reg.last_branch = 0;
+            if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, static_cast<unsigned>(inst_id));
+            try{
+                switch(inst_id){<%instructions.eachWithIndex{instr, idx -> %>
+                case arch::traits<ARCH>::opcode_e::${instr.name}: {
+                    <%instr.fields.eachLine{%>${it}
+                    <%}%>if(this->disass_enabled){
+                        /* generate console output when executing the command */<%instr.disass.eachLine{%>
+                        ${it}<%}%>
+                    }
+                    // used registers<%instr.usedVariables.each{ k,v->
+                    if(v.isArray) {%>
+                    auto* ${k} = reinterpret_cast<uint${nativeTypeSize(v.type.size)}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::${k}0]);<% }else{ %> 
+                    auto* ${k} = reinterpret_cast<uint${nativeTypeSize(v.type.size)}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::${k}]);
+                    <%}}%>// calculate next pc value
+                    *NEXT_PC = *PC + ${instr.length/8};
+                    // execute instruction<%instr.behavior.eachLine{%>
+                    ${it}<%}%>
+                    break;
+                }// @suppress("No break at end of case")<%}%>
+                default: {
+                    *NEXT_PC = *PC + ((instr & 3) == 3 ? 4 : 2);
+                    raise(0,  2);
+                }
+                }
+            }catch(memory_access_exception& e){}
+            // post execution stuff
+            process_spawn_blocks();
+            if(this->sync_exec && POST_SYNC) this->do_sync(POST_SYNC, static_cast<unsigned>(inst_id));
+            // if(!this->core.reg.trap_state) // update trap state if there is a pending interrupt
+            //    this->core.reg.trap_state =  this->core.reg.pending_trap;
+            // trap check
+            if(trap_state!=0){
+                super::core.enter_trap(trap_state, pc.val, instr);
+            } else {
+                icount++;
+                instret++;
+            }
+            cycle++;
+            pc.val=*NEXT_PC;
+            this->core.reg.PC = this->core.reg.NEXT_PC;
+            this->core.reg.trap_state =  this->core.reg.pending_trap;
+        }
+    }
+    return pc;
+}
+
+} // namespace ${coreDef.name.toLowerCase()}
+
+template <>
+std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreDef.name.toLowerCase()} *core, unsigned short port, bool dump) {
+    auto ret = new ${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*core, dump);
+    if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
+    return std::unique_ptr<vm_if>(ret);
+}
+} // namespace interp
+} // namespace iss
+
+#include <iss/arch/riscv_hart_m_p.h>
+#include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/factory.h>
+namespace iss {
+namespace {
+volatile std::array<bool, 2> dummy = {
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::${coreDef.name.toLowerCase()}>();
+		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        }),
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::${coreDef.name.toLowerCase()}>();
+		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        })
+};
+}
+}
+// clang-format on

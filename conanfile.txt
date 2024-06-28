@@ -1,0 +1,17 @@
+[requires]
+yaml-cpp/0.8.0
+jsoncpp/1.9.5
+boost/1.85.0
+asmjit/cci.20240531
+elfio/3.12
+fmt/8.0.1
+
+[options]
+boost/*:fPIC=True
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

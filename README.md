@@ -16,3 +16,8 @@ Last but not least an SystemC wrapper is provided which allows easy integration 
 
 Since DBT-RISE uses a generative approch other needed combinations or custom extension can be generated. For further information please contact [info@minres.com](mailto:info@minres.com).
 
+
+conan install . --output-folder=. --build=missing -s compiler.cppstd=17
+cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake
+cmake --preset conan-release
+ 

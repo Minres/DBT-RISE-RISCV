@@ -1,0 +1,12 @@
+{
+	"${coreDef.name}" : [<%instructions.eachWithIndex{instr,index -> %>${index==0?"":","}
+		{
+			"name"  :   "${instr.name}",
+			"size"  :   ${instr.length},
+			"encoding": "${instr.encoding}",
+            "mask":     "${instr.mask}",
+			"branch":   ${instr.modifiesPC},
+			"delay" :   ${instr.isConditional?"[1,1]":"1"}
+		}<%}%>
+	]
+}

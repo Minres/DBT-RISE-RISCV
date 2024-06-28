@@ -1,0 +1,66 @@
+import "ISA/RVI.core_desc"
+import "ISA/RVC.core_desc"
+import "ISA/RVM.core_desc"
+import "ISA/RVA.core_desc"
+import "ISA/RVC.core_desc"
+import "ISA/RVF.core_desc"
+import "ISA/RVD.core_desc"
+
+
+Core RV32I provides RVI {
+    architectural_state {
+        XLEN=32;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b01000000000000000001000100000000;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV32IMAC provides RVI, RVM, RVA, RVC {
+    architectural_state {
+        XLEN=32;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b01000000000101000001000100000101;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV32GC provides RVI, RVM, RVA, RVC, RVF {
+    architectural_state {
+        XLEN=32;
+        FLEN=32;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b01000000000101000001000100101101;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV64I provides RVI {
+    architectural_state {
+        XLEN=64;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b10000000000001000000000100000000;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV64GC provides RVI, RVM, RVA, RVC, RVF, RVD {
+    architectural_state {
+        XLEN=64;
+        FLEN=64;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b01000000000101000001000100101101;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
