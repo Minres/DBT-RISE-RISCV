@@ -38,8 +38,15 @@ add_subdirectory(softfloat)
 
 set(LIB_SOURCES
     src/iss/plugin/instruction_count.cpp
+	src/iss/arch/rv32i.cpp
     src/iss/arch/rv32imc.cpp
-    src/vm/interp/vm_rv32imc.cpp
+    src/iss/arch/rv32imac.cpp
+    src/iss/arch/rv32gc.cpp
+	src/iss/arch/rv64i.cpp
+    src/vm/interp/vm_rv32i.cpp
+    src/vm/interp/vm_rv32imac.cpp
+    src/vm/interp/vm_rv32gc.cpp
+    src/vm/interp/vm_rv64i.cpp
     src/vm/fp_functions.cpp
     src/iss/semihosting/semihosting.cpp
     src/iss/plugin/cycle_estimate.cpp

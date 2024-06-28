@@ -80,7 +80,7 @@
 					<folderInfo id="cdt.managedbuild.config.gnu.exe.release.1745230171." name="/" resourcePath="">
 						<toolChain id="cdt.managedbuild.toolchain.gnu.exe.release.2006835092" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.exe.release">
 							<targetPlatform binaryParser="org.eclipse.cdt.core.GNU_ELF;org.eclipse.cdt.core.ELF" id="cdt.managedbuild.target.gnu.platform.exe.release.1630517313" name="Debug Platform" superClass="cdt.managedbuild.target.gnu.platform.exe.release"/>
-							<builder buildPath="/DBT-RISE-RISCV/_build/Release" id="cmake4eclipse.mbs.builder.189476811" keepEnvironmentInBuildfile="false" name="CMake Builder" parallelBuildOn="true" parallelizationNumber="optimal" superClass="cmake4eclipse.mbs.builder"/>
+							<builder buildPath="/DBT-RISE-RISCV/_build/Release" id="cmake4eclipse.mbs.builder.189476811" keepEnvironmentInBuildfile="false" name="CMake Builder" parallelBuildOn="false" superClass="cmake4eclipse.mbs.builder"/>
 							<tool id="cdt.managedbuild.tool.gnu.archiver.base.1428458401" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release.187095968" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release">
 								<option id="gnu.cpp.compiler.exe.release.option.optimization.level.73514910" name="Optimization Level" superClass="gnu.cpp.compiler.exe.release.option.optimization.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>

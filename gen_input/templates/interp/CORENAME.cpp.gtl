@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2021 MINRES Technologies GmbH
+ * Copyright (C) 2024 MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,6 +98,13 @@ protected:
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
     inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index]:"illegal";}
+    inline const char *fname(size_t index){
+        static const char* f_reg_name[] = {
+                "f0","f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12","f13","f14","f15",
+                "f16","f17","f18","f19","f20","f21","f22","f23","f24","f25","f26","f27","f28","f29","f30","f31", "illegal"
+        };
+        return index<32?f_reg_name[index]:f_reg_name[32];
+    }
 
     virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
 
@@ -269,7 +276,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 }
 
 inline bool is_count_limit_enabled(finish_cond_e cond){
-    return (cond & finish_cond_e::COUNT_LIMIT) == finish_cond_e::COUNT_LIMIT;
+    return (cond & finish_cond_e::ICOUNT_LIMIT) == finish_cond_e::ICOUNT_LIMIT;
 }
 
 inline bool is_jump_to_self_enabled(finish_cond_e cond){

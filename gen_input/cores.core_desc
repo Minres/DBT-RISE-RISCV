@@ -7,7 +7,7 @@ import "ISA/RVF.core_desc"
 import "ISA/RVD.core_desc"
 
 
-Core RV32I provides RVI {
+Core RV32I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=32;
         // definitions for the architecture wrapper
@@ -18,7 +18,7 @@ Core RV32I provides RVI {
     }
 }
 
-Core RV32IMAC provides RVI, RVM, RVA, RVC {
+Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC {
     architectural_state {
         XLEN=32;
         // definitions for the architecture wrapper
@@ -29,7 +29,7 @@ Core RV32IMAC provides RVI, RVM, RVA, RVC {
     }
 }
 
-Core RV32GC provides RVI, RVM, RVA, RVC, RVF {
+Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
     architectural_state {
         XLEN=32;
         FLEN=32;
@@ -41,7 +41,19 @@ Core RV32GC provides RVI, RVM, RVA, RVC, RVF {
     }
 }
 
-Core RV64I provides RVI {
+Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+    architectural_state {
+        XLEN=32;
+        FLEN=64;
+        // definitions for the architecture wrapper
+        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
+        unsigned int MISA_VAL = 0b01000000000101000001000100101101;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV64I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=64;
         // definitions for the architecture wrapper
@@ -52,7 +64,7 @@ Core RV64I provides RVI {
     }
 }
 
-Core RV64GC provides RVI, RVM, RVA, RVC, RVF, RVD {
+Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
     architectural_state {
         XLEN=64;
         FLEN=64;
@@ -64,3 +76,6 @@ Core RV64GC provides RVI, RVM, RVA, RVC, RVF, RVD {
     }
 }
 
+/*
+for i in RV32I RV32IMAC RV32GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b interp -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done 
+ */ 

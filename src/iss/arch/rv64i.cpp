@@ -29,16 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
-<% 
-def getRegisterSizes(){
-	def regs = registers.collect{it.size}
-	regs[-1]=64 // correct for NEXT_PC
-	regs+=[32,32, 64, 64, 64, 32, 32] // append TRAP_STATE, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
-    return regs
-}
-%>
+
 // clang-format off
-#include "${coreDef.name.toLowerCase()}.h"
+#include "rv64i.h"
 #include "util/ities.h"
 #include <util/logging.h>
 #include <cstdio>
@@ -47,18 +40,18 @@ def getRegisterSizes(){
 
 using namespace iss::arch;
 
-constexpr std::array<const char*, ${registers.size}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_names;
-constexpr std::array<const char*, ${registers.size}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_aliases;
-constexpr std::array<const uint32_t, ${getRegisterSizes().size}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_bit_widths;
-constexpr std::array<const uint32_t, ${getRegisterSizes().size}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_byte_offsets;
+constexpr std::array<const char*, 36>    iss::arch::traits<iss::arch::rv64i>::reg_names;
+constexpr std::array<const char*, 36>    iss::arch::traits<iss::arch::rv64i>::reg_aliases;
+constexpr std::array<const uint32_t, 43> iss::arch::traits<iss::arch::rv64i>::reg_bit_widths;
+constexpr std::array<const uint32_t, 43> iss::arch::traits<iss::arch::rv64i>::reg_byte_offsets;
 
-${coreDef.name.toLowerCase()}::${coreDef.name.toLowerCase()}()  = default;
+rv64i::rv64i()  = default;
 
-${coreDef.name.toLowerCase()}::~${coreDef.name.toLowerCase()}() = default;
+rv64i::~rv64i() = default;
 
-void ${coreDef.name.toLowerCase()}::reset(uint64_t address) {
-    auto base_ptr = reinterpret_cast<traits<${coreDef.name.toLowerCase()}>::reg_t*>(get_regs_base_ptr());
-    for(size_t i=0; i<traits<${coreDef.name.toLowerCase()}>::NUM_REGS; ++i)
+void rv64i::reset(uint64_t address) {
+    auto base_ptr = reinterpret_cast<traits<rv64i>::reg_t*>(get_regs_base_ptr());
+    for(size_t i=0; i<traits<rv64i>::NUM_REGS; ++i)
         *(base_ptr+i)=0;
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
@@ -67,11 +60,11 @@ void ${coreDef.name.toLowerCase()}::reset(uint64_t address) {
     reg.icount=0;
 }
 
-uint8_t *${coreDef.name.toLowerCase()}::get_regs_base_ptr() {
+uint8_t *rv64i::get_regs_base_ptr() {
 	return reinterpret_cast<uint8_t*>(&reg);
 }
 
-${coreDef.name.toLowerCase()}::phys_addr_t ${coreDef.name.toLowerCase()}::virt2phys(const iss::addr_t &addr) {
-    return phys_addr_t(addr.access, addr.space, addr.val&traits<${coreDef.name.toLowerCase()}>::addr_mask);
+rv64i::phys_addr_t rv64i::virt2phys(const iss::addr_t &addr) {
+    return phys_addr_t(addr.access, addr.space, addr.val&traits<rv64i>::addr_mask);
 }
 // clang-format on
