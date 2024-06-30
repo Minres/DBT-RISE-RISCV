@@ -147,8 +147,9 @@ public:
             sc_core::sc_stop();
         }
         if(type.find('|') == std::string::npos)
-            type = type + "|m_p";
-        std::tie(cpu, vm) = f.create(type + "|" + backend);
+            std::tie(cpu, vm) = f.create(type + "|m_p|" + backend);
+        else
+            std::tie(cpu, vm) = f.create(type + "|" + backend);
         if(!cpu) {
             SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
         }
