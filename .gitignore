@@ -30,6 +30,6 @@
 /.gdbinit
 /*.out
 /dump.json
+/CMakeUserPresets.json
 /*.yaml
-/*.json
 /.direnv/

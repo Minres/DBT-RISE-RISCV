@@ -31,17 +31,13 @@ conan profile new default --detect
 Building the ISS is as simple as:
 
 ```
-conan install . --output-folder=. --build=missing -s compiler.cppstd=17
-cmake --preset conan-release
-cmake --build build/Release -j24
+cmake -S . -B build/Release --preset Release && cmake --build build/Release -j24
 ```
 
 Building a debug version is analogous:
 
 ```
-conan install . --output-folder=. --build=missing -s compiler.cppstd=17 --settings=build_type=Debug
-cmake --preset conan-debug
-cmake --build build/Debug -j24
+cmake -S . -B build/Debug --preset Debug && cmake --build build/Debug -j24
 ```
 
 To run a simple test one can use the MINRES Firmware examples:
