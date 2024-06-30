@@ -21,7 +21,7 @@ public:
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
     using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
     using heart_state_t = typename PLAT::hart_state_type;
-    sc_core_adapter(sysc::tgfs::core_complex* owner)
+    sc_core_adapter(sysc::riscv_vp::core_complex* owner)
     : owner(owner) {}
 
     iss::arch_if* get_arch_if() override { return this; }
@@ -177,7 +177,7 @@ public:
     }
 
 private:
-    sysc::tgfs::core_complex* const owner;
+    sysc::riscv_vp::core_complex* const owner;
     sc_core::sc_event wfi_evt;
     uint64_t hostvar{std::numeric_limits<uint64_t>::max()};
     unsigned to_host_wr_cnt = 0;

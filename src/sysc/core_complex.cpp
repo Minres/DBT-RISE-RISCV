@@ -79,7 +79,7 @@ using namespace scv_tr;
 #endif
 
 namespace sysc {
-namespace tgfs {
+namespace riscv_vp {
 using namespace std;
 using namespace iss;
 using namespace logging;
@@ -147,9 +147,9 @@ public:
             sc_core::sc_stop();
         }
         if(type.find('|') == std::string::npos)
-            std::tie(cpu, vm) = f.create(type + "|m_p|" + backend);
+            std::tie(cpu, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
         else
-            std::tie(cpu, vm) = f.create(type + "|" + backend);
+            std::tie(cpu, vm) = f.create(type + "|" + backend, gdb_port, owner);
         if(!cpu) {
             SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
         }

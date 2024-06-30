@@ -65,7 +65,7 @@ public:
     bool operator!=(const tlm_dmi_ext& o) const { return !operator==(o); }
 };
 
-namespace tgfs {
+namespace riscv_vp {
 class core_wrapper;
 struct core_trace;
 
@@ -98,7 +98,7 @@ public:
 
     cci::cci_param<uint64_t> reset_address{"reset_address", 0ULL};
 
-    cci::cci_param<std::string> core_type{"core_type", "rv32imc"};
+    cci::cci_param<std::string> core_type{"core_type", "rv32imac"};
 
     cci::cci_param<std::string> backend{"backend", "interp"};
 
