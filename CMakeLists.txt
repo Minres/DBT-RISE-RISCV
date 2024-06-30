@@ -144,7 +144,12 @@ foreach(F IN LISTS RISCV_SOURCES)
     endif()
 endforeach()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv fmt::fmt yaml-cpp::yaml-cpp Boost::program_options)
+target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv yaml-cpp::yaml-cpp Boost::program_options)
+if(TARGET fmt::fmt-header-only)
+	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt-header-only)
+else()
+	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
+endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS})
 
 install(TARGETS riscv-sim
