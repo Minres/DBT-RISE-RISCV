@@ -22,7 +22,7 @@ You need to have conan newer than version 2.0 available.
 If you do not have it already it can be done in the following way (assuming you are using bash):
 
 ```
-python3 -mvenv .venv
+python3 -m venv .venv
 . .venv/bin/activate
 pip3 install conan
 conan profile new default --detect
