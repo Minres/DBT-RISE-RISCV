@@ -14,7 +14,7 @@ Along with those ISA implementations there is a wrapper implementing the M/S/U m
 
 Last but not least an SystemC wrapper is provided to allow easy integration into SystemC based virtual platforms.
 
-Since DBT-RISE uses a generative approch other needed combinations or custom extension can be generated. For further information please contact [info@minres.com](mailto:info@minres.com).
+Since DBT-RISE uses a generative approach other needed combinations or custom extension can be generated. For further information please contact [info@minres.com](mailto:info@minres.com).
 
 ## Standalone build instructions
 
