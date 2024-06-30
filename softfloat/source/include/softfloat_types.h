@@ -47,10 +47,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 | the types below may, if desired, be defined as aliases for the native types
 | (typically 'float' and 'double', and possibly 'long double').
 *----------------------------------------------------------------------------*/
-typedef struct { uint16_t v; } float16_t;
-typedef struct { uint32_t v; } float32_t;
-typedef struct { uint64_t v; } float64_t;
-typedef struct { uint64_t v[2]; } float128_t;
+typedef struct {
+    uint16_t v;
+} float16_t;
+typedef struct {
+    uint32_t v;
+} float32_t;
+typedef struct {
+    uint64_t v;
+} float64_t;
+typedef struct {
+    uint64_t v[2];
+} float128_t;
 
 /*----------------------------------------------------------------------------
 | The format of an 80-bit extended floating-point number in memory.  This
@@ -58,9 +66,15 @@ typedef struct { uint64_t v[2]; } float128_t;
 | named 'signif'.
 *----------------------------------------------------------------------------*/
 #ifdef LITTLEENDIAN
-struct extFloat80M { uint64_t signif; uint16_t signExp; };
+struct extFloat80M {
+    uint64_t signif;
+    uint16_t signExp;
+};
 #else
-struct extFloat80M { uint16_t signExp; uint64_t signif; };
+struct extFloat80M {
+    uint16_t signExp;
+    uint64_t signif;
+};
 #endif
 
 /*----------------------------------------------------------------------------
@@ -78,4 +92,3 @@ struct extFloat80M { uint16_t signExp; uint64_t signif; };
 typedef struct extFloat80M extFloat80_t;
 
 #endif
-

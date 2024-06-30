@@ -33,5 +33,21 @@ Building the ISS is as simple as:
 ```
 conan install . --output-folder=. --build=missing -s compiler.cppstd=17
 cmake --preset conan-release
-cmake --build build/Release -24
+cmake --build build/Release -j24
+```
+
+Building a debug version is analogous:
+
+```
+conan install . --output-folder=. --build=missing -s compiler.cppstd=17 --settings=build_type=Debug
+cmake --preset conan-debug
+cmake --build build/Debug -j24
+```
+
+To run a simple test one can use the MINRES Firmware examples:
+
+```
+git clone --recursive -b develop https://git.minres.com/Firmware/Firmwares.git build/Firmwares
+make -C build/Firmwares/hello-world/ ISA=imc BOARD=iss
+./build/Release/riscv-sim -f build/Firmwares/hello-world/hello.elf
 ```

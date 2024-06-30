@@ -32,15 +32,15 @@
 
 #include <array>
 #include <cstdint>
+#include <fmt/format.h>
+#include <fstream>
 #include <iostream>
 #include <iss/factory.h>
 #include <iss/semihosting/semihosting.h>
 #include <string>
 #include <unordered_map>
-#include <vector>
-#include <fstream>
 #include <util/ities.h>
-#include <fmt/format.h>
+#include <vector>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
@@ -78,14 +78,14 @@ int main(int argc, char* argv[]) {
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
         ("backend", po::value<std::string>()->default_value("interp"), "the ISS backend to use, options are: interp, llvm, tcc, asmjit")
-        ("isa", po::value<std::string>()->default_value("rv32imc"), "core or isa name to use for simulation, use '?' to get list");
+        ("isa", po::value<std::string>()->default_value("rv32imac"), "core or isa name to use for simulation, use '?' to get list");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
         po::store(parsed, clim); // can throw
         // --help option
         if(clim.count("help")) {
-            std::cout << "DBT-RISE-TGC simulator for TGC RISC-V cores" << std::endl << desc << std::endl;
+            std::cout << "DBT-RISE-RISCV simulator for RISC-V cores" << std::endl << desc << std::endl;
             return 0;
         }
         po::notify(clim); // throws on error, so do after help in case
@@ -129,20 +129,16 @@ int main(int argc, char* argv[]) {
             std::sort(std::begin(list), std::end(list));
             std::cout << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
             return 0;
-        } else if(isa_opt.find('|') != std::string::npos) {
-            std::tie(cpu, vm) =
-                f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
-        } else {
-            auto base_isa = isa_opt.substr(0, 5);
-            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                isa_opt += "|mu_p_clic_pmp|" + clim["backend"].as<std::string>();
-            } else {
-                isa_opt += "|m_p|" + clim["backend"].as<std::string>();
-            }
-            std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         }
+        if(isa_opt.find('|') == std::string::npos)
+            isa_opt += "|m_p";
+        f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+        std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         if(!cpu) {
-            CPPLOG(ERR) << "Could not create cpu for isa " << isa_opt << " and backend " << clim["backend"].as<std::string>() << std::endl;
+            auto list = f.get_names();
+            std::sort(std::begin(list), std::end(list));
+            CPPLOG(ERR) << "Could not create cpu for isa " << isa_opt << " and backend " << clim["backend"].as<std::string>() << "\n"
+                        << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
             return 127;
         }
         if(!vm) {
@@ -235,7 +231,7 @@ int main(int argc, char* argv[]) {
             std::string filename = fmt::format("{}.signature", isa_opt);
             std::replace(std::begin(filename), std::end(filename), '|', '_');
             // default riscof requires this filename
-            filename = "DUT-tgc.signature";
+            filename = "DUT-riscv-sim.signature";
             file.open(filename, std::ios::out);
             if(!file.is_open()) {
                 LOG(ERR) << "Error opening file " << filename << std::endl;

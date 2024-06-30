@@ -27,12 +27,16 @@ if(NOT dbt_rise_core_git_POPULATED)
 endif()
 add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
 
+FetchContent_GetProperties(scc_git)
+list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
+
 find_package(elfio QUIET)
 find_package(jsoncpp)
 find_package(yaml-cpp)
 find_package(Boost COMPONENTS coroutine REQUIRED)
-set(CLANG_FORMAT_EXCLUDE_PATTERNS "/scc/" "/build/" "/.direnv/" "/compliance/" "/Verilated-FPGA-Sim/" "/tgc_d_axi4_cache/")
-#find_package(ClangFormat)
+
+set(CLANG_FORMAT_EXCLUDE_PATTERNS "/scc/" "/build/" "/.direnv/")
+find_package(ClangFormat)
 
 add_subdirectory(softfloat)
 
@@ -181,7 +185,7 @@ if(TARGET scc-sysc)
     project(dbt-rise-riscv_sc VERSION 1.0.0)
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
-        src/sysc/register_riscv_c.cpp
+        src/sysc/register_cores.cpp
     )
     FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/sysc/register_*.cpp)
     list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})

@@ -43,7 +43,7 @@
 namespace iss {
 namespace interp {
 using namespace sysc;
-volatile std::array<bool, 2> tgc_init = {
+volatile std::array<bool, 2> riscv_init = {
     iss_factory::instance().register_creator("rv32imc|m_p|interp",
                                              [](unsigned gdb_port, void* data) -> iss_factory::base_t {
                                                  auto cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
@@ -59,7 +59,7 @@ volatile std::array<bool, 2> tgc_init = {
 #if defined(WITH_LLVM)
 namespace llvm {
 using namespace sysc;
-volatile std::array<bool, 2> tgc_init = {
+volatile std::array<bool, 2> riscv_init = {
     iss_factory::instance().register_creator("rv32imc|m_p|llvm",
                                              [](unsigned gdb_port, void* data) -> iss_factory::base_t {
                                                  auto cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
@@ -76,7 +76,7 @@ volatile std::array<bool, 2> tgc_init = {
 #if defined(WITH_TCC)
 namespace tcc {
 using namespace sysc;
-volatile std::array<bool, 2> tgc_init = {
+volatile std::array<bool, 2> riscv_init = {
     iss_factory::instance().register_creator("rv32imc|m_p|tcc",
                                              [](unsigned gdb_port, void* data) -> iss_factory::base_t {
                                                  auto cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
@@ -93,7 +93,7 @@ volatile std::array<bool, 2> tgc_init = {
 #if defined(WITH_ASMJIT)
 namespace asmjit {
 using namespace sysc;
-volatile std::array<bool, 2> tgc_init = {
+volatile std::array<bool, 2> riscv_init = {
     iss_factory::instance().register_creator("rv32imc|m_p|asmjit",
                                              [](unsigned gdb_port, void* data) -> iss_factory::base_t {
                                                  auto cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
