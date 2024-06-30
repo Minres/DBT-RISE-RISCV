@@ -132,8 +132,7 @@ int main(int argc, char* argv[]) {
         }
         if(isa_opt.find('|') == std::string::npos)
             isa_opt += "|m_p";
-        f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
-        std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+        std::tie(cpu, vm) = f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         if(!cpu) {
             auto list = f.get_names();
             std::sort(std::begin(list), std::end(list));
