@@ -30,44 +30,35 @@
  *
  *******************************************************************************/
 
+#include <array>
+#include <cstdint>
+#include <fmt/format.h>
+#include <fstream>
 #include <iostream>
-#include <iss/iss.h>
+#include <iss/factory.h>
+#include <iss/semihosting/semihosting.h>
+#include <string>
+#include <unordered_map>
+#include <util/ities.h>
+#include <vector>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
-#include <iss/arch/riscv_hart_msu_vp.h>
-#include <iss/arch/rv32imac.h>
-#include <iss/arch/rv32gc.h>
-#include <iss/arch/rv64gc.h>
-#include <iss/arch/rv64i.h>
-#include <iss/arch/mnrv32.h>
 #ifdef WITH_LLVM
-#include <iss/llvm/jit_helper.h>
+#include <iss/llvm/jit_init.h>
 #endif
+#include "iss/plugin/cycle_estimate.h"
+#include "iss/plugin/instruction_count.h"
 #include <iss/log_categories.h>
-#include <iss/plugin/cycle_estimate.h>
-#include <iss/plugin/instruction_count.h>
+#ifndef WIN32
+#include <iss/plugin/loader.h>
+#endif
+#if defined(HAS_LUA)
+#include <iss/plugin/lua.h>
+#endif
 
 namespace po = boost::program_options;
-
-using cpu_ptr = std::unique_ptr<iss::arch_if>;
-using vm_ptr= std::unique_ptr<iss::vm_if>;
-
-template<typename CORE>
-std::tuple<cpu_ptr, vm_ptr> create_cpu(std::string const& backend, unsigned gdb_port){
-    CORE* lcpu = new iss::arch::riscv_hart_msu_vp<CORE>();
-    if(backend == "interp")
-        return {cpu_ptr{lcpu}, vm_ptr{iss::interp::create(lcpu, gdb_port)}};
-#ifdef WITH_LLVM
-    if(backend == "llvm")
-        return {cpu_ptr{lcpu}, vm_ptr{iss::llvm::create(lcpu, gdb_port)}};
-#endif
-    if(backend == "tcc")
-        return {cpu_ptr{lcpu}, vm_ptr{iss::tcc::create(lcpu, gdb_port)}};
-    return {nullptr, nullptr};
-}
-
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     /*
      *  Define and parse the program options
      */
@@ -76,29 +67,29 @@ int main(int argc, char *argv[]) {
     // clang-format off
     desc.add_options()
         ("help,h", "Print help message")
-        ("verbose,v", po::value<int>()->implicit_value(0), "Sets logging verbosity")
-        ("logfile,f", po::value<std::string>(), "Sets default log file.")
+        ("verbose,v", po::value<int>()->default_value(4), "Sets logging verbosity")
+        ("logfile,l", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
         ("gdb-port,g", po::value<unsigned>()->default_value(0), "enable gdb server and specify port to use")
         ("instructions,i", po::value<uint64_t>()->default_value(std::numeric_limits<uint64_t>::max()), "max. number of instructions to simulate")
         ("reset,r", po::value<std::string>(), "reset address")
         ("dump-ir", "dump the intermediate representation")
-        ("elf", po::value<std::vector<std::string>>(), "ELF file(s) to load")
+        ("elf,f", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
-        ("backend", po::value<std::string>()->default_value("tcc"), "the memory input file")
-        ("isa", po::value<std::string>()->default_value("rv32gc"), "isa to use for simulation");
+        ("backend", po::value<std::string>()->default_value("interp"), "the ISS backend to use, options are: interp, llvm, tcc, asmjit")
+        ("isa", po::value<std::string>()->default_value("rv32imac"), "core or isa name to use for simulation, use '?' to get list");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
         po::store(parsed, clim); // can throw
         // --help option
-        if (clim.count("help")) {
-            std::cout << "DBT-RISE-RiscV simulator for RISC-V" << std::endl << desc << std::endl;
+        if(clim.count("help")) {
+            std::cout << "DBT-RISE-RISCV simulator for RISC-V cores" << std::endl << desc << std::endl;
             return 0;
         }
         po::notify(clim); // throws on error, so do after help in case
-    } catch (po::error &e) {
+    } catch(po::error& e) {
         // there are problems
         std::cerr << "ERROR: " << e.what() << std::endl << std::endl;
         std::cerr << desc << std::endl;
@@ -108,19 +99,17 @@ int main(int argc, char *argv[]) {
 
     LOGGER(DEFAULT)::print_time() = false;
     LOGGER(connection)::print_time() = false;
-    if (clim.count("verbose")) {
-        auto l = logging::as_log_level(clim["verbose"].as<int>());
-        LOGGER(DEFAULT)::reporting_level() = l;
-        LOGGER(connection)::reporting_level() = l;
-    }
-    if (clim.count("logfile")) {
+    auto l = logging::as_log_level(clim["verbose"].as<int>());
+    LOGGER(DEFAULT)::reporting_level() = l;
+    LOGGER(connection)::reporting_level() = l;
+    if(clim.count("logfile")) {
         // configure the connection logger
         auto f = fopen(clim["logfile"].as<std::string>().c_str(), "w");
         LOG_OUTPUT(DEFAULT)::stream() = f;
         LOG_OUTPUT(connection)::stream() = f;
     }
 
-    std::vector<iss::vm_plugin *> plugin_list;
+    std::vector<iss::vm_plugin*> plugin_list;
     auto res = 0;
     try {
 #ifdef WITH_LLVM
@@ -128,83 +117,141 @@ int main(int argc, char *argv[]) {
         iss::init_jit_debug(argc, argv);
 #endif
         bool dump = clim.count("dump-ir");
+        auto& f = iss::core_factory::instance();
         // instantiate the simulator
-        vm_ptr vm{nullptr};
-        cpu_ptr cpu{nullptr};
+        iss::vm_ptr vm{nullptr};
+        iss::cpu_ptr cpu{nullptr};
+        semihosting_callback<uint32_t> cb{};
+        semihosting_cb_t<uint32_t> semihosting_cb = [&cb](iss::arch_if* i, uint32_t* a0, uint32_t* a1) { cb(i, a0, a1); };
         std::string isa_opt(clim["isa"].as<std::string>());
-        if (isa_opt=="mnrv32") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::mnrv32>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt=="rv64i") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::rv64i>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt=="rv64gc") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::rv64gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt=="rv32imac") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::rv32imac>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else if (isa_opt=="rv32gc") {
-            std::tie(cpu, vm) = create_cpu<iss::arch::rv32gc>(clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>());
-        } else {
-            LOG(ERROR) << "Illegal argument value for '--isa': " << clim["isa"].as<std::string>() << std::endl;
+        if(isa_opt.size() == 0 || isa_opt == "?") {
+            auto list = f.get_names();
+            std::sort(std::begin(list), std::end(list));
+            std::cout << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
+            return 0;
+        }
+        if(isa_opt.find('|') == std::string::npos)
+            isa_opt += "|m_p";
+        f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+        std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+        if(!cpu) {
+            auto list = f.get_names();
+            std::sort(std::begin(list), std::end(list));
+            CPPLOG(ERR) << "Could not create cpu for isa " << isa_opt << " and backend " << clim["backend"].as<std::string>() << "\n"
+                        << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
             return 127;
         }
-        if (clim.count("plugin")) {
-            for (std::string const& opt_val : clim["plugin"].as<std::vector<std::string>>()) {
-                std::string plugin_name=opt_val;
-                std::string filename{"cycles.txt"};
+        if(!vm) {
+            CPPLOG(ERR) << "Could not create vm for isa " << isa_opt << " and backend " << clim["backend"].as<std::string>() << std::endl;
+            return 127;
+        }
+        if(clim.count("plugin")) {
+            for(std::string const& opt_val : clim["plugin"].as<std::vector<std::string>>()) {
+                std::string plugin_name = opt_val;
+                std::string arg{""};
                 std::size_t found = opt_val.find('=');
-                if (found != std::string::npos) {
+                if(found != std::string::npos) {
                     plugin_name = opt_val.substr(0, found);
-                    filename = opt_val.substr(found + 1, opt_val.size());
+                    arg = opt_val.substr(found + 1, opt_val.size());
                 }
-                if (plugin_name == "ic") {
-                    auto *ic_plugin = new iss::plugin::instruction_count(filename);
+#if defined(WITH_PLUGINS)
+                if(plugin_name == "ic") {
+                    auto* ic_plugin = new iss::plugin::instruction_count(arg);
                     vm->register_plugin(*ic_plugin);
                     plugin_list.push_back(ic_plugin);
-                } else if (plugin_name == "ce") {
-                    auto *ce_plugin = new iss::plugin::cycle_estimate(filename);
+                } else if(plugin_name == "ce") {
+                    auto* ce_plugin = new iss::plugin::cycle_estimate(arg);
                     vm->register_plugin(*ce_plugin);
                     plugin_list.push_back(ce_plugin);
-                } else {
-                    LOG(ERROR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'" << std::endl;
-                    return 127;
+                } else
+#endif
+                {
+#if !defined(WIN32)
+                    std::vector<char const*> a{};
+                    if(arg.length())
+                        a.push_back({arg.c_str()});
+                    iss::plugin::loader l(plugin_name, {{"initPlugin"}});
+                    auto* plugin = l.call_function<iss::vm_plugin*>("initPlugin", a.size(), a.data());
+                    if(plugin) {
+                        vm->register_plugin(*plugin);
+                        plugin_list.push_back(plugin);
+                    } else
+#endif
+                    {
+                        CPPLOG(ERR) << "Unknown plugin name: " << plugin_name << ", valid names are 'ce', 'ic'" << std::endl;
+                        return 127;
+                    }
                 }
             }
         }
-        if (clim.count("disass")) {
+        if(clim.count("disass")) {
             vm->setDisassEnabled(true);
             LOGGER(disass)::reporting_level() = logging::INFO;
             LOGGER(disass)::print_time() = false;
             auto file_name = clim["disass"].as<std::string>();
-            if (file_name.length() > 0) {
+            if(file_name.length() > 0) {
                 LOG_OUTPUT(disass)::stream() = fopen(file_name.c_str(), "w");
                 LOGGER(disass)::print_severity() = false;
             }
         }
         uint64_t start_address = 0;
-        if (clim.count("mem"))
-            vm->get_arch()->load_file(clim["mem"].as<std::string>(), iss::arch::traits<iss::arch::mnrv32>::MEM);
-        if (clim.count("elf"))
-            for (std::string input : clim["elf"].as<std::vector<std::string>>()) {
+        if(clim.count("mem"))
+            vm->get_arch()->load_file(clim["mem"].as<std::string>());
+        if(clim.count("elf"))
+            for(std::string input : clim["elf"].as<std::vector<std::string>>()) {
                 auto start_addr = vm->get_arch()->load_file(input);
-                if (start_addr.second) start_address = start_addr.first;
+                if(start_addr.second) // FIXME: this always evaluates to true as load file always returns <sth, true>
+                    start_address = start_addr.first;
             }
-        for (std::string input : args) {
+        for(std::string input : args) {
             auto start_addr = vm->get_arch()->load_file(input); // treat remaining arguments as elf files
-            if (start_addr.second) start_address = start_addr.first;
+            if(start_addr.second) // FIXME: this always evaluates to true as load file always returns <sth, true>
+                start_address = start_addr.first;
         }
-        if (clim.count("reset")) {
+        if(clim.count("reset")) {
             auto str = clim["reset"].as<std::string>();
             start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), nullptr, 16) : std::stoull(str, nullptr, 10);
         }
         vm->reset(start_address);
         auto cycles = clim["instructions"].as<uint64_t>();
         res = vm->start(cycles, dump);
-    } catch (std::exception &e) {
-        LOG(ERROR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit"
-                   << std::endl;
+
+        auto instr_if = vm->get_arch()->get_instrumentation_if();
+        // this assumes a single input file
+        std::unordered_map<std::string, uint64_t> sym_table;
+        if(args.empty())
+            sym_table = instr_if->get_symbol_table(clim["elf"].as<std::vector<std::string>>()[0]);
+        else
+            sym_table = instr_if->get_symbol_table(args[0]);
+        if(sym_table.find("begin_signature") != std::end(sym_table) && sym_table.find("end_signature") != std::end(sym_table)) {
+            auto start_addr = sym_table["begin_signature"];
+            auto end_addr = sym_table["end_signature"];
+            std::array<uint8_t, 4> data;
+            std::ofstream file;
+            std::string filename = fmt::format("{}.signature", isa_opt);
+            std::replace(std::begin(filename), std::end(filename), '|', '_');
+            // default riscof requires this filename
+            filename = "DUT-riscv-sim.signature";
+            file.open(filename, std::ios::out);
+            if(!file.is_open()) {
+                LOG(ERR) << "Error opening file " << filename << std::endl;
+                return 1;
+            }
+            for(auto addr = start_addr; addr < end_addr; addr += data.size()) {
+                vm->get_arch()->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0 /*MEM*/, addr, data.size(),
+                                     data.data()); // FIXME: get space from iss::arch::traits<ARCH>::mem_type_e::MEM
+
+                // TODO : obey Target endianess
+                uint32_t to_print = (data[3] << 24) + (data[2] << 16) + (data[1] << 8) + data[0];
+                file << std::hex << fmt::format("{:08x}", to_print) << std::dec << std::endl;
+            }
+        }
+    } catch(std::exception& e) {
+        CPPLOG(ERR) << "Unhandled Exception reached the top of main: " << e.what() << ", application will now exit" << std::endl;
         res = 2;
     }
-    // cleanup to let plugins report of needed
-    for (auto *p : plugin_list) {
+    // cleanup to let plugins report if needed
+    for(auto* p : plugin_list) {
         delete p;
     }
     return res;

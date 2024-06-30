@@ -1,0 +1,700 @@
+
+RVI: 
+  LUI:
+    index: 0
+    encoding: 0b00000000000000000000000000110111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AUIPC:
+    index: 1
+    encoding: 0b00000000000000000000000000010111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  JAL:
+    index: 2
+    encoding: 0b00000000000000000000000001101111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   true
+    delay:   1
+  JALR:
+    index: 3
+    encoding: 0b00000000000000000000000001100111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BEQ:
+    index: 4
+    encoding: 0b00000000000000000000000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BNE:
+    index: 5
+    encoding: 0b00000000000000000001000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BLT:
+    index: 6
+    encoding: 0b00000000000000000100000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BGE:
+    index: 7
+    encoding: 0b00000000000000000101000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BLTU:
+    index: 8
+    encoding: 0b00000000000000000110000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BGEU:
+    index: 9
+    encoding: 0b00000000000000000111000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  LB:
+    index: 10
+    encoding: 0b00000000000000000000000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LH:
+    index: 11
+    encoding: 0b00000000000000000001000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LW:
+    index: 12
+    encoding: 0b00000000000000000010000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LBU:
+    index: 13
+    encoding: 0b00000000000000000100000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LHU:
+    index: 14
+    encoding: 0b00000000000000000101000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SB:
+    index: 15
+    encoding: 0b00000000000000000000000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SH:
+    index: 16
+    encoding: 0b00000000000000000001000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SW:
+    index: 17
+    encoding: 0b00000000000000000010000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ADDI:
+    index: 18
+    encoding: 0b00000000000000000000000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTI:
+    index: 19
+    encoding: 0b00000000000000000010000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTIU:
+    index: 20
+    encoding: 0b00000000000000000011000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  XORI:
+    index: 21
+    encoding: 0b00000000000000000100000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ORI:
+    index: 22
+    encoding: 0b00000000000000000110000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ANDI:
+    index: 23
+    encoding: 0b00000000000000000111000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLLI:
+    index: 24
+    encoding: 0b00000000000000000001000000010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRLI:
+    index: 25
+    encoding: 0b00000000000000000101000000010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRAI:
+    index: 26
+    encoding: 0b01000000000000000101000000010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ADD:
+    index: 27
+    encoding: 0b00000000000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SUB:
+    index: 28
+    encoding: 0b01000000000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLL:
+    index: 29
+    encoding: 0b00000000000000000001000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLT:
+    index: 30
+    encoding: 0b00000000000000000010000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTU:
+    index: 31
+    encoding: 0b00000000000000000011000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  XOR:
+    index: 32
+    encoding: 0b00000000000000000100000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRL:
+    index: 33
+    encoding: 0b00000000000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRA:
+    index: 34
+    encoding: 0b01000000000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  OR:
+    index: 35
+    encoding: 0b00000000000000000110000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AND:
+    index: 36
+    encoding: 0b00000000000000000111000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FENCE:
+    index: 37
+    encoding: 0b00000000000000000000000000001111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ECALL:
+    index: 38
+    encoding: 0b00000000000000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  EBREAK:
+    index: 39
+    encoding: 0b00000000000100000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  MRET:
+    index: 40
+    encoding: 0b00110000001000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  WFI:
+    index: 41
+    encoding: 0b00010000010100000000000001110011
+    mask: 0b11111111111111111111111111111111
+    size:   32
+    branch:   false
+    delay:   1
+Zicsr: 
+  CSRRW:
+    index: 42
+    encoding: 0b00000000000000000001000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRS:
+    index: 43
+    encoding: 0b00000000000000000010000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRC:
+    index: 44
+    encoding: 0b00000000000000000011000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRWI:
+    index: 45
+    encoding: 0b00000000000000000101000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRSI:
+    index: 46
+    encoding: 0b00000000000000000110000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRCI:
+    index: 47
+    encoding: 0b00000000000000000111000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+Zifencei: 
+  FENCE_I:
+    index: 48
+    encoding: 0b00000000000000000001000000001111
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:flush]]
+    size:   32
+    branch:   false
+    delay:   1
+RVM: 
+  MUL:
+    index: 49
+    encoding: 0b00000010000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULH:
+    index: 50
+    encoding: 0b00000010000000000001000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULHSU:
+    index: 51
+    encoding: 0b00000010000000000010000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULHU:
+    index: 52
+    encoding: 0b00000010000000000011000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  DIV:
+    index: 53
+    encoding: 0b00000010000000000100000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  DIVU:
+    index: 54
+    encoding: 0b00000010000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  REM:
+    index: 55
+    encoding: 0b00000010000000000110000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  REMU:
+    index: 56
+    encoding: 0b00000010000000000111000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVA: 
+  LRW:
+    index: 57
+    encoding: 0b00010000000000000010000000101111
+    mask: 0b11111001111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SCW:
+    index: 58
+    encoding: 0b00011000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOSWAPW:
+    index: 59
+    encoding: 0b00001000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOADDW:
+    index: 60
+    encoding: 0b00000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOXORW:
+    index: 61
+    encoding: 0b00100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOANDW:
+    index: 62
+    encoding: 0b01100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOORW:
+    index: 63
+    encoding: 0b01000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMINW:
+    index: 64
+    encoding: 0b10000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXW:
+    index: 65
+    encoding: 0b10100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMINUW:
+    index: 66
+    encoding: 0b11000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXUW:
+    index: 67
+    encoding: 0b11100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVC: 
+  C__ADDI4SPN:
+    index: 68
+    encoding: 0b0000000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LW:
+    index: 69
+    encoding: 0b0100000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SW:
+    index: 70
+    encoding: 0b1100000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDI:
+    index: 71
+    encoding: 0b0000000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__NOP:
+    index: 72
+    encoding: 0b0000000000000001
+    mask: 0b1110111110000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__JAL:
+    index: 73
+    encoding: 0b0010000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   1
+  C__LI:
+    index: 74
+    encoding: 0b0100000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LUI:
+    index: 75
+    encoding: 0b0110000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDI16SP:
+    index: 76
+    encoding: 0b0110000100000001
+    mask: 0b1110111110000011
+    size:   16
+    branch:   false
+    delay:   1
+  __reserved_clui:
+    index: 77
+    encoding: 0b0110000000000001
+    mask: 0b1111000001111111
+    size:   16
+    branch:   false
+    delay:   1
+  C__SRLI:
+    index: 78
+    encoding: 0b1000000000000001
+    mask: 0b1111110000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SRAI:
+    index: 79
+    encoding: 0b1000010000000001
+    mask: 0b1111110000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__ANDI:
+    index: 80
+    encoding: 0b1000100000000001
+    mask: 0b1110110000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SUB:
+    index: 81
+    encoding: 0b1000110000000001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__XOR:
+    index: 82
+    encoding: 0b1000110000100001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__OR:
+    index: 83
+    encoding: 0b1000110001000001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__AND:
+    index: 84
+    encoding: 0b1000110001100001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__J:
+    index: 85
+    encoding: 0b1010000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   1
+  C__BEQZ:
+    index: 86
+    encoding: 0b1100000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   [1,1]
+  C__BNEZ:
+    index: 87
+    encoding: 0b1110000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   [1,1]
+  C__SLLI:
+    index: 88
+    encoding: 0b0000000000000010
+    mask: 0b1111000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LWSP:
+    index: 89
+    encoding: 0b0100000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__MV:
+    index: 90
+    encoding: 0b1000000000000010
+    mask: 0b1111000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__JR:
+    index: 91
+    encoding: 0b1000000000000010
+    mask: 0b1111000001111111
+    size:   16
+    branch:   true
+    delay:   1
+  __reserved_cmv:
+    index: 92
+    encoding: 0b1000000000000010
+    mask: 0b1111111111111111
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADD:
+    index: 93
+    encoding: 0b1001000000000010
+    mask: 0b1111000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__JALR:
+    index: 94
+    encoding: 0b1001000000000010
+    mask: 0b1111000001111111
+    size:   16
+    branch:   true
+    delay:   1
+  C__EBREAK:
+    index: 95
+    encoding: 0b1001000000000010
+    mask: 0b1111111111111111
+    attributes: [[name:no_cont]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__SWSP:
+    index: 96
+    encoding: 0b1100000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  DII:
+    index: 97
+    encoding: 0b0000000000000000
+    mask: 0b1111111111111111
+    attributes: [[name:no_cont]]
+    size:   16
+    branch:   false
+    delay:   1
+

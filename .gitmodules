@@ -1,0 +1,6 @@
+[submodule "gen_input/ISA"]
+	path = gen_input/ISA
+	url = https://github.com/Minres/RISCV_ISA_CoreDSL.git
+[submodule "cmake-conan"]
+	path = cmake-conan
+	url = https://github.com/conan-io/cmake-conan.git

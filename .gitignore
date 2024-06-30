@@ -1,5 +1,6 @@
 .DS_Store
 /*.il
+/.settings
 /avr-instr.html
 /blink.S
 /flash.*
@@ -14,7 +15,6 @@
 /*.ods
 /build*/
 /*.logs
-language.settings.xml
 /*.gtkw
 /Debug wo LLVM/
 /*.txdb
@@ -30,4 +30,6 @@ language.settings.xml
 /.gdbinit
 /*.out
 /dump.json
-/src-gen/
+/CMakeUserPresets.json
+/*.yaml
+/.direnv/

@@ -1,0 +1,21 @@
+<% def getInstructionGroups() {
+    def instrGroups = [:]
+    instructions.each {
+        def groupName = it['instruction'].eContainer().name
+        if(!instrGroups.containsKey(groupName)) {
+            instrGroups[groupName]=[]
+        }
+        instrGroups[groupName]+=it;
+    }
+    instrGroups
+}%><%int index = 0; getInstructionGroups().each{name, instrList -> %>
+${name}: <% instrList.each { %>
+  ${it.instruction.name}:
+    index: ${index++}
+    encoding: ${it.encoding}
+    mask: ${it.mask}<%if(it.attributes.size) {%>
+    attributes: ${it.attributes}<%}%>
+    size:   ${it.length}
+    branch:   ${it.modifiesPC}
+    delay:   ${it.isConditional?"[1,1]":"1"}<%}}%>
+

@@ -1,0 +1,177 @@
+/*******************************************************************************
+ * Copyright (C) 2024 MINRES Technologies GmbH
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *******************************************************************************/
+<%
+def nativeTypeSize(int size){
+    if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
+}
+def getRegisterSizes(){
+    def regs = registers.collect{nativeTypeSize(it.size)}
+    regs+=[32,32, 64, 64, 64, 32, 32] // append TRAP_STATE, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
+    return regs
+}
+def getRegisterOffsets(){
+    def offset = 0
+    def offsets = []
+    getRegisterSizes().each { size ->
+        offsets<<offset
+        offset+=size/8
+    }
+    return offsets
+}
+def byteSize(int size){
+    if(size<=8) return 8;
+    if(size<=16) return 16;
+    if(size<=32) return 32;
+    if(size<=64) return 64;
+    return 128;
+}
+def getCString(def val){
+    return val.toString()+'ULL'
+}
+%>
+#ifndef _${coreDef.name.toUpperCase()}_H_
+#define _${coreDef.name.toUpperCase()}_H_
+// clang-format off
+#include <array>
+#include <iss/arch/traits.h>
+#include <iss/arch_if.h>
+#include <iss/vm_if.h>
+
+namespace iss {
+namespace arch {
+
+struct ${coreDef.name.toLowerCase()};
+
+template <> struct traits<${coreDef.name.toLowerCase()}> {
+
+    constexpr static char const* const core_type = "${coreDef.name}";
+    
+    static constexpr std::array<const char*, ${registers.size}> reg_names{
+        {"${registers.collect{it.name.toLowerCase()}.join('", "')}"}};
+ 
+    static constexpr std::array<const char*, ${registers.size}> reg_aliases{
+        {"${registers.collect{it.alias.toLowerCase()}.join('", "')}"}};
+
+    enum constants {${constants.collect{c -> c.name+"="+getCString(c.value)}.join(', ')}};
+
+    constexpr static unsigned FP_REGS_SIZE = ${constants.find {it.name=='FLEN'}?.value?:0};
+
+    enum reg_e {
+        ${registers.collect{it.name}.join(', ')}, NUM_REGS, TRAP_STATE=NUM_REGS, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
+    };
+
+    using reg_t = uint${addrDataWidth}_t;
+
+    using addr_t = uint${addrDataWidth}_t;
+
+    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
+
+    using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
+
+    using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
+
+    static constexpr std::array<const uint32_t, ${getRegisterSizes().size}> reg_bit_widths{
+        {${getRegisterSizes().join(',')}}};
+
+    static constexpr std::array<const uint32_t, ${getRegisterOffsets().size}> reg_byte_offsets{
+        {${getRegisterOffsets().join(',')}}};
+
+    static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
+
+    enum sreg_flag_e { FLAGS };
+
+    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = MEM };
+    
+    enum class opcode_e {<%instructions.eachWithIndex{instr, index -> %>
+        ${instr.instruction.name} = ${index},<%}%>
+        MAX_OPCODE
+    };
+};
+
+struct ${coreDef.name.toLowerCase()}: public arch_if {
+
+    using virt_addr_t = typename traits<${coreDef.name.toLowerCase()}>::virt_addr_t;
+    using phys_addr_t = typename traits<${coreDef.name.toLowerCase()}>::phys_addr_t;
+    using reg_t =  typename traits<${coreDef.name.toLowerCase()}>::reg_t;
+    using addr_t = typename traits<${coreDef.name.toLowerCase()}>::addr_t;
+
+    ${coreDef.name.toLowerCase()}();
+    ~${coreDef.name.toLowerCase()}();
+
+    void reset(uint64_t address=0) override;
+
+    uint8_t* get_regs_base_ptr() override;
+
+    inline uint64_t get_icount() { return reg.icount; }
+
+    inline bool should_stop() { return interrupt_sim; }
+
+    inline uint64_t stop_code() { return interrupt_sim; }
+
+    virtual phys_addr_t virt2phys(const iss::addr_t& addr);
+
+    virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
+
+    inline uint32_t get_last_branch() { return reg.last_branch; }
+
+
+#pragma pack(push, 1)
+    struct ${coreDef.name}_regs {<%
+        registers.each { reg -> if(reg.size>0) {%> 
+        uint${byteSize(reg.size)}_t ${reg.name} = 0;<%
+        }}%>
+        uint32_t trap_state = 0, pending_trap = 0;
+        uint64_t icount = 0;
+        uint64_t cycle = 0;
+        uint64_t instret = 0;
+        uint32_t instruction = 0;
+        uint32_t last_branch = 0;
+    } reg;
+#pragma pack(pop)
+    std::array<address_type, 4> addr_mode;
+    
+    uint64_t interrupt_sim=0;
+<%
+def fcsr = registers.find {it.name=='FCSR'}
+if(fcsr != null) {%>
+    uint${fcsr.size}_t get_fcsr(){return reg.FCSR;}
+    void set_fcsr(uint${fcsr.size}_t val){reg.FCSR = val;}      
+<%} else { %>
+    uint32_t get_fcsr(){return 0;}
+    void set_fcsr(uint32_t val){}
+<%}%>
+};
+
+}
+}            
+#endif /* _${coreDef.name.toUpperCase()}_H_ */
+// clang-format on

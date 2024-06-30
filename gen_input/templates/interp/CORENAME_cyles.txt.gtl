@@ -1,9 +1,0 @@
-{ 
-	"${coreDef.name}" : [<%instructions.eachWithIndex{instr,index -> %>${index==0?"":","}
-		{
-			"name"  : "${instr.name}",
-			"size"  : ${instr.length},
-			"delay" : ${generator.hasAttribute(instr.instruction, com.minres.coredsl.coreDsl.InstrAttribute.COND)?[1,1]:1}
-		}<%}%>
-	]
-}

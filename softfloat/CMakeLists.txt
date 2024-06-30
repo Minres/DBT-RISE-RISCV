@@ -8,7 +8,6 @@ project("sotfloat" VERSION 3.0.0)
 # Set the version number of your project here (format is MAJOR.MINOR.PATCHLEVEL - e.g. 1.0.0)
 set(VERSION "3e")
 
-include(Common)
 include(GNUInstallDirs)
 
 set(SPECIALIZATION RISCV)
@@ -327,7 +326,7 @@ set(OTHERS
 
 set(LIB_SOURCES ${PRIMITIVES} ${SPECIALIZE} ${OTHERS})
 
-add_library(softfloat ${LIB_SOURCES})
+add_library(softfloat STATIC ${LIB_SOURCES})
 set_property(TARGET softfloat PROPERTY C_STANDARD 99)
 target_compile_definitions(softfloat PRIVATE 
 	SOFTFLOAT_ROUND_ODD 
@@ -347,7 +346,7 @@ set_target_properties(softfloat PROPERTIES
 
 install(TARGETS softfloat
   EXPORT ${PROJECT_NAME}Targets            # for downstream dependencies
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # static lib
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static COMPONENT libs   # static lib
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs   # shared lib
   FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT libs # for mac
   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT devel   # headers for mac (note the different component -> different package)
