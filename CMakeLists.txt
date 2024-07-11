@@ -13,20 +13,22 @@ include(flink)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-include(FetchContent)
-FetchContent_Declare(
-    dbt_rise_core_git
-    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
-    GIT_TAG         "origin/develop"
-    GIT_SHALLOW    OFF
-    UPDATE_DISCONNECTED NOT ${UPDATE_SCC_SRC} # When enabled, this option causes the update step to be skipped.
-)
-FetchContent_GetProperties(dbt_rise_core_git)
-if(NOT dbt_rise_core_git_POPULATED)
-  FetchContent_Populate(dbt_rise_core_git)
+if(NOT TARGET dbt-rise-core)
+	include(FetchContent)
+	FetchContent_Declare(
+	    dbt_rise_core_git
+	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
+	    #GIT_TAG         "origin/develop"
+	    GIT_TAG         "b725ff307"
+	    GIT_SHALLOW    OFF
+	    UPDATE_DISCONNECTED NOT ${UPDATE_SCC_SRC} # When enabled, this option causes the update step to be skipped.
+	)
+	FetchContent_GetProperties(dbt_rise_core_git)
+	if(NOT dbt_rise_core_git_POPULATED)
+	  FetchContent_Populate(dbt_rise_core_git)
+	endif()
+	add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
 endif()
-add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
-
 FetchContent_GetProperties(scc_git)
 list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
 
