@@ -36,14 +36,13 @@
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
 #include <scc/utilities.h>
+#include <scc/signal_opt_ports.h>
 #include <tlm/scc/initiator_mixin.h>
 #include <tlm/scc/scv/tlm_rec_initiator_socket.h>
 #ifdef CWR_SYSTEMC
 #include <scmlinc/scml_property.h>
-#define SOCKET_WIDTH 32
 #else
 #include <cci_configuration>
-#define SOCKET_WIDTH scc::LT
 #endif
 #include <memory>
 #include <tlm>
@@ -68,12 +67,35 @@ public:
 namespace riscv_vp {
 class core_wrapper;
 struct core_trace;
+struct core_complex_if {
 
-class core_complex : public sc_core::sc_module, public scc::traceable {
+    virtual ~core_complex_if() = default;
+
+    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) =0;
+
+    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data)  =0;
+
+    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data)  =0;
+
+    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data)  =0;
+
+    virtual bool disass_output(uint64_t pc, const std::string instr)  =0;
+
+    virtual unsigned get_last_bus_cycles() =0;
+
+    virtual void sync(uint64_t) =0;
+
+    virtual char const* hier_name() = 0;
+
+    scc::sc_in_opt<uint64_t> mtime_i{"mtime_i"};
+};
+
+template <unsigned int BUSWIDTH = scc::LT>
+class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
-    tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<SOCKET_WIDTH>> ibus{"ibus"};
+    tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> ibus{"ibus"};
 
-    tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<SOCKET_WIDTH>> dbus{"dbus"};
+    tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> dbus{"dbus"};
 
     sc_core::sc_in<bool> rst_i{"rst_i"};
 
@@ -87,8 +109,6 @@ public:
 
 #ifndef CWR_SYSTEMC
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
-
-    sc_core::sc_port<tlm::tlm_peek_if<uint64_t>, 1, sc_core::SC_ZERO_OR_MORE_BOUND> mtime_o{"mtime_o"};
 
     cci::cci_param<std::string> elf_file{"elf_file", ""};
 
@@ -114,8 +134,6 @@ public:
 
 #else
     sc_core::sc_in<bool> clk_i{"clk_i"};
-
-    sc_core::sc_in<uint64_t> mtime_i{"mtime_i"};
 
     scml_property<std::string> elf_file{"elf_file", ""};
 
@@ -159,13 +177,13 @@ public:
 
     ~core_complex();
 
-    inline unsigned get_last_bus_cycles() {
+    unsigned get_last_bus_cycles() override {
         auto mem_incr = std::max(ibus_inc, dbus_inc);
         ibus_inc = dbus_inc = 0;
         return mem_incr > 1 ? mem_incr : 1;
     }
 
-    inline void sync(uint64_t cycle) {
+    void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
         quantum_keeper.inc(core_inc);
         if(quantum_keeper.need_sync()) {
@@ -175,19 +193,23 @@ public:
         last_sync_cycle = cycle;
     }
 
-    bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch);
+    bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) override;
 
-    bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data);
+    bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) override;
 
-    bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data);
+    bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) override;
 
-    bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data);
+    bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) override;
 
     void trace(sc_core::sc_trace_file* trf) const override;
 
-    bool disass_output(uint64_t pc, const std::string instr);
+    bool disass_output(uint64_t pc, const std::string instr) override;
 
     void set_clock_period(sc_core::sc_time period);
+
+    char const* hier_name() override {
+        return name();
+    }
 
 protected:
     void before_end_of_elaboration() override;

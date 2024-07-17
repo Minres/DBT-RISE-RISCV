@@ -124,7 +124,7 @@ using vm_ptr = std::unique_ptr<iss::vm_if>;
 
 class core_wrapper {
 public:
-    core_wrapper(core_complex* owner)
+    core_wrapper(core_complex_if* owner)
     : owner(owner) {}
 
     void reset(uint64_t addr) { vm->reset(addr); }
@@ -175,7 +175,7 @@ public:
                                              "SystemC sub-commands: break <time>, print_time"});
     }
 
-    core_complex* const owner;
+    core_complex_if* const owner;
     vm_ptr vm{nullptr};
     sc_cpu_ptr cpu{nullptr};
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
@@ -191,9 +191,9 @@ struct core_trace {
     scv_tr_handle tr_handle;
 };
 
-SC_HAS_PROCESS(core_complex); // NOLINT
 #ifndef CWR_SYSTEMC
-core_complex::core_complex(sc_module_name const& name)
+template <unsigned int BUSWIDTH>
+core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 : sc_module(name)
 , fetch_lut(tlm_dmi_ext())
 , read_lut(tlm_dmi_ext())
@@ -202,7 +202,8 @@ core_complex::core_complex(sc_module_name const& name)
 }
 #endif
 
-void core_complex::init() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::init() {
     trc = new core_trace();
     ibus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
@@ -221,6 +222,7 @@ void core_complex::init() {
         }
     });
 
+    SC_HAS_PROCESS(core_complex<BUSWIDTH>); // NOLINT
     SC_THREAD(run);
     SC_METHOD(rst_cb);
     sensitive << rst_i;
@@ -246,16 +248,19 @@ void core_complex::init() {
 #endif
 }
 
-core_complex::~core_complex() {
+template <unsigned int BUSWIDTH>
+core_complex<BUSWIDTH>::~core_complex() {
     delete cpu;
     delete trc;
     for(auto* p : plugin_list)
         delete p;
 }
 
-void core_complex::trace(sc_trace_file* trf) const {}
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
 
-void core_complex::before_end_of_elaboration() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::before_end_of_elaboration() {
     SCCDEBUG(SCMOD) << "instantiating iss::arch::tgf with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
@@ -296,7 +301,8 @@ void core_complex::before_end_of_elaboration() {
     }
 }
 
-void core_complex::start_of_simulation() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::start_of_simulation() {
     // quantum_keeper.reset();
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         istringstream is(GET_PROP_VALUE(elf_file));
@@ -319,7 +325,8 @@ void core_complex::start_of_simulation() {
     }
 }
 
-bool core_complex::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH>
+bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
     if(trc->m_db == nullptr)
         return false;
     if(trc->tr_handle.is_active())
@@ -333,7 +340,8 @@ bool core_complex::disass_output(uint64_t pc, const std::string instr_str) {
     return true;
 }
 
-void core_complex::forward() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::forward() {
 #ifndef CWR_SYSTEMC
     set_clock_period(clk_i.read());
 #else
@@ -342,24 +350,30 @@ void core_complex::forward() {
 #endif
 }
 
-void core_complex::set_clock_period(sc_core::sc_time period) {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
         cpu->set_interrupt_execution(true);
 }
 
-void core_complex::rst_cb() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::rst_cb() {
     if(rst_i.read())
         cpu->set_interrupt_execution(true);
 }
 
-void core_complex::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
 
-void core_complex::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
 
-void core_complex::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
 
-void core_complex::local_irq_cb() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
             cpu->local_irq(16 + i, local_irq_i[i].read());
@@ -367,7 +381,8 @@ void core_complex::local_irq_cb() {
     }
 }
 
-void core_complex::run() {
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::run() {
     wait(SC_ZERO_TIME); // separate from elaboration phase
     do {
         wait(SC_ZERO_TIME);
@@ -385,7 +400,8 @@ void core_complex::run() {
     sc_stop();
 }
 
-bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
+template <unsigned int BUSWIDTH>
+bool core_complex<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
@@ -443,7 +459,8 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data,
     }
 }
 
-bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH>
+bool core_complex<BUSWIDTH>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = write_lut.getEntry(addr);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
         auto offset = addr - lut_entry.get_start_address();
@@ -491,7 +508,8 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t* cons
     }
 }
 
-bool core_complex::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
+template <unsigned int BUSWIDTH>
+bool core_complex<BUSWIDTH>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
     gp.set_address(addr);
@@ -501,7 +519,8 @@ bool core_complex::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const d
     return dbus->transport_dbg(gp) == length;
 }
 
-bool core_complex::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH>
+bool core_complex<BUSWIDTH>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;
@@ -512,5 +531,10 @@ bool core_complex::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* 
     gp.set_streaming_width(length);
     return dbus->transport_dbg(gp) == length;
 }
-} /* namespace tgfs */
+
+template class core_complex<scc::LT>;
+template class core_complex<32>;
+template class core_complex<64>;
+
+} /* namespace riscv_vp */
 } /* namespace sysc */
