@@ -589,7 +589,8 @@ template <typename BASE> std::pair<uint64_t, bool> riscv_hart_msu_vp<BASE>::load
             for(const auto pseg : reader.segments) {
                 const auto fsize = pseg->get_file_size(); // 0x42c/0x0
                 const auto seg_data = pseg->get_data();
-                if(fsize > 0) {
+                const auto type = pseg->get_type();
+                if(type==1 && fsize > 0) {
                     auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
                                            pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
