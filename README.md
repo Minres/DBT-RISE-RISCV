@@ -25,7 +25,7 @@ If you do not have it already it can be done in the following way (assuming you 
 python3 -mvenv .venv
 . .venv/bin/activate
 pip3 install conan
-conan profile new default --detect
+conan profile default
 ```
 
 Building the ISS is as simple as:
