@@ -2,7 +2,7 @@ import "ISA/RVI.core_desc"
 import "ISA/RVC.core_desc"
 import "ISA/RVM.core_desc"
 import "ISA/RVA.core_desc"
-import "ISA/RVC.core_desc"
+import "ISA/Zc.core_desc"
 import "ISA/RVF.core_desc"
 import "ISA/RVD.core_desc"
 
@@ -29,7 +29,7 @@ Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC {
     }
 }
 
-Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf {
     architectural_state {
         XLEN=32;
         FLEN=32;
@@ -41,7 +41,7 @@ Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
     }
 }
 
-Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
     architectural_state {
         XLEN=32;
         FLEN=64;
@@ -64,7 +64,7 @@ Core RV64I provides RVI, Zicsr, Zifencei {
     }
 }
 
-Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
     architectural_state {
         XLEN=64;
         FLEN=64;

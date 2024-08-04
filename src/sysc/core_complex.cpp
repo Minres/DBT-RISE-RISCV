@@ -145,11 +145,16 @@ public:
         if(type.size() == 0 || type == "?") {
             std::cout << "Available cores: " << util::join(f.get_names(), ", ") << std::endl;
             sc_core::sc_stop();
+        } else if(type.find('|') != std::string::npos) {
+            std::tie(cpu, vm) = f.create(type + "|" + backend);
+        } else {
+            auto base_isa = type.substr(0, 5);
+            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
+                std::tie(cpu, vm) = f.create(type + "|mu_p_clic_pmp|" + backend, gdb_port, owner);
+            } else {
+                std::tie(cpu, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
         }
-        if(type.find('|') == std::string::npos)
-            std::tie(cpu, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
-        else
-            std::tie(cpu, vm) = f.create(type + "|" + backend, gdb_port, owner);
+        }
         if(!cpu) {
             SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
         }

@@ -19,8 +19,8 @@ if(NOT TARGET dbt-rise-core)
 	    dbt_rise_core_git
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
-	    GIT_TAG         "b725ff307"
-	    GIT_SHALLOW    OFF
+	    #GIT_SHALLOW    OFF
+	    GIT_TAG         a12f7a4
 	    UPDATE_DISCONNECTED NOT ${UPDATE_SCC_SRC} # When enabled, this option causes the update step to be skipped.
 	)
 	FetchContent_GetProperties(dbt_rise_core_git)
@@ -51,8 +51,9 @@ set(LIB_SOURCES
 	src/iss/arch/rv64i.cpp
     src/vm/interp/vm_rv32i.cpp
     src/vm/interp/vm_rv32imac.cpp
-    src/vm/interp/vm_rv32gc.cpp
+    #src/vm/interp/vm_rv32gc.cpp
     src/vm/interp/vm_rv64i.cpp
+	#src/vm/interp/vm_rv64gc.cpp
     src/vm/fp_functions.cpp
     src/iss/semihosting/semihosting.cpp
     src/iss/plugin/cycle_estimate.cpp
@@ -68,7 +69,9 @@ endif()
 
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
-        src/vm/asmjit/vm_rv32imc.cpp
+	src/vm/asmjit/vm_rv32i.cpp
+	#src/vm/asmjit/vm_rv32imac.cpp
+	src/vm/asmjit/vm_rv64i.cpp
     )
 endif()
 

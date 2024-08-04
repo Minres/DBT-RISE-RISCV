@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2021 MINRES Technologies GmbH
+ * Copyright (C) 2024 MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
  *******************************************************************************/
 
 // clang-format off
+#include <cstdint>
 #include <iss/arch/rv32i.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
@@ -43,6 +44,8 @@
 #include <exception>
 #include <vector>
 #include <sstream>
+#include <iss/instruction_decoder.h>
+
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -93,14 +96,8 @@ protected:
     using compile_ret_t = virt_addr_t;
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
-    inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index]:"illegal";}
-    inline const char *fname(size_t index){
-        static const char* f_reg_name[] = {
-                "f0","f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12","f13","f14","f15",
-                "f16","f17","f18","f19","f20","f21","f22","f23","f24","f25","f26","f27","f28","f29","f30","f31", "illegal"
-        };
-        return index<32?f_reg_name[index]:f_reg_name[32];
-    }
+    inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+
 
     virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
 
@@ -109,7 +106,6 @@ protected:
     inline void raise(uint16_t trap_id, uint16_t cause){
         auto trap_val =  0x80ULL << 24 | (cause << 16) | trap_id;
         this->core.reg.trap_state = trap_val;
-        this->template get_reg<uint32_t>(traits::NEXT_PC) = std::numeric_limits<uint32_t>::max();
     }
 
     inline void leave(unsigned lvl){
@@ -119,6 +115,13 @@ protected:
     inline void wait(unsigned type){
         this->core.wait_until(type);
     }
+
+    inline void set_tval(uint64_t new_tval){
+        tval = new_tval;
+    }
+
+    uint64_t fetch_count{0};
+    uint64_t tval{0};
 
     using yield_t = boost::coroutines2::coroutine<void>::push_type;
     using coro_t = boost::coroutines2::coroutine<void>::pull_type;
@@ -147,20 +150,12 @@ private:
      * start opcode definitions
      ****************************************************************************/
     struct instruction_descriptor {
-        size_t length;
+        uint32_t length;
         uint32_t value;
         uint32_t mask;
         typename arch::traits<ARCH>::opcode_e op;
     };
-    struct decoding_tree_node{
-        std::vector<instruction_descriptor> instrs;
-        std::vector<decoding_tree_node*> children;
-        uint32_t submask = std::numeric_limits<uint32_t>::max();
-        uint32_t value;
-        decoding_tree_node(uint32_t value) : value(value){}
-    };
 
-    decoding_tree_node* root {nullptr};
     const std::array<instruction_descriptor, 49> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
@@ -214,6 +209,9 @@ private:
         {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FENCE_I},
     }};
 
+    //needs to be declared after instr_descr
+    decoder instr_decoder;
+
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
         if(this->core.has_mmu()) {
             auto phys_pc = this->core.virt2phys(pc);
@@ -232,57 +230,6 @@ private:
 
         }
         return iss::Ok;
-    }
-    
-    void populate_decoding_tree(decoding_tree_node* root){
-        //create submask
-        for(auto instr: root->instrs){
-            root->submask &= instr.mask;
-        }
-        //put each instr according to submask&encoding into children
-        for(auto instr: root->instrs){
-            bool foundMatch = false;
-            for(auto child: root->children){
-                //use value as identifying trait
-                if(child->value == (instr.value&root->submask)){
-                    child->instrs.push_back(instr);
-                    foundMatch = true;
-                }
-            }
-            if(!foundMatch){
-                decoding_tree_node* child = new decoding_tree_node(instr.value&root->submask);
-                child->instrs.push_back(instr);
-                root->children.push_back(child);
-            }
-        }
-        root->instrs.clear();
-        //call populate_decoding_tree for all children
-        if(root->children.size() >1)
-            for(auto child: root->children){
-                populate_decoding_tree(child);      
-            }
-        else{
-            //sort instrs by value of the mask, this works bc we want to have the least restrictive one last
-            std::sort(root->children[0]->instrs.begin(), root->children[0]->instrs.end(), [](const instruction_descriptor& instr1, const instruction_descriptor& instr2) {
-            return instr1.mask > instr2.mask;
-            }); 
-        }
-    }
-    typename arch::traits<ARCH>::opcode_e  decode_instr(decoding_tree_node* node, code_word_t word){
-        if(!node->children.size()){
-            if(node->instrs.size() == 1) return node->instrs[0].op;
-            for(auto instr : node->instrs){
-                if((instr.mask&word) == instr.value) return instr.op;
-            }
-        }
-        else{
-            for(auto child : node->children){
-                if (child->value == (node->submask&word)){
-                    return decode_instr(child, word);
-                }  
-            }  
-        }
-        return arch::traits<ARCH>::opcode_e::MAX_OPCODE;
     }
 };
 
@@ -309,16 +256,23 @@ constexpr size_t bit_count(uint32_t u) {
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm_base<ARCH>(core, core_id, cluster_id) {
-    root = new decoding_tree_node(std::numeric_limits<uint32_t>::max());
-    for(auto instr:instr_descr){
-        root->instrs.push_back(instr);
+: vm_base<ARCH>(core, core_id, cluster_id)
+, instr_decoder([this]() {
+        std::vector<generic_instruction_descriptor> g_instr_descr;
+        g_instr_descr.reserve(instr_descr.size());
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
+            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
+            g_instr_descr.push_back(new_instr_descr);
     }
-    populate_decoding_tree(root);
+        return std::move(g_instr_descr);
+    }()) {}
+
+inline bool is_icount_limit_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::ICOUNT_LIMIT) == finish_cond_e::ICOUNT_LIMIT;
 }
 
-inline bool is_count_limit_enabled(finish_cond_e cond){
-    return (cond & finish_cond_e::ICOUNT_LIMIT) == finish_cond_e::ICOUNT_LIMIT;
+inline bool is_fcount_limit_enabled(finish_cond_e cond){
+    return (cond & finish_cond_e::FCOUNT_LIMIT) == finish_cond_e::FCOUNT_LIMIT;
 }
 
 inline bool is_jump_to_self_enabled(finish_cond_e cond){
@@ -326,7 +280,7 @@ inline bool is_jump_to_self_enabled(finish_cond_e cond){
 }
 
 template <typename ARCH>
-typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit){
+typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t count_limit){
     auto pc=start;
     auto* PC = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::PC]);
     auto* NEXT_PC = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::NEXT_PC]);
@@ -339,14 +293,20 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     auto *const data = reinterpret_cast<uint8_t*>(&instr);
 
     while(!this->core.should_stop() &&
-            !(is_count_limit_enabled(cond) && icount >= icount_limit)){
+            !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
+            !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
+        fetch_count++;
         if(fetch_ins(pc, data)!=iss::Ok){
             this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
             pc.val = super::core.enter_trap(std::numeric_limits<uint64_t>::max(), pc.val, 0);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-            auto inst_id = decode_instr(root, instr);
+            uint32_t inst_index = instr_decoder.decode_instr(instr);
+            opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
+            if(inst_index <instr_descr.size())
+                inst_id = instr_descr.at(instr_decoder.decode_instr(instr)).op;
+
             // pre execution stuff
              this->core.reg.last_branch = 0;
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, static_cast<unsigned>(inst_id));
@@ -1734,7 +1694,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
             //    this->core.reg.trap_state =  this->core.reg.pending_trap;
             // trap check
             if(trap_state!=0){
-                super::core.enter_trap(trap_state, pc.val, instr);
+                //In case of Instruction address misaligned (cause = 0 and trapid = 0) need the targeted addr (in tval)
+                auto mcause = (trap_state>>16) & 0xff; 
+                super::core.enter_trap(trap_state, pc.val, mcause ? instr:tval);
             } else {
                 icount++;
                 instret++;

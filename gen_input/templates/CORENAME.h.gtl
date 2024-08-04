@@ -75,10 +75,10 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     constexpr static char const* const core_type = "${coreDef.name}";
     
-    static constexpr std::array<const char*, ${registers.size}> reg_names{
+    static constexpr std::array<const char*, ${registers.size()}> reg_names{
         {"${registers.collect{it.name.toLowerCase()}.join('", "')}"}};
  
-    static constexpr std::array<const char*, ${registers.size}> reg_aliases{
+    static constexpr std::array<const char*, ${registers.size()}> reg_aliases{
         {"${registers.collect{it.alias.toLowerCase()}.join('", "')}"}};
 
     enum constants {${constants.collect{c -> c.name+"="+getCString(c.value)}.join(', ')}};
@@ -99,10 +99,10 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
 
-    static constexpr std::array<const uint32_t, ${getRegisterSizes().size}> reg_bit_widths{
+    static constexpr std::array<const uint32_t, ${getRegisterSizes().size()}> reg_bit_widths{
         {${getRegisterSizes().join(',')}}};
 
-    static constexpr std::array<const uint32_t, ${getRegisterOffsets().size}> reg_byte_offsets{
+    static constexpr std::array<const uint32_t, ${getRegisterOffsets().size()}> reg_byte_offsets{
         {${getRegisterOffsets().join(',')}}};
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);

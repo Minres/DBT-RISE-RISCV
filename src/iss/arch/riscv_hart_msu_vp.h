@@ -39,7 +39,9 @@
 #include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
+#include "iss/vm_types.h"
 #include "riscv_hart_common.h"
+#include <stdexcept>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -56,14 +58,6 @@
 #include <util/sparse_array.h>
 
 #include <iss/semihosting/semihosting.h>
-
-#if defined(__GNUC__)
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#else
-#define likely(x) x
-#define unlikely(x) x
-#endif
 
 namespace iss {
 namespace arch {
