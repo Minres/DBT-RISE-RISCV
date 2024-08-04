@@ -4,8 +4,8 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014 The Regents of the University of California.
-All rights reserved.
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdint.h>
 #include "platform.h"
-#include "primitives.h"
+#include "primitiveTypes.h"
+
+#define softfloat_commonNaNToF128M softfloat_commonNaNToF128M
 #include "specialize.h"
 
 /*----------------------------------------------------------------------------
@@ -49,8 +51,10 @@ void
  softfloat_commonNaNToF128M( const struct commonNaN *aPtr, uint32_t *zWPtr )
 {
 
-    softfloat_shortShiftRight128M( (const uint32_t *) &aPtr->v0, 16, zWPtr );
-    zWPtr[indexWordHi( 4 )] |= (uint32_t) aPtr->sign<<31 | 0x7FFF8000;
+    zWPtr[indexWord( 4, 3 )] = defaultNaNF128UI96;
+    zWPtr[indexWord( 4, 2 )] = defaultNaNF128UI64;
+    zWPtr[indexWord( 4, 1 )] = defaultNaNF128UI32;
+    zWPtr[indexWord( 4, 0 )] = defaultNaNF128UI0;
 
 }
 

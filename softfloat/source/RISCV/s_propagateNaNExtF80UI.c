@@ -4,7 +4,7 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014, 2018 The Regents of the University of
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
 California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -34,17 +34,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-#include <stdbool.h>
 #include <stdint.h>
 #include "platform.h"
-#include "internals.h"
+#include "primitiveTypes.h"
 #include "specialize.h"
 #include "softfloat.h"
 
 /*----------------------------------------------------------------------------
-| Interpreting the unsigned integer formed from concatenating 'uiA64' and
-| 'uiA0' as an 80-bit extended floating-point value, and likewise interpreting
-| the unsigned integer formed from concatenating 'uiB64' and 'uiB0' as another
+| Interpreting the unsigned integer formed from concatenating `uiA64' and
+| `uiA0' as an 80-bit extended floating-point value, and likewise interpreting
+| the unsigned integer formed from concatenating `uiB64' and `uiB0' as another
 | 80-bit extended floating-point value, and assuming at least on of these
 | floating-point values is a NaN, returns the bit pattern of the combined NaN
 | result.  If either original floating-point value is a signaling NaN, the
@@ -58,48 +57,16 @@ struct uint128
      uint_fast64_t uiB0
  )
 {
-    bool isSigNaNA, isSigNaNB;
-    uint_fast64_t uiNonsigA0, uiNonsigB0;
-    uint_fast16_t uiMagA64, uiMagB64;
     struct uint128 uiZ;
 
-    /*------------------------------------------------------------------------
-    *------------------------------------------------------------------------*/
-    isSigNaNA = softfloat_isSigNaNExtF80UI( uiA64, uiA0 );
-    isSigNaNB = softfloat_isSigNaNExtF80UI( uiB64, uiB0 );
-    /*------------------------------------------------------------------------
-    | Make NaNs non-signaling.
-    *------------------------------------------------------------------------*/
-    uiNonsigA0 = uiA0 | UINT64_C( 0xC000000000000000 );
-    uiNonsigB0 = uiB0 | UINT64_C( 0xC000000000000000 );
-    /*------------------------------------------------------------------------
-    *------------------------------------------------------------------------*/
-    if ( isSigNaNA | isSigNaNB ) {
+    if (
+           softfloat_isSigNaNExtF80UI( uiA64, uiA0 )
+        || softfloat_isSigNaNExtF80UI( uiB64, uiB0 )
+    ) {
         softfloat_raiseFlags( softfloat_flag_invalid );
-        if ( isSigNaNA ) {
-            if ( isSigNaNB ) goto returnLargerMag;
-            if ( isNaNExtF80UI( uiB64, uiB0 ) ) goto returnB;
-            goto returnA;
-        } else {
-            if ( isNaNExtF80UI( uiA64, uiA0 ) ) goto returnA;
-            goto returnB;
-        }
     }
- returnLargerMag:
-    uiMagA64 = uiA64 & 0x7FFF;
-    uiMagB64 = uiB64 & 0x7FFF;
-    if ( uiMagA64 < uiMagB64 ) goto returnB;
-    if ( uiMagB64 < uiMagA64 ) goto returnA;
-    if ( uiA0 < uiB0 ) goto returnB;
-    if ( uiB0 < uiA0 ) goto returnA;
-    if ( uiA64 < uiB64 ) goto returnA;
- returnB:
-    uiZ.v64 = uiB64;
-    uiZ.v0  = uiNonsigB0;
-    return uiZ;
- returnA:
-    uiZ.v64 = uiA64;
-    uiZ.v0  = uiNonsigA0;
+    uiZ.v64 = defaultNaNExtF80UI64;
+    uiZ.v0  = defaultNaNExtF80UI0;
     return uiZ;
 
 }

@@ -34,25 +34,57 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "platform.h"
+#include "internals.h"
 #include "specialize.h"
 #include "softfloat.h"
 
-/*----------------------------------------------------------------------------
-| Interpreting `uiA' and `uiB' as the bit patterns of two 64-bit floating-
-| point values, at least one of which is a NaN, returns the bit pattern of
-| the combined NaN result.  If either `uiA' or `uiB' has the pattern of a
-| signaling NaN, the invalid exception is raised.
-*----------------------------------------------------------------------------*/
-uint_fast64_t
- softfloat_propagateNaNF64UI( uint_fast64_t uiA, uint_fast64_t uiB )
+float32_t bf16_to_f32( bfloat16_t a )
 {
+    union ui16_bf16 uA;
+    uint_fast16_t uiA;
+    bool sign;
+    int_fast16_t exp;
+    uint_fast16_t frac;
+    struct commonNaN commonNaN;
+    uint_fast32_t uiZ;
+    struct exp8_sig16 normExpSig;
+    union ui32_f32 uZ;
 
-    if ( softfloat_isSigNaNF64UI( uiA ) || softfloat_isSigNaNF64UI( uiB ) ) {
-        softfloat_raiseFlags( softfloat_flag_invalid );
+    /*------------------------------------------------------------------------
+    *------------------------------------------------------------------------*/
+    uA.f = a;
+    uiA = uA.ui;
+    sign = signBF16UI( uiA );
+    exp  = expBF16UI( uiA );
+    frac = fracBF16UI( uiA );
+    /*------------------------------------------------------------------------
+    *------------------------------------------------------------------------*/
+    // NaN or Inf
+    if ( exp == 0xFF ) {
+        if ( frac ) {
+            softfloat_bf16UIToCommonNaN( uiA, &commonNaN );
+            uiZ = softfloat_commonNaNToF32UI( &commonNaN );
+        } else {
+            uiZ = packToF32UI( sign, 0xFF, 0 );
+        }
+        goto uiZ;
     }
-    return defaultNaNF64UI;
+    /*------------------------------------------------------------------------
+    *------------------------------------------------------------------------*/
+    // packToF32UI simply packs bitfields without any numerical change
+    // which means it can be used directly for any BF16 to f32 conversions which
+    // does not require bits manipulation
+    // (that is everything where the 16-bit are just padded right with 16 zeros, including
+    //  subnormal numbers)
+    uiZ = packToF32UI( sign, exp, ((uint_fast32_t) frac) <<16 );
+ uiZ:
+    uZ.ui = uiZ;
+    return uZ.f;
 
 }
+
+
 

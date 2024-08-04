@@ -4,8 +4,8 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014 The Regents of the University of California.
-All rights reserved.
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,9 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-#include <stdint.h>
 #include "platform.h"
-#include "primitives.h"
+#include "primitiveTypes.h"
+
+#define softfloat_commonNaNToExtF80UI softfloat_commonNaNToExtF80UI
 #include "specialize.h"
 
 /*----------------------------------------------------------------------------
@@ -48,8 +49,8 @@ struct uint128 softfloat_commonNaNToExtF80UI( const struct commonNaN *aPtr )
 {
     struct uint128 uiZ;
 
-    uiZ.v64 = (uint_fast16_t) aPtr->sign<<15 | 0x7FFF;
-    uiZ.v0 = UINT64_C( 0xC000000000000000 ) | aPtr->v64>>1;
+    uiZ.v64 = defaultNaNExtF80UI64;
+    uiZ.v0  = defaultNaNExtF80UI0;
     return uiZ;
 
 }

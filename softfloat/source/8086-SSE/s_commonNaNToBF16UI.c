@@ -1,11 +1,11 @@
 
 /*============================================================================
 
-This C header template is part of the SoftFloat IEEE Floating-Point Arithmetic
+This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014, 2015, 2016 The Regents of the University of
-California.  All rights reserved.
+Copyright 2011, 2012, 2013, 2014 The Regents of the University of California.
+All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,17 +34,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-// Edit lines marked with `==>'.  See "SoftFloat-source.html".
+#include <stdint.h>
+#include "platform.h"
+#include "specialize.h"
 
 /*----------------------------------------------------------------------------
+| Converts the common NaN pointed to by `aPtr' into a BF16 NaN, and 
+| returns the bit pattern of this value as an unsigned integer.
 *----------------------------------------------------------------------------*/
-==> #define LITTLEENDIAN 1
+uint_fast16_t softfloat_commonNaNToBF16UI( const struct commonNaN *aPtr )
+{
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define INLINE inline
+    return (uint_fast16_t) aPtr->sign<<15 | 0x7FC0 | aPtr->v64>>56;
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define THREAD_LOCAL _Thread_local
+}
 

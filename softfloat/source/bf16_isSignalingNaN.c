@@ -1,10 +1,10 @@
 
 /*============================================================================
 
-This C header template is part of the SoftFloat IEEE Floating-Point Arithmetic
+This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014, 2015, 2016 The Regents of the University of
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
 California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -34,17 +34,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-// Edit lines marked with `==>'.  See "SoftFloat-source.html".
+#include <stdbool.h>
+#include "platform.h"
+#include "internals.h"
+#include "specialize.h"
+#include "softfloat.h"
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define LITTLEENDIAN 1
+bool bf16_isSignalingNaN( bfloat16_t a )
+{
+    union ui16_bf16 uA;
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define INLINE inline
+    uA.f = a;
+    return softfloat_isSigNaNBF16UI( uA.ui );
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define THREAD_LOCAL _Thread_local
+}
 

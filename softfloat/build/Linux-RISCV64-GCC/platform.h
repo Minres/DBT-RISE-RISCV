@@ -1,11 +1,11 @@
 
 /*============================================================================
 
-This C header template is part of the SoftFloat IEEE Floating-Point Arithmetic
+This C header file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014, 2015, 2016 The Regents of the University of
-California.  All rights reserved.
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017 The Regents of the
+University of California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,17 +34,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-// Edit lines marked with `==>'.  See "SoftFloat-source.html".
+/*----------------------------------------------------------------------------
+*----------------------------------------------------------------------------*/
+#define LITTLEENDIAN 1
 
 /*----------------------------------------------------------------------------
 *----------------------------------------------------------------------------*/
-==> #define LITTLEENDIAN 1
+#ifdef __GNUC_STDC_INLINE__
+#define INLINE inline
+#else
+#define INLINE extern inline
+#endif
 
 /*----------------------------------------------------------------------------
 *----------------------------------------------------------------------------*/
-==> #define INLINE inline
-
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define THREAD_LOCAL _Thread_local
+#define SOFTFLOAT_BUILTIN_CLZ 1
+#define SOFTFLOAT_INTRINSIC_INT128 1
+#include "opts-GCC.h"
 

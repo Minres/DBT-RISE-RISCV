@@ -4,8 +4,8 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014 The Regents of the University of California.
-All rights reserved.
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,10 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-#include <stdbool.h>
 #include <stdint.h>
 #include "platform.h"
-#include "internals.h"
+#include "primitiveTypes.h"
 #include "specialize.h"
 #include "softfloat.h"
 
@@ -54,54 +53,22 @@ void
      struct extFloat80M *zSPtr
  )
 {
-    bool isSigNaNA;
-    const struct extFloat80M *sPtr;
-    bool isSigNaNB;
-    uint_fast16_t uiB64;
-    uint64_t uiB0;
-    uint_fast16_t uiA64;
-    uint64_t uiA0;
-    uint_fast16_t uiMagA64, uiMagB64;
+    uint_fast16_t ui64;
+    uint_fast64_t ui0;
 
-    isSigNaNA = extF80M_isSignalingNaN( (const extFloat80_t *) aSPtr );
-    sPtr = aSPtr;
-    if ( ! bSPtr ) {
-        if ( isSigNaNA ) softfloat_raiseFlags( softfloat_flag_invalid );
-        goto copy;
-    }
-    isSigNaNB = extF80M_isSignalingNaN( (const extFloat80_t *) bSPtr );
-    if ( isSigNaNA | isSigNaNB ) {
+    ui64 = aSPtr->signExp;
+    ui0  = aSPtr->signif;
+    if (
+        softfloat_isSigNaNExtF80UI( ui64, ui0 )
+            || (bSPtr
+                    && (ui64 = bSPtr->signExp,
+                        ui0  = bSPtr->signif,
+                        softfloat_isSigNaNExtF80UI( ui64, ui0 )))
+    ) {
         softfloat_raiseFlags( softfloat_flag_invalid );
-        if ( isSigNaNA ) {
-            uiB64 = bSPtr->signExp;
-            if ( isSigNaNB ) goto returnLargerUIMag;
-            uiB0 = bSPtr->signif;
-            if ( isNaNExtF80UI( uiB64, uiB0 ) ) goto copyB;
-            goto copy;
-        } else {
-            uiA64 = aSPtr->signExp;
-            uiA0 = aSPtr->signif;
-            if ( isNaNExtF80UI( uiA64, uiA0 ) ) goto copy;
-            goto copyB;
-        }
     }
-    uiB64 = bSPtr->signExp;
- returnLargerUIMag:
-    uiA64 = aSPtr->signExp;
-    uiMagA64 = uiA64 & 0x7FFF;
-    uiMagB64 = uiB64 & 0x7FFF;
-    if ( uiMagA64 < uiMagB64 ) goto copyB;
-    if ( uiMagB64 < uiMagA64 ) goto copy;
-    uiA0 = aSPtr->signif;
-    uiB0 = bSPtr->signif;
-    if ( uiA0 < uiB0 ) goto copyB;
-    if ( uiB0 < uiA0 ) goto copy;
-    if ( uiA64 < uiB64 ) goto copy;
- copyB:
-    sPtr = bSPtr;
- copy:
-    zSPtr->signExp = sPtr->signExp;
-    zSPtr->signif = sPtr->signif | UINT64_C( 0xC000000000000000 );
+    zSPtr->signExp = defaultNaNExtF80UI64;
+    zSPtr->signif  = defaultNaNExtF80UI0;
 
 }
 

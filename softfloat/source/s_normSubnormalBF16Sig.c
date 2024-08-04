@@ -1,7 +1,7 @@
 
 /*============================================================================
 
-This C header template is part of the SoftFloat IEEE Floating-Point Arithmetic
+This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
 Copyright 2011, 2012, 2013, 2014, 2015, 2016 The Regents of the University of
@@ -34,17 +34,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-// Edit lines marked with `==>'.  See "SoftFloat-source.html".
+#include <stdint.h>
+#include "platform.h"
+#include "internals.h"
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define LITTLEENDIAN 1
+struct exp8_sig16 softfloat_normSubnormalBF16Sig( uint_fast16_t sig )
+{
+    int_fast8_t shiftDist;
+    struct exp8_sig16 z;
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define INLINE inline
+    shiftDist = softfloat_countLeadingZeros16( sig ) - 8;
+    z.exp = 1 - shiftDist;
+    z.sig = sig<<shiftDist;
+    return z;
 
-/*----------------------------------------------------------------------------
-*----------------------------------------------------------------------------*/
-==> #define THREAD_LOCAL _Thread_local
+}
 
