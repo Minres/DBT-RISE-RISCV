@@ -157,18 +157,6 @@ protected:
         return rm;
     }
 
-    uint8_t get_rm(uint8_t rm){
-        auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]); 
-        if(rm == 7) {
-            rm = bit_sub<5, 7-5+1>(*FCSR);
-        }
-        if(rm > 4) {
-            raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-        }
-        return rm;
-    }
-
-
 private:
     /****************************************************************************
      * start opcode definitions
