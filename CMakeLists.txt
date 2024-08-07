@@ -13,8 +13,8 @@ include(flink)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+include(FetchContent)
 if(NOT TARGET dbt-rise-core)
-	include(FetchContent)
 	FetchContent_Declare(
 	    dbt_rise_core_git
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
