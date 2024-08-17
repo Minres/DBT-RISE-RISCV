@@ -33,3 +33,4 @@
 /CMakeUserPresets.json
 /*.yaml
 /.direnv/
+/.envrc.*
