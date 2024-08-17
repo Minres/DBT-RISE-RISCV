@@ -428,6 +428,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
         }
         oss << "  </feature>\n";
         oss << "</target>\n";
+        csr_xml = oss.str();
     }
     out_buf = csr_xml;
     return Ok;
