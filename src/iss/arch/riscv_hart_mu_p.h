@@ -304,8 +304,8 @@ public:
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
     void disass_output(uint64_t pc, const std::string instr) override {
-        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                            this->reg.icount + cycle_offset);
+        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}({})]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
+                                            this->reg.cycle + cycle_offset, this->reg.cycle);
     };
 
     iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
@@ -338,7 +338,7 @@ protected:
 
         uint64_t get_pendig_traps() override { return arch.reg.trap_state; }
 
-        uint64_t get_total_cycles() override { return arch.reg.icount + arch.cycle_offset; }
+        uint64_t get_total_cycles() override { return arch.reg.cycle + arch.cycle_offset; }
 
         void update_last_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
 
@@ -1105,7 +1105,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_plain(unsigned addr, reg_
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cycle(unsigned addr, reg_t& val) {
-    auto cycle_val = this->reg.icount + cycle_offset;
+    auto cycle_val = this->reg.cycle + cycle_offset;
     if(addr == mcycle) {
         val = static_cast<reg_t>(cycle_val);
     } else if(addr == mcycleh) {
@@ -1125,7 +1125,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cycle(unsigned addr, reg_
             mcycle_csr = (static_cast<uint64_t>(val) << 32) + (mcycle_csr & 0xffffffff);
         }
     }
-    cycle_offset = mcycle_csr - this->reg.icount; // TODO: relying on wrap-around
+    cycle_offset = mcycle_csr - this->reg.cycle; // TODO: relying on wrap-around
     return iss::Ok;
 }
 
@@ -1156,7 +1156,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_instret(unsigned addr, re
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_time(unsigned addr, reg_t& val) {
-    uint64_t time_val = this->reg.icount / (100000000 / 32768 - 1); //-> ~3052;
+    uint64_t time_val = this->reg.cycle / (100000000 / 32768 - 1); //-> ~3052;
     if(addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if(addr == timeh) {
