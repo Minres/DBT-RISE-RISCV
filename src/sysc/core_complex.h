@@ -33,10 +33,10 @@
 #ifndef _SYSC_CORE_COMPLEX_H_
 #define _SYSC_CORE_COMPLEX_H_
 
+#include <scc/signal_opt_ports.h>
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
 #include <scc/utilities.h>
-#include <scc/signal_opt_ports.h>
 #include <tlm/scc/initiator_mixin.h>
 #include <tlm/scc/scv/tlm_rec_initiator_socket.h>
 #ifdef CWR_SYSTEMC
@@ -71,27 +71,27 @@ struct core_complex_if {
 
     virtual ~core_complex_if() = default;
 
-    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) =0;
+    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) = 0;
 
-    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data)  =0;
+    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data)  =0;
+    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data)  =0;
+    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool disass_output(uint64_t pc, const std::string instr)  =0;
+    virtual bool disass_output(uint64_t pc, const std::string instr) = 0;
 
-    virtual unsigned get_last_bus_cycles() =0;
+    virtual unsigned get_last_bus_cycles() = 0;
 
-    virtual void sync(uint64_t) =0;
+    //! Allow quantum keeper handling
+    virtual void sync(uint64_t) = 0;
 
     virtual char const* hier_name() = 0;
 
     scc::sc_in_opt<uint64_t> mtime_i{"mtime_i"};
 };
 
-template <unsigned int BUSWIDTH = scc::LT>
-class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
+template <unsigned int BUSWIDTH = scc::LT> class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
     tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> ibus{"ibus"};
 
@@ -143,7 +143,7 @@ public:
 
     scml_property<unsigned long long> reset_address{"reset_address", 0ULL};
 
-    scml_property<std::string> core_type{"core_type", "rv32imc"};
+    scml_property<std::string> core_type{"core_type", "rv32imac"};
 
     scml_property<std::string> backend{"backend", "interp"};
 
@@ -161,7 +161,7 @@ public:
     , elf_file{"elf_file", ""}
     , enable_disass{"enable_disass", false}
     , reset_address{"reset_address", 0ULL}
-    , core_type{"core_type", "rv32imc"}
+    , core_type{"core_type", "rv32imac"}
     , backend{"backend", "interp"}
     , gdb_server_port{"gdb_server_port", 0}
     , dump_ir{"dump_ir", false}
@@ -207,9 +207,7 @@ public:
 
     void set_clock_period(sc_core::sc_time period);
 
-    char const* hier_name() override {
-        return name();
-    }
+    char const* hier_name() override { return name(); }
 
 protected:
     void before_end_of_elaboration() override;
@@ -235,7 +233,7 @@ private:
     void init();
     std::vector<iss::vm_plugin*> plugin_list;
 };
-} /* namespace tgfs */
+} // namespace riscv_vp
 } /* namespace sysc */
 
 #endif /* _SYSC_CORE_COMPLEX_H_ */

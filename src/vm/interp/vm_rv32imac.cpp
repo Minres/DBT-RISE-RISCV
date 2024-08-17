@@ -344,17 +344,21 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
             !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
-        fetch_count++;
+        if(this->debugging_enabled())
+            this->tgt_adapter->check_continue(*PC);
+        pc.val=*PC;
         if(fetch_ins(pc, data)!=iss::Ok){
-            this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(std::numeric_limits<uint64_t>::max(), pc.val, 0);
+            if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            process_spawn_blocks();
+            if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
             uint32_t inst_index = instr_decoder.decode_instr(instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
-                inst_id = instr_descr.at(instr_decoder.decode_instr(instr)).op;
+                inst_id = instr_descr[inst_index].op;
 
             // pre execution stuff
              this->core.reg.last_branch = 0;
@@ -432,14 +436,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        if(imm % traits::INSTR_ALIGNMENT) {
+                                        uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                        if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
                                                 *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(4 ));
                                             }
-                                            *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                            *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
                                         }
                                     }
@@ -469,6 +475,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t addr_mask = (uint32_t)- 2;
                                         uint32_t new_pc = (uint32_t)(((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) )) & (int64_t)(addr_mask ));
                                         if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
@@ -503,11 +510,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) == *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -536,11 +545,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) != *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -569,11 +580,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) < (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -602,11 +615,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) >= (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -635,11 +650,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) < *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -668,11 +685,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) >= *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -1454,7 +1473,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::ECALL: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ecall");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ecall";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1467,7 +1488,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ebreak");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ebreak";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1480,7 +1503,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::MRET: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "mret");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "mret";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1493,7 +1518,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::WFI: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "wfi");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "wfi";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1717,7 +1744,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence.i"),
+                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence_i"),
                             fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2009,13 +2036,18 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                                    if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                                        int32_t res_60 = super::template read_mem<int32_t>(traits::MEM, offs);
-                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)((int8_t)res_60);
-                                        super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
-                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        if(rd != 0) {
+                                            uint32_t offs = *(X+rs1);
+                                            int32_t res_60 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                            *(X+rd) = (uint32_t)((int8_t)res_60);
+                                            super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        }
                                     }
                                 }
                     break;
@@ -2038,18 +2070,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint8_t res_61 = super::template read_mem<uint8_t>(traits::RES, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_61;
-                        if(res1 != 0) {
-                            super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS));
-                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        }
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1? 0 : 1;
-                        }
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint8_t res_61 = super::template read_mem<uint8_t>(traits::RES, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_61;
+                                        if(res1 != 0) {
+                                            super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        }
+                                        if(rd != 0) {
+                                            *(X+rd) = res1? 0 : 1;
+                                        }
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOSWAPW: {
@@ -2061,7 +2098,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoswap.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoswapw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2070,15 +2107,20 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            int32_t res_62 = super::template read_mem<int32_t>(traits::MEM, offs);
-                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)((int8_t)res_62);
-                        }
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS));
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        if(rd != 0) {
+                                            int32_t res_62 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                            *(X+rd) = (uint32_t)((int8_t)res_62);
+                                        }
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOADDW: {
@@ -2090,7 +2132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoadd.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoaddw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2099,17 +2141,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_63 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_63;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) );
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_63 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_63;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+rs2) );
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOXORW: {
@@ -2121,7 +2168,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoxor.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoxorw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2130,17 +2177,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_64 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_64;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 ^ (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_64 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_64;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 ^ (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOANDW: {
@@ -2152,7 +2204,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoand.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoandw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2161,17 +2213,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_65 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_65;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 & (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_65 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_65;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 & (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOORW: {
@@ -2183,7 +2240,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoor.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoorw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2192,17 +2249,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_66 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_66;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 | (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_66 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_66;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 | (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMINW: {
@@ -2214,7 +2276,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomin.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2223,17 +2285,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_67 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_67;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 > (int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : ((uint32_t)res1);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_67 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_67;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 > (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMAXW: {
@@ -2245,7 +2312,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomax.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2254,17 +2321,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_68 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_68;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 < (int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : ((uint32_t)res1);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_68 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_68;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMINUW: {
@@ -2276,7 +2348,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominu.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominuw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2285,17 +2357,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_69 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_69;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 > (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : res1;
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_69 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_69;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 > (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMAXUW: {
@@ -2307,7 +2384,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxu.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxuw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2316,17 +2393,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_70 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_70;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 < (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : res1;
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_70 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_70;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 < (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::C__ADDI4SPN: {
@@ -2428,7 +2510,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "c.nop");
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop")
+                            );
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2534,7 +2619,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, ".reserved_clui");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = ".reserved_clui";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2778,7 +2865,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.clwsp"),
+                            "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
                             fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2853,7 +2940,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::__reserved_cmv: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, ".reserved_cmv");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = ".reserved_cmv";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2919,7 +3008,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::C__EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "c.ebreak");
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak")
+                            );
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2958,7 +3050,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::DII: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "dii");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "dii";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2988,11 +3082,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 icount++;
                 instret++;
             }
-            cycle++;
-            pc.val=*NEXT_PC;
-            this->core.reg.PC = this->core.reg.NEXT_PC;
+            *PC = *NEXT_PC;
             this->core.reg.trap_state =  this->core.reg.pending_trap;
         }
+        fetch_count++;
+        cycle++;
     }
     return pc;
 }

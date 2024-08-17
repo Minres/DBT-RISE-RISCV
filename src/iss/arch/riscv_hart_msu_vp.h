@@ -584,7 +584,7 @@ template <typename BASE> std::pair<uint64_t, bool> riscv_hart_msu_vp<BASE>::load
                 const auto fsize = pseg->get_file_size(); // 0x42c/0x0
                 const auto seg_data = pseg->get_data();
                 const auto type = pseg->get_type();
-                if(type==1 && fsize > 0) {
+                if(type == 1 && fsize > 0) {
                     auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
                                            pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
@@ -671,8 +671,10 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
                 }
                 return res;
             } catch(trap_access& ta) {
-                this->reg.trap_state = (1 << 31) | ta.id;
-                fault_data = ta.addr;
+                if((access & access_type::DEBUG) == 0) {
+                    this->reg.trap_state = (1UL << 31) | ta.id;
+                    fault_data = ta.addr;
+                }
                 return iss::Err;
             }
         } break;
@@ -710,8 +712,10 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
@@ -841,8 +845,10 @@ iss::status riscv_hart_msu_vp<BASE>::write(const address_type type, const access
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }

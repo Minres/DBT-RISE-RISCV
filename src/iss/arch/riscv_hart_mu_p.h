@@ -305,7 +305,7 @@ public:
 
     void disass_output(uint64_t pc, const std::string instr) override {
         NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                          this->reg.icount + cycle_offset);
+                                            this->reg.icount + cycle_offset);
     };
 
     iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
@@ -678,7 +678,7 @@ std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT, LOGCAT>::load_file(std::st
                 const auto fsize = pseg->get_file_size(); // 0x42c/0x0
                 const auto seg_data = pseg->get_data();
                 const auto type = pseg->get_type();
-                if(type==1 && fsize > 0) {
+                if(type == 1 && fsize > 0) {
                     auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
                                            pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
@@ -720,7 +720,7 @@ std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT, LOGCAT>::load_file(std::st
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::insert_mem_range(uint64_t base, uint64_t size, std::function<mem_read_f> rd_f,
-                                                          std::function<mem_write_f> wr_fn) {
+                                                                  std::function<mem_write_f> wr_fn) {
     std::tuple<uint64_t, uint64_t> entry{base, size};
     auto it = std::upper_bound(
         memfn_range.begin(), memfn_range.end(), entry,
@@ -877,8 +877,10 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
                 }
                 return res;
             } catch(trap_access& ta) {
-                this->reg.trap_state = (1UL << 31) | ta.id;
-                fault_data = ta.addr;
+                if((access & access_type::DEBUG) == 0) {
+                    this->reg.trap_state = (1UL << 31) | ta.id;
+                    fault_data = ta.addr;
+                }
                 return iss::Err;
             }
         } break;
@@ -905,8 +907,10 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
@@ -1045,8 +1049,10 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, 
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }

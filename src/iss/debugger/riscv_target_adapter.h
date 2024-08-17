@@ -30,8 +30,8 @@
  *
  *******************************************************************************/
 
-#ifndef _ISS_DEBUGGER_RISCV_TARGET_ADAPTER_H_
-#define _ISS_DEBUGGER_RISCV_TARGET_ADAPTER_H_
+#ifndef _ISS_ARCH_DEBUGGER_RISCV_TARGET_ADAPTER_H_
+#define _ISS_ARCH_DEBUGGER_RISCV_TARGET_ADAPTER_H_
 
 #include "iss/arch_if.h"
 #include <iss/arch/traits.h>
@@ -48,6 +48,10 @@
 
 namespace iss {
 namespace debugger {
+
+char const* const get_csr_name(unsigned);
+constexpr auto csr_offset = 100U;
+
 using namespace iss::arch;
 using namespace iss::debugger;
 
@@ -129,10 +133,16 @@ public:
 
 protected:
     static inline constexpr addr_t map_addr(const addr_t& i) { return i; }
-
+    std::string csr_xml;
     iss::arch_if* core;
     rp_thread_ref thread_idx;
 };
+
+template <typename ARCH> typename std::enable_if<iss::arch::traits<ARCH>::FLEN != 0, unsigned>::type get_f0_offset() {
+    return iss::arch::traits<ARCH>::F0;
+}
+
+template <typename ARCH> typename std::enable_if<iss::arch::traits<ARCH>::FLEN == 0, unsigned>::type get_f0_offset() { return 0; }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::set_gen_thread(rp_thread_ref& thread) {
     thread_idx = thread;
@@ -175,34 +185,37 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::current_thread_query
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
     CPPLOG(TRACE) << "reading target registers";
-    // return idx<0?:;
     data.clear();
     avail.clear();
     const uint8_t* reg_base = core->get_regs_base_ptr();
     auto start_reg = arch::traits<ARCH>::X0;
-    for(size_t reg_no = start_reg; reg_no < start_reg + 33 /*arch::traits<ARCH>::NUM_REGS*/; ++reg_no) {
-        auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
-        unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
-        for(size_t j = 0; j < reg_width; ++j) {
-            data.push_back(*(reg_base + offset + j));
-            avail.push_back(0xff);
+    for(size_t i = 0; i < 33; ++i) {
+        if(i < arch::traits<ARCH>::RFS || i == arch::traits<ARCH>::PC) {
+            auto reg_no = i < 32 ? start_reg + i : arch::traits<ARCH>::PC;
+            unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
+            for(size_t j = 0; j < arch::traits<ARCH>::XLEN / 8; ++j) {
+                data.push_back(*(reg_base + offset + j));
+                avail.push_back(0xff);
+            }
+        } else {
+            for(size_t j = 0; j < arch::traits<ARCH>::XLEN / 8; ++j) {
+                data.push_back(0);
+                avail.push_back(0);
+            }
         }
     }
-    // work around fill with F type registers
-    //    if (arch::traits<ARCH>::NUM_REGS < 65) {
-    //        auto reg_width = sizeof(typename arch::traits<ARCH>::reg_t);
-    //        for (size_t reg_no = 0; reg_no < 33; ++reg_no) {
-    //            for (size_t j = 0; j < reg_width; ++j) {
-    //                data.push_back(0x0);
-    //                avail.push_back(0x00);
-    //            }
-    //            // if(arch::traits<ARCH>::XLEN < 64)
-    //            //     for(unsigned j=0; j<4; ++j){
-    //            //         data.push_back(0x0);
-    //            //         avail.push_back(0x00);
-    //            //     }
-    //        }
-    //    }
+    if(iss::arch::traits<ARCH>::FLEN > 0) {
+        auto fstart_reg = get_f0_offset<ARCH>();
+        for(size_t i = 0; i < 32; ++i) {
+            auto reg_no = fstart_reg + i;
+            auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
+            unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
+            for(size_t j = 0; j < reg_width; ++j) {
+                data.push_back(*(reg_base + offset + j));
+                avail.push_back(0xff);
+            }
+        }
+    }
     return Ok;
 }
 
@@ -210,25 +223,25 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_registers(cons
     auto start_reg = arch::traits<ARCH>::X0;
     auto* reg_base = core->get_regs_base_ptr();
     auto iter = data.data();
-    bool e_ext = arch::traits<ARCH>::PC < 32;
-    for(size_t reg_no = 0; reg_no < start_reg + 33 /*arch::traits<ARCH>::NUM_REGS*/; ++reg_no) {
-        if(e_ext && reg_no > 15) {
-            if(reg_no == 32) {
-                auto reg_width = arch::traits<ARCH>::reg_bit_widths[arch::traits<ARCH>::PC] / 8;
-                auto offset = traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::PC];
-                std::copy(iter, iter + reg_width, reg_base);
-            } else {
-                const uint64_t zero_val = 0;
-                auto reg_width = arch::traits<ARCH>::reg_bit_widths[15] / 8;
-                auto iter = (uint8_t*)&zero_val;
-                std::copy(iter, iter + reg_width, reg_base);
-            }
-        } else {
-            auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
-            auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
-            std::copy(iter, iter + reg_width, reg_base);
-            iter += 4;
-            reg_base += offset;
+    auto iter_end = data.data() + data.size();
+    for(size_t i = 0; i < 33 && iter < iter_end; ++i) {
+        auto reg_width = arch::traits<ARCH>::XLEN / 8;
+        if(i < arch::traits<ARCH>::RFS) {
+            auto offset = traits<ARCH>::reg_byte_offsets[start_reg + i];
+            std::copy(iter, iter + reg_width, reg_base + offset);
+        } else if(i == 32) {
+            auto offset = traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::PC];
+            std::copy(iter, iter + reg_width, reg_base + offset);
+        }
+        iter += reg_width;
+    }
+    if(iss::arch::traits<ARCH>::FLEN > 0) {
+        auto fstart_reg = get_f0_offset<ARCH>();
+        auto reg_width = arch::traits<ARCH>::FLEN / 8;
+        for(size_t i = 0; i < 32 && iter < iter_end; ++i) {
+            unsigned offset = traits<ARCH>::reg_byte_offsets[fstart_reg + i];
+            std::copy(iter, iter + reg_width, reg_base + offset);
+            iter += reg_width;
         }
     }
     return Ok;
@@ -236,7 +249,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_registers(cons
 
 template <typename ARCH>
 status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
-    if(reg_no < 65) {
+    if(reg_no < csr_offset) {
         // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
         // arch::traits<ARCH>::reg_e>(reg_no))/8;
         auto* reg_base = core->get_regs_base_ptr();
@@ -247,23 +260,24 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
         std::copy(reg_base + offset, reg_base + offset + reg_width, data.begin());
         std::fill(avail.begin(), avail.end(), 0xff);
     } else {
-        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, reg_no - 65);
+        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, reg_no - csr_offset);
         data.resize(sizeof(typename traits<ARCH>::reg_t));
         avail.resize(sizeof(typename traits<ARCH>::reg_t));
         std::fill(avail.begin(), avail.end(), 0xff);
         core->read(a, data.size(), data.data());
+        std::fill(avail.begin(), avail.end(), 0xff);
     }
     return data.size() > 0 ? Ok : Err;
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_single_register(unsigned int reg_no, const std::vector<uint8_t>& data) {
-    if(reg_no < 65) {
+    if(reg_no < csr_offset) {
         auto* reg_base = core->get_regs_base_ptr();
         auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
         auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(data.begin(), data.begin() + reg_width, reg_base + offset);
     } else {
-        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - 65);
+        typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - csr_offset);
         core->write(a, data.size(), data.data());
     }
     return Ok;
@@ -276,7 +290,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::read_mem(uint64_t ad
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t>& data) {
-    auto a = map_addr({iss::access_type::DEBUG_READ, iss::address_type::VIRTUAL, 0, addr});
+    auto a = map_addr({iss::access_type::DEBUG_WRITE, iss::address_type::VIRTUAL, 0, addr});
     auto f = [&]() -> status { return core->write(a, data.size(), data.data()); };
     return srv->execute_syncronized(f);
 }
@@ -369,92 +383,55 @@ status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string& out_buf) {
-    const std::string res{"<?xml version=\"1.0\"?><!DOCTYPE target SYSTEM \"gdb-target.dtd\">"
-                          "<target><architecture>riscv:rv32</architecture>"
-                          //"  <feature name=\"org.gnu.gdb.riscv.rv32i\">\n"
-                          //"    <reg name=\"x0\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x1\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x2\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x3\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x4\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x5\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x6\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x7\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x8\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x9\"  bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x10\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x11\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x12\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x13\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x14\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x15\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x16\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x17\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x18\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x19\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x20\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x21\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x22\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x23\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x24\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x25\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x26\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x27\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x28\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x29\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x30\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"    <reg name=\"x31\" bitsize=\"32\" group=\"general\"/>\n"
-                          //"  </feature>\n"
-                          "</target>"};
-    out_buf = res;
+    if(!csr_xml.size()) {
+        std::ostringstream oss;
+        oss << "<?xml version=\"1.0\"?><!DOCTYPE feature SYSTEM \"gdb-target.dtd\"><target version=\"1.0\">\n";
+        if(iss::arch::traits<ARCH>::XLEN == 32)
+            oss << "<architecture>riscv:rv32</architecture>\n";
+        else if(iss::arch::traits<ARCH>::XLEN == 64)
+            oss << "  <architectureriscv:rv64</architecture>\n";
+        oss << "  <feature name=\"org.gnu.gdb.riscv.cpu\">\n";
+        auto reg_base_num = iss::arch::traits<ARCH>::X0;
+        for(auto i = 0U; i < iss::arch::traits<ARCH>::RFS; ++i) {
+            oss << "    <reg name=\"x" << i << "\" bitsize=\"" << iss::arch::traits<ARCH>::reg_bit_widths[reg_base_num + i]
+                << "\" type=\"int\" regnum=\"" << i << "\"/>\n";
+        }
+        oss << "    <reg name=\"pc\" bitsize=\"" << iss::arch::traits<ARCH>::reg_bit_widths[iss::arch::traits<ARCH>::PC]
+            << "\" type=\"code_ptr\" regnum=\"" << 32U << "\"/>\n";
+        oss << "  </feature>\n";
+        if(iss::arch::traits<ARCH>::FLEN > 0) {
+            oss << "  <feature name=\"org.gnu.gdb.riscv.fpu\">\n";
+            auto reg_base_num = get_f0_offset<ARCH>();
+            auto type = iss::arch::traits<ARCH>::FLEN == 32 ? "ieee_single" : "riscv_double";
+            for(auto i = 0U; i < 32; ++i) {
+                oss << "    <reg name=\"f" << i << "\" bitsize=\"" << iss::arch::traits<ARCH>::reg_bit_widths[reg_base_num + i]
+                    << "\" type=\"" << type << "\" regnum=\"" << i + 33 << "\"/>\n";
+            }
+            oss << "    <reg name=\"fcsr\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"103\" type int/>\n";
+            oss << "    <reg name=\"fflags\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"101\" type int/>\n";
+            oss << "    <reg name=\"frm\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"102\" type int/>\n";
+            oss << "  </feature>\n";
+        }
+        oss << "  <feature name=\"org.gnu.gdb.riscv.csr\">\n";
+        std::vector<uint8_t> data;
+        std::vector<uint8_t> avail;
+        data.resize(sizeof(typename traits<ARCH>::reg_t));
+        avail.resize(sizeof(typename traits<ARCH>::reg_t));
+        for(auto i = 0U; i < 4096; ++i) {
+            typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, i);
+            std::fill(avail.begin(), avail.end(), 0xff);
+            auto res = core->read(a, data.size(), data.data());
+            if(res == iss::Ok) {
+                oss << "    <reg name=\"" << get_csr_name(i) << "\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN
+                    << "\"  type=\"int\" regnum=\"" << (i + csr_offset) << "\"/>\n";
+            }
+        }
+        oss << "  </feature>\n";
+        oss << "</target>\n";
+    }
+    out_buf = csr_xml;
     return Ok;
 }
-
-/*
- *
-<?xml version="1.0"?>
-<!DOCTYPE target SYSTEM "gdb-target.dtd">
-<target>
-  <architecture>riscv:rv32</architecture>
-
-  <feature name="org.gnu.gdb.riscv.rv32i">
-    <reg name="x0"  bitsize="32" group="general"/>
-    <reg name="x1"  bitsize="32" group="general"/>
-    <reg name="x2"  bitsize="32" group="general"/>
-    <reg name="x3"  bitsize="32" group="general"/>
-    <reg name="x4"  bitsize="32" group="general"/>
-    <reg name="x5"  bitsize="32" group="general"/>
-    <reg name="x6"  bitsize="32" group="general"/>
-    <reg name="x7"  bitsize="32" group="general"/>
-    <reg name="x8"  bitsize="32" group="general"/>
-    <reg name="x9"  bitsize="32" group="general"/>
-    <reg name="x10" bitsize="32" group="general"/>
-    <reg name="x11" bitsize="32" group="general"/>
-    <reg name="x12" bitsize="32" group="general"/>
-    <reg name="x13" bitsize="32" group="general"/>
-    <reg name="x14" bitsize="32" group="general"/>
-    <reg name="x15" bitsize="32" group="general"/>
-    <reg name="x16" bitsize="32" group="general"/>
-    <reg name="x17" bitsize="32" group="general"/>
-    <reg name="x18" bitsize="32" group="general"/>
-    <reg name="x19" bitsize="32" group="general"/>
-    <reg name="x20" bitsize="32" group="general"/>
-    <reg name="x21" bitsize="32" group="general"/>
-    <reg name="x22" bitsize="32" group="general"/>
-    <reg name="x23" bitsize="32" group="general"/>
-    <reg name="x24" bitsize="32" group="general"/>
-    <reg name="x25" bitsize="32" group="general"/>
-    <reg name="x26" bitsize="32" group="general"/>
-    <reg name="x27" bitsize="32" group="general"/>
-    <reg name="x28" bitsize="32" group="general"/>
-    <reg name="x29" bitsize="32" group="general"/>
-    <reg name="x30" bitsize="32" group="general"/>
-    <reg name="x31" bitsize="32" group="general"/>
-  </feature>
-
-</target>
-
- */
 } // namespace debugger
 } // namespace iss
 

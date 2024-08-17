@@ -20,8 +20,8 @@ if(NOT TARGET dbt-rise-core)
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
 	    #GIT_SHALLOW    OFF
-	    GIT_TAG         a12f7a4
-	    UPDATE_DISCONNECTED NOT ${UPDATE_SCC_SRC} # When enabled, this option causes the update step to be skipped.
+	    GIT_TAG         45a9641
+	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
 	)
 	FetchContent_GetProperties(dbt_rise_core_git)
 	if(NOT dbt_rise_core_git_POPULATED)
@@ -37,7 +37,7 @@ find_package(jsoncpp)
 find_package(yaml-cpp)
 find_package(Boost COMPONENTS coroutine REQUIRED)
 
-set(CLANG_FORMAT_EXCLUDE_PATTERNS "/scc/" "/build/" "/.direnv/")
+set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
 find_package(ClangFormat)
 
 add_subdirectory(softfloat)
@@ -56,6 +56,7 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv64i.cpp
 	src/vm/interp/vm_rv64gc.cpp
     src/vm/fp_functions.cpp
+    src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
     src/iss/plugin/cycle_estimate.cpp
     src/iss/plugin/instruction_count.cpp
@@ -71,7 +72,6 @@ endif()
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
 	src/vm/asmjit/vm_rv32i.cpp
-	#src/vm/asmjit/vm_rv32imac.cpp
 	src/vm/asmjit/vm_rv64i.cpp
     )
 endif()

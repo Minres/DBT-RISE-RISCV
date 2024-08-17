@@ -64,7 +64,7 @@ Core RV64I provides RVI, Zicsr, Zifencei {
     }
 }
 
-Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
+Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd {
     architectural_state {
         XLEN=64;
         FLEN=64;
@@ -77,5 +77,5 @@ Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
 }
 
 /*
-for i in RV32I RV32IMAC RV32GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b interp -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done 
+for i in RV32I RV32IMAC RV32GC RV64I RV64GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b interp -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done 
  */ 

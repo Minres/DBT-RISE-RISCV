@@ -46,7 +46,7 @@ extern "C" {
 using this_t = uint8_t*;
 // this does not inlcude any reserved rm or the DYN rm, as DYN rm should be taken care of in the vm_impl
 const std::array<uint8_t, 5> rmm_map = {
-    softfloat_round_near_even /*RNE*/,   softfloat_round_minMag /*RTZ*/, softfloat_round_min /*RDN*/, softfloat_round_max /*RUP?*/,
+    softfloat_round_near_even /*RNE*/, softfloat_round_minMag /*RTZ*/, softfloat_round_min /*RDN*/, softfloat_round_max /*RUP?*/,
     softfloat_round_near_maxMag /*RMM*/
 };
 

@@ -37,7 +37,10 @@
 #include <iss/tcc/vm_base.h>
 #include <util/logging.h>
 #include <sstream>
-
+#include <iss/instruction_decoder.h>
+<%def fcsr = registers.find {it.name=='FCSR'}
+if(fcsr != null) {%>
+#include <vm/fp_functions.h><%}%>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -84,7 +87,12 @@ protected:
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, tu_builder&);
 
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+<%
+if(fcsr != null) {%>
+    inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}   
 
+    void add_prologue(tu_builder& tu) override;
+<%}%>
     void setup_module(std::string m) override {
         super::setup_module(m);
     }
@@ -97,7 +105,9 @@ protected:
 
     void gen_leave_trap(tu_builder& tu, unsigned lvl);
 
-    void gen_wait(tu_builder& tu, unsigned type);
+    inline void gen_set_tval(tu_builder& tu, uint64_t new_tval);
+
+    inline void gen_set_tval(tu_builder& tu, value new_tval);
 
     inline void gen_trap_check(tu_builder& tu) {
         tu("if(*trap_state!=0) goto trap_entry;");
@@ -128,31 +138,28 @@ protected:
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
     }    
 
+<%functions.each{ it.eachLine { %>
+    ${it}<%}%>
+<%}%>
 private:
     /****************************************************************************
      * start opcode definitions
      ****************************************************************************/
     struct instruction_descriptor {
-        size_t length;
+        uint32_t length;
         uint32_t value;
         uint32_t mask;
         compile_func op;
     };
-    struct decoding_tree_node{
-        std::vector<instruction_descriptor> instrs;
-        std::vector<decoding_tree_node*> children;
-        uint32_t submask = std::numeric_limits<uint32_t>::max();
-        uint32_t value;
-        decoding_tree_node(uint32_t value) : value(value){}
-    };
 
-    decoding_tree_node* root {nullptr};
-
-    const std::array<instruction_descriptor, ${instructions.size}> instr_descr = {{
+    const std::array<instruction_descriptor, ${instructions.size()}> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */<%instructions.each{instr -> %>
         /* instruction ${instr.instruction.name}, encoding '${instr.encoding}' */
         {${instr.length}, ${instr.encoding}, ${instr.mask}, &this_class::__${generator.functionName(instr.name)}},<%}%>
     }};
+
+    //needs to be declared after instr_descr
+    decoder instr_decoder;
  
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
@@ -164,82 +171,36 @@ private:
         <%}%>if(this->disass_enabled){
             /* generate console output when executing the command */<%instr.disass.eachLine{%>
             ${it}<%}%>
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
         }
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ ${instr.length/8};
         gen_set_pc(tu, pc, traits::NEXT_PC);
         tu.open_scope();
+        this->gen_set_tval(tu, instr);
         <%instr.behavior.eachLine{%>${it}
         <%}%>
         tu.close_scope();
-        gen_trap_check(tu);        
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,${idx});
+        gen_trap_check(tu);        
         return returnValue;
     }
     <%}%>
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    compile_ret_t illegal_intruction(virt_addr_t &pc, code_word_t instr, tu_builder& tu) {
+    compile_ret_t illegal_instruction(virt_addr_t &pc, code_word_t instr, tu_builder& tu) {
         vm_impl::gen_sync(tu, iss::PRE_SYNC, instr_descr.size());
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, std::string("illegal_instruction"));
+        }
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
-        gen_raise_trap(tu, 0, 2);     // illegal instruction trap
+        gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        this->gen_set_tval(tu, instr);
         vm_impl::gen_sync(tu, iss::POST_SYNC, instr_descr.size());
         vm_impl::gen_trap_check(tu);
-        return BRANCH;
-    }
-    
-    //decoding functionality
-
-    void populate_decoding_tree(decoding_tree_node* root){
-        //create submask
-        for(auto instr: root->instrs){
-            root->submask &= instr.mask;
-        }
-        //put each instr according to submask&encoding into children
-        for(auto instr: root->instrs){
-            bool foundMatch = false;
-            for(auto child: root->children){
-                //use value as identifying trait
-                if(child->value == (instr.value&root->submask)){
-                    child->instrs.push_back(instr);
-                    foundMatch = true;
-                }
-            }
-            if(!foundMatch){
-                decoding_tree_node* child = new decoding_tree_node(instr.value&root->submask);
-                child->instrs.push_back(instr);
-                root->children.push_back(child);
-            }
-        }
-        root->instrs.clear();
-        //call populate_decoding_tree for all children
-        if(root->children.size() >1)
-            for(auto child: root->children){
-                populate_decoding_tree(child);      
-            }
-        else{
-            //sort instrs by value of the mask, this works bc we want to have the least restrictive one last
-            std::sort(root->children[0]->instrs.begin(), root->children[0]->instrs.end(), [](const instruction_descriptor& instr1, const instruction_descriptor& instr2) {
-            return instr1.mask > instr2.mask;
-            }); 
-        }
-    }
-    compile_func decode_instr(decoding_tree_node* node, code_word_t word){
-        if(!node->children.size()){
-            if(node->instrs.size() == 1) return node->instrs[0].op;
-            for(auto instr : node->instrs){
-                if((instr.mask&word) == instr.value) return instr.op;
-            }
-        }
-        else{
-            for(auto child : node->children){
-                if (child->value == (node->submask&word)){
-                    return decode_instr(child, word);
-                }  
-            }  
-        }
-        return nullptr;
+        return ILLEGAL_INSTR;
     }
 };
 
@@ -252,13 +213,16 @@ template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm_base<ARCH>(core, core_id, cluster_id) {
-    root = new decoding_tree_node(std::numeric_limits<uint32_t>::max());
-    for(auto instr:instr_descr){
-        root->instrs.push_back(instr);
+: vm_base<ARCH>(core, core_id, cluster_id)
+, instr_decoder([this]() {
+        std::vector<generic_instruction_descriptor> g_instr_descr;
+        g_instr_descr.reserve(instr_descr.size());
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
+            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
+            g_instr_descr.push_back(new_instr_descr);
     }
-    populate_decoding_tree(root);
-}
+        return std::move(g_instr_descr);
+    }()) {}
 
 template <typename ARCH>
 std::tuple<continuation_e>
@@ -269,48 +233,79 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     phys_addr_t paddr(pc);
     if(this->core.has_mmu())
         paddr = this->core.virt2phys(pc);
-    //TODO: re-add page handling
-//    if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-//        auto res = this->core.read(paddr, 2, data);
-//        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
-//        if ((insn & 0x3) == 0x3) { // this is a 32bit instruction
-//            res = this->core.read(this->core.v2p(pc + 2), 2, data + 2);
-//        }
-//    } else {
         auto res = this->core.read(paddr, 4, reinterpret_cast<uint8_t*>(&instr));
-        if (res != iss::Ok) throw trap_access(TRAP_ID, pc.val);
-//    }
-    if (instr == 0x0000006f || (instr&0xffff)==0xa001) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-    // curr pc on stack
+    if (res != iss::Ok)
+        return ILLEGAL_FETCH;
+    if (instr == 0x0000006f || (instr&0xffff)==0xa001) 
+        return JUMP_TO_SELF;
     ++inst_cnt;
-    auto f = decode_instr(root, instr);
+    uint32_t inst_index = instr_decoder.decode_instr(instr);
+    compile_func f = nullptr;
+    if(inst_index < instr_descr.size())
+        f = instr_descr[inst_index].op;
     if (f == nullptr) {
-        f = &this_class::illegal_intruction;
+        f = &this_class::illegal_instruction;
     }
     return (this->*f)(pc, instr, tu);
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_raise_trap(tu_builder& tu, uint16_t trap_id, uint16_t cause) {
     tu("  *trap_state = {:#x};", 0x80 << 24 | (cause << 16) | trap_id);
-    tu.store(traits::NEXT_PC, tu.constant(std::numeric_limits<uint32_t>::max(), 32));
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_leave_trap(tu_builder& tu, unsigned lvl) {
     tu("leave_trap(core_ptr, {});", lvl);
     tu.store(traits::NEXT_PC, tu.read_mem(traits::CSR, (lvl << 8) + 0x41, traits::XLEN));
-    tu.store(traits::LAST_BRANCH, tu.constant(std::numeric_limits<uint32_t>::max(), 32));
+    tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP), 32));
 }
 
-template <typename ARCH> void vm_impl<ARCH>::gen_wait(tu_builder& tu, unsigned type) {
+template <typename ARCH> void vm_impl<ARCH>::gen_set_tval(tu_builder& tu, uint64_t new_tval) {
+    tu(fmt::format("tval = {};", new_tval));
+}
+template <typename ARCH> void vm_impl<ARCH>::gen_set_tval(tu_builder& tu, value new_tval) {
+    tu(fmt::format("tval = {};", new_tval.str));
 }
 
 template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
     tu("trap_entry:");
     this->gen_sync(tu, POST_SYNC, -1);    
-    tu("enter_trap(core_ptr, *trap_state, *pc, 0);");
-    tu.store(traits::LAST_BRANCH, tu.constant(std::numeric_limits<uint32_t>::max(),32));
+    tu("enter_trap(core_ptr, *trap_state, *pc, tval);");
+    tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP),32));
     tu("return *next_pc;");
 }
+<%
+if(fcsr != null) {%>
+template <typename ARCH> void vm_impl<ARCH>::add_prologue(tu_builder& tu){
+    std::ostringstream os;
+    os << "uint32_t (*fget_flags)()=" << (uintptr_t)&fget_flags << ";\\n";
+    os << "uint32_t (*fadd_s)(uint32_t v1, uint32_t v2, uint8_t mode)=" << (uintptr_t)&fadd_s << ";\\n";
+    os << "uint32_t (*fsub_s)(uint32_t v1, uint32_t v2, uint8_t mode)=" << (uintptr_t)&fsub_s << ";\\n";
+    os << "uint32_t (*fmul_s)(uint32_t v1, uint32_t v2, uint8_t mode)=" << (uintptr_t)&fmul_s << ";\\n";
+    os << "uint32_t (*fdiv_s)(uint32_t v1, uint32_t v2, uint8_t mode)=" << (uintptr_t)&fdiv_s << ";\\n";
+    os << "uint32_t (*fsqrt_s)(uint32_t v1, uint8_t mode)=" << (uintptr_t)&fsqrt_s << ";\\n";
+    os << "uint32_t (*fcmp_s)(uint32_t v1, uint32_t v2, uint32_t op)=" << (uintptr_t)&fcmp_s << ";\\n";
+    os << "uint32_t (*fcvt_s)(uint32_t v1, uint32_t op, uint8_t mode)=" << (uintptr_t)&fcvt_s << ";\\n";
+    os << "uint32_t (*fmadd_s)(uint32_t v1, uint32_t v2, uint32_t v3, uint32_t op, uint8_t mode)=" << (uintptr_t)&fmadd_s << ";\\n";
+    os << "uint32_t (*fsel_s)(uint32_t v1, uint32_t v2, uint32_t op)=" << (uintptr_t)&fsel_s << ";\\n";
+    os << "uint32_t (*fclass_s)( uint32_t v1 )=" << (uintptr_t)&fclass_s << ";\\n";
+    os << "uint32_t (*fconv_d2f)(uint64_t v1, uint8_t mode)=" << (uintptr_t)&fconv_d2f << ";\\n";
+    os << "uint64_t (*fconv_f2d)(uint32_t v1, uint8_t mode)=" << (uintptr_t)&fconv_f2d << ";\\n";
+    os << "uint64_t (*fadd_d)(uint64_t v1, uint64_t v2, uint8_t mode)=" << (uintptr_t)&fadd_d << ";\\n";
+    os << "uint64_t (*fsub_d)(uint64_t v1, uint64_t v2, uint8_t mode)=" << (uintptr_t)&fsub_d << ";\\n";
+    os << "uint64_t (*fmul_d)(uint64_t v1, uint64_t v2, uint8_t mode)=" << (uintptr_t)&fmul_d << ";\\n";
+    os << "uint64_t (*fdiv_d)(uint64_t v1, uint64_t v2, uint8_t mode)=" << (uintptr_t)&fdiv_d << ";\\n";
+    os << "uint64_t (*fsqrt_d)(uint64_t v1, uint8_t mode)=" << (uintptr_t)&fsqrt_d << ";\\n";
+    os << "uint64_t (*fcmp_d)(uint64_t v1, uint64_t v2, uint32_t op)=" << (uintptr_t)&fcmp_d << ";\\n";
+    os << "uint64_t (*fcvt_d)(uint64_t v1, uint32_t op, uint8_t mode)=" << (uintptr_t)&fcvt_d << ";\\n";
+    os << "uint64_t (*fmadd_d)(uint64_t v1, uint64_t v2, uint64_t v3, uint32_t op, uint8_t mode)=" << (uintptr_t)&fmadd_d << ";\\n";
+    os << "uint64_t (*fsel_d)(uint64_t v1, uint64_t v2, uint32_t op)=" << (uintptr_t)&fsel_d << ";\\n";
+    os << "uint64_t (*fclass_d)(uint64_t v1  )=" << (uintptr_t)&fclass_d << ";\\n";
+    os << "uint64_t (*fcvt_32_64)(uint32_t v1, uint32_t op, uint8_t mode)=" << (uintptr_t)&fcvt_32_64 << ";\\n";
+    os << "uint32_t (*fcvt_64_32)(uint64_t v1, uint32_t op, uint8_t mode)=" << (uintptr_t)&fcvt_64_32 << ";\\n";
+    os << "uint32_t (*unbox_s)(uint64_t v)=" << (uintptr_t)&unbox_s << ";\\n";
+    tu.add_prologue(os.str());
+}
+<%}%>
 
 } // namespace ${coreDef.name.toLowerCase()}
 
@@ -334,7 +329,7 @@ volatile std::array<bool, 2> dummy = {
 		    auto vm = new tcc::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<std::function<void(arch_if*, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t)>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
@@ -344,7 +339,7 @@ volatile std::array<bool, 2> dummy = {
 		    auto vm = new tcc::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<std::function<void(arch_if*, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t)>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};

@@ -157,6 +157,7 @@ protected:
         return rm;
     }
 
+
 private:
     /****************************************************************************
      * start opcode definitions
@@ -168,7 +169,7 @@ private:
         typename arch::traits<ARCH>::opcode_e op;
     };
 
-    const std::array<instruction_descriptor, 158> instr_descr = {{
+    const std::array<instruction_descriptor, 154> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::AUIPC},
@@ -294,10 +295,6 @@ private:
         {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__WU},
         {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__X__W},
         {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__W__X},
-        {16, 0b0110000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLW},
-        {16, 0b1110000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSW},
-        {16, 0b0110000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLWSP},
-        {16, 0b1110000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSWSP},
         {32, 0b00000000000000000011000000000111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FLD},
         {32, 0b00000000000000000011000000100111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FSD},
         {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMADD_D},
@@ -416,17 +413,21 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
             !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
-        fetch_count++;
+        if(this->debugging_enabled())
+            this->tgt_adapter->check_continue(*PC);
+        pc.val=*PC;
         if(fetch_ins(pc, data)!=iss::Ok){
-            this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(std::numeric_limits<uint64_t>::max(), pc.val, 0);
+            if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            process_spawn_blocks();
+            if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
             uint32_t inst_index = instr_decoder.decode_instr(instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
-                inst_id = instr_descr.at(instr_decoder.decode_instr(instr)).op;
+                inst_id = instr_descr[inst_index].op;
 
             // pre execution stuff
              this->core.reg.last_branch = 0;
@@ -504,14 +505,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        if(imm % traits::INSTR_ALIGNMENT) {
+                                        uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                        if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
                                                 *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(4 ));
                                             }
-                                            *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                            *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
                                         }
                                     }
@@ -541,6 +544,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t addr_mask = (uint32_t)- 2;
                                         uint32_t new_pc = (uint32_t)(((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) )) & (int64_t)(addr_mask ));
                                         if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
@@ -575,11 +579,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) == *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -608,11 +614,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) != *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -641,11 +649,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) < (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -674,11 +684,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) >= (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -707,11 +719,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) < *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -740,11 +754,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) >= *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -773,9 +789,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int8_t res_61 = super::template read_mem<int8_t>(traits::MEM, load_address);
+                                        int8_t res_57 = super::template read_mem<int8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int8_t res = (int8_t)res_61;
+                                        int8_t res = (int8_t)res_57;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -804,9 +820,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int16_t res_62 = super::template read_mem<int16_t>(traits::MEM, load_address);
+                                        int16_t res_58 = super::template read_mem<int16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int16_t res = (int16_t)res_62;
+                                        int16_t res = (int16_t)res_58;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -835,9 +851,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int32_t res_63 = super::template read_mem<int32_t>(traits::MEM, load_address);
+                                        int32_t res_59 = super::template read_mem<int32_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res = (int32_t)res_63;
+                                        int32_t res = (int32_t)res_59;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -866,9 +882,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint8_t res_64 = super::template read_mem<uint8_t>(traits::MEM, load_address);
+                                        uint8_t res_60 = super::template read_mem<uint8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint8_t res = res_64;
+                                        uint8_t res = res_60;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -897,9 +913,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint16_t res_65 = super::template read_mem<uint16_t>(traits::MEM, load_address);
+                                        uint16_t res_61 = super::template read_mem<uint16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint16_t res = res_65;
+                                        uint16_t res = res_61;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -1526,7 +1542,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::ECALL: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ecall");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ecall";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1539,7 +1557,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ebreak");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ebreak";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1552,7 +1572,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::MRET: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "mret");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "mret";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1565,7 +1587,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::WFI: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "wfi");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "wfi";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1597,9 +1621,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rd != 0) {
-                                            uint32_t res_66 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                            uint32_t res_62 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            uint32_t xrd = res_66;
+                                            uint32_t xrd = res_62;
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrs1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                             *(X+rd) = xrd;
@@ -1632,9 +1656,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_67 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_63 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_67;
+                                        uint32_t xrd = res_63;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | xrs1);
@@ -1667,9 +1691,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_68 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_64 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_68;
+                                        uint32_t xrd = res_64;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ xrs1);
@@ -1702,9 +1726,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_69 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_65 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_69;
+                                        uint32_t xrd = res_65;
                                         super::template write_mem<uint32_t>(traits::CSR, csr, (uint32_t)zimm);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         if(rd != 0) {
@@ -1734,9 +1758,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_70 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_66 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_70;
+                                        uint32_t xrd = res_66;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | (uint32_t)zimm);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -1768,9 +1792,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_71 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_67 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_71;
+                                        uint32_t xrd = res_67;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ ((uint32_t)zimm));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -1789,7 +1813,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence.i"),
+                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence_i"),
                             fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2081,13 +2105,18 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                                    if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                                        int32_t res_72 = super::template read_mem<int32_t>(traits::MEM, offs);
-                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)((int8_t)res_72);
-                                        super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
-                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        if(rd != 0) {
+                                            uint32_t offs = *(X+rs1);
+                                            int32_t res_68 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                            *(X+rd) = (uint32_t)((int8_t)res_68);
+                                            super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        }
                                     }
                                 }
                     break;
@@ -2110,18 +2139,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint8_t res_73 = super::template read_mem<uint8_t>(traits::RES, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_73;
-                        if(res1 != 0) {
-                            super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS));
-                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        }
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1? 0 : 1;
-                        }
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint8_t res_69 = super::template read_mem<uint8_t>(traits::RES, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_69;
+                                        if(res1 != 0) {
+                                            super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        }
+                                        if(rd != 0) {
+                                            *(X+rd) = res1? 0 : 1;
+                                        }
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOSWAPW: {
@@ -2133,7 +2167,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoswap.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoswapw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2142,15 +2176,20 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            int32_t res_74 = super::template read_mem<int32_t>(traits::MEM, offs);
-                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)((int8_t)res_74);
-                        }
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS));
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        if(rd != 0) {
+                                            int32_t res_70 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                            *(X+rd) = (uint32_t)((int8_t)res_70);
+                                        }
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOADDW: {
@@ -2162,7 +2201,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoadd.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoaddw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2171,17 +2210,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_75 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_75;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) );
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_71 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_71;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+rs2) );
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOXORW: {
@@ -2193,7 +2237,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoxor.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoxorw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2202,17 +2246,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_76 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_76;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 ^ (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_72 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_72;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 ^ (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOANDW: {
@@ -2224,7 +2273,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoand.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoandw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2233,17 +2282,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_77 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_77;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 & (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_73 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_73;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 & (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOORW: {
@@ -2255,7 +2309,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoor.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoorw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2264,17 +2318,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_78 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_78;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = res1;
-                        }
-                        uint32_t res2 = res1 | (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_74 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_74;
+                                        if(rd != 0) {
+                                            *(X+rd) = res1;
+                                        }
+                                        uint32_t res2 = res1 | (uint32_t)*(X+rs2);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMINW: {
@@ -2286,7 +2345,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomin.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2295,17 +2354,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_79 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_79;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 > (int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : ((uint32_t)res1);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_75 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_75;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 > (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMAXW: {
@@ -2317,7 +2381,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomax.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2326,17 +2390,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        int32_t res_80 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        int32_t res1 = (int8_t)res_80;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 < (int32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : ((uint32_t)res1);
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        int32_t res_76 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        int32_t res1 = (int8_t)res_76;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMINUW: {
@@ -2348,7 +2417,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominu.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominuw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2357,17 +2426,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_81 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_81;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 > (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : res1;
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_77 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_77;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 > (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::AMOMAXUW: {
@@ -2379,7 +2453,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxu.w"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxuw"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -2388,17 +2462,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t offs = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                        uint32_t res_82 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res1 = res_82;
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint32_t)res1;
-                        }
-                        uint32_t res2 = res1 < (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS)? (uint32_t)*(X+(uint32_t)(rs2 ) % traits::RFS) : res1;
-                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rd >= traits::RFS || rs1 >= traits::RFS || rs2 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t offs = *(X+rs1);
+                                        uint32_t res_78 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        uint32_t res1 = res_78;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res1;
+                                        }
+                                        uint32_t res2 = res1 < (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, res2);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::C__ADDI4SPN: {
@@ -2442,9 +2521,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        int32_t res_83 = super::template read_mem<int32_t>(traits::MEM, offs);
+                        int32_t res_79 = super::template read_mem<int32_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        *(X+rd + 8) = (uint32_t)(int32_t)res_83;
+                        *(X+rd + 8) = (uint32_t)(int32_t)res_79;
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -2500,7 +2579,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "c.nop");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "c.nop";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2606,7 +2687,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, ".reserved_clui");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = ".reserved_clui";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2864,9 +2947,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         }
                         else {
                             uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                            int32_t res_84 = super::template read_mem<int32_t>(traits::MEM, offs);
+                            int32_t res_80 = super::template read_mem<int32_t>(traits::MEM, offs);
                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                            *(X+rd) = (uint32_t)(int32_t)res_84;
+                            *(X+rd) = (uint32_t)(int32_t)res_80;
                         }
                     }
                     break;
@@ -2912,7 +2995,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                                     if(rs1 && rs1 < traits::RFS) {
-                                        *NEXT_PC = *(X+(uint32_t)(rs1 ) % traits::RFS) & (uint32_t)(~ 1 );
+                                        uint32_t addr_mask = (uint32_t)- 2;
+                                        *NEXT_PC = *(X+(uint32_t)(rs1 ) % traits::RFS) & addr_mask;
                                         this->core.reg.last_branch = 1;
                                     }
                                     else {
@@ -2924,7 +3008,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::__reserved_cmv: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, ".reserved_cmv");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = ".reserved_cmv";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -2978,9 +3064,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
+                                        uint32_t addr_mask = (uint32_t)- 2;
                                         uint32_t new_pc = *(X+rs1);
                                         *(X+1) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(2 ));
-                                        *NEXT_PC = new_pc & (uint32_t)(~ 1 );
+                                        *NEXT_PC = new_pc & addr_mask;
                                         this->core.reg.last_branch = 1;
                                     }
                                 }
@@ -2989,7 +3076,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::C__EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "c.ebreak");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "c.ebreak";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -3028,7 +3117,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::DII: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "dii");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "dii";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 2;
@@ -3060,9 +3151,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint32_t res_85 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_81 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res = (uint32_t)res_85;
+                                        uint32_t res = (uint32_t)res_81;
                                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                                     }
                                 }
@@ -3075,8 +3166,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs2}, {imm}({name(rs1)])", fmt::arg("mnemonic", "fsw"),
-                            fmt::arg("rs2", fname(rs2)), fmt::arg("imm", imm));
+                            "{mnemonic:10} {rs2}, {imm}({rs1})", fmt::arg("mnemonic", "fsw"),
+                            fmt::arg("rs2", fname(rs2)), fmt::arg("imm", imm), fmt::arg("rs1", name(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3495,7 +3586,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t res = fcvt_s(frs1, 0, rm);
+                                        uint32_t res = fcvt_s(frs1, 0, get_rm((uint8_t)rm));
                                         if((rd) != 0) {
                                             *(X+rd) = res;
                                         }
@@ -3529,7 +3620,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t res = fcvt_s(frs1, 1, rm);
+                                        uint32_t res = fcvt_s(frs1, 1, get_rm((uint8_t)rm));
                                         if((rd) != 0) {
                                             *(X+rd) = res;
                                         }
@@ -3685,7 +3776,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -3693,8 +3786,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 2, rm);
+                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 2, get_rm((uint8_t)rm));
                                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3712,7 +3807,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -3720,8 +3817,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 3, rm);
+                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 3, get_rm((uint8_t)rm));
                                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3778,110 +3877,6 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                 }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::C__FLW: {
-                    uint8_t rd = ((bit_sub<2,3>(instr)));
-                    uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-                    uint8_t rs1 = ((bit_sub<7,3>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} f(8+{rd}), {uimm}({rs1})", fmt::arg("mnemonic", "c.flw"),
-                            fmt::arg("rd", rd), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 2;
-                    // execute instruction
-                    {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        uint32_t res_86 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res = (uint32_t)res_86;
-                        if(traits::FLEN == 32) {
-                            *(F+rd + 8) = res;
-                        }
-                        else {
-                            *(F+rd + 8) = ((uint64_t)((int64_t)- 1 << 32)) | (uint64_t)(res );
-                        }
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::C__FSW: {
-                    uint8_t rs2 = ((bit_sub<2,3>(instr)));
-                    uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
-                    uint8_t rs1 = ((bit_sub<7,3>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} f(8+{rs2}), {uimm}({rs1})", fmt::arg("mnemonic", "c.fsw"),
-                            fmt::arg("rs2", rs2), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 2;
-                    // execute instruction
-                    {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(F+rs2 + 8));
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::C__FLWSP: {
-                    uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, {uimm}(x2)", fmt::arg("mnemonic", "c.flwsp"),
-                            fmt::arg("rd", rd), fmt::arg("uimm", uimm));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 2;
-                    // execute instruction
-                    {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                        uint32_t res_87 = super::template read_mem<uint32_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res = (uint32_t)res_87;
-                        if(traits::FLEN == 32) {
-                            *(F+rd) = res;
-                        }
-                        else {
-                            *(F+rd) = ((uint64_t)((int64_t)- 1 << 32)) | (uint64_t)(res );
-                        }
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::C__FSWSP: {
-                    uint8_t rs2 = ((bit_sub<2,5>(instr)));
-                    uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rs2}, {uimm}(x2), ", fmt::arg("mnemonic", "c.fswsp"),
-                            fmt::arg("rs2", rs2), fmt::arg("uimm", uimm));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 2;
-                    // execute instruction
-                    {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(F+rs2));
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
-                    break;
-                }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FLD: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -3900,9 +3895,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+(uint32_t)(rs1 ) % traits::RFS) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                        uint64_t res_88 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                        uint64_t res_82 = super::template read_mem<uint64_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = res_88;
+                        uint64_t res = res_82;
                         if(traits::FLEN == 64) {
                             *(F+rd) = (uint64_t)res;
                         }
@@ -3944,7 +3939,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -3976,7 +3971,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4008,7 +4003,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4040,7 +4035,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4071,7 +4066,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4102,7 +4097,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4133,7 +4128,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4164,7 +4159,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4194,7 +4189,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4224,7 +4219,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj_d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4250,7 +4245,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn_d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4276,7 +4271,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx_d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4302,7 +4297,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin_d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4332,7 +4327,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax_d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4362,7 +4357,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_s_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4383,7 +4378,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.s"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_s"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4409,7 +4404,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq_d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4437,7 +4432,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt_d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4465,7 +4460,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle_d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4492,7 +4487,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "flass.d"),
+                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass_d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4513,7 +4508,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.w.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_w_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4541,7 +4536,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.wu.d"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_wu_d"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4569,7 +4564,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.w"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_w"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4596,7 +4591,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.d.wu"),
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_wu"),
                             fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4634,9 +4629,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        uint64_t res_89 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                        uint64_t res_83 = super::template read_mem<uint64_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = (uint64_t)res_89;
+                        uint64_t res = (uint64_t)res_83;
                         if(traits::FLEN == 64) {
                             *(F+rd + 8) = res;
                         }
@@ -4686,9 +4681,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                        uint64_t res_90 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                        uint64_t res_84 = super::template read_mem<uint64_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = (uint64_t)res_90;
+                        uint64_t res = (uint64_t)res_84;
                         if(traits::FLEN == 64) {
                             *(F+rd) = res;
                         }
@@ -4740,11 +4735,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 icount++;
                 instret++;
             }
-            cycle++;
-            pc.val=*NEXT_PC;
-            this->core.reg.PC = this->core.reg.NEXT_PC;
+            *PC = *NEXT_PC;
             this->core.reg.trap_state =  this->core.reg.pending_trap;
         }
+        fetch_count++;
+        cycle++;
     }
     return pc;
 }

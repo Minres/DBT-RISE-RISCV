@@ -295,17 +295,21 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
             !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
-        fetch_count++;
+        if(this->debugging_enabled())
+            this->tgt_adapter->check_continue(*PC);
+        pc.val=*PC;
         if(fetch_ins(pc, data)!=iss::Ok){
-            this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(std::numeric_limits<uint64_t>::max(), pc.val, 0);
+            if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            process_spawn_blocks();
+            if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
             uint32_t inst_index = instr_decoder.decode_instr(instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
-                inst_id = instr_descr.at(instr_decoder.decode_instr(instr)).op;
+                inst_id = instr_descr[inst_index].op;
 
             // pre execution stuff
              this->core.reg.last_branch = 0;
@@ -383,14 +387,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        if(imm % traits::INSTR_ALIGNMENT) {
+                                        uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                        if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
                                                 *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(4 ));
                                             }
-                                            *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                            *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
                                         }
                                     }
@@ -420,6 +426,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t addr_mask = (uint32_t)- 2;
                                         uint32_t new_pc = (uint32_t)(((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) )) & (int64_t)(addr_mask ));
                                         if(new_pc % traits::INSTR_ALIGNMENT) {
+                                            set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
@@ -454,11 +461,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) == *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -487,11 +496,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) != *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -520,11 +531,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) < (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -553,11 +566,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) >= (int32_t)*(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -586,11 +601,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) < *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -619,11 +636,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) >= *(X+rs2)) {
-                                            if((uint32_t)(imm ) % traits::INSTR_ALIGNMENT) {
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            if(new_pc % traits::INSTR_ALIGNMENT) {
+                                                set_tval(new_pc);
                                                 raise(0, 0);
                                             }
                                             else {
-                                                *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                                *NEXT_PC = new_pc;
                                                 this->core.reg.last_branch = 1;
                                             }
                                         }
@@ -1405,7 +1424,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::ECALL: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ecall");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ecall";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1418,7 +1439,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "ebreak");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "ebreak";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1431,7 +1454,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::MRET: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "mret");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "mret";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1444,7 +1469,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::WFI: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        this->core.disass_output(pc.val, "wfi");
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "wfi";
+                        this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
                     *NEXT_PC = *PC + 4;
@@ -1668,7 +1695,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence.i"),
+                            "{mnemonic:10} {rs1}, {rd}, {imm}", fmt::arg("mnemonic", "fence_i"),
                             fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -1701,11 +1728,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 icount++;
                 instret++;
             }
-            cycle++;
-            pc.val=*NEXT_PC;
-            this->core.reg.PC = this->core.reg.NEXT_PC;
+            *PC = *NEXT_PC;
             this->core.reg.trap_state =  this->core.reg.pending_trap;
         }
+        fetch_count++;
+        cycle++;
     }
     return pc;
 }

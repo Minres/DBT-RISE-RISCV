@@ -88,7 +88,6 @@ protected:
     using super::write_reg_to_mem;
     using super::gen_read_mem;
     using super::gen_write_mem;
-    using super::gen_wait;
     using super::gen_leave;
     using super::gen_sync;
    
@@ -113,6 +112,7 @@ protected:
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
     } 
+
 private:
     /****************************************************************************
      * start opcode definitions
@@ -388,7 +388,9 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+            auto new_pc = (uint64_t)(PC+(int32_t)sext<21>(imm));
+            if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                gen_set_tval(jh, new_pc);
                 gen_raise(jh, 0, 0);
             }
             else{
@@ -398,7 +400,7 @@ private:
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
                         value_reg);
                 }
-                auto PC_val_v = (uint64_t)(PC+(int32_t)sext<21>(imm));
+                auto PC_val_v = new_pc;
                 mov(cc, jh.next_pc, PC_val_v);
                 mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
             }
@@ -452,12 +454,14 @@ private:
                 (gen_operation(cc, band, (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
                 ), addr_mask)
                 ), 64, true);
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, urem, new_pc, static_cast<uint32_t>(traits::INSTR_ALIGNMENT))
             ,0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
+                gen_set_tval(jh, new_pc);
                 gen_raise(jh, 0, 0);
             }
             cc.jmp(label_merge);
@@ -474,6 +478,7 @@ private:
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
                 }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -519,21 +524,25 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -579,21 +588,25 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -639,6 +652,7 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, lt, gen_ext(cc, 
                 load_reg_from_mem(jh, traits::X0 + rs1), 64, false), gen_ext(cc, 
@@ -646,16 +660,19 @@ private:
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -701,6 +718,7 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, gte, gen_ext(cc, 
                 load_reg_from_mem(jh, traits::X0 + rs1), 64, false), gen_ext(cc, 
@@ -708,16 +726,19 @@ private:
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -763,21 +784,25 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, ltu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -823,21 +848,25 @@ private:
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
+            {
             auto label_merge = cc.newLabel();
             cmp(cc, gen_operation(cc, gteu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
             ,0);
             cc.je(label_merge);
             {
-                if(imm%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                auto new_pc = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
+                    gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
                 else{
-                    auto PC_val_v = (uint64_t)(PC+(int16_t)sext<13>(imm));
+                    auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
                 }
             }
             cc.bind(label_merge);
+            }
         }
         auto returnValue = BRANCH;
         
@@ -2305,7 +2334,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "ecall";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -2342,7 +2371,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "ebreak";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -2379,7 +2408,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "mret";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -2416,7 +2445,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "wfi";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -2438,7 +2467,10 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        gen_wait(jh, 1);
+        InvokeNode* call_wait;
+        jh.cc.comment("//call_wait");
+        jh.cc.invoke(&call_wait, &wait, FuncSignature::build<void, int32_t>());
+        setArg(call_wait, 0, 1);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 41);
@@ -2822,7 +2854,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "addw";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -2875,7 +2907,7 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            //This disass is not yet implemented
+            //No disass specified, using instruction name
             std::string mnemonic = "subw";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -3470,7 +3502,7 @@ private:
         gen_raise(jh, 0, 2);
         gen_sync(jh, POST_SYNC, instr_descr.size());
         gen_instr_epilogue(jh);
-        return BRANCH;
+        return ILLEGAL_INSTR;
     }
 };
 
@@ -3499,9 +3531,9 @@ continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned
         paddr = this->core.virt2phys(pc);
     auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok)
-        throw trap_access(TRAP_ID, pc.val);
+        return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)
-        throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+        return JUMP_TO_SELF;
     ++inst_cnt;
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
