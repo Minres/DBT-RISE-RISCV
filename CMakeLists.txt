@@ -37,8 +37,12 @@ find_package(jsoncpp)
 find_package(yaml-cpp)
 find_package(Boost COMPONENTS coroutine REQUIRED)
 
-set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
-find_package(ClangFormat)
+if(CMAKE_PROJECT_NAME STREQUAL "dbt-rise-riscv")
+	set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
+	find_package(ClangFormat)
+else()
+	set(CLANG_FORMAT_EXCLUDE_PATTERNS ${CLANG_FORMAT_EXCLUDE_PATTERNS} /build/ /.direnv/ softfloat/ PARENT_SCOPE)
+endif()
 
 add_subdirectory(softfloat)
 
