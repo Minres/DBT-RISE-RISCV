@@ -131,7 +131,7 @@ public:
     : owner(owner) {}
 
     void reset(uint64_t addr) { vm->reset(addr); }
-    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump); }
+    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump, finish_cond_e::NONE); }
     inline std::pair<uint64_t, bool> load_file(std::string const& name) {
         iss::arch_if* cc = cpu->get_arch_if();
         return cc->load_file(name);
