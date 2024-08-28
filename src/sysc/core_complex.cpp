@@ -55,9 +55,9 @@
 
 #define STR(X) #X
 #define CREATE_CORE(CN)                                                                                                                    \
-    if(type == STR(CN)) {                                                                                                                  \
-        std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
-    } else
+        if(type == STR(CN)) {                                                                                                                  \
+            std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
+        } else
 
 #ifdef HAS_SCV
 #include <scv.h>
@@ -145,6 +145,7 @@ public:
         if(type.size() == 0 || type == "?") {
             std::cout << "Available cores: " << util::join(f.get_names(), ", ") << std::endl;
             sc_core::sc_stop();
+            exit(0);
         } else if(type.find('|') != std::string::npos) {
             std::tie(cpu, vm) = f.create(type + "|" + backend);
         } else {
@@ -156,28 +157,30 @@ public:
             }
         }
         if(!cpu) {
-            SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
-        }
-        if(!vm) {
-            SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
-        }
-        auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
-        sc_cpu_if->set_mhartid(hart_id);
-        get_mode = [sc_cpu_if]() { return sc_cpu_if->get_mode(); };
-        get_state = [sc_cpu_if]() { return sc_cpu_if->get_state(); };
-        get_interrupt_execution = [sc_cpu_if]() { return sc_cpu_if->get_interrupt_execution(); };
-        set_interrupt_execution = [sc_cpu_if](bool b) { return sc_cpu_if->set_interrupt_execution(b); };
-        local_irq = [sc_cpu_if](short s, bool b) { return sc_cpu_if->local_irq(s, b); };
+            if(type!="?")
+                SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
+        } else if(!vm) {
+            if(type!="?")
+                SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
+        } else {
+            auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
+            sc_cpu_if->set_mhartid(hart_id);
+            get_mode = [sc_cpu_if]() { return sc_cpu_if->get_mode(); };
+            get_state = [sc_cpu_if]() { return sc_cpu_if->get_state(); };
+            get_interrupt_execution = [sc_cpu_if]() { return sc_cpu_if->get_interrupt_execution(); };
+            set_interrupt_execution = [sc_cpu_if](bool b) { return sc_cpu_if->set_interrupt_execution(b); };
+            local_irq = [sc_cpu_if](short s, bool b) { return sc_cpu_if->local_irq(s, b); };
 
-        auto* srv = debugger::server<debugger::gdb_session>::get();
-        if(srv)
-            tgt_adapter = srv->get_target();
-        if(tgt_adapter)
-            tgt_adapter->add_custom_command({"sysc",
-                                             [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
-                                                 return cmd_sysc(argc, argv, of, df, tgt_adapter);
-                                             },
-                                             "SystemC sub-commands: break <time>, print_time"});
+            auto* srv = debugger::server<debugger::gdb_session>::get();
+            if(srv)
+                tgt_adapter = srv->get_target();
+            if(tgt_adapter)
+                tgt_adapter->add_custom_command({"sysc",
+                [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
+                    return cmd_sysc(argc, argv, of, df, tgt_adapter);
+                },
+                "SystemC sub-commands: break <time>, print_time"});
+        }
     }
 
     core_complex_if* const owner;
@@ -430,9 +433,9 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
                 dbus_inc += incr;
         }
         SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+                << (length == 4   ? *(uint32_t*)data
+                        : length == 2 ? *(uint16_t*)data
+                                : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -477,9 +480,9 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
         SCCTRACE() << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
-                   << (length == 4   ? *(uint32_t*)data
-                       : length == 2 ? *(uint16_t*)data
-                                     : (unsigned)*data);
+                << (length == 4   ? *(uint32_t*)data
+                        : length == 2 ? *(uint16_t*)data
+                                : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -490,7 +493,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
             if(dbus->get_direct_mem_ptr(gp, dmi_data)) {
                 if(dmi_data.is_write_allowed())
                     write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
-                                       dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
+                            dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
         return true;
