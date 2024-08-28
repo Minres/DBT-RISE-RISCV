@@ -55,8 +55,8 @@
 
 #define STR(X) #X
 #define CREATE_CORE(CN)                                                                                                                    \
-        if(type == STR(CN)) {                                                                                                                  \
-            std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
+        if(type == STR(CN)) {                                                                                                              \
+            std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                   \
         } else
 
 #ifdef HAS_SCV
@@ -397,7 +397,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
 template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr - lut_entry.get_start_address();
         std::copy(lut_entry.get_dmi_ptr() + offset, lut_entry.get_dmi_ptr() + offset + length, data);
         if(is_fetch)
@@ -444,7 +444,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
             gp.set_address(addr);
             tlm_dmi_ext dmi_data;
             if(sckt->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_read_allowed())
+                if(dmi_data.is_read_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
@@ -454,7 +454,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
 
 template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = write_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
@@ -491,7 +491,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
             gp.set_address(addr);
             tlm_dmi_ext dmi_data;
             if(dbus->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_write_allowed())
+                if(dmi_data.is_write_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
                     write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
                             dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
