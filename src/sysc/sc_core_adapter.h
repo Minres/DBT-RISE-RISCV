@@ -54,7 +54,7 @@ public:
             std::stringstream s;
             s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
               << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCDEBUG(owner->hier_name()) << "disass: "
+            SCCINFO(owner->hier_name()) << "disass: "
                                          << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc << "\t\t"
                                          << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
         }
