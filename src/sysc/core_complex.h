@@ -43,6 +43,10 @@
 #include <scmlinc/scml_property.h>
 #else
 #include <cci_configuration>
+#ifndef SC_SIGNAL_IF
+#include <tlm/scc/signal_target_mixin.h>
+#define USE_TLM_SIGNAL
+#endif
 #endif
 #include <memory>
 #include <tlm>
@@ -65,6 +69,11 @@ public:
 };
 
 namespace riscv_vp {
+#ifdef USE_TLM_SIGNAL
+using irq_signal_t = tlm::scc::tlm_signal_bool_opt_in;
+#else
+using irq_signal_t = sc_core::sc_in<bool>;
+#endif
 class core_wrapper;
 struct core_trace;
 struct core_complex_if {
@@ -99,13 +108,13 @@ public:
 
     sc_core::sc_in<bool> rst_i{"rst_i"};
 
-    sc_core::sc_in<bool> ext_irq_i{"ext_irq_i"};
+    irq_signal_t ext_irq_i{"ext_irq_i"};
 
-    sc_core::sc_in<bool> timer_irq_i{"timer_irq_i"};
+    irq_signal_t timer_irq_i{"timer_irq_i"};
 
-    sc_core::sc_in<bool> sw_irq_i{"sw_irq_i"};
+    irq_signal_t sw_irq_i{"sw_irq_i"};
 
-    sc_core::sc_vector<sc_core::sc_in<bool>> local_irq_i{"local_irq_i", 16};
+    sc_core::sc_vector<irq_signal_t> local_irq_i{"local_irq_i", 16};
 
 #ifndef CWR_SYSTEMC
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
@@ -215,10 +224,12 @@ protected:
     void forward();
     void run();
     void rst_cb();
+#ifndef USE_TLM_SIGNAL
     void sw_irq_cb();
     void timer_irq_cb();
     void ext_irq_cb();
     void local_irq_cb();
+#endif
     uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
     tlm_utils::tlm_quantumkeeper quantum_keeper;

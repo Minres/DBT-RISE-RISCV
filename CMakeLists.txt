@@ -82,7 +82,9 @@ endif()
 
 # Define the library
 add_library(${PROJECT_NAME} SHARED ${LIB_SOURCES})
-
+if(USE_SC_SIGNAL4IRQ)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC SC_SIGNAL_IF)
+endif()
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-shift-count-overflow)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

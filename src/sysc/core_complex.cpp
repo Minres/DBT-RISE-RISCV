@@ -37,7 +37,10 @@
 #include <iss/debugger/target_adapter_if.h>
 #include <iss/iss.h>
 #include <iss/vm_types.h>
+#include <tlm_core/tlm_2/tlm_2_interfaces/tlm_fw_bw_ifs.h>
+#include <tlm_core/tlm_2/tlm_generic_payload/tlm_phase.h>
 #include "iss_factory.h"
+#include "tlm/scc/tlm_signal_gp.h"
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
@@ -233,6 +236,25 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     SC_THREAD(run);
     SC_METHOD(rst_cb);
     sensitive << rst_i;
+#ifdef USE_TLM_SIGNAL
+    sw_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(3, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    timer_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(7, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    ext_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(11, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    for(auto i = 0U; i < local_irq_i.size(); ++i)
+        local_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+            cpu->local_irq(16+i, gp.get_value());
+            return tlm::TLM_COMPLETED;
+        });
+#else
     SC_METHOD(sw_irq_cb);
     sensitive << sw_irq_i;
     SC_METHOD(timer_irq_cb);
@@ -242,6 +264,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     SC_METHOD(local_irq_cb);
     for(auto pin : local_irq_i)
         sensitive << pin;
+#endif
     trc->m_db = scv_tr_db::get_default_db();
 
     SC_METHOD(forward);
@@ -362,6 +385,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
         cpu->set_interrupt_execution(true);
 }
 
+#ifndef USE_TLM_SIGNAL
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
@@ -375,6 +399,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
         }
     }
 }
+#endif
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     wait(SC_ZERO_TIME); // separate from elaboration phase
