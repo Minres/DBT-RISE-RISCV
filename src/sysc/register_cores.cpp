@@ -37,6 +37,7 @@
 #include <iss/arch/rv32imac.h>
 #include <iss/arch/rv32gc.h>
 #include <iss/arch/rv64i.h>
+#include <iss/arch/rv64gc.h>
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
 #include "sc_core_adapter.h"
@@ -102,7 +103,14 @@ volatile std::array<bool, 12> riscv_init = {
         auto cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
         auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::rv64i>>(cc);
         return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64i*>(cpu), gdb_port)}};
-    })};
+        }),
+    iss_factory::instance().register_creator("rv64gc|m_p|interp",
+                [](unsigned gdb_port, void* data) -> iss_factory::base_t {
+            auto cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
+            auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::rv64gc>>(cc);
+            return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
+        })
+    };
 } // namespace interp
 #if defined(WITH_LLVM)
 namespace llvm {
