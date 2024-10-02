@@ -29,18 +29,6 @@ Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
     }
 }
 
-Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf {
-    architectural_state {
-        XLEN=32;
-        FLEN=32;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100100101;
-        unsigned int MARCHID_VAL = 0x00000000;
-        unsigned int CLIC_NUM_IRQ = 0;
-    }
-}
-
 Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
     architectural_state {
         XLEN=32;
