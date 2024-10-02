@@ -132,18 +132,18 @@ uint32_t fcvt_s(uint32_t v1, uint32_t op, uint8_t mode) {
     softfloat_exceptionFlags = 0;
     float32_t r;
     switch(op) {
-    case 0: { // w->s, fp to int32
+    case 0: { // FCVT__W__S
         uint_fast32_t res = f32_to_i32(v1f, rmm_map.at(mode), true);
         return (uint32_t)res;
     }
-    case 1: { // wu->s
+    case 1: { // FCVT__WU__S
         uint_fast32_t res = f32_to_ui32(v1f, rmm_map.at(mode), true);
         return (uint32_t)res;
     }
-    case 2: // s->w
+    case 2: // FCVT__S__W
         r = i32_to_f32((int32_t)v1);
         return r.v;
-    case 3: // s->wu
+    case 3: // FCVT__S__WU
         r = ui32_to_f32(v1);
         return r.v;
     }
@@ -203,8 +203,8 @@ uint32_t fclass_s(uint32_t v1) {
     uA.f = a;
     uiA = uA.ui;
 
-    uint_fast16_t infOrNaN = expF32UI(uiA) == 0xFF;
-    uint_fast16_t subnormalOrZero = expF32UI(uiA) == 0;
+    bool infOrNaN = expF32UI(uiA) == 0xFF;
+    bool subnormalOrZero = expF32UI(uiA) == 0;
     bool sign = signF32UI(uiA);
     bool fracZero = fracF32UI(uiA) == 0;
     bool isNaN = isNaNF32UI(uiA);
@@ -217,9 +217,13 @@ uint32_t fclass_s(uint32_t v1) {
 }
 
 uint32_t fconv_d2f(uint64_t v1, uint8_t mode) {
+    bool isNan = isNaNF64UI(v1);
+    bool isSNaN = softfloat_isSigNaNF64UI(v1);
     softfloat_roundingMode = rmm_map.at(mode);
-    bool nan = (v1 & defaultNaNF64UI) == defaultNaNF64UI;
-    if(nan) {
+    softfloat_exceptionFlags = 0;
+    if(isNan) {
+        if(isSNaN)
+            softfloat_raiseFlags(softfloat_flag_invalid);
         return defaultNaNF32UI;
     } else {
         float32_t res = f64_to_f32(float64_t{v1});
@@ -228,11 +232,11 @@ uint32_t fconv_d2f(uint64_t v1, uint8_t mode) {
 }
 
 uint64_t fconv_f2d(uint32_t v1, uint8_t mode) {
-    bool nan = (v1 & defaultNaNF32UI) == defaultNaNF32UI;
-    if(nan) {
+    bool infOrNaN = expF32UI(v1) == 0xFF;
+    bool subnormalOrZero = expF32UI(v1) == 0;
+    if(infOrNaN || subnormalOrZero) {
         return defaultNaNF64UI;
     } else {
-        softfloat_roundingMode = rmm_map.at(mode);
         float64_t res = f32_to_f64(float32_t{v1});
         return res.v;
     }
@@ -312,22 +316,23 @@ uint64_t fcmp_d(uint64_t v1, uint64_t v2, uint32_t op) {
 }
 
 uint64_t fcvt_d(uint64_t v1, uint32_t op, uint8_t mode) {
+
     float64_t v1f{v1};
     softfloat_exceptionFlags = 0;
     float64_t r;
     switch(op) {
-    case 0: { // l->d, fp to int32
+    case 0: { // l from d
         int64_t res = f64_to_i64(v1f, rmm_map.at(mode), true);
         return (uint64_t)res;
     }
-    case 1: { // lu->s
+    case 1: { // lu from d
         uint64_t res = f64_to_ui64(v1f, rmm_map.at(mode), true);
         return res;
     }
-    case 2: // s->l
+    case 2: // d from l
         r = i64_to_f64(v1);
         return r.v;
-    case 3: // s->lu
+    case 3: // d from lu
         r = ui64_to_f64(v1);
         return r.v;
     }
@@ -335,12 +340,24 @@ uint64_t fcvt_d(uint64_t v1, uint32_t op, uint8_t mode) {
 }
 
 uint64_t fmadd_d(uint64_t v1, uint64_t v2, uint64_t v3, uint32_t op, uint8_t mode) {
-    // op should be {softfloat_mulAdd_subProd(2), softfloat_mulAdd_subC(1)}
+    uint64_t F64_SIGN = 1ULL << 63;
+    switch(op) {
+    case 0: // FMADD_D
+        break;
+    case 1: // FMSUB_D
+        v3 ^= F64_SIGN;
+        break;
+    case 2: // FNMADD_D
+        v1 ^= F64_SIGN;
+        v3 ^= F64_SIGN;
+        break;
+    case 3: // FNMSUB_D
+        v1 ^= F64_SIGN;
+        break;
+    }
     softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
-    float64_t res = softfloat_mulAddF64(v1, v2, v3, op & 0x1);
-    if(op > 1)
-        res.v ^= 1ULL << 63;
+    float64_t res = softfloat_mulAddF64(v1, v2, v3, 0);
     return res.v;
 }
 
@@ -376,8 +393,8 @@ uint64_t fclass_d(uint64_t v1) {
     uA.f = a;
     uiA = uA.ui;
 
-    uint_fast16_t infOrNaN = expF64UI(uiA) == 0x7FF;
-    uint_fast16_t subnormalOrZero = expF64UI(uiA) == 0;
+    bool infOrNaN = expF64UI(uiA) == 0x7FF;
+    bool subnormalOrZero = expF64UI(uiA) == 0;
     bool sign = signF64UI(uiA);
     bool fracZero = fracF64UI(uiA) == 0;
     bool isNaN = isNaNF64UI(uiA);
