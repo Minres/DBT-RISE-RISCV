@@ -115,7 +115,7 @@ protected:
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    } 
+    }
 <%functions.each{ it.eachLine { %>
     ${it}<%}%>
 <%}%>
@@ -138,7 +138,7 @@ private:
 
     //needs to be declared after instr_descr
     decoder instr_decoder;
- 
+
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
     continuation_e __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
@@ -216,7 +216,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
         for (uint32_t i = 0; i < instr_descr.size(); ++i) {
             generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
             g_instr_descr.push_back(new_instr_descr);
-    }
+        }
         return std::move(g_instr_descr);
     }()) {}
 
@@ -308,6 +308,7 @@ inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t 
     auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
     mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
+    cc.jmp(jh.trap_entry);
 }
 template <typename ARCH>
 template <typename T, typename>
