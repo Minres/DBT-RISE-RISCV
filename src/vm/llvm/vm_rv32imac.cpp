@@ -4472,9 +4472,8 @@ private:
         uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"),
-                );
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.nop";
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5204,7 +5203,7 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)||nzuimm==0) {
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
             this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
@@ -5515,9 +5514,8 @@ private:
         uint64_t PC = pc.val;
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"),
-                );
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.ebreak";
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5535,10 +5533,9 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         this->gen_raise_trap(0, 3);
-        bb = this->leave_blk;
-        auto returnValue = std::make_tuple(TRAP,nullptr);
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
         
         this->gen_sync(POST_SYNC, 95);
         this->gen_instr_epilogue(bb);
@@ -5622,10 +5619,9 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        bb = this->leave_blk;
-        auto returnValue = std::make_tuple(TRAP,nullptr);
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
         
         this->gen_sync(POST_SYNC, 97);
         this->gen_instr_epilogue(bb);

@@ -484,7 +484,7 @@ RVA:
     size:   32
     branch:   false
     delay:   1
-RVC: 
+Zca: 
   C__ADDI4SPN:
     index: 68
     encoding: 0b0000000000000000
@@ -524,6 +524,7 @@ RVC:
     index: 73
     encoding: 0b0010000000000001
     mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
     size:   16
     branch:   true
     delay:   1
@@ -559,6 +560,7 @@ RVC:
     index: 78
     encoding: 0b1000000000000001
     mask: 0b1111110000000011
+    attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
     delay:   1
@@ -566,6 +568,7 @@ RVC:
     index: 79
     encoding: 0b1000010000000001
     mask: 0b1111110000000011
+    attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
     delay:   1
@@ -629,6 +632,7 @@ RVC:
     index: 88
     encoding: 0b0000000000000010
     mask: 0b1111000000000011
+    attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
     delay:   1
@@ -678,7 +682,6 @@ RVC:
     index: 95
     encoding: 0b1001000000000010
     mask: 0b1111111111111111
-    attributes: [[name:no_cont]]
     size:   16
     branch:   false
     delay:   1
@@ -693,7 +696,6 @@ RVC:
     index: 97
     encoding: 0b0000000000000000
     mask: 0b1111111111111111
-    attributes: [[name:no_cont]]
     size:   16
     branch:   false
     delay:   1

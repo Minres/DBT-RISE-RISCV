@@ -4315,9 +4315,8 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"),
-                );
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.nop";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -5039,7 +5038,7 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)||nzuimm==0){
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
@@ -5343,9 +5342,8 @@ private:
         if(this->disass_enabled){
             /* generate disass */
             
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"),
-                );
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.ebreak";
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -5366,9 +5364,8 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, 3);
-        auto returnValue = TRAP;
+        auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 95);
         gen_instr_epilogue(jh);
@@ -5451,9 +5448,8 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        auto returnValue = TRAP;
+        auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 97);
         gen_instr_epilogue(jh);

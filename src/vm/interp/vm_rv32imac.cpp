@@ -2511,9 +2511,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"),
-                            );
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "c.nop";
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value
@@ -2849,7 +2848,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                                    if(rs1 >= traits::RFS || nzuimm == 0) {
+                                    if(rs1 >= traits::RFS) {
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
@@ -3009,9 +3008,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::C__EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"),
-                            );
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "c.ebreak";
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers// calculate next pc value

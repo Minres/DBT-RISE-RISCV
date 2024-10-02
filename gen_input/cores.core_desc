@@ -18,7 +18,7 @@ Core RV32I provides RVI, Zicsr, Zifencei {
     }
 }
 
-Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC {
+Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
     architectural_state {
         XLEN=32;
         // definitions for the architecture wrapper
