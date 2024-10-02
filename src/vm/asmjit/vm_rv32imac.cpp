@@ -30,7 +30,7 @@
  *
  *******************************************************************************/
 // clang-format off
-#include <iss/arch/rv32i.h>
+#include <iss/arch/rv32imac.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
@@ -51,7 +51,7 @@ namespace iss {
 namespace asmjit {
 
 
-namespace rv32i {
+namespace rv32imac {
 using namespace ::asmjit;
 using namespace iss::arch;
 using namespace iss::debugger;
@@ -124,7 +124,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 49> instr_descr = {{
+    const std::array<instruction_descriptor, 98> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -224,6 +224,104 @@ private:
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
         /* instruction FENCE_I, encoding '0b00000000000000000001000000001111' */
         {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
+        /* instruction MUL, encoding '0b00000010000000000000000000110011' */
+        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
+        /* instruction MULH, encoding '0b00000010000000000001000000110011' */
+        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
+        /* instruction MULHSU, encoding '0b00000010000000000010000000110011' */
+        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
+        /* instruction MULHU, encoding '0b00000010000000000011000000110011' */
+        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
+        /* instruction DIV, encoding '0b00000010000000000100000000110011' */
+        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
+        /* instruction DIVU, encoding '0b00000010000000000101000000110011' */
+        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
+        /* instruction REM, encoding '0b00000010000000000110000000110011' */
+        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
+        /* instruction REMU, encoding '0b00000010000000000111000000110011' */
+        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
+        /* instruction LRW, encoding '0b00010000000000000010000000101111' */
+        {32, 0b00010000000000000010000000101111, 0b11111001111100000111000001111111, &this_class::__lrw},
+        /* instruction SCW, encoding '0b00011000000000000010000000101111' */
+        {32, 0b00011000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__scw},
+        /* instruction AMOSWAPW, encoding '0b00001000000000000010000000101111' */
+        {32, 0b00001000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoswapw},
+        /* instruction AMOADDW, encoding '0b00000000000000000010000000101111' */
+        {32, 0b00000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoaddw},
+        /* instruction AMOXORW, encoding '0b00100000000000000010000000101111' */
+        {32, 0b00100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoxorw},
+        /* instruction AMOANDW, encoding '0b01100000000000000010000000101111' */
+        {32, 0b01100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoandw},
+        /* instruction AMOORW, encoding '0b01000000000000000010000000101111' */
+        {32, 0b01000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amoorw},
+        /* instruction AMOMINW, encoding '0b10000000000000000010000000101111' */
+        {32, 0b10000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominw},
+        /* instruction AMOMAXW, encoding '0b10100000000000000010000000101111' */
+        {32, 0b10100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxw},
+        /* instruction AMOMINUW, encoding '0b11000000000000000010000000101111' */
+        {32, 0b11000000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amominuw},
+        /* instruction AMOMAXUW, encoding '0b11100000000000000010000000101111' */
+        {32, 0b11100000000000000010000000101111, 0b11111000000000000111000001111111, &this_class::__amomaxuw},
+        /* instruction C__ADDI4SPN, encoding '0b0000000000000000' */
+        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c__addi4spn},
+        /* instruction C__LW, encoding '0b0100000000000000' */
+        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c__lw},
+        /* instruction C__SW, encoding '0b1100000000000000' */
+        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c__sw},
+        /* instruction C__ADDI, encoding '0b0000000000000001' */
+        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c__addi},
+        /* instruction C__NOP, encoding '0b0000000000000001' */
+        {16, 0b0000000000000001, 0b1110111110000011, &this_class::__c__nop},
+        /* instruction C__JAL, encoding '0b0010000000000001' */
+        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c__jal},
+        /* instruction C__LI, encoding '0b0100000000000001' */
+        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c__li},
+        /* instruction C__LUI, encoding '0b0110000000000001' */
+        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c__lui},
+        /* instruction C__ADDI16SP, encoding '0b0110000100000001' */
+        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c__addi16sp},
+        /* instruction __reserved_clui, encoding '0b0110000000000001' */
+        {16, 0b0110000000000001, 0b1111000001111111, &this_class::____reserved_clui},
+        /* instruction C__SRLI, encoding '0b1000000000000001' */
+        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c__srli},
+        /* instruction C__SRAI, encoding '0b1000010000000001' */
+        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c__srai},
+        /* instruction C__ANDI, encoding '0b1000100000000001' */
+        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c__andi},
+        /* instruction C__SUB, encoding '0b1000110000000001' */
+        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c__sub},
+        /* instruction C__XOR, encoding '0b1000110000100001' */
+        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c__xor},
+        /* instruction C__OR, encoding '0b1000110001000001' */
+        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c__or},
+        /* instruction C__AND, encoding '0b1000110001100001' */
+        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c__and},
+        /* instruction C__J, encoding '0b1010000000000001' */
+        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c__j},
+        /* instruction C__BEQZ, encoding '0b1100000000000001' */
+        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c__beqz},
+        /* instruction C__BNEZ, encoding '0b1110000000000001' */
+        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c__bnez},
+        /* instruction C__SLLI, encoding '0b0000000000000010' */
+        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c__slli},
+        /* instruction C__LWSP, encoding '0b0100000000000010' */
+        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c__lwsp},
+        /* instruction C__MV, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c__mv},
+        /* instruction C__JR, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c__jr},
+        /* instruction __reserved_cmv, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111111111111111, &this_class::____reserved_cmv},
+        /* instruction C__ADD, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c__add},
+        /* instruction C__JALR, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c__jalr},
+        /* instruction C__EBREAK, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c__ebreak},
+        /* instruction C__SWSP, encoding '0b1100000000000010' */
+        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c__swsp},
+        /* instruction DII, encoding '0b0000000000000000' */
+        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
     }};
 
     //needs to be declared after instr_descr
@@ -1345,19 +1443,19 @@ private:
         }
         else{
             if(rd!=0){
-                auto label_then11 = cc.newLabel();
-                auto label_merge11 = cc.newLabel();
-                auto tmp_reg11 = get_reg(cc, 8, false);
+                auto label_then21 = cc.newLabel();
+                auto label_merge21 = cc.newLabel();
+                auto tmp_reg21 = get_reg(cc, 8, false);
                 cmp(cc, gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs1), 32, true), (int16_t)sext<12>(imm));
-                cc.jl(label_then11);
-                mov(cc, tmp_reg11,0);
-                cc.jmp(label_merge11);
-                cc.bind(label_then11);
-                mov(cc, tmp_reg11, 1);
-                cc.bind(label_merge11);
+                cc.jl(label_then21);
+                mov(cc, tmp_reg21,0);
+                cc.jmp(label_merge21);
+                cc.bind(label_then21);
+                mov(cc, tmp_reg21, 1);
+                cc.bind(label_merge21);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg11
+                      gen_ext(cc, tmp_reg21
                       , 32, false)
                 );
             }
@@ -1406,18 +1504,18 @@ private:
         }
         else{
             if(rd!=0){
-                auto label_then12 = cc.newLabel();
-                auto label_merge12 = cc.newLabel();
-                auto tmp_reg12 = get_reg(cc, 8, false);
+                auto label_then22 = cc.newLabel();
+                auto label_merge22 = cc.newLabel();
+                auto tmp_reg22 = get_reg(cc, 8, false);
                 cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)));
-                cc.jb(label_then12);
-                mov(cc, tmp_reg12,0);
-                cc.jmp(label_merge12);
-                cc.bind(label_then12);
-                mov(cc, tmp_reg12, 1);
-                cc.bind(label_merge12);
+                cc.jb(label_then22);
+                mov(cc, tmp_reg22,0);
+                cc.jmp(label_merge22);
+                cc.bind(label_then22);
+                mov(cc, tmp_reg22, 1);
+                cc.bind(label_merge22);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg12
+                      gen_ext(cc, tmp_reg22
                       , 32, false)
                 );
             }
@@ -1912,20 +2010,20 @@ private:
         }
         else{
             if(rd!=0){
-                auto label_then13 = cc.newLabel();
-                auto label_merge13 = cc.newLabel();
-                auto tmp_reg13 = get_reg(cc, 8, false);
+                auto label_then23 = cc.newLabel();
+                auto label_merge23 = cc.newLabel();
+                auto tmp_reg23 = get_reg(cc, 8, false);
                 cmp(cc, gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs2), 32, true));
-                cc.jl(label_then13);
-                mov(cc, tmp_reg13,0);
-                cc.jmp(label_merge13);
-                cc.bind(label_then13);
-                mov(cc, tmp_reg13, 1);
-                cc.bind(label_merge13);
+                cc.jl(label_then23);
+                mov(cc, tmp_reg23,0);
+                cc.jmp(label_merge23);
+                cc.bind(label_then23);
+                mov(cc, tmp_reg23, 1);
+                cc.bind(label_merge23);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg13
+                      gen_ext(cc, tmp_reg23
                       , 32, false)
                 );
             }
@@ -1974,18 +2072,18 @@ private:
         }
         else{
             if(rd!=0){
-                auto label_then14 = cc.newLabel();
-                auto label_merge14 = cc.newLabel();
-                auto tmp_reg14 = get_reg(cc, 8, false);
+                auto label_then24 = cc.newLabel();
+                auto label_merge24 = cc.newLabel();
+                auto tmp_reg24 = get_reg(cc, 8, false);
                 cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2));
-                cc.jb(label_then14);
-                mov(cc, tmp_reg14,0);
-                cc.jmp(label_merge14);
-                cc.bind(label_then14);
-                mov(cc, tmp_reg14, 1);
-                cc.bind(label_merge14);
+                cc.jb(label_then24);
+                mov(cc, tmp_reg24,0);
+                cc.jmp(label_merge24);
+                cc.bind(label_then24);
+                mov(cc, tmp_reg24, 1);
+                cc.bind(label_merge24);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg14
+                      gen_ext(cc, tmp_reg24
                       , 32, false)
                 );
             }
@@ -2427,10 +2525,10 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_wait_15;
+        InvokeNode* call_wait_25;
         jh.cc.comment("//call_wait");
-        jh.cc.invoke(&call_wait_15, &wait, FuncSignature::build<void, int32_t>());
-        setArg(call_wait_15, 0, 1);
+        jh.cc.invoke(&call_wait_25, &wait, FuncSignature::build<void, int32_t>());
+        setArg(call_wait_25, 0, 1);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 41);
@@ -2796,6 +2894,2572 @@ private:
     	return returnValue;        
     }
     
+    /* instruction 49: MUL */
+    continuation_e __mul(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mul"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("MUL_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 49);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto res = gen_operation(cc, smul, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 49);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 50: MULH */
+    continuation_e __mulh(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulh"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("MULH_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 50);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto res = gen_operation(cc, smul, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
+                          ), 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 50);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 51: MULHSU */
+    continuation_e __mulhsu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhsu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("MULHSU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 51);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto res = gen_operation(cc, sumul, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), load_reg_from_mem(jh, traits::X0 + rs2))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
+                          ), 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 51);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 52: MULHU */
+    continuation_e __mulhu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("MULHU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 52);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto res = gen_operation(cc, umul, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_operation(cc, shr, res, static_cast<uint32_t>(traits::XLEN))
+                          ), 32, false));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 52);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 53: DIV */
+    continuation_e __div(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "div"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("DIV_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 53);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto dividend = gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs1), 32, true);
+            auto divisor = gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, true);
+            if(rd!=0){
+                {
+                auto label_merge = cc.newLabel();
+                cmp(cc, gen_operation(cc, ne, divisor, 0)
+                ,0);
+                auto label_else = cc.newLabel();
+                cc.je(label_else);
+                {
+                    auto MMIN = ((uint32_t)1)<<(static_cast<uint32_t>(traits::XLEN)-1);
+                    {
+                    auto label_merge = cc.newLabel();
+                    cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
+                    , gen_operation(cc, eq, divisor, - 1)
+                    )
+                    ,0);
+                    auto label_else = cc.newLabel();
+                    cc.je(label_else);
+                    {
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              MMIN);
+                    }
+                    cc.jmp(label_merge);
+                    cc.bind(label_else);
+                        {
+                            mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                                  gen_ext(cc, 
+                                      (gen_operation(cc, sdiv, dividend, divisor)
+                                      ), 32, true));
+                        }
+                    cc.bind(label_merge);
+                    }
+                }
+                cc.jmp(label_merge);
+                cc.bind(label_else);
+                    {
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              (uint32_t)- 1);
+                    }
+                cc.bind(label_merge);
+                }
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 53);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 54: DIVU */
+    continuation_e __divu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "divu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("DIVU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 54);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            {
+            auto label_merge = cc.newLabel();
+            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
+            ,0);
+            auto label_else = cc.newLabel();
+            cc.je(label_else);
+            {
+                if(rd!=0){
+                    mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                          gen_operation(cc, udiv, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
+                          );
+                }
+            }
+            cc.jmp(label_merge);
+            cc.bind(label_else);
+                {
+                    if(rd!=0){
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              (uint32_t)- 1);
+                    }
+                }
+            cc.bind(label_merge);
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 54);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 55: REM */
+    continuation_e __rem(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "rem"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("REM_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 55);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            {
+            auto label_merge = cc.newLabel();
+            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
+            ,0);
+            auto label_else = cc.newLabel();
+            cc.je(label_else);
+            {
+                auto MMIN = (uint32_t)1<<(static_cast<uint32_t>(traits::XLEN)-1);
+                {
+                auto label_merge = cc.newLabel();
+                cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
+                , gen_operation(cc, eq, gen_ext(cc, 
+                    load_reg_from_mem(jh, traits::X0 + rs2), 32, false), - 1)
+                )
+                ,0);
+                auto label_else = cc.newLabel();
+                cc.je(label_else);
+                {
+                    if(rd!=0){
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              gen_ext(cc, 0, 32, false)
+                        );
+                    }
+                }
+                cc.jmp(label_merge);
+                cc.bind(label_else);
+                    {
+                        if(rd!=0){
+                            mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                                  gen_ext(cc, 
+                                      (gen_operation(cc, srem, gen_ext(cc, 
+                                          load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
+                                          load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
+                                      ), 32, false));
+                        }
+                    }
+                cc.bind(label_merge);
+                }
+            }
+            cc.jmp(label_merge);
+            cc.bind(label_else);
+                {
+                    if(rd!=0){
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              load_reg_from_mem(jh, traits::X0 + rs1));
+                    }
+                }
+            cc.bind(label_merge);
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 55);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 56: REMU */
+    continuation_e __remu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "remu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("REMU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 56);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            {
+            auto label_merge = cc.newLabel();
+            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
+            ,0);
+            auto label_else = cc.newLabel();
+            cc.je(label_else);
+            {
+                if(rd!=0){
+                    mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                          gen_operation(cc, urem, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
+                          );
+                }
+            }
+            cc.jmp(label_merge);
+            cc.bind(label_else);
+                {
+                    if(rd!=0){
+                        mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                              load_reg_from_mem(jh, traits::X0 + rs1));
+                    }
+                }
+            cc.bind(label_merge);
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 56);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 57: LRW */
+    continuation_e __lrw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {aq}, {rl}", fmt::arg("mnemonic", "lrw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("aq", name(aq)), fmt::arg("rl", name(rl)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("LRW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 57);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rd!=0){
+                auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_ext(cc, 
+                              gen_read_mem(jh, traits::MEM, offs, 4), 32, false)), 32, true));
+                gen_write_mem(jh, traits::RES, offs, (uint8_t)- 1, 1);
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 57);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 58: SCW */
+    continuation_e __scw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {aq}, {rl}", fmt::arg("mnemonic", "scw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", name(aq)), fmt::arg("rl", name(rl)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("SCW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 58);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::RES, offs, 1);
+            {
+            auto label_merge = cc.newLabel();
+            cmp(cc, gen_operation(cc, ne, res1, 0)
+            ,0);
+            cc.je(label_merge);
+            {
+                gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+                    load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+            }
+            cc.bind(label_merge);
+            }
+            if(rd!=0){
+                auto label_then26 = cc.newLabel();
+                auto label_merge26 = cc.newLabel();
+                auto tmp_reg26 = get_reg(cc, 8, false);
+                cmp(cc, res1, 0);
+                cc.jne(label_then26);
+                mov(cc, tmp_reg26,1);
+                cc.jmp(label_merge26);
+                cc.bind(label_then26);
+                mov(cc, tmp_reg26, 0);
+                cc.bind(label_merge26);
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, tmp_reg26
+                      , 32, false)
+                );
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 58);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 59: AMOSWAPW */
+    continuation_e __amoswapw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoswapw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOSWAPW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 59);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res = load_reg_from_mem(jh, traits::X0 + rs2);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_ext(cc, 
+                              gen_read_mem(jh, traits::MEM, offs, 4), 32, false)), 32, true));
+            }
+            gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+                res, 32, false), 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 59);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 60: AMOADDW */
+    continuation_e __amoaddw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoaddw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOADDW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 60);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_ext(cc, 
+                gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
+            auto res2 = gen_operation(cc, add, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res1, 32, true));
+            }
+            gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+                res2, 32, true), 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 60);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 61: AMOXORW */
+    continuation_e __amoxorw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoxorw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOXORW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 61);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
+            auto res2 = gen_operation(cc, bxor, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  res1, 32, true), 32, true), 32, false));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 61);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 62: AMOANDW */
+    continuation_e __amoandw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoandw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOANDW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 62);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
+            auto res2 = gen_operation(cc, band, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  res1, 32, true), 32, true), 32, false));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 62);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 63: AMOORW */
+    continuation_e __amoorw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amoorw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOORW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 63);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
+            auto res2 = gen_operation(cc, bor, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  res1, 32, true), 32, true), 32, false));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 63);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 64: AMOMINW */
+    continuation_e __amominw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOMINW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 64);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_ext(cc, 
+                gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
+            auto label_then27 = cc.newLabel();
+            auto label_merge27 = cc.newLabel();
+            auto tmp_reg27 = get_reg(cc, 32, false);
+            cmp(cc, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.jg(label_then27);
+            mov(cc, tmp_reg27,gen_ext(cc, 
+                res1, 32, false));
+            cc.jmp(label_merge27);
+            cc.bind(label_then27);
+            mov(cc, tmp_reg27, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge27);
+            auto res2 = tmp_reg27
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res1, 32, true));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 64);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 65: AMOMAXW */
+    continuation_e __amomaxw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOMAXW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 65);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_ext(cc, 
+                gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
+            auto label_then28 = cc.newLabel();
+            auto label_merge28 = cc.newLabel();
+            auto tmp_reg28 = get_reg(cc, 32, false);
+            cmp(cc, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.jl(label_then28);
+            mov(cc, tmp_reg28,gen_ext(cc, 
+                res1, 32, false));
+            cc.jmp(label_merge28);
+            cc.bind(label_then28);
+            mov(cc, tmp_reg28, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge28);
+            auto res2 = tmp_reg28
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res1, 32, true));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 65);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 66: AMOMINUW */
+    continuation_e __amominuw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amominuw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOMINUW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 66);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
+            auto label_then29 = cc.newLabel();
+            auto label_merge29 = cc.newLabel();
+            auto tmp_reg29 = get_reg(cc, 32, false);
+            cmp(cc, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.ja(label_then29);
+            mov(cc, tmp_reg29,res1);
+            cc.jmp(label_merge29);
+            cc.bind(label_then29);
+            mov(cc, tmp_reg29, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge29);
+            auto res2 = tmp_reg29
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  res1, 32, true), 32, true), 32, false));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 66);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 67: AMOMAXUW */
+    continuation_e __amomaxuw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rl = ((bit_sub<25,1>(instr)));
+        uint8_t aq = ((bit_sub<26,1>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2} (aqu = {aq},rel = {rl})", fmt::arg("mnemonic", "amomaxuw"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)), fmt::arg("aq", aq), fmt::arg("rl", rl));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("AMOMAXUW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 67);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
+            auto label_then30 = cc.newLabel();
+            auto label_merge30 = cc.newLabel();
+            auto tmp_reg30 = get_reg(cc, 32, false);
+            cmp(cc, res1, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.jb(label_then30);
+            mov(cc, tmp_reg30,res1);
+            cc.jmp(label_merge30);
+            cc.bind(label_then30);
+            mov(cc, tmp_reg30, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge30);
+            auto res2 = tmp_reg30
+            ;
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  res1, 32, true), 32, true), 32, false));
+            }
+            gen_write_mem(jh, traits::MEM, offs, res2, 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 67);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 68: C__ADDI4SPN */
+    continuation_e __c__addi4spn(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__ADDI4SPN_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 68);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(imm){
+            mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+                  gen_ext(cc, 
+                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), imm)
+                      ), 32, false));
+        }
+        else{
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 68);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 69: C__LW */
+    continuation_e __c__lw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__LW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 69);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        auto offs = gen_ext(cc, 
+            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
+            ), 32, false);
+        mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+              gen_ext(cc, 
+                  gen_ext(cc, 
+                      gen_read_mem(jh, traits::MEM, offs, 4), 32, false), 32, true));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 69);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 70: C__SW */
+    continuation_e __c__sw(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
+                fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SW_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 70);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        auto offs = gen_ext(cc, 
+            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
+            ), 32, false);
+        gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+            load_reg_from_mem(jh, traits::X0 + rs2+8), 32, false), 4);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 70);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 71: C__ADDI */
+    continuation_e __c__addi(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__ADDI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 71);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rs1!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rs1),
+                      gen_ext(cc, 
+                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int8_t)sext<6>(imm))
+                          ), 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 71);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 72: C__NOP */
+    continuation_e __c__nop(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"),
+                );
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__NOP_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 72);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 72);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 73: C__JAL */
+    continuation_e __c__jal(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
+                fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__JAL_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 73);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::X0+ 1),
+              (uint32_t)(PC+2));
+        auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
+        mov(cc, jh.next_pc, PC_val_v);
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 73);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 74: C__LI */
+    continuation_e __c__li(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__LI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 74);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      (uint32_t)((int8_t)sext<6>(imm)));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 74);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 75: C__LUI */
+    continuation_e __c__lui(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint32_t imm = ((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__LUI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 75);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(imm==0||rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        if(rd!=0){
+            mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                  (uint32_t)((int32_t)sext<18>(imm)));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 75);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 76: C__ADDI16SP */
+    continuation_e __c__addi16sp(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint16_t nzimm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {nzimm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
+                fmt::arg("nzimm", nzimm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__ADDI16SP_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 76);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(nzimm){
+            mov(cc, get_ptr_for(jh, traits::X0+ 2),
+                  gen_ext(cc, 
+                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), (int16_t)sext<10>(nzimm))
+                      ), 32, true));
+        }
+        else{
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 76);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 77: __reserved_clui */
+    continuation_e ____reserved_clui(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            //No disass specified, using instruction name
+            std::string mnemonic = ".reserved_clui";
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("__reserved_clui_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 77);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 77);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 78: C__SRLI */
+    continuation_e __c__srli(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SRLI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 78);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
+              gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1+8), shamt)
+              );
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 78);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 79: C__SRAI */
+    continuation_e __c__srai(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SRAI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 79);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(shamt){
+            mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
+                  gen_ext(cc, 
+                      (gen_operation(cc, sar, (gen_ext(cc, 
+                          load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), shamt)
+                      ), 32, true));
+        }
+        else{
+            if(static_cast<uint32_t>(traits::XLEN)==128){
+                mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
+                      gen_ext(cc, 
+                          (gen_operation(cc, sar, (gen_ext(cc, 
+                              load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), 64)
+                          ), 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 79);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 80: C__ANDI */
+    continuation_e __c__andi(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__ANDI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 80);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
+              gen_ext(cc, 
+                  (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1+8), (int8_t)sext<6>(imm))
+                  ), 32, true));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 80);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 81: C__SUB */
+    continuation_e __c__sub(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SUB_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 81);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+              gen_ext(cc, 
+                  (gen_operation(cc, sub, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
+                  ), 32, true));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 81);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 82: C__XOR */
+    continuation_e __c__xor(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__XOR_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 82);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+              gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
+              );
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 82);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 83: C__OR */
+    continuation_e __c__or(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__OR_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 83);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+              gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
+              );
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 83);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 84: C__AND */
+    continuation_e __c__and(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__AND_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 84);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
+              gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
+              );
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 84);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 85: C__J */
+    continuation_e __c__j(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
+                fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__J_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 85);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
+        mov(cc, jh.next_pc, PC_val_v);
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 85);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 86: C__BEQZ */
+    continuation_e __c__beqz(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__BEQZ_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 86);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        {
+        auto label_merge = cc.newLabel();
+        cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
+        ,0);
+        cc.je(label_merge);
+        {
+            auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
+            mov(cc, jh.next_pc, PC_val_v);
+            mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
+        }
+        cc.bind(label_merge);
+        }
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 86);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 87: C__BNEZ */
+    continuation_e __c__bnez(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__BNEZ_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 87);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        {
+        auto label_merge = cc.newLabel();
+        cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
+        ,0);
+        cc.je(label_merge);
+        {
+            auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
+            mov(cc, jh.next_pc, PC_val_v);
+            mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
+        }
+        cc.bind(label_merge);
+        }
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 87);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 88: C__SLLI */
+    continuation_e __c__slli(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t nzuimm = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.slli"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("nzuimm", nzuimm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SLLI_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 88);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)||nzuimm==0){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rs1!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rs1),
+                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), nzuimm)
+                      );
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 88);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 89: C__LWSP */
+    continuation_e __c__lwsp(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__LWSP_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 89);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = gen_ext(cc, 
+                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
+                ), 32, false);
+            mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                  gen_ext(cc, 
+                      gen_ext(cc, 
+                          gen_read_mem(jh, traits::MEM, offs, 4), 32, false), 32, true));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 89);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 90: C__MV */
+    continuation_e __c__mv(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__MV_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 90);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      load_reg_from_mem(jh, traits::X0 + rs2));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 90);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 91: C__JR */
+    continuation_e __c__jr(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
+                fmt::arg("rs1", name(rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__JR_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 91);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        if(rs1&&rs1<static_cast<uint32_t>(traits::RFS)){
+            auto addr_mask = (uint32_t)- 2;
+            auto PC_val_v = gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1%static_cast<uint32_t>(traits::RFS)), addr_mask)
+            ;
+            mov(cc, jh.next_pc, PC_val_v);
+            mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
+        }
+        else{
+            gen_raise(jh, 0, 2);
+        }
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 91);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 92: __reserved_cmv */
+    continuation_e ____reserved_cmv(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            //No disass specified, using instruction name
+            std::string mnemonic = ".reserved_cmv";
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("__reserved_cmv_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 92);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        gen_raise(jh, 0, 2);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 92);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 93: C__ADD */
+    continuation_e __c__add(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__ADD_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 93);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rd), load_reg_from_mem(jh, traits::X0 + rs2))
+                          ), 32, false));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 93);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 94: C__JALR */
+    continuation_e __c__jalr(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
+                fmt::arg("rs1", name(rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__JALR_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 94);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto addr_mask = (uint32_t)- 2;
+            auto new_pc = load_reg_from_mem(jh, traits::X0 + rs1);
+            mov(cc, get_ptr_for(jh, traits::X0+ 1),
+                  (uint32_t)(PC+2));
+            auto PC_val_v = gen_operation(cc, band, new_pc, addr_mask)
+            ;
+            mov(cc, jh.next_pc, PC_val_v);
+            mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
+        }
+        auto returnValue = BRANCH;
+        
+        gen_sync(jh, POST_SYNC, 94);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 95: C__EBREAK */
+    continuation_e __c__ebreak(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"),
+                );
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__EBREAK_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 95);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        gen_raise(jh, 0, 3);
+        auto returnValue = TRAP;
+        
+        gen_sync(jh, POST_SYNC, 95);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 96: C__SWSP */
+    continuation_e __c__swsp(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
+                fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("C__SWSP_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 96);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        if(rs2>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            auto offs = gen_ext(cc, 
+                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
+                ), 32, false);
+            gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+                load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 96);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 97: DII */
+    continuation_e __dii(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            //No disass specified, using instruction name
+            std::string mnemonic = "dii";
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("DII_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 97);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+2;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        cc.comment("//behavior:");
+        /*generate behavior*/
+        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        auto returnValue = TRAP;
+        
+        gen_sync(jh, POST_SYNC, 97);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
@@ -2951,8 +5615,8 @@ void vm_impl<ARCH>::gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) {
 } // namespace tgc5c
 
 template <>
-std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short port, bool dump) {
-    auto ret = new rv32i::vm_impl<arch::rv32i>(*core, dump);
+std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned short port, bool dump) {
+    auto ret = new rv32imac::vm_impl<arch::rv32imac>(*core, dump);
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
@@ -2965,22 +5629,22 @@ std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short por
 namespace iss {
 namespace {
 volatile std::array<bool, 2> dummy = {
-        core_factory::instance().register_creator("rv32i|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
-            auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32i>();
-		    auto vm = new asmjit::rv32i::vm_impl<arch::rv32i>(*cpu, false);
+        core_factory::instance().register_creator("rv32imac|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32imac>();
+		    auto vm = new asmjit::rv32imac::vm_impl<arch::rv32imac>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32i>::reg_t>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32imac>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("rv32i|mu_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
-            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv32i>();
-		    auto vm = new asmjit::rv32i::vm_impl<arch::rv32i>(*cpu, false);
+        core_factory::instance().register_creator("rv32imac|mu_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv32imac>();
+		    auto vm = new asmjit::rv32imac::vm_impl<arch::rv32imac>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32i>::reg_t>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32imac>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};

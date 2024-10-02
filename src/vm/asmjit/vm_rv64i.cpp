@@ -111,7 +111,7 @@ protected:
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    } 
+    }
 
 private:
     /****************************************************************************
@@ -252,7 +252,7 @@ private:
 
     //needs to be declared after instr_descr
     decoder instr_decoder;
- 
+
     /* instruction definitions */
     /* instruction 0: LUI */
     continuation_e __lui(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
@@ -1377,23 +1377,21 @@ private:
         }
         else{
             if(rd!=0){
-                {
-                auto label_then = cc.newLabel();
-                auto label_merge = cc.newLabel();
-                auto tmp_reg = get_reg_for(cc, 1);
+                auto label_then11 = cc.newLabel();
+                auto label_merge11 = cc.newLabel();
+                auto tmp_reg11 = get_reg(cc, 8, false);
                 cmp(cc, gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs1), 64, true), (int16_t)sext<12>(imm));
-                cc.jl(label_then);
-                mov(cc, tmp_reg,0);
-                cc.jmp(label_merge);
-                cc.bind(label_then);
-                mov(cc, tmp_reg,1);
-                cc.bind(label_merge);
+                cc.jl(label_then11);
+                mov(cc, tmp_reg11,0);
+                cc.jmp(label_merge11);
+                cc.bind(label_then11);
+                mov(cc, tmp_reg11, 1);
+                cc.bind(label_merge11);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg
+                      gen_ext(cc, tmp_reg11
                       , 64, false)
                 );
-                }
             }
         }
         auto returnValue = CONT;
@@ -1440,22 +1438,20 @@ private:
         }
         else{
             if(rd!=0){
-                {
-                auto label_then = cc.newLabel();
-                auto label_merge = cc.newLabel();
-                auto tmp_reg = get_reg_for(cc, 1);
+                auto label_then12 = cc.newLabel();
+                auto label_merge12 = cc.newLabel();
+                auto tmp_reg12 = get_reg(cc, 8, false);
                 cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), (uint64_t)((int16_t)sext<12>(imm)));
-                cc.jb(label_then);
-                mov(cc, tmp_reg,0);
-                cc.jmp(label_merge);
-                cc.bind(label_then);
-                mov(cc, tmp_reg,1);
-                cc.bind(label_merge);
+                cc.jb(label_then12);
+                mov(cc, tmp_reg12,0);
+                cc.jmp(label_merge12);
+                cc.bind(label_then12);
+                mov(cc, tmp_reg12, 1);
+                cc.bind(label_merge12);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg
+                      gen_ext(cc, tmp_reg12
                       , 64, false)
                 );
-                }
             }
         }
         auto returnValue = CONT;
@@ -1948,24 +1944,22 @@ private:
         }
         else{
             if(rd!=0){
-                {
-                auto label_then = cc.newLabel();
-                auto label_merge = cc.newLabel();
-                auto tmp_reg = get_reg_for(cc, 1);
+                auto label_then13 = cc.newLabel();
+                auto label_merge13 = cc.newLabel();
+                auto tmp_reg13 = get_reg(cc, 8, false);
                 cmp(cc, gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs1), 64, true), gen_ext(cc, 
                     load_reg_from_mem(jh, traits::X0 + rs2), 64, true));
-                cc.jl(label_then);
-                mov(cc, tmp_reg,0);
-                cc.jmp(label_merge);
-                cc.bind(label_then);
-                mov(cc, tmp_reg,1);
-                cc.bind(label_merge);
+                cc.jl(label_then13);
+                mov(cc, tmp_reg13,0);
+                cc.jmp(label_merge13);
+                cc.bind(label_then13);
+                mov(cc, tmp_reg13, 1);
+                cc.bind(label_merge13);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg
+                      gen_ext(cc, tmp_reg13
                       , 64, false)
                 );
-                }
             }
         }
         auto returnValue = CONT;
@@ -2012,22 +2006,20 @@ private:
         }
         else{
             if(rd!=0){
-                {
-                auto label_then = cc.newLabel();
-                auto label_merge = cc.newLabel();
-                auto tmp_reg = get_reg_for(cc, 1);
+                auto label_then14 = cc.newLabel();
+                auto label_merge14 = cc.newLabel();
+                auto tmp_reg14 = get_reg(cc, 8, false);
                 cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2));
-                cc.jb(label_then);
-                mov(cc, tmp_reg,0);
-                cc.jmp(label_merge);
-                cc.bind(label_then);
-                mov(cc, tmp_reg,1);
-                cc.bind(label_merge);
+                cc.jb(label_then14);
+                mov(cc, tmp_reg14,0);
+                cc.jmp(label_merge14);
+                cc.bind(label_then14);
+                mov(cc, tmp_reg14, 1);
+                cc.bind(label_merge14);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg
+                      gen_ext(cc, tmp_reg14
                       , 64, false)
                 );
-                }
             }
         }
         auto returnValue = CONT;
@@ -2467,10 +2459,10 @@ private:
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_wait;
+        InvokeNode* call_wait_15;
         jh.cc.comment("//call_wait");
-        jh.cc.invoke(&call_wait, &wait, FuncSignature::build<void, int32_t>());
-        setArg(call_wait, 0, 1);
+        jh.cc.invoke(&call_wait_15, &wait, FuncSignature::build<void, int32_t>());
+        setArg(call_wait_15, 0, 1);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 41);
@@ -3517,7 +3509,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
         for (uint32_t i = 0; i < instr_descr.size(); ++i) {
             generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
             g_instr_descr.push_back(new_instr_descr);
-    }
+        }
         return std::move(g_instr_descr);
     }()) {}
 
@@ -3609,6 +3601,7 @@ inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t 
     auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
     mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
+    cc.jmp(jh.trap_entry);
 }
 template <typename ARCH>
 template <typename T, typename>
