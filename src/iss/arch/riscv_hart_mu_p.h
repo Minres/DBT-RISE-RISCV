@@ -304,8 +304,8 @@ public:
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
     void disass_output(uint64_t pc, const std::string instr) override {
-        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}({})]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                            this->reg.cycle + cycle_offset, this->reg.cycle);
+        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
+                                            this->reg.cycle + cycle_offset);
     };
 
     iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
@@ -348,7 +348,7 @@ protected:
 
         unsigned get_reg_size(unsigned num) override { return traits<BASE>::reg_bit_widths[num]; }
 
-        std::unordered_map<std::string, uint64_t> get_symbol_table(std::string name) override { return arch.get_sym_table(name); }
+        std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
         riscv_hart_mu_p<BASE, FEAT, LOGCAT>& arch;
     };
@@ -370,8 +370,6 @@ protected:
     int64_t instret_offset{0};
     uint64_t minstret_csr{0};
     reg_t fault_data;
-    uint64_t tohost = tohost_dflt;
-    uint64_t fromhost = fromhost_dflt;
     bool tohost_lower_written = false;
     riscv_instrumentation_if instr_if;
 
@@ -651,71 +649,14 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p(feature_config cfg)
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT, LOGCAT>::load_file(std::string name, int type) {
-    FILE* fp = fopen(name.c_str(), "r");
-    if(fp) {
-        std::array<char, 5> buf;
-        auto n = fread(buf.data(), 1, 4, fp);
-        fclose(fp);
-        if(n != 4)
-            throw std::runtime_error("input file has insufficient size");
-        buf[4] = 0;
-        if(strcmp(buf.data() + 1, "ELF") == 0) {
-            // Create elfio reader
-            ELFIO::elfio reader;
-            // Load ELF data
-            if(!reader.load(name))
-                throw std::runtime_error("could not process elf file");
-            // check elf properties
-            if(reader.get_class() != ELFIO::ELFCLASS32)
-                if(sizeof(reg_t) == 4)
-                    throw std::runtime_error("wrong elf class in file");
-            if(reader.get_type() != ELFIO::ET_EXEC)
-                throw std::runtime_error("wrong elf type in file");
-            if(reader.get_machine() != ELFIO::EM_RISCV)
-                throw std::runtime_error("wrong elf machine in file");
-            auto entry = reader.get_entry();
-            for(const auto& pseg : reader.segments) {
-                const auto fsize = pseg->get_file_size(); // 0x42c/0x0
-                const auto seg_data = pseg->get_data();
-                const auto type = pseg->get_type();
-                if(type == 1 && fsize > 0) {
-                    auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
-                                           pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
-                    if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
-                }
-            }
-            for(const auto& sec : reader.sections) {
-                if(sec->get_name() == ".symtab") {
-                    if(ELFIO::SHT_SYMTAB == sec->get_type() || ELFIO::SHT_DYNSYM == sec->get_type()) {
-                        ELFIO::symbol_section_accessor symbols(reader, sec.get());
-                        auto sym_no = symbols.get_symbols_num();
-                        std::string name;
-                        ELFIO::Elf64_Addr value = 0;
-                        ELFIO::Elf_Xword size = 0;
-                        unsigned char bind = 0;
-                        unsigned char type = 0;
-                        ELFIO::Elf_Half section = 0;
-                        unsigned char other = 0;
-                        for(auto i = 0U; i < sym_no; ++i) {
-                            symbols.get_symbol(i, name, value, size, bind, type, section, other);
-                            if(name == "tohost") {
-                                tohost = value;
-                            } else if(name == "fromhost") {
-                                fromhost = value;
-                            }
-                        }
-                    }
-                } else if(sec->get_name() == ".tohost") {
-                    tohost = sec->get_address();
-                    fromhost = tohost + 0x40;
-                }
-            }
-            return std::make_pair(entry, true);
-        }
-        throw std::runtime_error(fmt::format("memory load file {} is not a valid elf file", name));
+    if(read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64,
+                     [this](uint64_t addr, uint64_t size, const uint8_t* const data) -> iss::status {
+                         return this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM, addr, size,
+                                            data);
+                     })) {
+        return std::make_pair(entry_address, true);
     }
-    throw std::runtime_error(fmt::format("memory load file not found, check if {} is a valid file", name));
+    return std::make_pair(entry_address, false);
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>

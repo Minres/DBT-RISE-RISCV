@@ -35,6 +35,7 @@
 #ifndef _RISCV_HART_COMMON
 #define _RISCV_HART_COMMON
 
+#include "iss/vm_types.h"
 #include <cstdint>
 #include <elfio/elfio.hpp>
 #include <fmt/format.h>
@@ -314,55 +315,67 @@ struct riscv_hart_common {
     riscv_hart_common(){};
     ~riscv_hart_common(){};
     std::unordered_map<std::string, uint64_t> symbol_table;
+    uint64_t entry_address{0};
+    uint64_t tohost = tohost_dflt;
+    uint64_t fromhost = fromhost_dflt;
 
-    std::unordered_map<std::string, uint64_t> get_sym_table(std::string name) {
-        if(!symbol_table.empty())
-            return symbol_table;
-        FILE* fp = fopen(name.c_str(), "r");
-        if(fp) {
-            std::array<char, 5> buf;
-            auto n = fread(buf.data(), 1, 4, fp);
-            fclose(fp);
-            if(n != 4)
-                throw std::runtime_error("input file has insufficient size");
-            buf[4] = 0;
-            if(strcmp(buf.data() + 1, "ELF") == 0) {
-                // Create elfio reader
-                ELFIO::elfio reader;
-                // Load ELF data
-                if(!reader.load(name))
-                    throw std::runtime_error("could not process elf file");
-                // check elf properties
-                if(reader.get_type() != ELFIO::ET_EXEC)
-                    throw std::runtime_error("wrong elf type in file");
-                if(reader.get_machine() != ELFIO::EM_RISCV)
-                    throw std::runtime_error("wrong elf machine in file");
-                const auto sym_sec = reader.sections[".symtab"];
-                if(ELFIO::SHT_SYMTAB == sym_sec->get_type() || ELFIO::SHT_DYNSYM == sym_sec->get_type()) {
-                    ELFIO::symbol_section_accessor symbols(reader, sym_sec);
-                    auto sym_no = symbols.get_symbols_num();
-                    std::string name;
-                    ELFIO::Elf64_Addr value = 0;
-                    ELFIO::Elf_Xword size = 0;
-                    unsigned char bind = 0;
-                    unsigned char type = 0;
-                    ELFIO::Elf_Half section = 0;
-                    unsigned char other = 0;
-                    for(auto i = 0U; i < sym_no; ++i) {
-                        symbols.get_symbol(i, name, value, size, bind, type, section, other);
-                        if(name != "") {
-                            this->symbol_table[name] = value;
+    bool read_elf_file(std::string name, uint8_t expected_elf_class,
+                       std::function<iss::status(uint64_t, uint64_t, const uint8_t* const)> cb) {
+        // Create elfio reader
+        ELFIO::elfio reader;
+        // Load ELF data
+        if(reader.load(name)) {
+            // check elf properties
+            if(reader.get_class() != expected_elf_class)
+                return false;
+            if(reader.get_type() != ELFIO::ET_EXEC)
+                return false;
+            if(reader.get_machine() != ELFIO::EM_RISCV)
+                return false;
+            entry_address = reader.get_entry();
+            for(const auto& pseg : reader.segments) {
+                const auto fsize = pseg->get_file_size(); // 0x42c/0x0
+                const auto seg_data = pseg->get_data();
+                const auto type = pseg->get_type();
+                if(type == 1 && fsize > 0) {
+                    auto res = cb(pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
+                    if(res != iss::Ok)
+                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
+                }
+            }
+            const auto sym_sec = reader.sections[".symtab"];
+            if(ELFIO::SHT_SYMTAB == sym_sec->get_type() || ELFIO::SHT_DYNSYM == sym_sec->get_type()) {
+                ELFIO::symbol_section_accessor symbols(reader, sym_sec);
+                auto sym_no = symbols.get_symbols_num();
+                std::string name;
+                ELFIO::Elf64_Addr value = 0;
+                ELFIO::Elf_Xword size = 0;
+                unsigned char bind = 0;
+                unsigned char type = 0;
+                ELFIO::Elf_Half section = 0;
+                unsigned char other = 0;
+                for(auto i = 0U; i < sym_no; ++i) {
+                    symbols.get_symbol(i, name, value, size, bind, type, section, other);
+                    if(name != "") {
+                        this->symbol_table[name] = value;
 #ifndef NDEBUG
-                            CPPLOG(DEBUG) << "Found Symbol " << name;
+                        CPPLOG(DEBUG) << "Found Symbol " << name;
 #endif
-                        }
                     }
                 }
-                return symbol_table;
+                try {
+                    tohost = symbol_table.at("tohost");
+                    try {
+                        fromhost = symbol_table.at("fromhost");
+                    } catch(std::out_of_range& e) {
+                        fromhost = tohost + 0x40;
+                    }
+                } catch(std::out_of_range& e) {
+                }
             }
-            throw std::runtime_error(fmt::format("memory load file {} is not a valid elf file", name));
-        } else
-            throw std::runtime_error(fmt::format("memory load file not found, check if {} is a valid file", name));
+            return true;
+        }
+        return false;
     };
 };
 
