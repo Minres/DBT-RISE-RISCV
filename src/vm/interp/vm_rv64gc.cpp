@@ -147,14 +147,12 @@ protected:
     }
 
     uint8_t get_rm(uint8_t rm){
-        auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]); 
-        if(rm == 7) {
-            rm = bit_sub<5, 7-5+1>(*FCSR);
-        }
-        if(rm > 4) {
+        auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]); 
+        uint8_t rm_eff = rm == 7? bit_sub<5, 7-5+1>(*FCSR) : rm;
+        if(rm_eff > 4) {
             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
         }
-        return rm;
+        return rm_eff;
     }
 
 
@@ -2686,7 +2684,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             uint64_t offs = *(X+rs1);
                                             int32_t res_100 = super::template read_mem<int32_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            *(X+rd) = (uint64_t)((int8_t)res_100);
+                                            *(X+rd) = (uint64_t)((int32_t)res_100);
                                             super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
@@ -2754,12 +2752,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint64_t offs = *(X+rs1);
+                                        uint64_t res = *(X+rs2);
                                         if(rd != 0) {
                                             int32_t res_102 = super::template read_mem<int32_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            *(X+rd) = (uint64_t)((int8_t)res_102);
+                                            *(X+rd) = (uint64_t)((int32_t)res_102);
                                         }
-                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
+                                        super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
@@ -2790,11 +2789,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         int32_t res_103 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int8_t)res_103;
+                                        int32_t res1 = (int32_t)res_103;
+                                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+rs2) );
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res1;
                                         }
-                                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+rs2) );
                                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -2827,10 +2826,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res_104 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t res1 = res_104;
-                                        if(rd != 0) {
-                                            *(X+rd) = res1;
-                                        }
                                         uint32_t res2 = res1 ^ (uint32_t)*(X+rs2);
+                                        if(rd != 0) {
+                                            *(X+rd) = ((uint64_t)(int64_t)(int32_t)res1);
+                                        }
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -2863,10 +2862,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res_105 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t res1 = res_105;
-                                        if(rd != 0) {
-                                            *(X+rd) = res1;
-                                        }
                                         uint32_t res2 = res1 & (uint32_t)*(X+rs2);
+                                        if(rd != 0) {
+                                            *(X+rd) = ((uint64_t)(int64_t)(int32_t)res1);
+                                        }
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -2899,10 +2898,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res_106 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t res1 = res_106;
-                                        if(rd != 0) {
-                                            *(X+rd) = res1;
-                                        }
                                         uint32_t res2 = res1 | (uint32_t)*(X+rs2);
+                                        if(rd != 0) {
+                                            *(X+rd) = ((uint64_t)(int64_t)(int32_t)res1);
+                                        }
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -2934,11 +2933,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         int32_t res_107 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int8_t)res_107;
+                                        int32_t res1 = (int32_t)res_107;
+                                        uint32_t res2 = res1 > (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint32_t res2 = res1 > (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -2970,11 +2969,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         int32_t res_108 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int8_t)res_108;
+                                        int32_t res1 = (int32_t)res_108;
+                                        uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3007,10 +3006,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res_109 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t res1 = res_109;
-                                        if(rd != 0) {
-                                            *(X+rd) = (uint64_t)res1;
-                                        }
                                         uint32_t res2 = res1 > (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
+                                        if(rd != 0) {
+                                            *(X+rd) = ((uint64_t)(int64_t)(int32_t)res1);
+                                        }
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3043,10 +3042,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res_110 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t res1 = res_110;
+                                        uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)res1;
+                                            *(X+rd) = ((uint64_t)(int64_t)(int32_t)res1);
                                         }
-                                        uint32_t res2 = res1 < (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
                                         super::template write_mem<uint32_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3078,7 +3077,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             uint64_t offs = *(X+rs1);
                                             int64_t res_111 = super::template read_mem<int64_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            *(X+rd) = (uint64_t)((int8_t)res_111);
+                                            *(X+rd) = (uint64_t)((int64_t)res_111);
                                             super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
@@ -3145,16 +3144,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        {
-                                            uint64_t offs = *(X+rs1);
-                                            if(rd != 0) {
-                                                int64_t res_113 = super::template read_mem<int64_t>(traits::MEM, offs);
-                                                if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                                *(X+rd) = (uint64_t)((int8_t)res_113);
-                                            }
-                                            super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(X+rs2));
+                                        uint64_t offs = *(X+rs1);
+                                        uint64_t res = *(X+rs2);
+                                        if(rd != 0) {
+                                            int64_t res_113 = super::template read_mem<int64_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                            *(X+rd) = (uint64_t)((int64_t)res_113);
                                         }
+                                        super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)res);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
@@ -3184,11 +3182,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         uint64_t res_114 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_114;
+                                        uint64_t res1 = res_114;
+                                        uint64_t res2 = (uint64_t)((uint128_t)(res1 ) + (uint128_t)(*(X+rs2) ));
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)((uint128_t)(res ) + (uint128_t)(*(X+rs2) )));
+                                        super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
@@ -3219,11 +3218,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         uint64_t res_115 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_115;
+                                        uint64_t res1 = res_115;
+                                        uint64_t res2 = res1 ^ *(X+rs2);
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = ((uint64_t)(int64_t)res1);
                                         }
-                                        uint64_t res2 = res ^ *(X+rs2);
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3255,11 +3254,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         uint64_t res_116 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_116;
+                                        uint64_t res1 = res_116;
+                                        uint64_t res2 = res1 & *(X+rs2);
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint64_t res2 = res & *(X+rs2);
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3291,11 +3290,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         uint64_t res_117 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_117;
+                                        uint64_t res1 = res_117;
+                                        uint64_t res2 = res1 | *(X+rs2);
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint64_t res2 = res | *(X+rs2);
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3325,13 +3324,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint64_t offs = *(X+rs1);
-                                        uint64_t res_118 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                                        int64_t res_118 = super::template read_mem<int64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res1 = res_118;
+                                        int64_t res1 = (int64_t)res_118;
+                                        uint64_t res2 = res1 > (int64_t)*(X+rs2)? (uint64_t)*(X+rs2) : ((uint64_t)res1);
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res1;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint64_t res2 = res1 > (int64_t)*(X+rs2)? *(X+rs2) : res1;
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3361,13 +3360,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint64_t offs = *(X+rs1);
-                                        uint64_t res_119 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                                        int64_t res_119 = super::template read_mem<int64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_119;
+                                        int64_t res1 = (int64_t)res_119;
+                                        uint64_t res2 = res1 < (int64_t)*(X+rs2)? (uint64_t)*(X+rs2) : ((uint64_t)res1);
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint64_t res2 = res < (int64_t)*(X+rs2)? *(X+rs2) : res;
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3399,11 +3398,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t offs = *(X+rs1);
                                         uint64_t res_120 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t res = res_120;
+                                        uint64_t res1 = res_120;
+                                        uint64_t res2 = res1 > *(X+rs2)? *(X+rs2) : res1;
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res;
+                                            *(X+rd) = (uint64_t)res1;
                                         }
-                                        uint64_t res2 = res > *(X+rs2)? *(X+rs2) : res;
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3436,10 +3435,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint64_t res_121 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint64_t res1 = res_121;
-                                        if(rd != 0) {
-                                            *(X+rd) = (uint64_t)(int64_t)res1;
-                                        }
                                         uint64_t res2 = res1 < *(X+rs2)? (uint64_t)*(X+rs2) : res1;
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res1;
+                                        }
                                         super::template write_mem<uint64_t>(traits::MEM, offs, res2);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -4301,13 +4300,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, f {rs1}, f {rs2}, f {rs3}", fmt::arg("mnemonic", "fmadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4315,7 +4314,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fmadd_s(unbox_s(*(F+rs1)), unbox_s(*(F+rs2)), unbox_s(*(F+rs3)), 0, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4328,13 +4327,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, f {rs1}, f {rs2}, f {rs3}", fmt::arg("mnemonic", "fmsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4342,7 +4341,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fmadd_s(unbox_s(*(F+rs1)), unbox_s(*(F+rs2)), unbox_s(*(F+rs3)), 1, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4355,13 +4354,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, name(rd), f {rs1}, f {rs2}, f {rs3}", fmt::arg("mnemonic", "fnmadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+                            "{mnemonic:10} {rm}, name(rd), {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4372,7 +4371,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fmadd_s(frs1, frs2, frs3, 2, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4385,13 +4384,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, f {rs1}, f {rs2}, f {rs3}", fmt::arg("mnemonic", "fnmsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2), fmt::arg("rs3", rs3));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4402,7 +4401,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fmadd_s(frs1, frs2, frs3, 3, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4414,13 +4413,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4430,7 +4429,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fadd_s(frs1, frs2, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4442,13 +4441,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4458,7 +4457,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fsub_s(frs1, frs2, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4470,13 +4469,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fmul.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4486,7 +4485,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fmul_s(frs1, frs2, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4498,13 +4497,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fdiv.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4514,7 +4513,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fdiv_s(frs1, frs2, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4525,13 +4524,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, f {rd}, f {rs1}", fmt::arg("mnemonic", "fsqrt.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", rd), fmt::arg("rs1", rs1));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4540,7 +4539,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fsqrt_s(frs1, get_rm((uint8_t)rm));
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4551,8 +4550,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4574,8 +4573,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4597,8 +4596,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4608,7 +4607,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         uint32_t frs1 = unbox_s(*(F+rs1));
                         uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = frs1 ^ (frs2 & 2147483648);
+                        uint32_t res = frs1 ^ (frs2 & (uint32_t)2147483648);
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                     }
                     break;
@@ -4620,13 +4619,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fmin.s"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4636,7 +4635,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fsel_s(frs1, frs2, 0);
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4647,13 +4646,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, f {rs1}, f {rs2}", fmt::arg("mnemonic", "fmax.s"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", rs1), fmt::arg("rs2", rs2));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4663,7 +4662,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint32_t res = fsel_s(frs1, frs2, 1);
                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4681,7 +4680,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4696,7 +4695,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4708,14 +4707,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, f {rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", rs1));
+                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
+                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4730,7 +4729,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4749,7 +4748,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4765,7 +4764,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4784,7 +4783,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4800,7 +4799,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4819,7 +4818,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4835,7 +4834,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4882,7 +4881,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4894,7 +4893,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res = fcvt_s((uint32_t)*(X+rs1), 2, get_rm((uint8_t)rm));
                                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4913,7 +4912,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4925,7 +4924,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t res = fcvt_s((uint32_t)*(X+rs1), 3, get_rm((uint8_t)rm));
                                         *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4963,8 +4962,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} f {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
-                            fmt::arg("rd", rd), fmt::arg("rs1", name(rs1)));
+                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4996,7 +4995,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -5010,7 +5009,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint64_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -5029,7 +5028,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -5043,7 +5042,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint64_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -5062,7 +5061,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -5079,7 +5078,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -5098,7 +5097,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -5115,7 +5114,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -5137,17 +5136,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t offs = (uint64_t)((uint128_t)(*(X+(uint32_t)(rs1 ) % traits::RFS) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                        uint64_t res_127 = super::template read_mem<uint64_t>(traits::MEM, offs);
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = res_127;
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        uint64_t res_127 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                        *(F+rd) = res_127;
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FSD: {
@@ -5167,10 +5165,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t offs = (uint64_t)((uint128_t)(*(X+(uint32_t)(rs1 ) % traits::RFS) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                        super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(F+rs2));
-                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        super::template write_mem<uint64_t>(traits::MEM, offs, *(F+rs2));
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FMADD_D: {
@@ -5188,20 +5191,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fmadd_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), (uint64_t)*(F+rs3), 0, rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 0, get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5220,20 +5217,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fmadd_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), (uint64_t)*(F+rs3), 1, rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 1, get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5252,20 +5243,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fmadd_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), (uint64_t)*(F+rs3), 2, rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 2, get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5284,20 +5269,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fmadd_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), (uint64_t)*(F+rs3), 3, rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 3, get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5315,20 +5294,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fadd_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fadd_d(*(F+rs1), *(F+rs2), get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5346,20 +5319,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fsub_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fsub_d(*(F+rs1), *(F+rs2), get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5377,20 +5344,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fmul_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fmul_d(*(F+rs1), *(F+rs2), get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5408,20 +5369,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fdiv_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fdiv_d(*(F+rs1), *(F+rs2), get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5438,20 +5393,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fsqrt_d((uint64_t)*(F+rs1), rm < 7? rm : (uint8_t)*FCSR);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fsqrt_d(*(F+rs1), get_rm(rm));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5471,13 +5420,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = (bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = (bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5497,13 +5440,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = (~ bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = (~ bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5523,13 +5460,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = (uint64_t)*(F+rs1) ^ ((uint64_t)*(F+rs2) & (uint64_t)((1 << 63) ));
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = *(F+rs1) ^ (*(F+rs2) & ((uint64_t)1 << 63));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5546,20 +5477,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fsel_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), 0);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fsel_d(*(F+rs1), *(F+rs2), 0);
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5576,20 +5501,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fsel_d((uint64_t)*(F+rs1), (uint64_t)*(F+rs2), 1);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fsel_d(*(F+rs1), *(F+rs2), 1);
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5605,12 +5524,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t res = fconv_d2f(*(F+rs1), rm);
-                        *(F+rd) = (uint64_t)((int64_t)((- 1 << 32) ) + (int64_t)(res ));
+                        uint32_t res = fconv_d2f(*(F+rs1), get_rm(rm));
+                        *(F+rd) = (uint64_t)((int128_t)(((int64_t)- 1 << 32) ) + (int128_t)(res ));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5630,13 +5553,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fconv_f2d((uint32_t)*(F+rs1), rm);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
+                        *(F+rd) = fconv_f2d((uint32_t)*(F+rs1), get_rm(rm));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5654,18 +5571,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 0);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)res;
-                        }
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 0);
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FLT_D: {
@@ -5682,18 +5604,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 2);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)res;
-                        }
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 2);
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FLE_D: {
@@ -5710,18 +5637,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 1);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)res;
-                        }
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 1);
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCLASS_D: {
@@ -5740,8 +5672,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)fclass_d((uint64_t)*(F+rs1));
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)fclass_d(*(F+rs1));
+                                        }
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_W_D: {
@@ -5758,18 +5697,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t res = fcvt_64_32(*(F+rs1), 0, rm);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)res;
-                        }
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t res = fcvt_64_32(*(F+rs1), 0, get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_WU_D: {
@@ -5786,18 +5730,23 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t res = fcvt_64_32(*(F+rs1), 1, rm);
-                        if(((uint32_t)(rd ) % traits::RFS) != 0) {
-                            *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)res;
-                        }
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint32_t res = fcvt_64_32(*(F+rs1), 1, get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_D_W: {
@@ -5812,19 +5761,18 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcvt_32_64((uint32_t)*(X+(uint32_t)(rs1 ) % traits::RFS), 2, rm);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = fcvt_32_64((uint32_t)*(X+rs1), 2, get_rm(rm));
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_D_WU: {
@@ -5839,19 +5787,18 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcvt_32_64((uint32_t)*(X+(uint32_t)(rs1 ) % traits::RFS), 3, rm);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = fcvt_32_64((uint32_t)*(X+rs1), 3, get_rm(rm));
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_L_D: {
@@ -5866,17 +5813,25 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)fcvt_d((uint64_t)*(F+rs1), 0, rm);
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t res = (uint64_t)fcvt_d(*(F+rs1), 0, get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_LU_D: {
@@ -5891,17 +5846,25 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)fcvt_d((uint64_t)*(F+rs1), 1, rm);
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & (uint64_t)(~ traits::FFLAG_MASK )) | (uint64_t)((flags & traits::FFLAG_MASK) );
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        uint64_t res = (uint64_t)fcvt_d(*(F+rs1), 1, get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_D_L: {
@@ -5916,19 +5879,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcvt_d(*(X+(uint32_t)(rs1 ) % traits::RFS), 2, rm);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = fcvt_d(*(X+rs1), 2, get_rm(rm));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FCVT_D_LU: {
@@ -5943,19 +5909,22 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint64_t res = fcvt_d(*(X+(uint32_t)(rs1 ) % traits::RFS), 3, rm);
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = (uint64_t)res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)((int128_t)((- 1 << 64) ) + (int128_t)(res ));
-                        }
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = fcvt_d(*(X+rs1), 3, get_rm(rm));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FMV_X_D: {
@@ -5974,8 +5943,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(X+(uint32_t)(rd ) % traits::RFS) = (uint64_t)*(F+rs1);
-                    }
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint64_t)*(F+rs1);
+                                        }
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FMV_D_X: {
@@ -5994,8 +5970,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = *(X+(uint32_t)(rs1 ) % traits::RFS);
-                    }
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = *(X+rs1);
+                                    }
+                                }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::C__FLD: {
