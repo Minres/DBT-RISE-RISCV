@@ -57,8 +57,7 @@ Core RV64I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=64;
         // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b10000000000000000000000100000000;
+        unsigned int MISA_VAL = 0x80000100;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -69,8 +68,7 @@ Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd {
         XLEN=64;
         FLEN=64;
         // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000001000100101101;
+        unsigned int MISA_VAL = 0x800000000000112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
