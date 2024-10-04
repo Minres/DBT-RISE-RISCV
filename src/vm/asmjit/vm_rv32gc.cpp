@@ -6873,17 +6873,20 @@ private:
             InvokeNode* call_fcvt_s_317;
             jh.cc.comment("//call_fcvt_s");
             auto fcvt_s_317_arg0 = frs1;
-            auto fcvt_s_317_arg2 = get_rm(jh, (uint8_t)rm);
+            auto fcvt_s_317_arg2 = get_rm(jh, rm);
             x86::Gp ret_val_fcvt_s_317 = get_reg_Gp(jh.cc, 32, true);
             jh.cc.invoke(&call_fcvt_s_317, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_s_317;
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_fcvt_s_317, 32, false), 32, true);
             setArg(call_fcvt_s_317, 0, fcvt_s_317_arg0);
             setArg(call_fcvt_s_317, 1, 0);
             setArg(call_fcvt_s_317, 2, fcvt_s_317_arg2);
             setRet(call_fcvt_s_317, 0, ret_val_fcvt_s_317);
             if((rd)!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      res);
+                      gen_ext(cc, 
+                          res, 32, true));
             }
             InvokeNode* call_fget_flags_318;
             jh.cc.comment("//call_fget_flags");
@@ -6954,14 +6957,17 @@ private:
             auto fcvt_s_320_arg2 = get_rm(jh, (uint8_t)rm);
             x86::Gp ret_val_fcvt_s_320 = get_reg_Gp(jh.cc, 32, true);
             jh.cc.invoke(&call_fcvt_s_320, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_s_320;
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_fcvt_s_320, 32, false), 32, true);
             setArg(call_fcvt_s_320, 0, fcvt_s_320_arg0);
             setArg(call_fcvt_s_320, 1, 1);
             setArg(call_fcvt_s_320, 2, fcvt_s_320_arg2);
             setRet(call_fcvt_s_320, 0, ret_val_fcvt_s_320);
             if((rd)!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      res);
+                      gen_ext(cc, 
+                          res, 32, true));
             }
             InvokeNode* call_fget_flags_321;
             jh.cc.comment("//call_fget_flags");
@@ -7481,7 +7487,9 @@ private:
             if((rd)!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          load_reg_from_mem(jh, traits::F0 + rs1), 32, false));
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  load_reg_from_mem(jh, traits::F0 + rs1), 32, false), 32, true), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -9093,7 +9101,9 @@ private:
             auto fcvt_64_32_372_arg2 = get_rm(jh, rm);
             x86::Gp ret_val_fcvt_64_32_372 = get_reg_Gp(jh.cc, 32, true);
             jh.cc.invoke(&call_fcvt_64_32_372, &fcvt_64_32, FuncSignature::build<uint32_t, uint64_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_64_32_372;
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_fcvt_64_32_372, 32, false), 32, true);
             setArg(call_fcvt_64_32_372, 0, fcvt_64_32_372_arg0);
             setArg(call_fcvt_64_32_372, 1, 0);
             setArg(call_fcvt_64_32_372, 2, fcvt_64_32_372_arg2);
@@ -9101,7 +9111,7 @@ private:
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          res, 32, false));
+                          res, 32, true));
             }
             InvokeNode* call_fget_flags_373;
             jh.cc.comment("//call_fget_flags");
@@ -9164,7 +9174,9 @@ private:
             auto fcvt_64_32_374_arg2 = get_rm(jh, rm);
             x86::Gp ret_val_fcvt_64_32_374 = get_reg_Gp(jh.cc, 32, true);
             jh.cc.invoke(&call_fcvt_64_32_374, &fcvt_64_32, FuncSignature::build<uint32_t, uint64_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_64_32_374;
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_fcvt_64_32_374, 32, false), 32, true);
             setArg(call_fcvt_64_32_374, 0, fcvt_64_32_374_arg0);
             setArg(call_fcvt_64_32_374, 1, 1);
             setArg(call_fcvt_64_32_374, 2, fcvt_64_32_374_arg2);
@@ -9172,7 +9184,7 @@ private:
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          res, 32, false));
+                          res, 32, true));
             }
             InvokeNode* call_fget_flags_375;
             jh.cc.comment("//call_fget_flags");

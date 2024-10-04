@@ -9154,12 +9154,18 @@ private:
             std::vector<Value*> fcvt_s_858_args{
                 frs1,
                 this->gen_ext(this->gen_const(8,0), 32),
-                this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
+                this->gen_ext(get_rm(bb, rm), 8)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_858_args);
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_858_args),
+                    32, false),
+                64, true);
             if((rd)!=0) {
                 this->builder.CreateStore(
-                this->gen_ext(res, 64),
+                this->gen_ext(
+                    res,
+                    64, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
             std::vector<Value*> fget_flags_860_args{
@@ -9228,10 +9234,16 @@ private:
                 this->gen_ext(this->gen_const(8,1), 32),
                 this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_863_args);
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_863_args),
+                    32, false),
+                64, true);
             if((rd)!=0) {
                 this->builder.CreateStore(
-                this->gen_ext(res, 64),
+                this->gen_ext(
+                    res,
+                    64, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
             std::vector<Value*> fget_flags_865_args{
@@ -9719,8 +9731,12 @@ private:
             if((rd)!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
-                    this->gen_reg_load(traits::F0+ rs1),
-                    64, false),
+                    this->gen_ext(
+                        this->gen_ext(
+                            this->gen_reg_load(traits::F0+ rs1),
+                            32, false),
+                        64, true),
+                    64, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -11398,12 +11414,16 @@ private:
                 this->gen_ext(this->gen_const(8,0), 32),
                 this->gen_ext(get_rm(bb, rm), 8)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_962_args);
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_962_args),
+                    32, false),
+                64, true);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
                     res,
-                    64, false),
+                    64, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
             std::vector<Value*> fget_flags_964_args{
@@ -11468,12 +11488,16 @@ private:
                 this->gen_ext(this->gen_const(8,1), 32),
                 this->gen_ext(get_rm(bb, rm), 8)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_966_args);
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_966_args),
+                    32, false),
+                64, true);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
                     res,
-                    64, false),
+                    64, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
             std::vector<Value*> fget_flags_968_args{

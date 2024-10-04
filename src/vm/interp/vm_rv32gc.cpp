@@ -3589,9 +3589,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t res = fcvt_s(frs1, 0, get_rm((uint8_t)rm));
+                                        int32_t res = (int32_t)(int32_t)fcvt_s(frs1, 0, get_rm(rm));
                                         if((rd) != 0) {
-                                            *(X+rd) = res;
+                                            *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
                                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
@@ -3623,9 +3623,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t res = fcvt_s(frs1, 1, get_rm((uint8_t)rm));
+                                        int32_t res = (int32_t)(int32_t)fcvt_s(frs1, 1, get_rm((uint8_t)rm));
                                         if((rd) != 0) {
-                                            *(X+rd) = res;
+                                            *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
                                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
@@ -3849,7 +3849,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((rd) != 0) {
-                                            *(X+rd) = (uint32_t)*(F+rs1);
+                                            *(X+rd) = (uint32_t)(int32_t)(int32_t)*(F+rs1);
                                         }
                                     }
                                 }
@@ -4571,7 +4571,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res = fcvt_64_32(*(F+rs1), 0, get_rm(rm));
+                                        int32_t res = (int32_t)(int32_t)fcvt_64_32(*(F+rs1), 0, get_rm(rm));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -4604,7 +4604,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res = fcvt_64_32(*(F+rs1), 1, get_rm(rm));
+                                        int32_t res = (int32_t)(int32_t)fcvt_64_32(*(F+rs1), 1, get_rm(rm));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
