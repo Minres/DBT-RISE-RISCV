@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.24)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 ###############################################################################
@@ -20,7 +20,7 @@ if(NOT TARGET dbt-rise-core)
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
 	    #GIT_SHALLOW    OFF
-	    GIT_TAG         45a9641
+	    GIT_TAG         99cf682
 	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
 	)
 	FetchContent_GetProperties(dbt_rise_core_git)
@@ -68,15 +68,22 @@ set(LIB_SOURCES
 
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
-        src/vm/llvm/vm_rv32imc.cpp
+        src/vm/llvm/vm_rv32i.cpp
+        src/vm/llvm/vm_rv32imac.cpp
+        src/vm/llvm/vm_rv32gc.cpp
+        src/vm/llvm/vm_rv64i.cpp
+        src/vm/llvm/vm_rv64gc.cpp
         src/vm/llvm/fp_impl.cpp
     )
 endif()
 
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
-	src/vm/asmjit/vm_rv32i.cpp
-	src/vm/asmjit/vm_rv64i.cpp
+        src/vm/asmjit/vm_rv32i.cpp
+        src/vm/asmjit/vm_rv32imac.cpp
+        src/vm/asmjit/vm_rv32gc.cpp
+        src/vm/asmjit/vm_rv64i.cpp
+        src/vm/asmjit/vm_rv64gc.cpp
     )
 endif()
 
