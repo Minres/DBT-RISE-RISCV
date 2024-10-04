@@ -4,8 +4,8 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014 The Regents of the University of California.
-All rights reserved.
+Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -34,10 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-#include <stdbool.h>
 #include <stdint.h>
 #include "platform.h"
-#include "internals.h"
 #include "specialize.h"
 #include "softfloat.h"
 
@@ -50,14 +48,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 uint_fast32_t
  softfloat_propagateNaNF32UI( uint_fast32_t uiA, uint_fast32_t uiB )
 {
-    bool isSigNaNA;
 
-    isSigNaNA = softfloat_isSigNaNF32UI( uiA );
-    if ( isSigNaNA || softfloat_isSigNaNF32UI( uiB ) ) {
+    if ( softfloat_isSigNaNF32UI( uiA ) || softfloat_isSigNaNF32UI( uiB ) ) {
         softfloat_raiseFlags( softfloat_flag_invalid );
-        if ( isSigNaNA ) return uiA | 0x00400000;
     }
-    return (isNaNF32UI( uiA ) ? uiA : uiB) | 0x00400000;
+    return defaultNaNF32UI;
 
 }
 

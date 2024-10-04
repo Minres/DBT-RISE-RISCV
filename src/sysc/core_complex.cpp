@@ -37,7 +37,10 @@
 #include <iss/debugger/target_adapter_if.h>
 #include <iss/iss.h>
 #include <iss/vm_types.h>
+#include <tlm_core/tlm_2/tlm_2_interfaces/tlm_fw_bw_ifs.h>
+#include <tlm_core/tlm_2/tlm_generic_payload/tlm_phase.h>
 #include "iss_factory.h"
+#include "tlm/scc/tlm_signal_gp.h"
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
@@ -55,9 +58,9 @@
 
 #define STR(X) #X
 #define CREATE_CORE(CN)                                                                                                                    \
-    if(type == STR(CN)) {                                                                                                                  \
-        std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
-    } else
+        if(type == STR(CN)) {                                                                                                              \
+            std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                   \
+        } else
 
 #ifdef HAS_SCV
 #include <scv.h>
@@ -79,7 +82,7 @@ using namespace scv_tr;
 #endif
 
 namespace sysc {
-namespace tgfs {
+namespace riscv_vp {
 using namespace std;
 using namespace iss;
 using namespace logging;
@@ -124,11 +127,11 @@ using vm_ptr = std::unique_ptr<iss::vm_if>;
 
 class core_wrapper {
 public:
-    core_wrapper(core_complex* owner)
+    core_wrapper(core_complex_if* owner)
     : owner(owner) {}
 
     void reset(uint64_t addr) { vm->reset(addr); }
-    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump); }
+    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump, finish_cond_e::NONE); }
     inline std::pair<uint64_t, bool> load_file(std::string const& name) {
         iss::arch_if* cc = cpu->get_arch_if();
         return cc->load_file(name);
@@ -145,36 +148,45 @@ public:
         if(type.size() == 0 || type == "?") {
             std::cout << "Available cores: " << util::join(f.get_names(), ", ") << std::endl;
             sc_core::sc_stop();
+            exit(0);
+        } else if(type.find('|') != std::string::npos) {
+            std::tie(cpu, vm) = f.create(type + "|" + backend);
+        } else {
+            auto base_isa = type.substr(0, 5);
+            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
+                std::tie(cpu, vm) = f.create(type + "|mu_p_clic_pmp|" + backend, gdb_port, owner);
+            } else {
+                std::tie(cpu, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
+            }
         }
-        if(type.find('|') == std::string::npos)
-            type = type + "|m_p";
-        std::tie(cpu, vm) = f.create(type + "|" + backend);
         if(!cpu) {
-            SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
-        }
-        if(!vm) {
-            SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
-        }
-        auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
-        sc_cpu_if->set_mhartid(hart_id);
-        get_mode = [sc_cpu_if]() { return sc_cpu_if->get_mode(); };
-        get_state = [sc_cpu_if]() { return sc_cpu_if->get_state(); };
-        get_interrupt_execution = [sc_cpu_if]() { return sc_cpu_if->get_interrupt_execution(); };
-        set_interrupt_execution = [sc_cpu_if](bool b) { return sc_cpu_if->set_interrupt_execution(b); };
-        local_irq = [sc_cpu_if](short s, bool b) { return sc_cpu_if->local_irq(s, b); };
+            if(type!="?")
+                SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
+        } else if(!vm) {
+            if(type!="?")
+                SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
+        } else {
+            auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
+            sc_cpu_if->set_mhartid(hart_id);
+            get_mode = [sc_cpu_if]() { return sc_cpu_if->get_mode(); };
+            get_state = [sc_cpu_if]() { return sc_cpu_if->get_state(); };
+            get_interrupt_execution = [sc_cpu_if]() { return sc_cpu_if->get_interrupt_execution(); };
+            set_interrupt_execution = [sc_cpu_if](bool b) { return sc_cpu_if->set_interrupt_execution(b); };
+            local_irq = [sc_cpu_if](short s, bool b) { return sc_cpu_if->local_irq(s, b); };
 
-        auto* srv = debugger::server<debugger::gdb_session>::get();
-        if(srv)
-            tgt_adapter = srv->get_target();
-        if(tgt_adapter)
-            tgt_adapter->add_custom_command({"sysc",
-                                             [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
-                                                 return cmd_sysc(argc, argv, of, df, tgt_adapter);
-                                             },
-                                             "SystemC sub-commands: break <time>, print_time"});
+            auto* srv = debugger::server<debugger::gdb_session>::get();
+            if(srv)
+                tgt_adapter = srv->get_target();
+            if(tgt_adapter)
+                tgt_adapter->add_custom_command({"sysc",
+                [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
+                    return cmd_sysc(argc, argv, of, df, tgt_adapter);
+                },
+                "SystemC sub-commands: break <time>, print_time"});
+        }
     }
 
-    core_complex* const owner;
+    core_complex_if* const owner;
     vm_ptr vm{nullptr};
     sc_cpu_ptr cpu{nullptr};
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
@@ -190,9 +202,9 @@ struct core_trace {
     scv_tr_handle tr_handle;
 };
 
-SC_HAS_PROCESS(core_complex); // NOLINT
 #ifndef CWR_SYSTEMC
-core_complex::core_complex(sc_module_name const& name)
+template <unsigned int BUSWIDTH>
+core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 : sc_module(name)
 , fetch_lut(tlm_dmi_ext())
 , read_lut(tlm_dmi_ext())
@@ -201,7 +213,7 @@ core_complex::core_complex(sc_module_name const& name)
 }
 #endif
 
-void core_complex::init() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     trc = new core_trace();
     ibus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
@@ -220,9 +232,29 @@ void core_complex::init() {
         }
     });
 
+    SC_HAS_PROCESS(core_complex<BUSWIDTH>); // NOLINT
     SC_THREAD(run);
     SC_METHOD(rst_cb);
     sensitive << rst_i;
+#ifdef USE_TLM_SIGNAL
+    sw_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(3, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    timer_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(7, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    ext_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+        cpu->local_irq(11, gp.get_value());
+        return tlm::TLM_COMPLETED;
+    });
+    for(auto i = 0U; i < local_irq_i.size(); ++i)
+        local_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+            cpu->local_irq(16+i, gp.get_value());
+            return tlm::TLM_COMPLETED;
+        });
+#else
     SC_METHOD(sw_irq_cb);
     sensitive << sw_irq_i;
     SC_METHOD(timer_irq_cb);
@@ -232,6 +264,7 @@ void core_complex::init() {
     SC_METHOD(local_irq_cb);
     for(auto pin : local_irq_i)
         sensitive << pin;
+#endif
     trc->m_db = scv_tr_db::get_default_db();
 
     SC_METHOD(forward);
@@ -245,16 +278,16 @@ void core_complex::init() {
 #endif
 }
 
-core_complex::~core_complex() {
+template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
     delete cpu;
     delete trc;
     for(auto* p : plugin_list)
         delete p;
 }
 
-void core_complex::trace(sc_trace_file* trf) const {}
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
 
-void core_complex::before_end_of_elaboration() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elaboration() {
     SCCDEBUG(SCMOD) << "instantiating iss::arch::tgf with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
@@ -295,7 +328,7 @@ void core_complex::before_end_of_elaboration() {
     }
 }
 
-void core_complex::start_of_simulation() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulation() {
     // quantum_keeper.reset();
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         istringstream is(GET_PROP_VALUE(elf_file));
@@ -318,7 +351,7 @@ void core_complex::start_of_simulation() {
     }
 }
 
-bool core_complex::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
     if(trc->m_db == nullptr)
         return false;
     if(trc->tr_handle.is_active())
@@ -332,7 +365,7 @@ bool core_complex::disass_output(uint64_t pc, const std::string instr_str) {
     return true;
 }
 
-void core_complex::forward() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
 #ifndef CWR_SYSTEMC
     set_clock_period(clk_i.read());
 #else
@@ -341,32 +374,34 @@ void core_complex::forward() {
 #endif
 }
 
-void core_complex::set_clock_period(sc_core::sc_time period) {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
         cpu->set_interrupt_execution(true);
 }
 
-void core_complex::rst_cb() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
     if(rst_i.read())
         cpu->set_interrupt_execution(true);
 }
 
-void core_complex::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
+#ifndef USE_TLM_SIGNAL
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
 
-void core_complex::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
 
-void core_complex::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
 
-void core_complex::local_irq_cb() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
             cpu->local_irq(16 + i, local_irq_i[i].read());
         }
     }
 }
+#endif
 
-void core_complex::run() {
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     wait(SC_ZERO_TIME); // separate from elaboration phase
     do {
         wait(SC_ZERO_TIME);
@@ -384,10 +419,10 @@ void core_complex::run() {
     sc_stop();
 }
 
-bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr - lut_entry.get_start_address();
         std::copy(lut_entry.get_dmi_ptr() + offset, lut_entry.get_dmi_ptr() + offset + length, data);
         if(is_fetch)
@@ -423,9 +458,9 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data,
                 dbus_inc += incr;
         }
         SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+                << (length == 4   ? *(uint32_t*)data
+                        : length == 2 ? *(uint16_t*)data
+                                : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -434,7 +469,7 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data,
             gp.set_address(addr);
             tlm_dmi_ext dmi_data;
             if(sckt->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_read_allowed())
+                if(dmi_data.is_read_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
@@ -442,9 +477,9 @@ bool core_complex::read_mem(uint64_t addr, unsigned length, uint8_t* const data,
     }
 }
 
-bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = write_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && addr + length <= lut_entry.get_end_address() + 1) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
@@ -470,9 +505,9 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t* cons
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
         SCCTRACE() << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
-                   << (length == 4   ? *(uint32_t*)data
-                       : length == 2 ? *(uint16_t*)data
-                                     : (unsigned)*data);
+                << (length == 4   ? *(uint32_t*)data
+                        : length == 2 ? *(uint16_t*)data
+                                : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -481,16 +516,16 @@ bool core_complex::write_mem(uint64_t addr, unsigned length, const uint8_t* cons
             gp.set_address(addr);
             tlm_dmi_ext dmi_data;
             if(dbus->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_write_allowed())
+                if(dmi_data.is_write_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
                     write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
-                                       dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
+                            dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
         return true;
     }
 }
 
-bool core_complex::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
     gp.set_address(addr);
@@ -500,7 +535,7 @@ bool core_complex::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const d
     return dbus->transport_dbg(gp) == length;
 }
 
-bool core_complex::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;
@@ -511,5 +546,10 @@ bool core_complex::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* 
     gp.set_streaming_width(length);
     return dbus->transport_dbg(gp) == length;
 }
-} /* namespace tgfs */
+
+template class core_complex<scc::LT>;
+template class core_complex<32>;
+template class core_complex<64>;
+
+} /* namespace riscv_vp */
 } /* namespace sysc */

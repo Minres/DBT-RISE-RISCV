@@ -4,7 +4,7 @@
 This C source file is part of the SoftFloat IEEE Floating-Point Arithmetic
 Package, Release 3e, by John R. Hauser.
 
-Copyright 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+Copyright 2011, 2012, 2013, 2014, 2015, 2016 The Regents of the University of
 California.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -34,10 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =============================================================================*/
 
-#include <stdbool.h>
 #include <stdint.h>
 #include "platform.h"
-#include "internals.h"
 #include "specialize.h"
 #include "softfloat.h"
 
@@ -50,14 +48,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 uint_fast16_t
  softfloat_propagateNaNF16UI( uint_fast16_t uiA, uint_fast16_t uiB )
 {
-    bool isSigNaNA;
 
-    isSigNaNA = softfloat_isSigNaNF16UI( uiA );
-    if ( isSigNaNA || softfloat_isSigNaNF16UI( uiB ) ) {
+    if ( softfloat_isSigNaNF16UI( uiA ) || softfloat_isSigNaNF16UI( uiB ) ) {
         softfloat_raiseFlags( softfloat_flag_invalid );
-        if ( isSigNaNA ) return uiA | 0x0200;
     }
-    return (isNaNF16UI( uiA ) ? uiA : uiB) | 0x0200;
+    return defaultNaNF16UI;
 
 }
 

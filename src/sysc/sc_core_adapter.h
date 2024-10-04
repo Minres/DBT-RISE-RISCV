@@ -21,7 +21,7 @@ public:
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
     using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
     using heart_state_t = typename PLAT::hart_state_type;
-    sc_core_adapter(sysc::tgfs::core_complex* owner)
+    sc_core_adapter(sysc::riscv_vp::core_complex_if* owner)
     : owner(owner) {}
 
     iss::arch_if* get_arch_if() override { return this; }
@@ -54,9 +54,9 @@ public:
             std::stringstream s;
             s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
               << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCDEBUG(owner->name()) << "disass: "
-                                    << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc << "\t\t" << std::setw(40)
-                                    << std::setfill(' ') << std::left << instr << s.str();
+            SCCINFO(owner->hier_name()) << "disass: "
+                                         << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc << "\t\t"
+                                         << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
         }
     };
 
@@ -79,10 +79,10 @@ public:
                     switch(hostvar >> 48) {
                     case 0:
                         if(hostvar != 0x1) {
-                            SCCINFO(owner->name())
+                            SCCINFO(owner->hier_name())
                                 << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar << "), stopping simulation";
                         } else {
-                            SCCINFO(owner->name())
+                            SCCINFO(owner->hier_name())
                                 << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar << "), stopping simulation";
                         }
                         this->reg.trap_state = std::numeric_limits<uint32_t>::max();
@@ -112,21 +112,8 @@ public:
     }
 
     iss::status read_csr(unsigned addr, reg_t& val) override {
-#ifndef CWR_SYSTEMC
-        if((addr == iss::arch::time || addr == iss::arch::timeh) && owner->mtime_o.get_interface(0)) {
-            uint64_t time_val;
-            bool ret = owner->mtime_o->nb_peek(time_val);
-            if(addr == iss::arch::time) {
-                val = static_cast<reg_t>(time_val);
-            } else if(addr == iss::arch::timeh) {
-                if(sizeof(reg_t) != 4)
-                    return iss::Err;
-                val = static_cast<reg_t>(time_val >> 32);
-            }
-            return ret ? iss::Ok : iss::Err;
-#else
         if((addr == iss::arch::time || addr == iss::arch::timeh)) {
-            uint64_t time_val = owner->mtime_i.read();
+            uint64_t time_val = owner->mtime_i.get_interface() ? owner->mtime_i.read() : 0;
             if(addr == iss::arch::time) {
                 val = static_cast<reg_t>(time_val);
             } else if(addr == iss::arch::timeh) {
@@ -135,14 +122,13 @@ public:
                 val = static_cast<reg_t>(time_val >> 32);
             }
             return iss::Ok;
-#endif
         } else {
             return PLAT::read_csr(addr, val);
         }
     }
 
     void wait_until(uint64_t flags) override {
-        SCCDEBUG(owner->name()) << "Sleeping until interrupt";
+        SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         while(this->reg.pending_trap == 0 && (this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
             sc_core::wait(wfi_evt);
         }
@@ -173,11 +159,11 @@ public:
             this->csr[iss::arch::mip] &= ~mask;
         this->check_interrupt();
         if(value)
-            SCCTRACE(owner->name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
+            SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
     }
 
 private:
-    sysc::tgfs::core_complex* const owner;
+    sysc::riscv_vp::core_complex_if* const owner{nullptr};
     sc_core::sc_event wfi_evt;
     uint64_t hostvar{std::numeric_limits<uint64_t>::max()};
     unsigned to_host_wr_cnt = 0;

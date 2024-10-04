@@ -37,7 +37,10 @@
 #include <iss/asmjit/vm_base.h>
 #include <asmjit/asmjit.h>
 #include <util/logging.h>
-
+#include <iss/instruction_decoder.h>
+<%def fcsr = registers.find {it.name=='FCSR'}
+if(fcsr != null) {%>
+#include <vm/fp_functions.h><%}%>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -80,61 +83,62 @@ public:
 
 protected:
     using super::get_ptr_for;
-using super::get_reg;
     using super::get_reg_for;
+    using super::get_reg_for_Gp;
     using super::load_reg_from_mem;
+    using super::load_reg_from_mem_Gp;
     using super::write_reg_to_mem;
-    using super::gen_ext;
     using super::gen_read_mem;
     using super::gen_write_mem;
-    using super::gen_wait;
     using super::gen_leave;
-    using super::gen_operation;
+    using super::gen_sync;
    
     using this_class = vm_impl<ARCH>;
     using compile_func = continuation_e (this_class::*)(virt_addr_t&, code_word_t, jit_holder&);
 
     continuation_e gen_single_inst_behavior(virt_addr_t&, unsigned int &, jit_holder&) override;
+    enum globals_e {TVAL = 0, GLOBALS_SIZE};
     void gen_block_prologue(jit_holder& jh) override;
     void gen_block_epilogue(jit_holder& jh) override;
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
-
+<%if(fcsr != null) {%>
+    inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}   
+<%}%>
     void gen_instr_prologue(jit_holder& jh);
     void gen_instr_epilogue(jit_holder& jh);
     inline void gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause);
+    template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type> void gen_set_tval(jit_holder& jh, T new_tval) ;
+    void gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) ;
 
     template<unsigned W, typename U, typename S = typename std::make_signed<U>::type>
     inline S sext(U from) {
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    } 
+    }
+<%functions.each{ it.eachLine { %>
+    ${it}<%}%>
+<%}%>
 private:
     /****************************************************************************
      * start opcode definitions
      ****************************************************************************/
     struct instruction_descriptor {
-        size_t length;
+        uint32_t length;
         uint32_t value;
         uint32_t mask;
         compile_func op;
     };
-    struct decoding_tree_node{
-        std::vector<instruction_descriptor> instrs;
-        std::vector<decoding_tree_node*> children;
-        uint32_t submask = std::numeric_limits<uint32_t>::max();
-        uint32_t value;
-        decoding_tree_node(uint32_t value) : value(value){}
-    };
 
-    decoding_tree_node* root {nullptr};
-
-    const std::array<instruction_descriptor, ${instructions.size}> instr_descr = {{
+    const std::array<instruction_descriptor, ${instructions.size()}> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */<%instructions.each{instr -> %>
         /* instruction ${instr.instruction.name}, encoding '${instr.encoding}' */
         {${instr.length}, ${instr.encoding}, ${instr.mask}, &this_class::__${generator.functionName(instr.name)}},<%}%>
     }};
- 
+
+    //needs to be declared after instr_descr
+    decoder instr_decoder;
+
     /* instruction definitions */<%instructions.eachWithIndex{instr, idx -> %>
     /* instruction ${idx}: ${instr.name} */
     continuation_e __${generator.functionName(instr.name)}(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
@@ -147,7 +151,7 @@ private:
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignatureT<void, void *, uint64_t, char *>());
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
             call_print_disass->setArg(0, jh.arch_if_ptr);
             call_print_disass->setArg(1, pc.val);
             call_print_disass->setArg(2, mnemonic_ptr);
@@ -155,87 +159,49 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("${instr.name}_{:#x}:",pc.val).c_str());
-        this->gen_sync(jh, PRE_SYNC, ${idx});
-        cc.mov(jh.pc, pc.val);
+        gen_sync(jh, PRE_SYNC, ${idx});
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
         pc = pc+${instr.length/8};
-        cc.mov(jh.next_pc, pc.val);
+        mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
         /*generate behavior*/
         <%instr.behavior.eachLine{%>${it}
         <%}%>
+        gen_sync(jh, POST_SYNC, ${idx});
         gen_instr_epilogue(jh);
-        this->gen_sync(jh, POST_SYNC, ${idx});
     	return returnValue;        
     }
     <%}%>
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
-    continuation_e illegal_intruction(virt_addr_t &pc, code_word_t instr, jit_holder& jh ) {
+    continuation_e illegal_instruction(virt_addr_t &pc, code_word_t instr, jit_holder& jh ) {
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("illegal_intruction{:#x}:",pc.val).c_str());
-        this->gen_sync(jh, PRE_SYNC, instr_descr.size());
+        if(this->disass_enabled){          
+            auto mnemonic = std::string("illegal_instruction");
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+        }
+        cc.comment(fmt::format("illegal_instruction{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, instr_descr.size());
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
+        mov(cc, jh.next_pc, pc.val);
         gen_instr_prologue(jh);
         cc.comment("//behavior:");
+        gen_raise(jh, 0, 2);
+        gen_sync(jh, POST_SYNC, instr_descr.size());
         gen_instr_epilogue(jh);
-        this->gen_sync(jh, POST_SYNC, instr_descr.size());
-        return BRANCH;
-    }
-     
-    //decoding functionality
-
-    void populate_decoding_tree(decoding_tree_node* root){
-        //create submask
-        for(auto instr: root->instrs){
-            root->submask &= instr.mask;
-        }
-        //put each instr according to submask&encoding into children
-        for(auto instr: root->instrs){
-            bool foundMatch = false;
-            for(auto child: root->children){
-                //use value as identifying trait
-                if(child->value == (instr.value&root->submask)){
-                    child->instrs.push_back(instr);
-                    foundMatch = true;
-                }
-            }
-            if(!foundMatch){
-                decoding_tree_node* child = new decoding_tree_node(instr.value&root->submask);
-                child->instrs.push_back(instr);
-                root->children.push_back(child);
-            }
-        }
-        root->instrs.clear();
-        //call populate_decoding_tree for all children
-        if(root->children.size() >1)
-            for(auto child: root->children){
-                populate_decoding_tree(child);      
-            }
-        else{
-            //sort instrs by value of the mask, this works bc we want to have the least restrictive one last
-            std::sort(root->children[0]->instrs.begin(), root->children[0]->instrs.end(), [](const instruction_descriptor& instr1, const instruction_descriptor& instr2) {
-            return instr1.mask > instr2.mask;
-            }); 
-        }
-    }
-    compile_func decode_instr(decoding_tree_node* node, code_word_t word){
-        if(!node->children.size()){
-            if(node->instrs.size() == 1) return node->instrs[0].op;
-            for(auto instr : node->instrs){
-                if((instr.mask&word) == instr.value) return instr.op;
-            }
-        }
-        else{
-            for(auto child : node->children){
-                if (child->value == (node->submask&word)){
-                    return decode_instr(child, word);
-                }  
-            }  
-        }
-        return nullptr;
+        return ILLEGAL_INSTR;
     }
 };
 
@@ -243,13 +209,16 @@ template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
-: vm_base<ARCH>(core, core_id, cluster_id) {
-    root = new decoding_tree_node(std::numeric_limits<uint32_t>::max());
-    for(auto instr: instr_descr){
-        root->instrs.push_back(instr);
-    }
-    populate_decoding_tree(root);
-}
+: vm_base<ARCH>(core, core_id, cluster_id)
+, instr_decoder([this]() {
+        std::vector<generic_instruction_descriptor> g_instr_descr;
+        g_instr_descr.reserve(instr_descr.size());
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
+            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
+            g_instr_descr.push_back(new_instr_descr);
+        }
+        return std::move(g_instr_descr);
+    }()) {}
 
 template <typename ARCH>
 continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, jit_holder& jh) {
@@ -261,13 +230,16 @@ continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned
         paddr = this->core.virt2phys(pc);
     auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok)
-        throw trap_access(TRAP_ID, pc.val);
+        return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)
-        throw simulation_stopped(0); // 'J 0' or 'C.J 0'
+        return JUMP_TO_SELF;
     ++inst_cnt;
-    auto f = decode_instr(root, instr);
+    uint32_t inst_index = instr_decoder.decode_instr(instr);
+    compile_func f = nullptr;
+    if(inst_index < instr_descr.size())
+        f = instr_descr[inst_index].op;
     if (f == nullptr) 
-        f = &this_class::illegal_intruction;
+        f = &this_class::illegal_instruction;
     return (this->*f)(pc, instr, jh);
 }
 template <typename ARCH>
@@ -275,11 +247,10 @@ void vm_impl<ARCH>::gen_instr_prologue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//gen_instr_prologue");
-    cc.inc(get_ptr_for(jh, traits::ICOUNT));
 
-    x86::Gp current_trap_state = get_reg_for(jh, traits::TRAP_STATE);
-    cc.mov(current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
-    cc.mov(get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
+    x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
+    mov(cc, get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
 
 }
 template <typename ARCH>
@@ -287,16 +258,18 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//gen_instr_epilogue");
-    x86::Gp current_trap_state = get_reg_for(jh, traits::TRAP_STATE);
-    cc.mov(current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
-    cc.cmp(current_trap_state, 0);
+    x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
+    cmp(cc, current_trap_state, 0);
     cc.jne(jh.trap_entry);
+    cc.inc(get_ptr_for(jh, traits::ICOUNT));
 }
 template <typename ARCH>
 void vm_impl<ARCH>::gen_block_prologue(jit_holder& jh){
-
-    jh.pc = load_reg_from_mem(jh, traits::PC);
-    jh.next_pc = load_reg_from_mem(jh, traits::NEXT_PC);
+    jh.pc = load_reg_from_mem_Gp(jh, traits::PC);
+    jh.next_pc = load_reg_from_mem_Gp(jh, traits::NEXT_PC);
+    jh.globals.resize(GLOBALS_SIZE);
+    jh.globals[TVAL] = get_reg_Gp(jh.cc, 64, false);
 }
 template <typename ARCH>
 void vm_impl<ARCH>::gen_block_epilogue(jit_holder& jh){
@@ -306,39 +279,52 @@ void vm_impl<ARCH>::gen_block_epilogue(jit_holder& jh){
 
     cc.bind(jh.trap_entry);
     this->write_back(jh);
-    this->gen_sync(jh, POST_SYNC, -1);
 
-    x86::Gp current_trap_state = get_reg_for(jh, traits::TRAP_STATE);
-    cc.mov(current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
+    x86::Gp current_trap_state = get_reg_for_Gp(cc, traits::TRAP_STATE);
+    mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
 
-    x86::Gp current_pc = get_reg_for(jh, traits::PC);
-    cc.mov(current_pc, get_ptr_for(jh, traits::PC));
+    x86::Gp current_pc = get_reg_for_Gp(cc, traits::PC);
+    mov(cc, current_pc, get_ptr_for(jh, traits::PC));
 
-    x86::Gp instr = cc.newInt32("instr");
-    cc.mov(instr, 0); // FIXME:this is not correct
     cc.comment("//enter trap call;");
     InvokeNode* call_enter_trap;
-    cc.invoke(&call_enter_trap, &enter_trap, FuncSignatureT<uint64_t, void*, uint64_t, uint64_t, uint64_t>());
+    cc.invoke(&call_enter_trap, &enter_trap, FuncSignature::build<uint64_t, void*, uint64_t, uint64_t, uint64_t>());
     call_enter_trap->setArg(0, jh.arch_if_ptr);
     call_enter_trap->setArg(1, current_trap_state);
     call_enter_trap->setArg(2, current_pc);
-    call_enter_trap->setArg(3, instr);
+    call_enter_trap->setArg(3, jh.globals[TVAL]);
 
-    x86::Gp current_next_pc = get_reg_for(jh, traits::NEXT_PC);
-    cc.mov(current_next_pc, get_ptr_for(jh, traits::NEXT_PC));
-    cc.mov(jh.next_pc, current_next_pc);
+    x86_reg_t current_next_pc = get_reg_for(cc, traits::NEXT_PC);
+    mov(cc, current_next_pc, get_ptr_for(jh, traits::NEXT_PC));
+    mov(cc, jh.next_pc, current_next_pc);
 
-    cc.mov(get_ptr_for(jh, traits::LAST_BRANCH), std::numeric_limits<uint32_t>::max());
+    mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
     cc.ret(jh.next_pc);
 }
 template <typename ARCH>
 inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause) {
     auto& cc = jh.cc;
     cc.comment("//gen_raise");
-    auto tmp1 = get_reg_for(jh, traits::TRAP_STATE);
-    cc.mov(tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
-    cc.mov(get_ptr_for(jh, traits::TRAP_STATE), tmp1);
-    cc.mov(jh.next_pc, std::numeric_limits<uint32_t>::max());
+    auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
+    mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
+    cc.jmp(jh.trap_entry);
+}
+template <typename ARCH>
+template <typename T, typename>
+void vm_impl<ARCH>::gen_set_tval(jit_holder& jh, T new_tval) {
+        mov(jh.cc, jh.globals[TVAL], new_tval);
+    }
+template <typename ARCH>
+void vm_impl<ARCH>::gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) {
+    if(nonstd::holds_alternative<x86::Gp>(_new_tval)) {
+        x86::Gp new_tval = nonstd::get<x86::Gp>(_new_tval);
+        if(new_tval.size() < 8)
+            new_tval = gen_ext_Gp(jh.cc, new_tval, 64, false);
+        mov(jh.cc, jh.globals[TVAL], new_tval);
+    } else {
+        throw std::runtime_error("Variant not supported in gen_set_tval");
+    }
 }
 
 } // namespace tgc5c
@@ -363,7 +349,7 @@ volatile std::array<bool, 2> dummy = {
 		    auto vm = new asmjit::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<std::function<void(arch_if*, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t)>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
@@ -373,7 +359,7 @@ volatile std::array<bool, 2> dummy = {
 		    auto vm = new asmjit::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<std::function<void(arch_if*, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t, arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t)>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};

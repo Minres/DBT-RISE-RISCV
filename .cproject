@@ -57,10 +57,10 @@
 					<undefs/>
 				</win32>
 			</storageModule>
-			<storageModule buildDir="build/${ConfigName}" dirtyTs="1719729866498" moduleId="de.marw.cmake4eclipse.mbs.settings">
-				<options otherArguments="--preset conan-debug"/>
+			<storageModule buildDir="build/${ConfigName}" dirtyTs="1723907105559" moduleId="de.marw.cmake4eclipse.mbs.settings">
+				<options otherArguments="--preset Debug"/>
 				<defs>
-					<def name="CMAKE_BUILD_TYPE" type="STRING" val="DEBUG"/>
+					<def name="UPDATE_EXTERNAL_PROJECT" type="BOOL" val="ON"/>
 				</defs>
 			</storageModule>
 		</cconfiguration>

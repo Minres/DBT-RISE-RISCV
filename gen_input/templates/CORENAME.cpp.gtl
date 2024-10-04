@@ -47,10 +47,10 @@ def getRegisterSizes(){
 
 using namespace iss::arch;
 
-constexpr std::array<const char*, ${registers.size}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_names;
-constexpr std::array<const char*, ${registers.size}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_aliases;
-constexpr std::array<const uint32_t, ${getRegisterSizes().size}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_bit_widths;
-constexpr std::array<const uint32_t, ${getRegisterSizes().size}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_byte_offsets;
+constexpr std::array<const char*, ${registers.size()}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_names;
+constexpr std::array<const char*, ${registers.size()}>    iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_aliases;
+constexpr std::array<const uint32_t, ${getRegisterSizes().size()}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_bit_widths;
+constexpr std::array<const uint32_t, ${getRegisterSizes().size()}> iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_byte_offsets;
 
 ${coreDef.name.toLowerCase()}::${coreDef.name.toLowerCase()}()  = default;
 

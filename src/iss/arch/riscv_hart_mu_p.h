@@ -39,7 +39,9 @@
 #include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
+#include "iss/vm_types.h"
 #include "riscv_hart_common.h"
+#include <stdexcept>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -57,18 +59,11 @@
 
 #include <iss/semihosting/semihosting.h>
 
-#if defined(__GNUC__)
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#else
-#define likely(x) x
-#define unlikely(x) x
-#endif
-
 namespace iss {
 namespace arch {
 
-template <typename BASE, features_e FEAT = FEAT_NONE> class riscv_hart_mu_p : public BASE, public riscv_hart_common {
+template <typename BASE, features_e FEAT = FEAT_NONE, typename LOGCAT = logging::disass>
+class riscv_hart_mu_p : public BASE, public riscv_hart_common {
 protected:
     const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
     const std::array<const char*, 16> trap_str = {{""
@@ -95,7 +90,7 @@ protected:
 
 public:
     using core = BASE;
-    using this_class = riscv_hart_mu_p<BASE, FEAT>;
+    using this_class = riscv_hart_mu_p<BASE, FEAT, LOGCAT>;
     using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
     using addr_t = typename core::addr_t;
@@ -309,8 +304,8 @@ public:
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
     void disass_output(uint64_t pc, const std::string instr) override {
-        CLOG(INFO, disass) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                          this->reg.icount + cycle_offset);
+        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
+                                            this->reg.cycle + cycle_offset);
     };
 
     iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
@@ -324,7 +319,7 @@ public:
 protected:
     struct riscv_instrumentation_if : public iss::instrumentation_if {
 
-        riscv_instrumentation_if(riscv_hart_mu_p<BASE, FEAT>& arch)
+        riscv_instrumentation_if(riscv_hart_mu_p<BASE, FEAT, LOGCAT>& arch)
         : arch(arch) {}
         /**
          * get the name of this architecture
@@ -343,7 +338,7 @@ protected:
 
         uint64_t get_pendig_traps() override { return arch.reg.trap_state; }
 
-        uint64_t get_total_cycles() override { return arch.reg.icount + arch.cycle_offset; }
+        uint64_t get_total_cycles() override { return arch.reg.cycle + arch.cycle_offset; }
 
         void update_last_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
 
@@ -353,9 +348,9 @@ protected:
 
         unsigned get_reg_size(unsigned num) override { return traits<BASE>::reg_bit_widths[num]; }
 
-        std::unordered_map<std::string, uint64_t> get_symbol_table(std::string name) override { return arch.get_sym_table(name); }
+        std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
-        riscv_hart_mu_p<BASE, FEAT>& arch;
+        riscv_hart_mu_p<BASE, FEAT, LOGCAT>& arch;
     };
 
     friend struct riscv_instrumentation_if;
@@ -375,8 +370,6 @@ protected:
     int64_t instret_offset{0};
     uint64_t minstret_csr{0};
     reg_t fault_data;
-    uint64_t tohost = tohost_dflt;
-    uint64_t fromhost = fromhost_dflt;
     bool tohost_lower_written = false;
     riscv_instrumentation_if instr_if;
 
@@ -409,8 +402,8 @@ protected:
 
     std::vector<uint8_t> tcm;
 
-    iss::status read_csr_reg(unsigned addr, reg_t& val);
-    iss::status write_csr_reg(unsigned addr, reg_t val);
+    iss::status read_plain(unsigned addr, reg_t& val);
+    iss::status write_plain(unsigned addr, reg_t val);
     iss::status read_null(unsigned addr, reg_t& val);
     iss::status write_null(unsigned addr, reg_t val) { return iss::status::Ok; }
     iss::status read_cycle(unsigned addr, reg_t& val);
@@ -433,15 +426,17 @@ protected:
     iss::status read_intstatus(unsigned addr, reg_t& val);
     iss::status write_intthresh(unsigned addr, reg_t val);
     iss::status write_xtvt(unsigned addr, reg_t val);
-    iss::status write_dcsr_dcsr(unsigned addr, reg_t val);
-    iss::status read_dcsr_reg(unsigned addr, reg_t& val);
-    iss::status write_dcsr_reg(unsigned addr, reg_t val);
-    iss::status read_dpc_reg(unsigned addr, reg_t& val);
-    iss::status write_dpc_reg(unsigned addr, reg_t val);
-    iss::status write_pmpcfg_reg(unsigned addr, reg_t val);
+    iss::status write_dcsr(unsigned addr, reg_t val);
+    iss::status read_debug(unsigned addr, reg_t& val);
+    iss::status write_dscratch(unsigned addr, reg_t val);
+    iss::status read_dpc(unsigned addr, reg_t& val);
+    iss::status write_dpc(unsigned addr, reg_t val);
+    iss::status read_fcsr(unsigned addr, reg_t& val);
+    iss::status write_fcsr(unsigned addr, reg_t val);
+    iss::status write_pmpcfg(unsigned addr, reg_t val);
 
-    virtual iss::status read_custom_csr_reg(unsigned addr, reg_t& val) { return iss::status::Err; };
-    virtual iss::status write_custom_csr_reg(unsigned addr, reg_t val) { return iss::status::Err; };
+    virtual iss::status read_custom_csr(unsigned addr, reg_t& val) { return iss::status::Err; };
+    virtual iss::status write_custom_csr(unsigned addr, reg_t val) { return iss::status::Err; };
 
     void register_custom_csr_rd(unsigned addr) { csr_rd_cb[addr] = &this_class::read_custom_csr_reg; }
     void register_custom_csr_wr(unsigned addr) { csr_wr_cb[addr] = &this_class::write_custom_csr_reg; }
@@ -469,8 +464,8 @@ protected:
     std::function<mem_write_f> hart_mem_wr_delegate;
 };
 
-template <typename BASE, features_e FEAT>
-riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
+template <typename BASE, features_e FEAT, typename LOGCAT>
+riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p(feature_config cfg)
 : state()
 , instr_if(*this)
 , cfg(cfg) {
@@ -481,18 +476,22 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
     csr[mimpid] = 1;
 
     uart_buf.str("");
+    if(traits<BASE>::FLEN > 0) {
+        csr_rd_cb[fcsr] = &this_class::read_fcsr;
+        csr_wr_cb[fcsr] = &this_class::write_fcsr;
+    }
     for(unsigned addr = mhpmcounter3; addr <= mhpmcounter31; ++addr) {
         csr_rd_cb[addr] = &this_class::read_null;
-        csr_wr_cb[addr] = &this_class::write_csr_reg;
+        csr_wr_cb[addr] = &this_class::write_plain;
     }
     if(traits<BASE>::XLEN == 32)
         for(unsigned addr = mhpmcounter3h; addr <= mhpmcounter31h; ++addr) {
             csr_rd_cb[addr] = &this_class::read_null;
-            csr_wr_cb[addr] = &this_class::write_csr_reg;
+            csr_wr_cb[addr] = &this_class::write_plain;
         }
     for(unsigned addr = mhpmevent3; addr <= mhpmevent31; ++addr) {
         csr_rd_cb[addr] = &this_class::read_null;
-        csr_wr_cb[addr] = &this_class::write_csr_reg;
+        csr_wr_cb[addr] = &this_class::write_plain;
     }
     for(unsigned addr = hpmcounter3; addr <= hpmcounter31; ++addr) {
         csr_rd_cb[addr] = &this_class::read_null;
@@ -500,12 +499,11 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
     if(traits<BASE>::XLEN == 32)
         for(unsigned addr = hpmcounter3h; addr <= hpmcounter31h; ++addr) {
             csr_rd_cb[addr] = &this_class::read_null;
-            // csr_wr_cb[addr] = &this_class::write_csr_reg;
         }
     // common regs
     const std::array<unsigned, 4> roaddrs{{misa, mvendorid, marchid, mimpid}};
     for(auto addr : roaddrs) {
-        csr_rd_cb[addr] = &this_class::read_csr_reg;
+        csr_rd_cb[addr] = &this_class::read_plain;
         csr_wr_cb[addr] = &this_class::write_null;
     }
     const std::array<unsigned, 8> rwaddrs{{
@@ -519,8 +517,8 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
         utval,
     }};
     for(auto addr : rwaddrs) {
-        csr_rd_cb[addr] = &this_class::read_csr_reg;
-        csr_wr_cb[addr] = &this_class::write_csr_reg;
+        csr_rd_cb[addr] = &this_class::read_plain;
+        csr_wr_cb[addr] = &this_class::write_plain;
     }
     // special handling & overrides
     csr_rd_cb[time] = &this_class::read_time;
@@ -565,18 +563,18 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
 
     if(FEAT & FEAT_PMP) {
         for(size_t i = pmpaddr0; i <= pmpaddr15; ++i) {
-            csr_rd_cb[i] = &this_class::read_csr_reg;
-            csr_wr_cb[i] = &this_class::write_csr_reg;
+            csr_rd_cb[i] = &this_class::read_plain;
+            csr_wr_cb[i] = &this_class::write_plain;
         }
         for(size_t i = pmpcfg0; i < pmpcfg0 + 16 / sizeof(reg_t); ++i) {
-            csr_rd_cb[i] = &this_class::read_csr_reg;
-            csr_wr_cb[i] = &this_class::write_pmpcfg_reg;
+            csr_rd_cb[i] = &this_class::read_plain;
+            csr_wr_cb[i] = &this_class::write_pmpcfg;
         }
     }
     if(FEAT & FEAT_EXT_N) {
-        csr_rd_cb[mideleg] = &this_class::read_csr_reg;
+        csr_rd_cb[mideleg] = &this_class::read_plain;
         csr_wr_cb[mideleg] = &this_class::write_ideleg;
-        csr_rd_cb[medeleg] = &this_class::read_csr_reg;
+        csr_rd_cb[medeleg] = &this_class::read_plain;
         csr_wr_cb[medeleg] = &this_class::write_edeleg;
         csr_rd_cb[uie] = &this_class::read_ie;
         csr_wr_cb[uie] = &this_class::write_ie;
@@ -590,7 +588,7 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
         csr_rd_cb[utvec] = &this_class::read_tvec;
     }
     if(FEAT & FEAT_CLIC) {
-        csr_rd_cb[mtvt] = &this_class::read_csr_reg;
+        csr_rd_cb[mtvt] = &this_class::read_plain;
         csr_wr_cb[mtvt] = &this_class::write_xtvt;
         //        csr_rd_cb[mxnti] = &this_class::read_csr_reg;
         //        csr_wr_cb[mxnti] = &this_class::write_csr_reg;
@@ -600,14 +598,14 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
         //        csr_wr_cb[mscratchcsw] = &this_class::write_csr_reg;
         //        csr_rd_cb[mscratchcswl] = &this_class::read_csr_reg;
         //        csr_wr_cb[mscratchcswl] = &this_class::write_csr_reg;
-        csr_rd_cb[mintthresh] = &this_class::read_csr_reg;
+        csr_rd_cb[mintthresh] = &this_class::read_plain;
         csr_wr_cb[mintthresh] = &this_class::write_intthresh;
         if(FEAT & FEAT_EXT_N) {
-            csr_rd_cb[utvt] = &this_class::read_csr_reg;
+            csr_rd_cb[utvt] = &this_class::read_plain;
             csr_wr_cb[utvt] = &this_class::write_xtvt;
             csr_rd_cb[uintstatus] = &this_class::read_intstatus;
             csr_wr_cb[uintstatus] = &this_class::write_null;
-            csr_rd_cb[uintthresh] = &this_class::read_csr_reg;
+            csr_rd_cb[uintthresh] = &this_class::read_plain;
             csr_wr_cb[uintthresh] = &this_class::write_intthresh;
         }
         clic_int_reg.resize(cfg.clic_num_irq, clic_int_reg_t{.raw = 0});
@@ -636,89 +634,34 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p(feature_config cfg)
         insert_mem_range(cfg.tcm_base, cfg.tcm_size, read_clic_cb, write_clic_cb);
     }
     if(FEAT & FEAT_DEBUG) {
-        csr_wr_cb[dscratch0] = &this_class::write_dcsr_reg;
-        csr_rd_cb[dscratch0] = &this_class::read_dcsr_reg;
-        csr_wr_cb[dscratch1] = &this_class::write_dcsr_reg;
-        csr_rd_cb[dscratch1] = &this_class::read_dcsr_reg;
-        csr_wr_cb[dpc] = &this_class::write_dpc_reg;
-        csr_rd_cb[dpc] = &this_class::read_dpc_reg;
-        csr_wr_cb[dcsr] = &this_class::write_dcsr_dcsr;
-        csr_rd_cb[dcsr] = &this_class::read_dcsr_reg;
+        csr_wr_cb[dscratch0] = &this_class::write_dscratch;
+        csr_rd_cb[dscratch0] = &this_class::read_debug;
+        csr_wr_cb[dscratch1] = &this_class::write_dscratch;
+        csr_rd_cb[dscratch1] = &this_class::read_debug;
+        csr_wr_cb[dpc] = &this_class::write_dpc;
+        csr_rd_cb[dpc] = &this_class::read_dpc;
+        csr_wr_cb[dcsr] = &this_class::write_dcsr;
+        csr_rd_cb[dcsr] = &this_class::read_debug;
     }
     hart_mem_rd_delegate = [this](phys_addr_t a, unsigned l, uint8_t* const d) -> iss::status { return this->read_mem(a, l, d); };
     hart_mem_wr_delegate = [this](phys_addr_t a, unsigned l, uint8_t const* const d) -> iss::status { return this->write_mem(a, l, d); };
 }
 
-template <typename BASE, features_e FEAT> std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT>::load_file(std::string name, int type) {
-    FILE* fp = fopen(name.c_str(), "r");
-    if(fp) {
-        std::array<char, 5> buf;
-        auto n = fread(buf.data(), 1, 4, fp);
-        fclose(fp);
-        if(n != 4)
-            throw std::runtime_error("input file has insufficient size");
-        buf[4] = 0;
-        if(strcmp(buf.data() + 1, "ELF") == 0) {
-            // Create elfio reader
-            ELFIO::elfio reader;
-            // Load ELF data
-            if(!reader.load(name))
-                throw std::runtime_error("could not process elf file");
-            // check elf properties
-            if(reader.get_class() != ELFIO::ELFCLASS32)
-                if(sizeof(reg_t) == 4)
-                    throw std::runtime_error("wrong elf class in file");
-            if(reader.get_type() != ELFIO::ET_EXEC)
-                throw std::runtime_error("wrong elf type in file");
-            if(reader.get_machine() != ELFIO::EM_RISCV)
-                throw std::runtime_error("wrong elf machine in file");
-            auto entry = reader.get_entry();
-            for(const auto& pseg : reader.segments) {
-                const auto fsize = pseg->get_file_size(); // 0x42c/0x0
-                const auto seg_data = pseg->get_data();
-                if(fsize > 0) {
-                    auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
-                                           pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
-                    if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
-                }
-            }
-            for(auto& sec : reader.sections) {
-                if(sec->get_name() == ".symtab") {
-                    if(ELFIO::SHT_SYMTAB == sec->get_type() || ELFIO::SHT_DYNSYM == sec->get_type()) {
-                        ELFIO::symbol_section_accessor symbols{reader, sec.get()};
-                        auto sym_no = symbols.get_symbols_num();
-                        std::string name;
-                        ELFIO::Elf64_Addr value = 0;
-                        ELFIO::Elf_Xword size = 0;
-                        unsigned char bind = 0;
-                        unsigned char type = 0;
-                        ELFIO::Elf_Half section = 0;
-                        unsigned char other = 0;
-                        for(auto i = 0U; i < sym_no; ++i) {
-                            symbols.get_symbol(i, name, value, size, bind, type, section, other);
-                            if(name == "tohost") {
-                                tohost = value;
-                            } else if(name == "fromhost") {
-                                fromhost = value;
-                            }
-                        }
-                    }
-                } else if(sec->get_name() == ".tohost") {
-                    tohost = sec->get_address();
-                    fromhost = tohost + 0x40;
-                }
-            }
-            return std::make_pair(entry, true);
-        }
-        throw std::runtime_error(fmt::format("memory load file {} is not a valid elf file", name));
+template <typename BASE, features_e FEAT, typename LOGCAT>
+std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT, LOGCAT>::load_file(std::string name, int type) {
+    if(read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64,
+                     [this](uint64_t addr, uint64_t size, const uint8_t* const data) -> iss::status {
+                         return this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM, addr, size,
+                                            data);
+                     })) {
+        return std::make_pair(entry_address, true);
     }
-    throw std::runtime_error(fmt::format("memory load file not found, check if {} is a valid file", name));
+    return std::make_pair(entry_address, false);
 }
 
-template <typename BASE, features_e FEAT>
-inline void riscv_hart_mu_p<BASE, FEAT>::insert_mem_range(uint64_t base, uint64_t size, std::function<mem_read_f> rd_f,
-                                                          std::function<mem_write_f> wr_fn) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::insert_mem_range(uint64_t base, uint64_t size, std::function<mem_read_f> rd_f,
+                                                                  std::function<mem_write_f> wr_fn) {
     std::tuple<uint64_t, uint64_t> entry{base, size};
     auto it = std::upper_bound(
         memfn_range.begin(), memfn_range.end(), entry,
@@ -729,13 +672,14 @@ inline void riscv_hart_mu_p<BASE, FEAT>::insert_mem_range(uint64_t base, uint64_
     memfn_write.insert(std::begin(memfn_write) + idx, wr_fn);
 }
 
-template <typename BASE, features_e FEAT> inline iss::status riscv_hart_mu_p<BASE, FEAT>::write_pmpcfg_reg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+inline iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_pmpcfg(unsigned addr, reg_t val) {
     csr[addr] = val & 0x9f9f9f9f;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT>
-bool riscv_hart_mu_p<BASE, FEAT>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+bool riscv_hart_mu_p<BASE, FEAT, LOGCAT>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
     constexpr auto PMP_SHIFT = 2U;
     constexpr auto PMP_R = 0x1U;
     constexpr auto PMP_W = 0x2U;
@@ -815,9 +759,9 @@ bool riscv_hart_mu_p<BASE, FEAT>::pmp_check(const access_type type, const uint64
     return !any_active || this->reg.PRIV == PRIV_M;
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::read(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
-                                              const unsigned length, uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, const access_type access, const uint32_t space,
+                                                      const uint64_t addr, const unsigned length, uint8_t* const data) {
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
         CPPLOG(TRACEALL) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
@@ -874,8 +818,10 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const address_type type, const acc
                 }
                 return res;
             } catch(trap_access& ta) {
-                this->reg.trap_state = (1UL << 31) | ta.id;
-                fault_data = ta.addr;
+                if((access & access_type::DEBUG) == 0) {
+                    this->reg.trap_state = (1UL << 31) | ta.id;
+                    fault_data = ta.addr;
+                }
                 return iss::Err;
             }
         } break;
@@ -902,15 +848,17 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const address_type type, const acc
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::write(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
-                                               const unsigned length, const uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, const access_type access, const uint32_t space,
+                                                       const uint64_t addr, const unsigned length, const uint8_t* const data) {
 #ifndef NDEBUG
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
@@ -992,8 +940,6 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const address_type type, const ac
             case 0x10023000: // UART1 base, TXFIFO reg
                 uart_buf << (char)data[0];
                 if(((char)data[0]) == '\n' || data[0] == 0) {
-                    // CPPLOG(INFO)<<"UART"<<((addr>>16)&0x3)<<" send
-                    // '"<<uart_buf.str()<<"'";
                     std::cout << uart_buf.str();
                     uart_buf.str("");
                 }
@@ -1044,13 +990,16 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const address_type type, const ac
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_csr(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_csr(unsigned addr, reg_t& val) {
     if(addr >= csr.size())
         return iss::Err;
     auto req_priv_lvl = (addr >> 8) & 0x3;
@@ -1062,7 +1011,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return (this->*(it->second))(addr, val);
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_csr(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_csr(unsigned addr, reg_t val) {
     if(addr >= csr.size())
         return iss::Err;
     auto req_priv_lvl = (addr >> 8) & 0x3;
@@ -1076,23 +1026,27 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return (this->*(it->second))(addr, val);
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_csr_reg(unsigned addr, reg_t& val) {
-    val = csr[addr];
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_null(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_null(unsigned addr, reg_t& val) {
     val = 0;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_csr_reg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_plain(unsigned addr, reg_t& val) {
+    val = csr[addr];
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_plain(unsigned addr, reg_t val) {
     csr[addr] = val;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_cycle(unsigned addr, reg_t& val) {
-    auto cycle_val = this->reg.icount + cycle_offset;
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cycle(unsigned addr, reg_t& val) {
+    auto cycle_val = this->reg.cycle + cycle_offset;
     if(addr == mcycle) {
         val = static_cast<reg_t>(cycle_val);
     } else if(addr == mcycleh) {
@@ -1101,7 +1055,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_cycle(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cycle(unsigned addr, reg_t val) {
     if(sizeof(typename traits<BASE>::reg_t) != 4) {
         mcycle_csr = static_cast<uint64_t>(val);
     } else {
@@ -1111,11 +1066,12 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
             mcycle_csr = (static_cast<uint64_t>(val) << 32) + (mcycle_csr & 0xffffffff);
         }
     }
-    cycle_offset = mcycle_csr - this->reg.icount; // TODO: relying on wrap-around
+    cycle_offset = mcycle_csr - this->reg.cycle; // TODO: relying on wrap-around
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_instret(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_instret(unsigned addr, reg_t& val) {
     if((addr & 0xff) == (minstret & 0xff)) {
         val = static_cast<reg_t>(this->reg.instret);
     } else if((addr & 0xff) == (minstreth & 0xff)) {
@@ -1124,7 +1080,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_instret(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_instret(unsigned addr, reg_t val) {
     if(sizeof(typename traits<BASE>::reg_t) != 4) {
         this->reg.instret = static_cast<uint64_t>(val);
     } else {
@@ -1138,8 +1095,9 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_time(unsigned addr, reg_t& val) {
-    uint64_t time_val = this->reg.icount / (100000000 / 32768 - 1); //-> ~3052;
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_time(unsigned addr, reg_t& val) {
+    uint64_t time_val = this->reg.cycle / (100000000 / 32768 - 1); //-> ~3052;
     if(addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if(addr == timeh) {
@@ -1150,22 +1108,27 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_tvec(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_tvec(unsigned addr, reg_t& val) {
     val = FEAT & features_e::FEAT_CLIC ? csr[addr] : csr[addr] & ~2;
     return iss::Ok;
 }
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
     val = state.mstatus & hart_state_type::get_mask((addr >> 8) & 0x3);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_status(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_status(unsigned addr, reg_t val) {
     state.write_mstatus(val, (addr >> 8) & 0x3);
     check_interrupt();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_cause(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cause(unsigned addr, reg_t& val) {
     if((FEAT & features_e::FEAT_CLIC) && (csr[mtvec] & 0x3) == 3) {
         val = csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1) | (0xfUL << 16));
         auto mode = (addr >> 8) & 0x3;
@@ -1185,7 +1148,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_cause(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cause(unsigned addr, reg_t val) {
     if((FEAT & features_e::FEAT_CLIC) && (csr[mtvec] & 0x3) == 3) {
         auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1) | (0xfUL << 16));
         csr[addr] = (val & mask) | (csr[addr] & ~mask);
@@ -1208,12 +1172,14 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_hartid(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_hartid(unsigned addr, reg_t& val) {
     val = mhartid_reg;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
     val = csr[mie] & mask;
     if(this->reg.PRIV != 3)
@@ -1221,14 +1187,16 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
     csr[mie] = (csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
     val = csr[mip] & mask;
     if(this->reg.PRIV != 3)
@@ -1236,24 +1204,28 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ideleg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ideleg(unsigned addr, reg_t val) {
     auto mask = 0b000100010001; // only U mode supported
     csr[mideleg] = (csr[mideleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_edeleg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, reg_t val) {
     auto mask = 0b1011001111110111; // bit 14/10 (reserved), bit 11 (Env call), and 3 (break) are hardwired to 0
     csr[medeleg] = (csr[medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_epc(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_epc(unsigned addr, reg_t val) {
     csr[addr] = val & get_pc_mask();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_dcsr_dcsr(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dcsr(unsigned addr, reg_t val) {
     if(!debug_mode_active())
         throw illegal_instruction_fault(this->fault_data);
     //                  +-------------- ebreakm
@@ -1264,35 +1236,40 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_dcsr_reg(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_debug(unsigned addr, reg_t& val) {
     if(!debug_mode_active())
         throw illegal_instruction_fault(this->fault_data);
     val = csr[addr];
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_dcsr_reg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dscratch(unsigned addr, reg_t val) {
     if(!debug_mode_active())
         throw illegal_instruction_fault(this->fault_data);
     csr[addr] = val;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_dpc_reg(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_dpc(unsigned addr, reg_t& val) {
     if(!debug_mode_active())
         throw illegal_instruction_fault(this->fault_data);
     val = this->reg.DPC;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_dpc_reg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dpc(unsigned addr, reg_t val) {
     if(!debug_mode_active())
         throw illegal_instruction_fault(this->fault_data);
     this->reg.DPC = val;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_intstatus(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_intstatus(unsigned addr, reg_t& val) {
     auto mode = (addr >> 8) & 0x3;
     val = clic_uact_lvl & 0xff;
     if(mode == 0x3)
@@ -1300,18 +1277,32 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_intthresh(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_fcsr(unsigned addr, reg_t& val) {
+    val = this->get_fcsr();
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_fcsr(unsigned addr, reg_t val) {
+    this->set_fcsr(val);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_intthresh(unsigned addr, reg_t val) {
     csr[addr] = (val & 0xff) | (1 << (cfg.clic_int_ctl_bits)) - 1;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_xtvt(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_xtvt(unsigned addr, reg_t val) {
     csr[addr] = val & ~0x3fULL;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::read_mem(phys_addr_t paddr, unsigned length, uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_mem(phys_addr_t paddr, unsigned length, uint8_t* const data) {
     switch(paddr.val) {
     default: {
         for(auto offs = 0U; offs < length; ++offs) {
@@ -1322,8 +1313,8 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read_mem(phys_addr_t paddr, unsigned le
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::write_mem(phys_addr_t paddr, unsigned length, const uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_mem(phys_addr_t paddr, unsigned length, const uint8_t* const data) {
     switch(paddr.val) {
     // TODO remove UART, Peripherals should not be part of the ISS
     case 0xFFFF0000: // UART0 base, TXFIFO reg
@@ -1384,8 +1375,8 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write_mem(phys_addr_t paddr, unsigned l
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
     if(addr == cfg.clic_base) { // cliccfg
         *data = clic_cfg_reg;
         for(auto i = 1; i < length; ++i)
@@ -1404,8 +1395,8 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read_clic(uint64_t addr, unsigned lengt
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
     if(addr == cfg.clic_base) { // cliccfg
         clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
@@ -1420,12 +1411,12 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write_clic(uint64_t addr, unsigned leng
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT> inline void riscv_hart_mu_p<BASE, FEAT>::reset(uint64_t address) {
+template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
     BASE::reset(address);
     state.mstatus = hart_state_type::mstatus_reset_val;
 }
 
-template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::check_interrupt() {
+template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::check_interrupt() {
     // TODO: Implement CLIC functionality
     auto ideleg = csr[mideleg];
     // Multiple simultaneous interrupts and traps at the same privilege level are
@@ -1448,7 +1439,8 @@ template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::chec
     }
 }
 
-template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
+template <typename BASE, features_e FEAT, typename LOGCAT>
+uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
     if(flags == std::numeric_limits<uint64_t>::max())
@@ -1582,7 +1574,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
     return this->reg.NEXT_PC;
 }
 
-template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::leave_trap(uint64_t flags) {
+template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::leave_trap(uint64_t flags) {
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = (flags & 0x3) ? 3 : 0;
     if(inst_priv > cur_priv) {

@@ -2,7 +2,7 @@ import "ISA/RVI.core_desc"
 import "ISA/RVC.core_desc"
 import "ISA/RVM.core_desc"
 import "ISA/RVA.core_desc"
-import "ISA/RVC.core_desc"
+import "ISA/Zc.core_desc"
 import "ISA/RVF.core_desc"
 import "ISA/RVD.core_desc"
 
@@ -12,42 +12,30 @@ Core RV32I provides RVI, Zicsr, Zifencei {
         XLEN=32;
         // definitions for the architecture wrapper
         //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000000000100000000;
+        unsigned <XLEN> MISA_VAL = 0b01000000000000000000000100000000;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
 }
 
-Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC {
+Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
     architectural_state {
         XLEN=32;
         // definitions for the architecture wrapper
         //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000001000100000101;
+        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100000101;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
 }
 
-Core RV32IMACF provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
-    architectural_state {
-        XLEN=32;
-        FLEN=32;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000001000100100101;
-        unsigned int MARCHID_VAL = 0x00000000;
-        unsigned int CLIC_NUM_IRQ = 0;
-    }
-}
-
-Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
     architectural_state {
         XLEN=32;
         FLEN=64;
         // definitions for the architecture wrapper
         //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000001000100101101;
+        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100101101;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -57,25 +45,23 @@ Core RV64I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=64;
         // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b10000000000000000000000100000000;
+        unsigned <XLEN> MISA_VAL = 0x80000100;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
 }
 
-Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, RVC, RVF, RVD {
+Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd {
     architectural_state {
         XLEN=64;
         FLEN=64;
         // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned int MISA_VAL = 0b01000000000000000001000100101101;
+        unsigned <XLEN> MISA_VAL = 0x800000000000112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
 }
 
 /*
-for i in RV32I RV32IMAC RV32GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b interp -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done 
- */ 
+for i in RV32I RV32IMAC RV32IMACF RV32GC RV64I RV64GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b interp -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done 
+*/ 

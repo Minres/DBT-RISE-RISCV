@@ -39,7 +39,9 @@
 #include "iss/instrumentation_if.h"
 #include "iss/log_categories.h"
 #include "iss/vm_if.h"
+#include "iss/vm_types.h"
 #include "riscv_hart_common.h"
+#include <stdexcept>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -56,14 +58,6 @@
 #include <util/sparse_array.h>
 
 #include <iss/semihosting/semihosting.h>
-
-#if defined(__GNUC__)
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#else
-#define likely(x) x
-#define unlikely(x) x
-#endif
 
 namespace iss {
 namespace arch {
@@ -334,7 +328,7 @@ public:
 
     void disass_output(uint64_t pc, const std::string instr) override {
         CLOG(INFO, disass) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                          this->reg.icount + cycle_offset);
+                                          this->reg.cycle + cycle_offset);
     };
 
     iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
@@ -367,7 +361,7 @@ protected:
 
         uint64_t get_pendig_traps() override { return arch.reg.trap_state; }
 
-        uint64_t get_total_cycles() override { return arch.reg.icount + arch.cycle_offset; }
+        uint64_t get_total_cycles() override { return arch.reg.cycle + arch.cycle_offset; }
 
         void update_last_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
 
@@ -377,7 +371,7 @@ protected:
 
         unsigned get_reg_size(unsigned num) override { return traits<BASE>::reg_bit_widths[num]; }
 
-        std::unordered_map<std::string, uint64_t> get_symbol_table(std::string name) override { return arch.get_sym_table(name); }
+        std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
         riscv_hart_msu_vp<BASE>& arch;
     };
@@ -399,8 +393,6 @@ protected:
     uint64_t minstret_csr{0};
     reg_t fault_data;
     std::array<vm_info, 2> vm;
-    uint64_t tohost = tohost_dflt;
-    uint64_t fromhost = fromhost_dflt;
     bool tohost_lower_written = false;
     riscv_instrumentation_if instr_if;
 
@@ -563,70 +555,14 @@ riscv_hart_msu_vp<BASE>::riscv_hart_msu_vp()
 }
 
 template <typename BASE> std::pair<uint64_t, bool> riscv_hart_msu_vp<BASE>::load_file(std::string name, int type) {
-    FILE* fp = fopen(name.c_str(), "r");
-    if(fp) {
-        std::array<char, 5> buf;
-        auto n = fread(buf.data(), 1, 4, fp);
-        fclose(fp);
-        if(n != 4)
-            throw std::runtime_error("input file has insufficient size");
-        buf[4] = 0;
-        if(strcmp(buf.data() + 1, "ELF") == 0) {
-            // Create elfio reader
-            ELFIO::elfio reader;
-            // Load ELF data
-            if(!reader.load(name))
-                throw std::runtime_error("could not process elf file");
-            // check elf properties
-            if(reader.get_class() != ELFCLASS32)
-                if(sizeof(reg_t) == 4)
-                    throw std::runtime_error("wrong elf class in file");
-            if(reader.get_type() != ET_EXEC)
-                throw std::runtime_error("wrong elf type in file");
-            if(reader.get_machine() != EM_RISCV)
-                throw std::runtime_error("wrong elf machine in file");
-            auto entry = reader.get_entry();
-            for(const auto pseg : reader.segments) {
-                const auto fsize = pseg->get_file_size(); // 0x42c/0x0
-                const auto seg_data = pseg->get_data();
-                if(fsize > 0) {
-                    auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
-                                           pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
-                    if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
-                }
-            }
-            for(const auto sec : reader.sections) {
-                if(sec->get_name() == ".symtab") {
-                    if(SHT_SYMTAB == sec->get_type() || SHT_DYNSYM == sec->get_type()) {
-                        ELFIO::symbol_section_accessor symbols(reader, sec);
-                        auto sym_no = symbols.get_symbols_num();
-                        std::string name;
-                        ELFIO::Elf64_Addr value = 0;
-                        ELFIO::Elf_Xword size = 0;
-                        unsigned char bind = 0;
-                        unsigned char type = 0;
-                        ELFIO::Elf_Half section = 0;
-                        unsigned char other = 0;
-                        for(auto i = 0U; i < sym_no; ++i) {
-                            symbols.get_symbol(i, name, value, size, bind, type, section, other);
-                            if(name == "tohost") {
-                                tohost = value;
-                            } else if(name == "fromhost") {
-                                fromhost = value;
-                            }
-                        }
-                    }
-                } else if(sec->get_name() == ".tohost") {
-                    tohost = sec->get_address();
-                    fromhost = tohost + 0x40;
-                }
-            }
-            return std::make_pair(entry, true);
-        }
-        throw std::runtime_error(fmt::format("memory load file {} is not a valid elf file", name));
+    if(read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64,
+                     [this](uint64_t addr, uint64_t size, const uint8_t* const data) -> iss::status {
+                         return this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM, addr, size,
+                                            data);
+                     })) {
+        return std::make_pair(entry_address, true);
     }
-    throw std::runtime_error(fmt::format("memory load file not found, check if {} is a valid file", name));
+    return std::make_pair(entry_address, false);
 }
 
 template <typename BASE>
@@ -676,8 +612,10 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
                 }
                 return res;
             } catch(trap_access& ta) {
-                this->reg.trap_state = (1 << 31) | ta.id;
-                fault_data = ta.addr;
+                if((access & access_type::DEBUG) == 0) {
+                    this->reg.trap_state = (1UL << 31) | ta.id;
+                    fault_data = ta.addr;
+                }
                 return iss::Err;
             }
         } break;
@@ -715,8 +653,10 @@ iss::status riscv_hart_msu_vp<BASE>::read(const address_type type, const access_
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
@@ -846,8 +786,10 @@ iss::status riscv_hart_msu_vp<BASE>::write(const address_type type, const access
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        this->reg.trap_state = (1UL << 31) | ta.id;
-        fault_data = ta.addr;
+        if((access & access_type::DEBUG) == 0) {
+            this->reg.trap_state = (1UL << 31) | ta.id;
+            fault_data = ta.addr;
+        }
         return iss::Err;
     }
 }
@@ -894,7 +836,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_reg(unsigned
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_cycle(unsigned addr, reg_t& val) {
-    auto cycle_val = this->reg.icount + cycle_offset;
+    auto cycle_val = this->reg.cycle + cycle_offset;
     if(addr == mcycle) {
         val = static_cast<reg_t>(cycle_val);
     } else if(addr == mcycleh) {
@@ -915,7 +857,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_cycle(unsign
             mcycle_csr = (static_cast<uint64_t>(val) << 32) + (mcycle_csr & 0xffffffff);
         }
     }
-    cycle_offset = mcycle_csr - this->reg.icount; // TODO: relying on wrap-around
+    cycle_offset = mcycle_csr - this->reg.cycle; // TODO: relying on wrap-around
     return iss::Ok;
 }
 
@@ -943,7 +885,7 @@ template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::write_instret(unsi
 }
 
 template <typename BASE> iss::status riscv_hart_msu_vp<BASE>::read_time(unsigned addr, reg_t& val) {
-    uint64_t time_val = this->reg.icount / (100000000 / 32768 - 1); //-> ~3052;
+    uint64_t time_val = this->reg.cycle / (100000000 / 32768 - 1); //-> ~3052;
     if(addr == time) {
         val = static_cast<reg_t>(time_val);
     } else if(addr == timeh) {

@@ -33,6 +33,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "fp_functions.h"
+#include <array>
 
 extern "C" {
 #include "internals.h"
@@ -43,9 +44,10 @@ extern "C" {
 #include <limits>
 
 using this_t = uint8_t*;
-const uint8_t rmm_map[] = {
-    softfloat_round_near_even /*RNE*/,   softfloat_round_minMag /*RTZ*/, softfloat_round_min /*RDN*/, softfloat_round_max /*RUP?*/,
-    softfloat_round_near_maxMag /*RMM*/, softfloat_round_max /*RTZ*/,    softfloat_round_max /*RTZ*/, softfloat_round_max /*RTZ*/,
+// this does not inlcude any reserved rm or the DYN rm, as DYN rm should be taken care of in the vm_impl
+const std::array<uint8_t, 5> rmm_map = {
+    softfloat_round_near_even /*RNE*/, softfloat_round_minMag /*RTZ*/, softfloat_round_min /*RDN*/, softfloat_round_max /*RUP?*/,
+    softfloat_round_near_maxMag /*RMM*/
 };
 
 const uint32_t quiet_nan32 = 0x7fC00000;
@@ -56,7 +58,7 @@ uint32_t fget_flags() { return softfloat_exceptionFlags & 0x1f; }
 
 uint32_t fadd_s(uint32_t v1, uint32_t v2, uint8_t mode) {
     float32_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float32_t r = f32_add(v1f, v2f);
     return r.v;
@@ -64,7 +66,7 @@ uint32_t fadd_s(uint32_t v1, uint32_t v2, uint8_t mode) {
 
 uint32_t fsub_s(uint32_t v1, uint32_t v2, uint8_t mode) {
     float32_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float32_t r = f32_sub(v1f, v2f);
     return r.v;
@@ -72,7 +74,7 @@ uint32_t fsub_s(uint32_t v1, uint32_t v2, uint8_t mode) {
 
 uint32_t fmul_s(uint32_t v1, uint32_t v2, uint8_t mode) {
     float32_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float32_t r = f32_mul(v1f, v2f);
     return r.v;
@@ -80,7 +82,7 @@ uint32_t fmul_s(uint32_t v1, uint32_t v2, uint8_t mode) {
 
 uint32_t fdiv_s(uint32_t v1, uint32_t v2, uint8_t mode) {
     float32_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float32_t r = f32_div(v1f, v2f);
     return r.v;
@@ -88,7 +90,7 @@ uint32_t fdiv_s(uint32_t v1, uint32_t v2, uint8_t mode) {
 
 uint32_t fsqrt_s(uint32_t v1, uint8_t mode) {
     float32_t v1f{v1};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float32_t r = f32_sqrt(v1f);
     return r.v;
@@ -130,18 +132,18 @@ uint32_t fcvt_s(uint32_t v1, uint32_t op, uint8_t mode) {
     softfloat_exceptionFlags = 0;
     float32_t r;
     switch(op) {
-    case 0: { // w->s, fp to int32
-        uint_fast32_t res = f32_to_i32(v1f, rmm_map[mode & 0x7], true);
+    case 0: { // FCVT__W__S
+        uint_fast32_t res = f32_to_i32(v1f, rmm_map.at(mode), true);
         return (uint32_t)res;
     }
-    case 1: { // wu->s
-        uint_fast32_t res = f32_to_ui32(v1f, rmm_map[mode & 0x7], true);
+    case 1: { // FCVT__WU__S
+        uint_fast32_t res = f32_to_ui32(v1f, rmm_map.at(mode), true);
         return (uint32_t)res;
     }
-    case 2: // s->w
-        r = i32_to_f32(v1);
+    case 2: // FCVT__S__W
+        r = i32_to_f32((int32_t)v1);
         return r.v;
-    case 3: // s->wu
+    case 3: // FCVT__S__WU
         r = ui32_to_f32(v1);
         return r.v;
     }
@@ -149,12 +151,24 @@ uint32_t fcvt_s(uint32_t v1, uint32_t op, uint8_t mode) {
 }
 
 uint32_t fmadd_s(uint32_t v1, uint32_t v2, uint32_t v3, uint32_t op, uint8_t mode) {
-    // op should be {softfloat_mulAdd_subProd(2), softfloat_mulAdd_subC(1)}
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    uint32_t F32_SIGN = 1UL << 31;
+    switch(op) {
+    case 0: // FMADD_S
+        break;
+    case 1: // FMSUB_S
+        v3 ^= F32_SIGN;
+        break;
+    case 2: // FNMADD_S
+        v1 ^= F32_SIGN;
+        v3 ^= F32_SIGN;
+        break;
+    case 3: // FNMSUB_S
+        v1 ^= F32_SIGN;
+        break;
+    }
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
-    float32_t res = softfloat_mulAddF32(v1, v2, v3, op & 0x1);
-    if(op > 1)
-        res.v ^= 1ULL << 31;
+    float32_t res = softfloat_mulAddF32(v1, v2, v3, 0);
     return res.v;
 }
 
@@ -189,8 +203,8 @@ uint32_t fclass_s(uint32_t v1) {
     uA.f = a;
     uiA = uA.ui;
 
-    uint_fast16_t infOrNaN = expF32UI(uiA) == 0xFF;
-    uint_fast16_t subnormalOrZero = expF32UI(uiA) == 0;
+    bool infOrNaN = expF32UI(uiA) == 0xFF;
+    bool subnormalOrZero = expF32UI(uiA) == 0;
     bool sign = signF32UI(uiA);
     bool fracZero = fracF32UI(uiA) == 0;
     bool isNaN = isNaNF32UI(uiA);
@@ -203,9 +217,13 @@ uint32_t fclass_s(uint32_t v1) {
 }
 
 uint32_t fconv_d2f(uint64_t v1, uint8_t mode) {
-    softfloat_roundingMode = rmm_map[mode & 0x7];
-    bool nan = (v1 & defaultNaNF64UI) == defaultNaNF64UI;
-    if(nan) {
+    bool isNan = isNaNF64UI(v1);
+    bool isSNaN = softfloat_isSigNaNF64UI(v1);
+    softfloat_roundingMode = rmm_map.at(mode);
+    softfloat_exceptionFlags = 0;
+    if(isNan) {
+        if(isSNaN)
+            softfloat_raiseFlags(softfloat_flag_invalid);
         return defaultNaNF32UI;
     } else {
         float32_t res = f64_to_f32(float64_t{v1});
@@ -214,11 +232,11 @@ uint32_t fconv_d2f(uint64_t v1, uint8_t mode) {
 }
 
 uint64_t fconv_f2d(uint32_t v1, uint8_t mode) {
-    bool nan = (v1 & defaultNaNF32UI) == defaultNaNF32UI;
-    if(nan) {
+    bool infOrNaN = expF32UI(v1) == 0xFF;
+    bool subnormalOrZero = expF32UI(v1) == 0;
+    if(infOrNaN || subnormalOrZero) {
         return defaultNaNF64UI;
     } else {
-        softfloat_roundingMode = rmm_map[mode & 0x7];
         float64_t res = f32_to_f64(float32_t{v1});
         return res.v;
     }
@@ -228,7 +246,7 @@ uint64_t fadd_d(uint64_t v1, uint64_t v2, uint8_t mode) {
     bool nan = (v1 & defaultNaNF32UI) == quiet_nan32;
     bool snan = softfloat_isSigNaNF32UI(v1);
     float64_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float64_t r = f64_add(v1f, v2f);
     return r.v;
@@ -236,7 +254,7 @@ uint64_t fadd_d(uint64_t v1, uint64_t v2, uint8_t mode) {
 
 uint64_t fsub_d(uint64_t v1, uint64_t v2, uint8_t mode) {
     float64_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float64_t r = f64_sub(v1f, v2f);
     return r.v;
@@ -244,7 +262,7 @@ uint64_t fsub_d(uint64_t v1, uint64_t v2, uint8_t mode) {
 
 uint64_t fmul_d(uint64_t v1, uint64_t v2, uint8_t mode) {
     float64_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float64_t r = f64_mul(v1f, v2f);
     return r.v;
@@ -252,7 +270,7 @@ uint64_t fmul_d(uint64_t v1, uint64_t v2, uint8_t mode) {
 
 uint64_t fdiv_d(uint64_t v1, uint64_t v2, uint8_t mode) {
     float64_t v1f{v1}, v2f{v2};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float64_t r = f64_div(v1f, v2f);
     return r.v;
@@ -260,7 +278,7 @@ uint64_t fdiv_d(uint64_t v1, uint64_t v2, uint8_t mode) {
 
 uint64_t fsqrt_d(uint64_t v1, uint8_t mode) {
     float64_t v1f{v1};
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
     float64_t r = f64_sqrt(v1f);
     return r.v;
@@ -298,22 +316,23 @@ uint64_t fcmp_d(uint64_t v1, uint64_t v2, uint32_t op) {
 }
 
 uint64_t fcvt_d(uint64_t v1, uint32_t op, uint8_t mode) {
+
     float64_t v1f{v1};
     softfloat_exceptionFlags = 0;
     float64_t r;
     switch(op) {
-    case 0: { // l->d, fp to int32
-        int64_t res = f64_to_i64(v1f, rmm_map[mode & 0x7], true);
+    case 0: { // l from d
+        int64_t res = f64_to_i64(v1f, rmm_map.at(mode), true);
         return (uint64_t)res;
     }
-    case 1: { // lu->s
-        uint64_t res = f64_to_ui64(v1f, rmm_map[mode & 0x7], true);
+    case 1: { // lu from d
+        uint64_t res = f64_to_ui64(v1f, rmm_map.at(mode), true);
         return res;
     }
-    case 2: // s->l
+    case 2: // d from l
         r = i64_to_f64(v1);
         return r.v;
-    case 3: // s->lu
+    case 3: // d from lu
         r = ui64_to_f64(v1);
         return r.v;
     }
@@ -321,12 +340,24 @@ uint64_t fcvt_d(uint64_t v1, uint32_t op, uint8_t mode) {
 }
 
 uint64_t fmadd_d(uint64_t v1, uint64_t v2, uint64_t v3, uint32_t op, uint8_t mode) {
-    // op should be {softfloat_mulAdd_subProd(2), softfloat_mulAdd_subC(1)}
-    softfloat_roundingMode = rmm_map[mode & 0x7];
+    uint64_t F64_SIGN = 1ULL << 63;
+    switch(op) {
+    case 0: // FMADD_D
+        break;
+    case 1: // FMSUB_D
+        v3 ^= F64_SIGN;
+        break;
+    case 2: // FNMADD_D
+        v1 ^= F64_SIGN;
+        v3 ^= F64_SIGN;
+        break;
+    case 3: // FNMSUB_D
+        v1 ^= F64_SIGN;
+        break;
+    }
+    softfloat_roundingMode = rmm_map.at(mode);
     softfloat_exceptionFlags = 0;
-    float64_t res = softfloat_mulAddF64(v1, v2, v3, op & 0x1);
-    if(op > 1)
-        res.v ^= 1ULL << 63;
+    float64_t res = softfloat_mulAddF64(v1, v2, v3, 0);
     return res.v;
 }
 
@@ -362,8 +393,8 @@ uint64_t fclass_d(uint64_t v1) {
     uA.f = a;
     uiA = uA.ui;
 
-    uint_fast16_t infOrNaN = expF64UI(uiA) == 0x7FF;
-    uint_fast16_t subnormalOrZero = expF64UI(uiA) == 0;
+    bool infOrNaN = expF64UI(uiA) == 0x7FF;
+    bool subnormalOrZero = expF64UI(uiA) == 0;
     bool sign = signF64UI(uiA);
     bool fracZero = fracF64UI(uiA) == 0;
     bool isNaN = isNaNF64UI(uiA);
@@ -381,9 +412,9 @@ uint64_t fcvt_32_64(uint32_t v1, uint32_t op, uint8_t mode) {
     float64_t r;
     switch(op) {
     case 0: // l->s, fp to int32
-        return f32_to_i64(v1f, rmm_map[mode & 0x7], true);
+        return f32_to_i64(v1f, rmm_map.at(mode), true);
     case 1: // wu->s
-        return f32_to_ui64(v1f, rmm_map[mode & 0x7], true);
+        return f32_to_ui64(v1f, rmm_map.at(mode), true);
     case 2: // s->w
         r = i32_to_f64(v1);
         return r.v;
@@ -399,11 +430,11 @@ uint32_t fcvt_64_32(uint64_t v1, uint32_t op, uint8_t mode) {
     float32_t r;
     switch(op) {
     case 0: { // wu->s
-        int32_t r = f64_to_i32(float64_t{v1}, rmm_map[mode & 0x7], true);
+        int32_t r = f64_to_i32(float64_t{v1}, rmm_map.at(mode), true);
         return r;
     }
     case 1: { // wu->s
-        uint32_t r = f64_to_ui32(float64_t{v1}, rmm_map[mode & 0x7], true);
+        uint32_t r = f64_to_ui32(float64_t{v1}, rmm_map.at(mode), true);
         return r;
     }
     case 2: // l->s, fp to int32

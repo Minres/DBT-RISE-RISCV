@@ -5,6 +5,10 @@ boost/1.85.0
 asmjit/cci.20240531
 elfio/3.12
 fmt/8.0.1
+spdlog/1.9.2
+gsl-lite/0.41.0
+lz4/1.9.3 
+zlib/1.2.13
 
 [options]
 boost/*:fPIC=True

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.24)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 ###############################################################################
@@ -14,19 +14,21 @@ include(flink)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
-FetchContent_Declare(
-    dbt_rise_core_git
-    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
-    GIT_TAG         "origin/develop"
-    GIT_SHALLOW    OFF
-    UPDATE_DISCONNECTED NOT ${UPDATE_SCC_SRC} # When enabled, this option causes the update step to be skipped.
-)
-FetchContent_GetProperties(dbt_rise_core_git)
-if(NOT dbt_rise_core_git_POPULATED)
-  FetchContent_Populate(dbt_rise_core_git)
+if(NOT TARGET dbt-rise-core)
+	FetchContent_Declare(
+	    dbt_rise_core_git
+	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
+	    #GIT_TAG         "origin/develop"
+	    #GIT_SHALLOW    OFF
+	    GIT_TAG         99cf682
+	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
+	)
+	FetchContent_GetProperties(dbt_rise_core_git)
+	if(NOT dbt_rise_core_git_POPULATED)
+	  FetchContent_Populate(dbt_rise_core_git)
+	endif()
+	add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
 endif()
-add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
-
 FetchContent_GetProperties(scc_git)
 list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
 
@@ -35,8 +37,12 @@ find_package(jsoncpp)
 find_package(yaml-cpp)
 find_package(Boost COMPONENTS coroutine REQUIRED)
 
-set(CLANG_FORMAT_EXCLUDE_PATTERNS "/scc/" "/build/" "/.direnv/")
-find_package(ClangFormat)
+if(CMAKE_PROJECT_NAME STREQUAL "dbt-rise-riscv")
+	set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
+	find_package(ClangFormat)
+else()
+	set(CLANG_FORMAT_EXCLUDE_PATTERNS ${CLANG_FORMAT_EXCLUDE_PATTERNS} /build/ /.direnv/ softfloat/ PARENT_SCOPE)
+endif()
 
 add_subdirectory(softfloat)
 
@@ -47,11 +53,14 @@ set(LIB_SOURCES
     src/iss/arch/rv32imac.cpp
     src/iss/arch/rv32gc.cpp
 	src/iss/arch/rv64i.cpp
+    src/iss/arch/rv64gc.cpp
     src/vm/interp/vm_rv32i.cpp
     src/vm/interp/vm_rv32imac.cpp
     src/vm/interp/vm_rv32gc.cpp
     src/vm/interp/vm_rv64i.cpp
+	src/vm/interp/vm_rv64gc.cpp
     src/vm/fp_functions.cpp
+    src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
     src/iss/plugin/cycle_estimate.cpp
     src/iss/plugin/instruction_count.cpp
@@ -59,20 +68,30 @@ set(LIB_SOURCES
 
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
-        src/vm/llvm/vm_rv32imc.cpp
+        src/vm/llvm/vm_rv32i.cpp
+        src/vm/llvm/vm_rv32imac.cpp
+        src/vm/llvm/vm_rv32gc.cpp
+        src/vm/llvm/vm_rv64i.cpp
+        src/vm/llvm/vm_rv64gc.cpp
         src/vm/llvm/fp_impl.cpp
     )
 endif()
 
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
-        src/vm/asmjit/vm_rv32imc.cpp
+        src/vm/asmjit/vm_rv32i.cpp
+        src/vm/asmjit/vm_rv32imac.cpp
+        src/vm/asmjit/vm_rv32gc.cpp
+        src/vm/asmjit/vm_rv64i.cpp
+        src/vm/asmjit/vm_rv64gc.cpp
     )
 endif()
 
 # Define the library
 add_library(${PROJECT_NAME} SHARED ${LIB_SOURCES})
-
+if(USE_SC_SIGNAL4IRQ)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC SC_SIGNAL_IF)
+endif()
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-shift-count-overflow)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -144,7 +163,12 @@ foreach(F IN LISTS RISCV_SOURCES)
     endif()
 endforeach()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv fmt::fmt yaml-cpp::yaml-cpp Boost::program_options)
+target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv yaml-cpp::yaml-cpp Boost::program_options)
+if(TARGET fmt::fmt-header-only)
+	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt-header-only)
+else()
+	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
+endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS})
 
 install(TARGETS riscv-sim
