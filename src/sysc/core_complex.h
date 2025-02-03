@@ -137,6 +137,8 @@ public:
 
     cci::cci_param<uint32_t> mhartid{"mhartid", 0};
 
+    cci::cci_param<uint32_t> local_irq_num{"local_irq_num", 0};
+
     cci::cci_param<std::string> plugins{"plugins", ""};
 
     core_complex(sc_core::sc_module_name const& name);

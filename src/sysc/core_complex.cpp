@@ -292,6 +292,12 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
     cpu->create_cpu(GET_PROP_VALUE(core_type), GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+#ifndef CWR_SYSTEMC
+    if(!local_irq_num.is_default_value()) {
+        auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu->cpu.get());
+        sc_cpu_if->set_irq_num(16 + local_irq_num);
+    }
+#endif
     sc_assert(cpu->vm != nullptr);
     cpu->vm->setDisassEnabled(GET_PROP_VALUE(enable_disass) || trc->m_db != nullptr);
     if(GET_PROP_VALUE(plugins).length()) {

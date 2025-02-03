@@ -28,6 +28,8 @@ public:
 
     void set_mhartid(unsigned id) override { PLAT::set_mhartid(id); }
 
+    void set_irq_num(unsigned num) override { PLAT::set_irq_num(num); }
+
     uint32_t get_mode() override { return this->reg.PRIV; }
 
     void set_interrupt_execution(bool v) override { this->interrupt_sim = v ? 1 : 0; }
