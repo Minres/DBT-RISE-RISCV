@@ -251,8 +251,8 @@ public:
 
     using hart_state_type = hart_state<reg_t>;
 
-    constexpr reg_t get_irq_mask() {
-        return 0b100010001000; // only machine mode is supported
+    reg_t get_irq_mask() {
+        return irq_mask;
     }
 
     constexpr bool has_compressed() { return traits<BASE>::MISA_VAL & 0b0100; }
@@ -286,7 +286,13 @@ public:
 
     void set_csr(unsigned addr, reg_t val) { csr[addr & csr.page_addr_mask] = val; }
 
-    void set_irq_num(unsigned i) { mcause_max_irq = 1 << util::ilog2(i); }
+    void set_irq_num(unsigned i) { 
+        mcause_max_irq = 1 << util::ilog2(i);
+        if(i > 16) {
+            // local interrupts, so enable irq_mask
+            irq_mask |= ((1U << (i-16)) - 1) << 16;
+        }
+    }
 
     void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
 
@@ -346,6 +352,7 @@ protected:
     reg_t fault_data;
     bool tohost_lower_written = false;
     riscv_instrumentation_if instr_if;
+    reg_t irq_mask{0b100010001000}; // only machine mode is supported
 
     semihosting_cb_t<reg_t> semihosting_cb;
 

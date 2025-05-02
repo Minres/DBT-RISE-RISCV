@@ -19,6 +19,7 @@ namespace sysc {
 struct sc_core_adapter_if {
     virtual iss::arch_if* get_arch_if() = 0;
     virtual void set_mhartid(unsigned) = 0;
+    virtual void set_irq_num(unsigned) = 0;
     virtual uint32_t get_mode() = 0;
     virtual uint64_t get_state() = 0;
     virtual bool get_interrupt_execution() = 0;
