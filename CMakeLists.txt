@@ -66,13 +66,19 @@ set(LIB_SOURCES
     src/iss/plugin/instruction_count.cpp
 )
 
+if(WITH_TCC)
+    list(APPEND LIB_SOURCES
+        src/vm/tcc/vm_rv32i.cpp
+        src/vm/tcc/vm_rv32imac.cpp
+        src/vm/tcc/vm_rv64i.cpp
+    )
+endif()
+
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
         src/vm/llvm/vm_rv32i.cpp
         src/vm/llvm/vm_rv32imac.cpp
-        src/vm/llvm/vm_rv32gc.cpp
         src/vm/llvm/vm_rv64i.cpp
-        src/vm/llvm/vm_rv64gc.cpp
         src/vm/llvm/fp_impl.cpp
     )
 endif()

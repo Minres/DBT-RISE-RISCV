@@ -130,7 +130,7 @@ protected:
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    }
+    }   
 
 private:
     /****************************************************************************
@@ -345,7 +345,7 @@ private:
 
     //needs to be declared after instr_descr
     decoder instr_decoder;
-
+ 
     /* instruction definitions */
     /* instruction 0: LUI */
     std::tuple<continuation_e, BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
@@ -371,7 +371,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -417,7 +417,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -463,7 +463,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -520,7 +520,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -601,7 +601,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -666,7 +666,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -731,7 +731,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -800,7 +800,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -869,7 +869,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -934,7 +934,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -999,7 +999,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1057,7 +1057,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1115,7 +1115,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1173,7 +1173,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1229,7 +1229,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1285,7 +1285,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1338,7 +1338,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1391,7 +1391,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1444,7 +1444,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1496,7 +1496,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1512,7 +1512,7 @@ private:
                 ),
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                8), 32),
+                1), 32),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -1550,7 +1550,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1565,7 +1565,7 @@ private:
                 ),
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                8), 32),
+                1), 32),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -1603,7 +1603,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1653,7 +1653,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1703,7 +1703,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1753,7 +1753,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1803,7 +1803,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1853,7 +1853,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -1905,7 +1905,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -1957,7 +1957,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2009,7 +2009,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2062,7 +2062,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2079,7 +2079,7 @@ private:
                 ,
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                8), 32),
+                1), 32),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -2117,7 +2117,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2132,7 +2132,7 @@ private:
                 ,
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                8), 32),
+                1), 32),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -2170,7 +2170,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2220,7 +2220,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2273,7 +2273,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2329,7 +2329,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2379,7 +2379,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -2431,7 +2431,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_write_mem(traits::FENCE,
@@ -2467,7 +2467,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2502,7 +2502,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2537,7 +2537,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2572,13 +2572,14 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> wait_253_args{
-            this->gen_ext(this->gen_const(8,1), 32)
+        auto wait_arg0 = this->gen_const(8,1);
+        std::vector<Value*> wait_args{
+            wait_arg0
         };
-        this->builder.CreateCall(this->mod->getFunction("wait"), wait_253_args);
+        this->builder.CreateCall(this->mod->getFunction("wait"), wait_args);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -2613,7 +2614,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -2669,7 +2670,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -2726,7 +2727,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -2740,7 +2741,7 @@ private:
                 csr,
                 this->builder.CreateAnd(
                    xrd,
-                   this->builder.CreateNot(xrs1))
+                   this->builder.CreateNeg(xrs1))
                 );
             }
             if(rd!=0) {
@@ -2783,7 +2784,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -2834,7 +2835,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -2890,7 +2891,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -2946,7 +2947,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_write_mem(traits::FENCE,
@@ -2986,7 +2987,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3041,7 +3042,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3099,7 +3100,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3156,7 +3157,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3212,7 +3213,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3316,7 +3317,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3389,7 +3390,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3497,7 +3498,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3571,7 +3572,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -3582,8 +3583,7 @@ private:
             this->builder.CreateStore(
             this->gen_ext(
                 (this->gen_ext(
-                    this->gen_read_mem(traits::MEM, offs, 4),
-                    32, false)),
+                    this->gen_read_mem(traits::MEM, offs, 4), 8,true)),
                 32, true),
             get_reg_ptr(rd + traits::X0), false);
             this->gen_write_mem(traits::RES,
@@ -3627,7 +3627,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3659,7 +3659,7 @@ private:
                 this->gen_ext(this->gen_choose(res1,
                 this->gen_const(8,0),
                 this->gen_const(8,1),
-                8), 32),
+                1), 32),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -3699,7 +3699,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3707,20 +3707,18 @@ private:
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
-            auto res =this->gen_reg_load(traits::X0+ rs2);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
                     (this->gen_ext(
-                        this->gen_read_mem(traits::MEM, offs, 4),
-                        32, false)),
+                        this->gen_read_mem(traits::MEM, offs, 4), 8,true)),
                     32, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
             this->gen_write_mem(traits::MEM,
             offs,
             this->gen_ext(
-                res,
+                this->gen_reg_load(traits::X0+ rs2),
                 32, false));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
@@ -3759,7 +3757,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3768,14 +3766,7 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_ext(
-                this->gen_read_mem(traits::MEM, offs, 4),
-                32, false);
-            auto res2 =this->builder.CreateAdd(
-               this->gen_ext(res1, 64,true),
-               this->gen_ext(this->gen_ext(
-                   this->gen_reg_load(traits::X0+ rs2),
-                   32, false), 64,true))
-            ;
+                this->gen_read_mem(traits::MEM, offs, 4), 8,true);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
@@ -3783,6 +3774,12 @@ private:
                     32, true),
                 get_reg_ptr(rd + traits::X0), false);
             }
+            auto res2 =this->builder.CreateAdd(
+               this->gen_ext(res1, 64,true),
+               this->gen_ext(this->gen_ext(
+                   this->gen_reg_load(traits::X0+ rs2),
+                   32, false), 64,true))
+            ;
             this->gen_write_mem(traits::MEM,
             offs,
             this->gen_ext(
@@ -3825,7 +3822,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3834,21 +3831,17 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_read_mem(traits::MEM, offs, 4);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res1,
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->builder.CreateXor(
                res1,
                this->gen_ext(
                    this->gen_reg_load(traits::X0+ rs2),
                    32, false))
             ;
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            res1, 32,true),
-                        32, true), 32,false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -3889,7 +3882,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3898,21 +3891,17 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_read_mem(traits::MEM, offs, 4);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res1,
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->builder.CreateAnd(
                res1,
                this->gen_ext(
                    this->gen_reg_load(traits::X0+ rs2),
                    32, false))
             ;
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            res1, 32,true),
-                        32, true), 32,false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -3953,7 +3942,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -3962,21 +3951,17 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_read_mem(traits::MEM, offs, 4);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res1,
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->builder.CreateOr(
                res1,
                this->gen_ext(
                    this->gen_reg_load(traits::X0+ rs2),
                    32, false))
             ;
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            res1, 32,true),
-                        32, true), 32,false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -4017,7 +4002,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -4026,8 +4011,14 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_ext(
-                this->gen_read_mem(traits::MEM, offs, 4),
-                32, false);
+                this->gen_read_mem(traits::MEM, offs, 4), 8,true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res1,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->gen_choose(this->builder.CreateICmp(ICmpInst::ICMP_SGT,
                res1,
                this->gen_ext(
@@ -4040,13 +4031,6 @@ private:
             this->gen_ext(
                 res1, 32,false),
             32);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res1,
-                    32, true),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -4087,7 +4071,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -4096,8 +4080,14 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_ext(
-                this->gen_read_mem(traits::MEM, offs, 4),
-                32, false);
+                this->gen_read_mem(traits::MEM, offs, 4), 8,true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res1,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->gen_choose(this->builder.CreateICmp(ICmpInst::ICMP_SLT,
                res1,
                this->gen_ext(
@@ -4110,13 +4100,6 @@ private:
             this->gen_ext(
                 res1, 32,false),
             32);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res1,
-                    32, true),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -4157,7 +4140,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -4166,6 +4149,13 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_read_mem(traits::MEM, offs, 4);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res1,
+                    32, false),
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->gen_choose(this->builder.CreateICmp(ICmpInst::ICMP_UGT,
                res1,
                this->gen_ext(
@@ -4177,15 +4167,6 @@ private:
                 32, false),
             res1,
             32);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            res1, 32,true),
-                        32, true), 32,false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -4226,7 +4207,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -4235,6 +4216,13 @@ private:
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
             auto res1 =this->gen_read_mem(traits::MEM, offs, 4);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res1,
+                    32, false),
+                get_reg_ptr(rd + traits::X0), false);
+            }
             auto res2 =this->gen_choose(this->builder.CreateICmp(ICmpInst::ICMP_ULT,
                res1,
                this->gen_ext(
@@ -4246,15 +4234,6 @@ private:
                 32, false),
             res1,
             32);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            res1, 32,true),
-                        32, true), 32,false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
             this->gen_write_mem(traits::MEM,
             offs,
             res2);
@@ -4292,7 +4271,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(imm) {
@@ -4342,7 +4321,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         auto offs =this->gen_ext(
@@ -4392,7 +4371,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         auto offs =this->gen_ext(
@@ -4439,7 +4418,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
@@ -4472,8 +4451,9 @@ private:
         uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            //No disass specified, using instruction name
-            std::string mnemonic = "c.nop";
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"),
+                );
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -4488,7 +4468,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
@@ -4523,7 +4503,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -4566,7 +4546,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -4612,7 +4592,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(imm==0||rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -4655,7 +4635,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(nzimm) {
@@ -4702,7 +4682,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
@@ -4739,7 +4719,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -4781,7 +4761,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(shamt){ this->builder.CreateStore(
@@ -4841,7 +4821,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -4885,7 +4865,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -4929,7 +4909,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -4971,7 +4951,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -5013,7 +4993,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(
@@ -5054,7 +5034,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -5094,7 +5074,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -5147,7 +5127,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -5200,10 +5180,10 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+        if(rs1>=static_cast<uint32_t>(traits::RFS)||nzuimm==0) {
             this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
@@ -5249,7 +5229,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0) {
@@ -5303,7 +5283,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -5348,7 +5328,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -5393,7 +5373,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_raise_trap(0, 2);
@@ -5430,7 +5410,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
@@ -5480,7 +5460,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -5514,8 +5494,9 @@ private:
         uint64_t PC = pc.val;
         if(this->disass_enabled){
             /* generate console output when executing the command */
-            //No disass specified, using instruction name
-            std::string mnemonic = "c.ebreak";
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"),
+                );
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5530,12 +5511,13 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
+        this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         this->gen_raise_trap(0, 3);
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
+        bb = this->leave_blk;
+        auto returnValue = std::make_tuple(TRAP,nullptr);
         
         this->gen_sync(POST_SYNC, 95);
         this->gen_instr_epilogue(bb);
@@ -5567,7 +5549,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)) {
@@ -5616,12 +5598,13 @@ private:
         this->set_tval(instr);
         pc=pc+ 2;
         this->gen_set_pc(pc, traits::NEXT_PC);
-        
+
         this->gen_instr_prologue();
         /*generate behavior*/
+        this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
+        bb = this->leave_blk;
+        auto returnValue = std::make_tuple(TRAP,nullptr);
         
         this->gen_sync(POST_SYNC, 97);
         this->gen_instr_epilogue(bb);
@@ -5642,7 +5625,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        this->gen_sync(iss::PRE_SYNC, instr_descr.size());
+	this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(this->get_typeptr(traits::NEXT_PC), get_reg_ptr(traits::NEXT_PC), true),
                                    get_reg_ptr(traits::PC), true);
         this->builder.CreateStore(
@@ -5657,7 +5640,7 @@ private:
         this->gen_instr_epilogue(bb);
         this->builder.CreateBr(bb);
         return std::make_tuple(ILLEGAL_INSTR, nullptr);
-    }    
+    }
 };
 
 template <typename CODE_WORD> void debug_fn(CODE_WORD instr) {
@@ -5676,7 +5659,7 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
         for (uint32_t i = 0; i < instr_descr.size(); ++i) {
             generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
             g_instr_descr.push_back(new_instr_descr);
-        }
+    }
         return std::move(g_instr_descr);
     }()) {}
 
@@ -5691,7 +5674,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt,
     auto *const data = (uint8_t *)&instr;
     if(this->core.has_mmu())
         paddr = this->core.virt2phys(pc);
-    auto res = this->core.read(paddr, 4, data);
+        auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok) 
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)
@@ -5717,7 +5700,6 @@ template <typename ARCH>
 void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits::TRAP_STATE), true);
-    this->builder.CreateBr(this->trap_blk);
 }
 
 template <typename ARCH>

@@ -16,7 +16,8 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_STANDARD": "17",
                 "CMAKE_PROJECT_TOP_LEVEL_INCLUDES":"cmake-conan/conan_provider.cmake",
-                "WITH_TCC": "OFF"
+                "WITH_TCC": "ON",
+                "WITH_LLVM": "OFF"
             }
         },
         {
@@ -26,7 +27,8 @@
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_CXX_STANDARD": "17",
                 "CMAKE_PROJECT_TOP_LEVEL_INCLUDES":"cmake-conan/conan_provider.cmake",
-                "WITH_TCC": "OFF"
+                "WITH_TCC": "ON",
+                "WITH_LLVM": "OFF"
             }
         },
         {
