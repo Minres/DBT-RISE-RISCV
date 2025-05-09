@@ -72,32 +72,70 @@ using namespace ::llvm;
 void add_fp_functions_2_module(Module* mod, uint32_t flen, uint32_t xlen) {
     if(flen) {
         FDECL(fget_flags, INT_TYPE(32));
+
+        FDECL(fadd_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fsub_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fmul_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fdiv_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fsqrt_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fcmp_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(16));
+        FDECL(fmadd_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(8));
+        FDECL(fsel_h, INT_TYPE(16), INT_TYPE(16), INT_TYPE(16), INT_TYPE(16));
+        FDECL(fclass_h, INT_TYPE(16), INT_TYPE(16));
+        FDECL(unbox_h, INT_TYPE(16), INT_TYPE(32), INT_TYPE(64)); // technically the first arg is only 8 bits
+
+        FDECL(f16toi32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8))
+        FDECL(f16toui32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8))
+        FDECL(i32tof16, INT_TYPE(16), INT_TYPE(32), INT_TYPE(8))
+        FDECL(ui32tof16, INT_TYPE(16), INT_TYPE(32), INT_TYPE(8))
+        FDECL(f16toi64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8))
+        FDECL(f16toui64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8))
+        FDECL(i64tof16, INT_TYPE(16), INT_TYPE(64), INT_TYPE(8))
+        FDECL(ui64tof16, INT_TYPE(16), INT_TYPE(64), INT_TYPE(8))
+
         FDECL(fadd_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fsub_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fmul_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fdiv_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fsqrt_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fcmp_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32));
-        FDECL(fcvt_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fmadd_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
         FDECL(fsel_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(32), INT_TYPE(32));
         FDECL(fclass_s, INT_TYPE(32), INT_TYPE(32));
-        FDECL(fcvt_32_64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
-        FDECL(fcvt_64_32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+        FDECL(unbox_s, INT_TYPE(32), INT_TYPE(32), INT_TYPE(64)); // technically the first arg is only 8 bits
+
+        FDECL(f32toi32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
+        FDECL(f32toui32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
+        FDECL(i32tof32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
+        FDECL(ui32tof32, INT_TYPE(32), INT_TYPE(32), INT_TYPE(8));
+        FDECL(f32toi64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+        FDECL(f32toui64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+        FDECL(i64tof32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
+        FDECL(ui64tof32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
         if(flen > 32) {
-            FDECL(fconv_d2f, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
-            FDECL(fconv_f2d, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+
             FDECL(fadd_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
             FDECL(fsub_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
             FDECL(fmul_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
             FDECL(fdiv_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
             FDECL(fsqrt_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
             FDECL(fcmp_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(32));
-            FDECL(fcvt_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
             FDECL(fmadd_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
             FDECL(fsel_d, INT_TYPE(64), INT_TYPE(64), INT_TYPE(64), INT_TYPE(32));
             FDECL(fclass_d, INT_TYPE(64), INT_TYPE(64));
-            FDECL(unbox_s, INT_TYPE(32), INT_TYPE(64));
+
+            FDECL(f64tof32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
+            FDECL(f32tof64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+            FDECL(f64toi64, INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
+            FDECL(f64toui64, INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
+            FDECL(i64tof64, INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
+            FDECL(ui64tof64, INT_TYPE(64), INT_TYPE(64), INT_TYPE(8));
+            FDECL(i32tof64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+            FDECL(ui32tof64, INT_TYPE(64), INT_TYPE(32), INT_TYPE(8));
+            FDECL(f64toi32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
+            FDECL(f64toui32, INT_TYPE(32), INT_TYPE(64), INT_TYPE(8));
+
+            FDECL(unbox_d, INT_TYPE(64), INT_TYPE(32), INT_TYPE(64)); // technically the first arg is only 8 bits
         }
     }
 }

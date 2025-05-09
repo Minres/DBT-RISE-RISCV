@@ -31,12 +31,14 @@
  *******************************************************************************/
 // clang-format off
 #include <iss/arch/rv64i.h>
+// vm_base needs to be included before gdb_session as termios.h (via boost and gdb_server) has a define which clashes with a variable
+// name in ConstantRange.h
+#include <iss/llvm/vm_base.h>
+#include <iss/iss.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
-#include <iss/iss.h>
-#include <iss/llvm/vm_base.h>
-#include <util/logging.h>
 #include <iss/instruction_decoder.h>
+#include <util/logging.h>
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -97,7 +99,7 @@ protected:
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
-    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &, BasicBlock *) override;
+    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, BasicBlock *) override;
 
     void gen_leave_behavior(BasicBlock *leave_blk) override;
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
@@ -130,7 +132,7 @@ protected:
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    }   
+    }
 
 private:
     /****************************************************************************
@@ -271,7 +273,7 @@ private:
 
     //needs to be declared after instr_descr
     decoder instr_decoder;
- 
+
     /* instruction definitions */
     /* instruction 0: LUI */
     std::tuple<continuation_e, BasicBlock*> __lui(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
@@ -297,11 +299,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -343,11 +345,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -389,12 +391,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto new_pc =(uint64_t)(PC+(int32_t)sext<21>(imm));
@@ -446,12 +448,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto addr_mask =(uint64_t)- 2;
@@ -527,12 +529,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -592,12 +594,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -657,12 +659,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -726,12 +728,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -795,12 +797,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -860,12 +862,12 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -925,11 +927,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -983,11 +985,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1041,11 +1043,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1099,11 +1101,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1155,11 +1157,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1211,11 +1213,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1264,11 +1266,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1317,11 +1319,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1370,11 +1372,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1422,11 +1424,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1438,7 +1440,7 @@ private:
                 ),
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                1), 64),
+                8), 64),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -1476,11 +1478,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1491,7 +1493,7 @@ private:
                 ),
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                1), 64),
+                8), 64),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -1529,11 +1531,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1579,11 +1581,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1629,11 +1631,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1679,11 +1681,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1729,11 +1731,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1779,11 +1781,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1833,11 +1835,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1885,11 +1887,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1937,11 +1939,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1990,11 +1992,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2007,7 +2009,7 @@ private:
                 ,
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                1), 64),
+                8), 64),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -2045,11 +2047,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2060,7 +2062,7 @@ private:
                 ,
                 this->gen_const(8,1),
                 this->gen_const(8,0),
-                1), 64),
+                8), 64),
                 get_reg_ptr(rd + traits::X0), false);
             }
         }
@@ -2098,11 +2100,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2148,11 +2150,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2201,11 +2203,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2257,11 +2259,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2307,11 +2309,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2359,7 +2361,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_write_mem(traits::FENCE,
@@ -2395,7 +2397,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2430,7 +2432,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2465,7 +2467,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
@@ -2500,14 +2502,13 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
-        auto wait_arg0 = this->gen_const(8,1);
-        std::vector<Value*> wait_args{
-            wait_arg0
+        std::vector<Value*> wait_57_args{
+            this->gen_ext(this->gen_const(8,1), 32)
         };
-        this->builder.CreateCall(this->mod->getFunction("wait"), wait_args);
+        this->builder.CreateCall(this->mod->getFunction("wait"), wait_57_args);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -2542,11 +2543,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -2600,11 +2601,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -2658,11 +2659,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -2711,11 +2712,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto res =this->gen_ext(
@@ -2765,11 +2766,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto sh_val =this->builder.CreateShl(
@@ -2820,11 +2821,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto sh_val =this->builder.CreateLShr(
@@ -2875,11 +2876,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto sh_val =this->builder.CreateAShr(
@@ -2928,11 +2929,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto res =this->gen_ext(
@@ -2985,11 +2986,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto res =this->gen_ext(
@@ -3043,11 +3044,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto count =this->builder.CreateAnd(
@@ -3104,11 +3105,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto count =this->builder.CreateAnd(
@@ -3165,11 +3166,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto count =this->builder.CreateAnd(
@@ -3225,11 +3226,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrs1 =this->gen_reg_load(traits::X0+ rs1);
@@ -3281,11 +3282,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 8);
@@ -3338,11 +3339,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 8);
@@ -3352,7 +3353,7 @@ private:
                 csr,
                 this->builder.CreateAnd(
                    xrd,
-                   this->builder.CreateNeg(xrs1))
+                   this->builder.CreateNot(xrs1))
                 );
             }
             if(rd!=0) {
@@ -3395,11 +3396,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 8);
@@ -3446,11 +3447,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 8);
@@ -3502,11 +3503,11 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 8);
@@ -3558,7 +3559,7 @@ private:
         this->set_tval(instr);
         pc=pc+ 4;
         this->gen_set_pc(pc, traits::NEXT_PC);
-
+        
         this->gen_instr_prologue();
         /*generate behavior*/
         this->gen_write_mem(traits::FENCE,
@@ -3586,7 +3587,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-	this->gen_sync(iss::PRE_SYNC, instr_descr.size());
+        this->gen_sync(iss::PRE_SYNC, instr_descr.size());
         this->builder.CreateStore(this->builder.CreateLoad(this->get_typeptr(traits::NEXT_PC), get_reg_ptr(traits::NEXT_PC), true),
                                    get_reg_ptr(traits::PC), true);
         this->builder.CreateStore(
@@ -3601,7 +3602,7 @@ private:
         this->gen_instr_epilogue(bb);
         this->builder.CreateBr(bb);
         return std::make_tuple(ILLEGAL_INSTR, nullptr);
-    }
+    }    
 };
 
 template <typename CODE_WORD> void debug_fn(CODE_WORD instr) {
@@ -3620,27 +3621,26 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
         for (uint32_t i = 0; i < instr_descr.size(); ++i) {
             generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
             g_instr_descr.push_back(new_instr_descr);
-    }
+        }
         return std::move(g_instr_descr);
     }()) {}
 
 template <typename ARCH>
 std::tuple<continuation_e, BasicBlock *>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, BasicBlock *this_block) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
     // const typename traits::addr_t upper_bits = ~traits::PGMASK;
     phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    if(this->core.has_mmu())
-        paddr = this->core.virt2phys(pc);
-        auto res = this->core.read(paddr, 4, data);
+    auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok) 
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
-    if (instr == 0x0000006f || (instr&0xffff)==0xa001)
+    if (instr == 0x0000006f || (instr&0xffff)==0xa001){
+        this->builder.CreateBr(this->leave_blk);
         return std::make_tuple(JUMP_TO_SELF, nullptr);
-    ++inst_cnt;
+        }
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
@@ -3661,6 +3661,7 @@ template <typename ARCH>
 void vm_impl<ARCH>::gen_raise_trap(uint16_t trap_id, uint16_t cause) {
     auto *TRAP_val = this->gen_const(32, 0x80 << 24 | (cause << 16) | trap_id);
     this->builder.CreateStore(TRAP_val, get_reg_ptr(traits::TRAP_STATE), true);
+    this->builder.CreateBr(this->trap_blk);
 }
 
 template <typename ARCH>
@@ -3721,6 +3722,10 @@ void vm_impl<ARCH>::gen_instr_epilogue(BasicBlock *bb) {
     auto* icount_val = this->builder.CreateAdd(
         this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::ICOUNT), get_reg_ptr(arch::traits<ARCH>::ICOUNT)), this->gen_const(64U, 1));
     this->builder.CreateStore(icount_val, get_reg_ptr(arch::traits<ARCH>::ICOUNT), false);
+    //increment cyclecount
+    auto* cycle_val = this->builder.CreateAdd(
+        this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::CYCLE), get_reg_ptr(arch::traits<ARCH>::CYCLE)), this->gen_const(64U, 1));
+    this->builder.CreateStore(cycle_val, get_reg_ptr(arch::traits<ARCH>::CYCLE), false);
 }
 
 } // namespace rv64i

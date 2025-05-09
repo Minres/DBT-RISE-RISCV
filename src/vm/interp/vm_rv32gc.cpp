@@ -37,7 +37,9 @@
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
+
 #include <vm/fp_functions.h>
+
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
@@ -146,13 +148,33 @@ protected:
                  spawn_blocks.erase(it);
     }
 
+    uint64_t NaNBox32(uint32_t val){
+        if(traits::FLEN == 32) {
+            return (uint64_t)val;
+        }
+        else {
+            uint64_t box = ~ ((uint64_t)0);
+            return (uint64_t)(((uint128_t)box<<32)|val);
+        }
+    }
+
     uint8_t get_rm(uint8_t rm){
-        auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]); 
+        auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+::iss::arch::traits<ARCH>::reg_byte_offsets[::iss::arch::traits<ARCH>::FCSR]); 
         uint8_t rm_eff = rm == 7? bit_sub<5, 7-5+1>(*FCSR) : rm;
         if(rm_eff > 4) {
             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
         }
         return rm_eff;
+    }
+
+    uint64_t NaNBox64(uint64_t val){
+        if(traits::FLEN == 64) {
+            return (uint64_t)val;
+        }
+        else {
+            uint64_t box = ~ ((uint64_t)0);
+            return (uint64_t)(((uint128_t)box<<64)|val);
+        }
     }
 
 
@@ -269,60 +291,60 @@ private:
         {16, 0b0000000000000000, 0b1111111111111111, arch::traits<ARCH>::opcode_e::DII},
         {32, 0b00000000000000000010000000000111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FLW},
         {32, 0b00000000000000000010000000100111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FSW},
-        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMADD__S},
-        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMSUB__S},
-        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMADD__S},
-        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMSUB__S},
         {32, 0b00000000000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FADD__S},
         {32, 0b00001000000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FSUB__S},
         {32, 0b00010000000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMUL__S},
         {32, 0b00011000000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FDIV__S},
+        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMIN__S},
+        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMAX__S},
         {32, 0b01011000000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FSQRT__S},
+        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMADD__S},
+        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMSUB__S},
+        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMADD__S},
+        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMSUB__S},
+        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__W__S},
+        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__WU__S},
+        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__W},
+        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__WU},
         {32, 0b00100000000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJ__S},
         {32, 0b00100000000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJN__S},
         {32, 0b00100000000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJX__S},
-        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMIN__S},
-        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMAX__S},
-        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__W__S},
-        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__WU__S},
+        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__X__W},
+        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__W__X},
         {32, 0b10100000000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FEQ__S},
         {32, 0b10100000000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLT__S},
         {32, 0b10100000000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLE__S},
         {32, 0b11100000000000000001000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FCLASS__S},
-        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__W},
-        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__WU},
-        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__X__W},
-        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FMV__W__X},
         {16, 0b0110000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLW},
         {16, 0b1110000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSW},
         {16, 0b0110000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLWSP},
         {16, 0b1110000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSWSP},
         {32, 0b00000000000000000011000000000111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FLD},
         {32, 0b00000000000000000011000000100111, 0b00000000000000000111000001111111, arch::traits<ARCH>::opcode_e::FSD},
-        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMADD_D},
-        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMSUB_D},
-        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMADD_D},
-        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMSUB_D},
-        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FADD_D},
-        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FSUB_D},
-        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMUL_D},
-        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FDIV_D},
-        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FSQRT_D},
-        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJ_D},
-        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJN_D},
-        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJX_D},
-        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMIN_D},
-        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMAX_D},
-        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_S_D},
-        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_D_S},
-        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FEQ_D},
-        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLT_D},
-        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLE_D},
-        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FCLASS_D},
-        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_W_D},
-        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_WU_D},
-        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_D_W},
-        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT_D_WU},
+        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FADD__D},
+        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FSUB__D},
+        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMUL__D},
+        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, arch::traits<ARCH>::opcode_e::FDIV__D},
+        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMIN__D},
+        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FMAX__D},
+        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FSQRT__D},
+        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMADD__D},
+        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FMSUB__D},
+        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMADD__D},
+        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, arch::traits<ARCH>::opcode_e::FNMSUB__D},
+        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__W__D},
+        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__WU__D},
+        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__D__W},
+        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__D__WU},
+        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__S__D},
+        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, arch::traits<ARCH>::opcode_e::FCVT__D__S},
+        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJ__D},
+        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJN__D},
+        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FSGNJX__D},
+        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FEQ__D},
+        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLT__D},
+        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, arch::traits<ARCH>::opcode_e::FLE__D},
+        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, arch::traits<ARCH>::opcode_e::FCLASS__D},
         {16, 0b0010000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLD},
         {16, 0b1010000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSD},
         {16, 0b0010000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLDSP},
@@ -333,22 +355,8 @@ private:
     decoder instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
-        if(this->core.has_mmu()) {
-            auto phys_pc = this->core.virt2phys(pc);
-//            if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-//                if (this->core.read(phys_pc, 2, data) != iss::Ok) return iss::Err;
-//                if ((data[0] & 0x3) == 0x3) // this is a 32bit instruction
-//                    if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok)
-//                        return iss::Err;
-//            } else {
-                if (this->core.read(phys_pc, 4, data) != iss::Ok)
+        if (this->core.read(iss::address_type::PHYSICAL, pc.access, pc.space, pc.val, 4, data) != iss::Ok)
                     return iss::Err;
-//            }
-        } else {
-            if (this->core.read(phys_addr_t(pc.access, pc.space, pc.val), 4, data) != iss::Ok)
-                return iss::Err;
-
-        }
         return iss::Ok;
     }
 };
@@ -357,9 +365,6 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
     volatile CODE_WORD x = insn;
     insn = 2 * x;
 }
-
-template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
-
 // according to
 // https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
 #ifdef __GCC__
@@ -447,7 +452,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -473,7 +479,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -482,7 +489,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)imm ));
+                                            *(X+rd) = (uint32_t)((uint64_t)(*PC) + (int64_t)((int32_t)imm));
                                         }
                                     }
                                 }
@@ -499,7 +506,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -507,14 +515,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int32_t)sext<21>(imm) ));
+                                        uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int32_t)sext<21>(imm)));
                                         if(new_pc % traits::INSTR_ALIGNMENT) {
                                             set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
-                                                *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(4 ));
+                                                *(X+rd) = (uint32_t)((uint64_t)(*PC) + (uint64_t)(4));
                                             }
                                             *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
@@ -535,7 +543,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -544,14 +553,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t addr_mask = (uint32_t)- 2;
-                                        uint32_t new_pc = (uint32_t)(((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) )) & (int64_t)(addr_mask ));
+                                        uint32_t new_pc = (uint32_t)(((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm))) & (uint64_t)(addr_mask));
                                         if(new_pc % traits::INSTR_ALIGNMENT) {
                                             set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
-                                                *(X+rd) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(4 ));
+                                                *(X+rd) = (uint32_t)((uint64_t)(*PC) + (uint64_t)(4));
                                             }
                                             *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
@@ -572,7 +581,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -581,7 +591,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) == *(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -607,7 +617,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -616,7 +627,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) != *(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -642,7 +653,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -651,7 +663,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) < (int32_t)*(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -677,7 +689,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -686,7 +699,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int32_t)*(X+rs1) >= (int32_t)*(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -712,7 +725,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -721,7 +735,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) < *(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -747,7 +761,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -756,7 +771,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) >= *(X+rs2)) {
-                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<13>(imm) ));
+                                            uint32_t new_pc = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<13>(imm)));
                                             if(new_pc % traits::INSTR_ALIGNMENT) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
@@ -782,7 +797,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -790,10 +806,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int8_t res_61 = super::template read_mem<int8_t>(traits::MEM, load_address);
+                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        int8_t res_1 = super::template read_mem<int8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int8_t res = (int8_t)res_61;
+                                        int8_t res = (int8_t)res_1;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -813,7 +829,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -821,10 +838,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int16_t res_62 = super::template read_mem<int16_t>(traits::MEM, load_address);
+                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        int16_t res_2 = super::template read_mem<int16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int16_t res = (int16_t)res_62;
+                                        int16_t res = (int16_t)res_2;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -844,7 +861,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -852,10 +870,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        int32_t res_63 = super::template read_mem<int32_t>(traits::MEM, load_address);
+                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        int32_t res_3 = super::template read_mem<int32_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res = (int32_t)res_63;
+                                        int32_t res = (int32_t)res_3;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -875,7 +893,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -883,10 +902,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint8_t res_64 = super::template read_mem<uint8_t>(traits::MEM, load_address);
+                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        uint8_t res_4 = super::template read_mem<uint8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint8_t res = res_64;
+                                        uint8_t res = res_4;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -906,7 +925,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -914,10 +934,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint16_t res_65 = super::template read_mem<uint16_t>(traits::MEM, load_address);
+                                        uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        uint16_t res_5 = super::template read_mem<uint16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint16_t res = res_65;
+                                        uint16_t res = res_5;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -937,7 +957,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -945,7 +966,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint8_t>(traits::MEM, store_address, (uint8_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -964,7 +985,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -972,7 +994,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint16_t>(traits::MEM, store_address, (uint16_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -991,7 +1013,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -999,7 +1022,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                        uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint32_t>(traits::MEM, store_address, (uint32_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -1018,7 +1041,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1027,7 +1051,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         }
                                     }
                                 }
@@ -1045,7 +1069,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1072,7 +1097,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1099,7 +1125,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1126,7 +1153,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1153,7 +1181,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1180,7 +1209,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1207,7 +1237,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1234,7 +1265,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1261,7 +1293,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1270,7 +1303,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)(*(X+rs2) ));
+                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1)) + (uint64_t)(*(X+rs2)));
                                         }
                                     }
                                 }
@@ -1288,7 +1321,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1297,7 +1331,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1) ) - (uint64_t)(*(X+rs2) ));
+                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rs1)) - (uint64_t)(*(X+rs2)));
                                         }
                                     }
                                 }
@@ -1315,7 +1349,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1324,7 +1359,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = *(X+rs1) << ((uint64_t)(*(X+rs2) ) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 )));
+                                            *(X+rd) = *(X+rs1) << ((uint64_t)(*(X+rs2)) & ((uint64_t)(traits::XLEN) - (uint64_t)(1)));
                                         }
                                     }
                                 }
@@ -1342,7 +1377,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1369,7 +1405,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1396,7 +1433,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1423,7 +1461,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1432,7 +1471,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = *(X+rs1) >> ((uint64_t)(*(X+rs2) ) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 )));
+                                            *(X+rd) = *(X+rs1) >> ((uint64_t)(*(X+rs2)) & ((uint64_t)(traits::XLEN) - (uint64_t)(1)));
                                         }
                                     }
                                 }
@@ -1450,7 +1489,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1459,7 +1499,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((int32_t)*(X+rs1) >> ((uint64_t)(*(X+rs2) ) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 ))));
+                                            *(X+rd) = (uint32_t)((int32_t)*(X+rs1) >> ((uint64_t)(*(X+rs2)) & ((uint64_t)(traits::XLEN) - (uint64_t)(1))));
                                         }
                                     }
                                 }
@@ -1477,7 +1517,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1504,7 +1545,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1532,7 +1574,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             fmt::arg("pred", pred), fmt::arg("succ", succ), fmt::arg("fm", fm), fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1548,7 +1591,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "ecall";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1563,7 +1607,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "ebreak";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1578,7 +1623,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "mret";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1593,7 +1639,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "wfi";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1613,7 +1660,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1623,9 +1671,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rd != 0) {
-                                            uint32_t res_66 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                            uint32_t res_6 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            uint32_t xrd = res_66;
+                                            uint32_t xrd = res_6;
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrs1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                             *(X+rd) = xrd;
@@ -1650,7 +1698,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1658,9 +1707,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_67 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_7 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_67;
+                                        uint32_t xrd = res_7;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | xrs1);
@@ -1685,7 +1734,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1693,9 +1743,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_68 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_8 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_68;
+                                        uint32_t xrd = res_8;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ xrs1);
@@ -1720,7 +1770,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1728,9 +1779,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_69 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_9 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_69;
+                                        uint32_t xrd = res_9;
                                         super::template write_mem<uint32_t>(traits::CSR, csr, (uint32_t)zimm);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         if(rd != 0) {
@@ -1752,7 +1803,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1760,9 +1812,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_70 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_10 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_70;
+                                        uint32_t xrd = res_10;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | (uint32_t)zimm);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -1786,7 +1838,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1794,9 +1847,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res_71 = super::template read_mem<uint32_t>(traits::CSR, csr);
+                                        uint32_t res_11 = super::template read_mem<uint32_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t xrd = res_71;
+                                        uint32_t xrd = res_11;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ ((uint32_t)zimm));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -1819,7 +1872,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1840,7 +1894,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1848,7 +1903,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        int64_t res = (int64_t)((int32_t)*(X+rs1) ) * (int64_t)((int32_t)*(X+rs2) );
+                                        int64_t res = (int64_t)((int32_t)*(X+rs1)) * (int64_t)((int32_t)*(X+rs2));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -1868,7 +1923,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1876,7 +1932,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        int64_t res = (int64_t)((int32_t)*(X+rs1) ) * (int64_t)((int32_t)*(X+rs2) );
+                                        int64_t res = (int64_t)((int32_t)*(X+rs1)) * (int64_t)((int32_t)*(X+rs2));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)(res >> traits::XLEN);
                                         }
@@ -1896,7 +1952,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1904,7 +1961,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        int64_t res = (int64_t)((int32_t)*(X+rs1) ) * (int64_t)(*(X+rs2) );
+                                        int64_t res = (int64_t)((int32_t)*(X+rs1)) * (uint64_t)(*(X+rs2));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)(res >> traits::XLEN);
                                         }
@@ -1924,7 +1981,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1932,7 +1990,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res = (uint64_t)(*(X+rs1) ) * (uint64_t)(*(X+rs2) );
+                                        uint64_t res = (uint64_t)(*(X+rs1)) * (uint64_t)(*(X+rs2));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)(res >> traits::XLEN);
                                         }
@@ -1952,7 +2010,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1964,7 +2023,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         int32_t divisor = (int32_t)*(X+rs2);
                                         if(rd != 0) {
                                             if(divisor != 0) {
-                                                uint32_t MMIN = ((uint32_t)1) << ((uint64_t)(traits::XLEN ) - (uint64_t)(1 ));
+                                                uint32_t MMIN = ((uint32_t)1) << ((uint64_t)(traits::XLEN) - (uint64_t)(1));
                                                 if(*(X+rs1) == MMIN && divisor == - 1) {
                                                     *(X+rd) = MMIN;
                                                 }
@@ -1992,7 +2051,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2026,7 +2086,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2035,7 +2096,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs2) != 0) {
-                                            uint32_t MMIN = (uint32_t)1 << ((uint64_t)(traits::XLEN ) - (uint64_t)(1 ));
+                                            uint32_t MMIN = (uint32_t)1 << ((uint64_t)(traits::XLEN) - (uint64_t)(1));
                                             if(*(X+rs1) == MMIN && (int32_t)*(X+rs2) == - 1) {
                                                 if(rd != 0) {
                                                     *(X+rd) = 0;
@@ -2068,7 +2129,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2103,7 +2165,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2113,9 +2176,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         if(rd != 0) {
                                             uint32_t offs = *(X+rs1);
-                                            int32_t res_72 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            int32_t res_12 = super::template read_mem<int32_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            *(X+rd) = (uint32_t)((int32_t)res_72);
+                                            *(X+rd) = (uint32_t)((int32_t)res_12);
                                             super::template write_mem<uint8_t>(traits::RES, offs, (uint8_t)- 1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
@@ -2137,7 +2200,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2146,9 +2210,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint8_t res_73 = super::template read_mem<uint8_t>(traits::RES, offs);
+                                        uint8_t res_13 = super::template read_mem<uint8_t>(traits::RES, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_73;
+                                        uint32_t res1 = res_13;
                                         if(res1 != 0) {
                                             super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -2174,7 +2238,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2185,9 +2250,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t offs = *(X+rs1);
                                         uint32_t res = *(X+rs2);
                                         if(rd != 0) {
-                                            int32_t res_74 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                            int32_t res_14 = super::template read_mem<int32_t>(traits::MEM, offs);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            *(X+rd) = (uint32_t)((int32_t)res_74);
+                                            *(X+rd) = (uint32_t)((int32_t)res_14);
                                         }
                                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)res);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -2209,7 +2274,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2218,10 +2284,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        int32_t res_75 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        int32_t res_15 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int32_t)res_75;
-                                        int64_t res2 = (int64_t)(res1 ) + (int64_t)((int32_t)*(X+rs2) );
+                                        int32_t res1 = (int32_t)res_15;
+                                        int64_t res2 = (int64_t)(res1) + (int64_t)((int32_t)*(X+rs2));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res1;
                                         }
@@ -2245,7 +2311,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2254,9 +2321,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint32_t res_76 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_16 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_76;
+                                        uint32_t res1 = res_16;
                                         uint32_t res2 = res1 ^ (uint32_t)*(X+rs2);
                                         if(rd != 0) {
                                             *(X+rd) = ((uint32_t)(int32_t)(int32_t)res1);
@@ -2281,7 +2348,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2290,9 +2358,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint32_t res_77 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_17 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_77;
+                                        uint32_t res1 = res_17;
                                         uint32_t res2 = res1 & (uint32_t)*(X+rs2);
                                         if(rd != 0) {
                                             *(X+rd) = ((uint32_t)(int32_t)(int32_t)res1);
@@ -2317,7 +2385,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2326,9 +2395,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint32_t res_78 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_18 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_78;
+                                        uint32_t res1 = res_18;
                                         uint32_t res2 = res1 | (uint32_t)*(X+rs2);
                                         if(rd != 0) {
                                             *(X+rd) = ((uint32_t)(int32_t)(int32_t)res1);
@@ -2353,7 +2422,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2362,9 +2432,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        int32_t res_79 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        int32_t res_19 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int32_t)res_79;
+                                        int32_t res1 = (int32_t)res_19;
                                         uint32_t res2 = res1 > (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res1;
@@ -2389,7 +2459,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2398,9 +2469,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        int32_t res_80 = super::template read_mem<int32_t>(traits::MEM, offs);
+                                        int32_t res_20 = super::template read_mem<int32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res1 = (int32_t)res_80;
+                                        int32_t res1 = (int32_t)res_20;
                                         uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : ((uint32_t)res1);
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res1;
@@ -2425,7 +2496,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2434,9 +2506,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint32_t res_81 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_21 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_81;
+                                        uint32_t res1 = res_21;
                                         uint32_t res2 = res1 > (uint32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
                                         if(rd != 0) {
                                             *(X+rd) = ((uint32_t)(int32_t)(int32_t)res1);
@@ -2461,7 +2533,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2470,9 +2543,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t offs = *(X+rs1);
-                                        uint32_t res_82 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t res_22 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res1 = res_82;
+                                        uint32_t res1 = res_22;
                                         uint32_t res2 = res1 < (int32_t)*(X+rs2)? (uint32_t)*(X+rs2) : res1;
                                         if(rd != 0) {
                                             *(X+rd) = ((uint32_t)(int32_t)(int32_t)res1);
@@ -2494,12 +2567,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
                                     if(imm) {
-                                        *(X+rd + 8) = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(imm ));
+                                        *(X+rd + 8) = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(imm));
                                     }
                                     else {
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -2519,14 +2593,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        int32_t res_83 = super::template read_mem<int32_t>(traits::MEM, offs);
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
+                        int32_t res_23 = super::template read_mem<int32_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        *(X+rd + 8) = (uint32_t)(int32_t)res_83;
+                        *(X+rd + 8) = (uint32_t)(int32_t)res_23;
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -2542,11 +2617,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2 + 8));
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
@@ -2563,7 +2639,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2572,7 +2649,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rs1 != 0) {
-                                            *(X+rs1) = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int8_t)sext<6>(imm) ));
+                                            *(X+rs1) = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int8_t)sext<6>(imm)));
                                         }
                                     }
                                 }
@@ -2586,7 +2663,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "c.nop";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2603,12 +2681,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        *(X+1) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(2 ));
-                        *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                        *(X+1) = (uint32_t)((uint64_t)(*PC) + (uint64_t)(2));
+                        *NEXT_PC = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<12>(imm)));
                         this->core.reg.last_branch = 1;
                     }
                     break;
@@ -2624,7 +2703,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2650,7 +2730,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2673,12 +2754,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
                                     if(nzimm) {
-                                        *(X+2) = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)((int16_t)sext<10>(nzimm) ));
+                                        *(X+2) = (uint32_t)((uint64_t)(*(X+2)) + (int64_t)((int16_t)sext<10>(nzimm)));
                                     }
                                     else {
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -2694,7 +2776,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = ".reserved_clui";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2713,7 +2796,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2732,7 +2816,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2758,11 +2843,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        *(X+rs1 + 8) = (uint32_t)(*(X+rs1 + 8) & (uint32_t)((int8_t)sext<6>(imm) ));
+                        *(X+rs1 + 8) = (uint32_t)(*(X+rs1 + 8) & (int32_t)((int8_t)sext<6>(imm)));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -2777,11 +2863,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        *(X+rd + 8) = (uint32_t)((uint64_t)(*(X+rd + 8) ) - (uint64_t)(*(X+rs2 + 8) ));
+                        *(X+rd + 8) = (uint32_t)((uint64_t)(*(X+rd + 8)) - (uint64_t)(*(X+rs2 + 8)));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -2796,7 +2883,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2815,7 +2903,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2834,7 +2923,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2851,11 +2941,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                                    *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                    *NEXT_PC = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<12>(imm)));
                                     this->core.reg.last_branch = 1;
                                 }
                     break;
@@ -2871,12 +2962,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
                                     if(*(X+rs1 + 8) == 0) {
-                                        *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<9>(imm) ));
+                                        *NEXT_PC = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<9>(imm)));
                                         this->core.reg.last_branch = 1;
                                     }
                                 }
@@ -2893,12 +2985,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
                                     if(*(X+rs1 + 8) != 0) {
-                                        *NEXT_PC = (uint32_t)((uint64_t)(*PC ) + (uint64_t)((int16_t)sext<9>(imm) ));
+                                        *NEXT_PC = (uint32_t)((uint64_t)(*PC) + (int64_t)((int16_t)sext<9>(imm)));
                                         this->core.reg.last_branch = 1;
                                     }
                                 }
@@ -2915,7 +3008,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2941,7 +3035,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2949,10 +3044,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
                         else {
-                            uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                            int32_t res_84 = super::template read_mem<int32_t>(traits::MEM, offs);
+                            uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
+                            int32_t res_24 = super::template read_mem<int32_t>(traits::MEM, offs);
                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                            *(X+rd) = (uint32_t)(int32_t)res_84;
+                            *(X+rd) = (uint32_t)(int32_t)res_24;
                         }
                     }
                     break;
@@ -2968,7 +3063,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -2993,13 +3089,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
                                     if(rs1 && rs1 < traits::RFS) {
                                         uint32_t addr_mask = (uint32_t)- 2;
-                                        *NEXT_PC = *(X+(uint32_t)(rs1 ) % traits::RFS) & addr_mask;
+                                        *NEXT_PC = *(X+(uint32_t)(rs1) % traits::RFS) & addr_mask;
                                         this->core.reg.last_branch = 1;
                                     }
                                     else {
@@ -3015,7 +3112,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = ".reserved_cmv";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3034,7 +3132,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3043,7 +3142,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rd) ) + (uint64_t)(*(X+rs2) ));
+                                            *(X+rd) = (uint32_t)((uint64_t)(*(X+rd)) + (uint64_t)(*(X+rs2)));
                                         }
                                     }
                                 }
@@ -3059,7 +3158,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3069,7 +3169,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t addr_mask = (uint32_t)- 2;
                                         uint32_t new_pc = *(X+rs1);
-                                        *(X+1) = (uint32_t)((uint64_t)(*PC ) + (uint64_t)(2 ));
+                                        *(X+1) = (uint32_t)((uint64_t)(*PC) + (uint64_t)(2));
                                         *NEXT_PC = new_pc & addr_mask;
                                         this->core.reg.last_branch = 1;
                                     }
@@ -3083,7 +3183,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "c.ebreak";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3102,7 +3203,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3110,7 +3212,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
+                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
                                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -3124,7 +3226,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "dii";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
@@ -3145,7 +3248,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -3153,11 +3257,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint32_t res_85 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        uint32_t res_25 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res = (uint32_t)res_85;
-                                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                                        *(F+rd) = NaNBox32(res_25);
                                     }
                                 }
                     break;
@@ -3175,7 +3278,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -3183,125 +3287,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
+                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(F+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMADD__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t res = fmadd_s(unbox_s(*(F+rs1)), unbox_s(*(F+rs2)), unbox_s(*(F+rs3)), 0, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMSUB__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t res = fmadd_s(unbox_s(*(F+rs1)), unbox_s(*(F+rs2)), unbox_s(*(F+rs3)), 1, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FNMADD__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, name(rd), {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t frs3 = unbox_s(*(F+rs3));
-                        uint32_t res = fmadd_s(frs1, frs2, frs3, 2, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FNMSUB__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t frs3 = unbox_s(*(F+rs3));
-                        uint32_t res = fmadd_s(frs1, frs2, frs3, 3, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::FADD__S: {
@@ -3312,8 +3302,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3323,10 +3313,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fadd_s(frs1, frs2, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
@@ -3340,8 +3327,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3351,10 +3338,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fsub_s(frs1, frs2, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fsub_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
@@ -3368,8 +3352,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3379,10 +3363,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fmul_s(frs1, frs2, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fmul_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
@@ -3396,8 +3377,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3407,107 +3388,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fdiv_s(frs1, frs2, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fdiv_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSQRT__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t res = fsqrt_s(frs1, get_rm((uint8_t)rm));
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJ__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = (bit_sub<31, 31-31+1>(frs2)<<31)|bit_sub<0, 30-0+1>(frs1);
-                        *(F+rd) = (uint64_t)(- 1 << 32) | (uint64_t)res;
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJN__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = (~ bit_sub<31, 31-31+1>(frs2)<<31)|bit_sub<0, 30-0+1>(frs1);
-                        *(F+rd) = (uint64_t)(- 1 << 32) | (uint64_t)res;
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJX__S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = frs1 ^ (frs2 & (uint32_t)2147483648);
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3529,10 +3412,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fsel_s(frs1, frs2, 0);
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fsel_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 0));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
@@ -3556,10 +3436,135 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        uint32_t frs1 = unbox_s(*(F+rs1));
-                        uint32_t frs2 = unbox_s(*(F+rs2));
-                        uint32_t res = fsel_s(frs1, frs2, 1);
-                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
+                        *(F+rd) = NaNBox32(fsel_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 1));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSQRT__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(fsqrt_s(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMADD__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 0, get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMSUB__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 1, get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FNMADD__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 2, get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FNMSUB__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    uint8_t rs3 = ((bit_sub<27,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 3, get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
@@ -3572,8 +3577,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.w.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.s"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3588,9 +3593,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t frs1 = unbox_s(*(F+rs1));
-                                        int32_t res = (int32_t)(int32_t)fcvt_s(frs1, 0, get_rm(rm));
-                                        if((rd) != 0) {
+                                        int32_t res = (int32_t)(int32_t)f32toi32(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm));
+                                        if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
@@ -3606,8 +3610,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.s"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3622,13 +3626,189 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t frs1 = unbox_s(*(F+rs1));
-                                        int32_t res = (int32_t)(int32_t)fcvt_s(frs1, 1, get_rm((uint8_t)rm));
-                                        if((rd) != 0) {
+                                        int32_t res = (int32_t)(int32_t)f32toui32(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm));
+                                        if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
                                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__S__W: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.w"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = NaNBox32(i32tof32((uint32_t)*(X+rs1), get_rm(rm)));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__S__WU: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.wu"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = NaNBox32(ui32tof32((uint32_t)*(X+rs1), get_rm(rm)));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSGNJ__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(((uint32_t)bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2)))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSGNJN__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32(((uint32_t)~ bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2)))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSGNJX__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox32((unbox_s(traits::FLEN, *(F+rs2)) & ((uint32_t)1 << 31)) ^ unbox_s(traits::FLEN, *(F+rs1)));
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMV__X__W: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)(int32_t)(int32_t)*(F+rs1);
+                                        }
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMV__W__X: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = NaNBox32((uint32_t)*(X+rs1));
                                     }
                                 }
                     break;
@@ -3656,10 +3836,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t frs2 = unbox_s(*(F+rs2));
-                                        uint32_t res = fcmp_s(frs1, frs2, 0);
-                                        if((rd) != 0) {
+                                        uint32_t res = fcmp_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 0);
+                                        if(rd != 0) {
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
@@ -3691,10 +3869,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t frs2 = unbox_s(*(F+rs2));
-                                        uint32_t res = fcmp_s(frs1, frs2, 2);
-                                        if((rd) != 0) {
+                                        uint32_t res = fcmp_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 2);
+                                        if(rd != 0) {
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
@@ -3726,10 +3902,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t frs1 = unbox_s(*(F+rs1));
-                                        uint32_t frs2 = unbox_s(*(F+rs2));
-                                        uint32_t res = fcmp_s(frs1, frs2, 1);
-                                        if((rd) != 0) {
+                                        uint32_t res = fcmp_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 1);
+                                        if(rd != 0) {
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
@@ -3750,7 +3924,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -3758,124 +3933,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t res = fclass_s(unbox_s(*(F+rs1)));
-                                        if((rd) != 0) {
+                                        uint32_t res = fclass_s(unbox_s(traits::FLEN, *(F+rs1)));
+                                        if(rd != 0) {
                                             *(X+rd) = res;
                                         }
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT__S__W: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.w"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rs1 >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 2, get_rm((uint8_t)rm));
-                                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                                        uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT__S__WU: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.wu"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rs1 >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        uint32_t res = fcvt_s((uint32_t)*(X+rs1), 3, get_rm((uint8_t)rm));
-                                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)res;
-                                        uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMV__X__W: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
-                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rd >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        if((rd) != 0) {
-                                            *(X+rd) = (uint32_t)(int32_t)(int32_t)*(F+rs1);
-                                        }
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMV__W__X: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
-                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rs1 >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        *(F+rd) = (uint64_t)((int64_t)- 1 << 32) | (uint64_t)*(X+rs1);
                                     }
                                 }
                     break;
@@ -3893,20 +3954,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        uint32_t res_86 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
+                        uint32_t res_26 = super::template read_mem<uint32_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res = (uint32_t)res_86;
-                        if(traits::FLEN == 32) {
-                            *(F+rd + 8) = res;
-                        }
-                        else {
-                            *(F+rd + 8) = ((uint64_t)((int64_t)- 1 << 32)) | (uint64_t)(res );
-                        }
+                        uint32_t res = (uint32_t)res_26;
+                        *(F+rd + 8) = NaNBox32(res);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3923,11 +3980,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(F+rs2 + 8));
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
@@ -3945,20 +4003,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                        uint32_t res_87 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
+                        uint32_t res_27 = super::template read_mem<uint32_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint32_t res = (uint32_t)res_87;
-                        if(traits::FLEN == 32) {
-                            *(F+rd) = res;
-                        }
-                        else {
-                            *(F+rd) = ((uint64_t)((int64_t)- 1 << 32)) | (uint64_t)(res );
-                        }
+                        uint32_t res = (uint32_t)res_27;
+                        *(F+rd) = NaNBox32(res);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3974,11 +4028,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(F+rs2));
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
@@ -3997,7 +4052,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -4005,10 +4061,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        uint64_t res_88 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        uint64_t res_28 = super::template read_mem<uint64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        *(F+rd) = res_88;
+                                        *(F+rd) = NaNBox64(res_28);
                                     }
                                 }
                     break;
@@ -4026,7 +4082,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -4034,14 +4091,186 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1) ) + (uint64_t)((int16_t)sext<12>(imm) ));
-                                        super::template write_mem<uint64_t>(traits::MEM, offs, *(F+rs2));
+                                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
+                                        super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(F+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMADD_D: {
+                case arch::traits<ARCH>::opcode_e::FADD__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSUB__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fsub_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMUL__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fmul_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FDIV__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fdiv_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMIN__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fsel_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 0));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMAX__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fsel_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 1));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSQRT__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(fsqrt_d(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FMADD__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rm = ((bit_sub<12,3>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -4050,8 +4279,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4061,13 +4290,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 0, get_rm(rm));
+                        *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 0, get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMSUB_D: {
+                case arch::traits<ARCH>::opcode_e::FMSUB__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rm = ((bit_sub<12,3>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -4076,8 +4305,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4087,13 +4316,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 1, get_rm(rm));
+                        uint64_t res = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 1, get_rm(rm)));
+                        *(F+rd) = res;
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FNMADD_D: {
+                case arch::traits<ARCH>::opcode_e::FNMADD__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rm = ((bit_sub<12,3>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -4102,8 +4332,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4113,13 +4343,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 2, get_rm(rm));
+                        *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 2, get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FNMSUB_D: {
+                case arch::traits<ARCH>::opcode_e::FNMSUB__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rm = ((bit_sub<12,3>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -4128,8 +4358,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4139,121 +4369,147 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fmadd_d(*(F+rs1), *(F+rs2), *(F+rs3), 3, get_rm(rm));
+                        *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 3, get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FADD_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = fadd_d(*(F+rs1), *(F+rs2), get_rm(rm));
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSUB_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = fsub_d(*(F+rs1), *(F+rs2), get_rm(rm));
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMUL_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = fmul_d(*(F+rs1), *(F+rs2), get_rm(rm));
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FDIV_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = fdiv_d(*(F+rs1), *(F+rs2), get_rm(rm));
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSQRT_D: {
+                case arch::traits<ARCH>::opcode_e::FCVT__W__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rm = ((bit_sub<12,3>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.d"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        int32_t res = (int32_t)(int32_t)f64toi32(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__WU__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.d"),
+                            fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rd >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        int32_t res = (int32_t)(int32_t)f64toui32(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm));
+                                        if(rd != 0) {
+                                            *(X+rd) = (uint32_t)res;
+                                        }
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__D__W: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.w"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = NaNBox64(i32tof64((uint32_t)*(X+rs1), get_rm(rm)));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__D__WU: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.wu"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    if(rs1 >= traits::RFS) {
+                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
+                                    }
+                                    else {
+                                        *(F+rd) = NaNBox64(ui32tof64((uint32_t)*(X+rs1), get_rm(rm)));
+                                        uint32_t flags = fget_flags();
+                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                    }
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FCVT__S__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -4263,173 +4519,104 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fsqrt_d(*(F+rs1), get_rm(rm));
+                        *(F+rd) = NaNBox32(f64tof32(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm)));
                         uint32_t flags = fget_flags();
                         *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJ_D: {
+                case arch::traits<ARCH>::opcode_e::FCVT__D__S: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rm = ((bit_sub<12,3>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.s"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64(f32tof64(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm)));
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FSGNJ__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     uint8_t rs2 = ((bit_sub<20,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj_d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = (bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJN_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn_d"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = (~ bit_sub<63, 63-63+1>(*(F+rs2))<<63)|bit_sub<0, 62-0+1>(*(F+rs1));
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FSGNJX_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx_d"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = *(F+rs1) ^ (*(F+rs2) & ((uint64_t)1 << 63));
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMIN_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin_d"),
-                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fsel_d(*(F+rs1), *(F+rs2), 0);
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *(F+rd) = NaNBox64(((uint64_t)bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2)))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FMAX_D: {
+                case arch::traits<ARCH>::opcode_e::FSGNJN__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     uint8_t rs2 = ((bit_sub<20,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax_d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.d"),
                             fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = fsel_d(*(F+rs1), *(F+rs2), 1);
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *(F+rd) = NaNBox64(((uint64_t)~ bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2)))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_S_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_s_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        uint32_t res = fconv_d2f(*(F+rs1), get_rm(rm));
-                        *(F+rd) = (uint64_t)((int128_t)(((int64_t)- 1 << 32) ) + (int128_t)(res ));
-                        uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_D_S: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_s"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                        *(F+rd) = fconv_f2d((uint32_t)*(F+rs1), get_rm(rm));
-                    }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FEQ_D: {
+                case arch::traits<ARCH>::opcode_e::FSGNJX__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     uint8_t rs2 = ((bit_sub<20,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq_d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.d"),
+                            fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                        *(F+rd) = NaNBox64((unbox_d(traits::FLEN, *(F+rs2)) & ((uint64_t)1 << 63)) ^ unbox_d(traits::FLEN, *(F+rs1)));
+                    }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::FEQ__D: {
+                    uint8_t rd = ((bit_sub<7,5>(instr)));
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t rs2 = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq.d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4445,7 +4632,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 0);
+                                        uint64_t res = fcmp_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 0);
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -4455,14 +4642,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                 }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FLT_D: {
+                case arch::traits<ARCH>::opcode_e::FLT__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     uint8_t rs2 = ((bit_sub<20,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt_d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4478,7 +4665,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 2);
+                                        uint64_t res = fcmp_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 2);
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -4488,14 +4675,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                 }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FLE_D: {
+                case arch::traits<ARCH>::opcode_e::FLE__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     uint8_t rs2 = ((bit_sub<20,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle_d"),
+                            "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -4511,7 +4698,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res = fcmp_d(*(F+rs1), *(F+rs2), 1);
+                                        uint64_t res = fcmp_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 1);
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
@@ -4521,48 +4708,19 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                 }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCLASS_D: {
+                case arch::traits<ARCH>::opcode_e::FCLASS__D: {
                     uint8_t rd = ((bit_sub<7,5>(instr)));
                     uint8_t rs1 = ((bit_sub<15,5>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass_d"),
+                            "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass.d"),
                             fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rd >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        if(rd != 0) {
-                                            *(X+rd) = (uint32_t)fclass_d(*(F+rs1));
-                                        }
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_W_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_w_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
@@ -4571,97 +4729,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        int32_t res = (int32_t)(int32_t)fcvt_64_32(*(F+rs1), 0, get_rm(rm));
+                                        uint64_t res = fclass_d(unbox_d(traits::FLEN, *(F+rs1)));
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
                                         }
-                                        uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_WU_D: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_wu_d"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]); 
-                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rd >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        int32_t res = (int32_t)(int32_t)fcvt_64_32(*(F+rs1), 1, get_rm(rm));
-                                        if(rd != 0) {
-                                            *(X+rd) = (uint32_t)res;
-                                        }
-                                        uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_D_W: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_w"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rs1 >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        *(F+rd) = fcvt_32_64((uint32_t)*(X+rs1), 2, get_rm(rm));
-                                    }
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::FCVT_D_WU: {
-                    uint8_t rd = ((bit_sub<7,5>(instr)));
-                    uint8_t rm = ((bit_sub<12,3>(instr)));
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_wu"),
-                            fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
-                    auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    if(rs1 >= traits::RFS) {
-                                        raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
-                                    }
-                                    else {
-                                        *(F+rd) = fcvt_32_64((uint32_t)*(X+rs1), 3, get_rm(rm));
                                     }
                                 }
                     break;
@@ -4679,20 +4750,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
-                        uint64_t res_89 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
+                        uint64_t res_29 = super::template read_mem<uint64_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = (uint64_t)res_89;
-                        if(traits::FLEN == 64) {
-                            *(F+rd + 8) = res;
-                        }
-                        else {
-                            *(F+rd + 8) = (uint64_t)(((uint8_t)(- 1 << 64)) ) | res;
-                        }
+                        uint64_t res = (uint64_t)res_29;
+                        *(F+rd + 8) = NaNBox64(res);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4709,11 +4776,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8) ) + (uint64_t)(uimm ));
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
                         super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(F+rs2 + 8));
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
@@ -4731,20 +4799,16 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
-                        uint64_t res_90 = super::template read_mem<uint64_t>(traits::MEM, offs);
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
+                        uint64_t res_30 = super::template read_mem<uint64_t>(traits::MEM, offs);
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                        uint64_t res = (uint64_t)res_90;
-                        if(traits::FLEN == 64) {
-                            *(F+rd) = res;
-                        }
-                        else {
-                            *(F+rd) = (uint64_t)(((uint8_t)(- 1 << 64)) ) | res;
-                        }
+                        uint64_t res = (uint64_t)res_30;
+                        *(F+rd) = NaNBox64(res);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4760,11 +4824,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* X = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
-                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);// calculate next pc value
+                    auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2) ) + (uint64_t)(uimm ));
+                        uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
                         super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(F+rs2));
                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
