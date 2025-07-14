@@ -143,7 +143,7 @@ public:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
         auto& f = sysc::iss_factory::instance();
         if(type.size() == 0 || type == "?") {
-            std::cout << "Available cores: " << util::join(f.get_names(), ", ") << std::endl;
+            SCCINFO(owner->hier_name()) << "Available cores: \n    " << util::join(f.get_names(), ",\n    ") << std::endl;
             sc_core::sc_stop();
         } else if(type.find('|') != std::string::npos) {
             std::tie(cpu, vm) = f.create(type + "|" + backend);
@@ -287,7 +287,9 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     SCCDEBUG(SCMOD) << "instantiating iss::arch::tgf with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
-    cpu->create_cpu(GET_PROP_VALUE(core_type), GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    auto& type = GET_PROP_VALUE(core_type);
+    cpu->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    if(type=="?") return;
 #ifndef CWR_SYSTEMC
     if(!local_irq_num.is_default_value()) {
         auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu->cpu.get());
