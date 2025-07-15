@@ -1,0 +1,12 @@
+{
+    "cmake.pinnedCommands": [
+        "workbench.action.tasks.configureTaskRunner",
+        "workbench.action.tasks.runTask"
+    ],
+    "clangd.arguments": [
+    "--pretty",
+    "--background-index",
+    "--compile-commands-dir=${workspaceFolder}/build"
+    ],
+    "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json"
+}
