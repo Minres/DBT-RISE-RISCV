@@ -37,7 +37,7 @@
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
-#include <vm/fp_functions.h>
+
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
@@ -225,22 +225,8 @@ private:
     decoder instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
-        if(this->core.has_mmu()) {
-            auto phys_pc = this->core.virt2phys(pc);
-//            if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-//                if (this->core.read(phys_pc, 2, data) != iss::Ok) return iss::Err;
-//                if ((data[0] & 0x3) == 0x3) // this is a 32bit instruction
-//                    if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok)
-//                        return iss::Err;
-//            } else {
-                if (this->core.read(phys_pc, 4, data) != iss::Ok)
+        if (this->core.read(iss::address_type::PHYSICAL, pc.access, pc.space, pc.val, 4, data) != iss::Ok)
                     return iss::Err;
-//            }
-        } else {
-            if (this->core.read(phys_addr_t(pc.access, pc.space, pc.val), 4, data) != iss::Ok)
-                return iss::Err;
-
-        }
         return iss::Ok;
     }
 };
@@ -249,9 +235,6 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
     volatile CODE_WORD x = insn;
     insn = 2 * x;
 }
-
-template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
-
 // according to
 // https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
 #ifdef __GCC__
@@ -339,7 +322,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -365,7 +349,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -374,7 +359,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int32_t)imm ));
+                                            *(X+rd) = (uint64_t)((uint128_t)(*PC) + (int128_t)((int32_t)imm));
                                         }
                                     }
                                 }
@@ -391,7 +376,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -399,14 +385,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int32_t)sext<21>(imm) ));
-                                        if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                        uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int32_t)sext<21>(imm)));
+                                        if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                             set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
-                                                *(X+rd) = (uint64_t)((uint128_t)(*PC ) + (uint128_t)(4 ));
+                                                *(X+rd) = (uint64_t)((uint128_t)(*PC) + (uint128_t)(4));
                                             }
                                             *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
@@ -427,7 +413,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -436,14 +423,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint64_t addr_mask = (uint64_t)- 2;
-                                        uint64_t new_pc = (uint64_t)(((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) )) & (int128_t)(addr_mask ));
-                                        if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                        uint64_t new_pc = (uint64_t)(((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm))) & (uint128_t)(addr_mask));
+                                        if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                             set_tval(new_pc);
                                             raise(0, 0);
                                         }
                                         else {
                                             if(rd != 0) {
-                                                *(X+rd) = (uint64_t)((uint128_t)(*PC ) + (uint128_t)(4 ));
+                                                *(X+rd) = (uint64_t)((uint128_t)(*PC) + (uint128_t)(4));
                                             }
                                             *NEXT_PC = new_pc;
                                             this->core.reg.last_branch = 1;
@@ -464,7 +451,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -473,8 +461,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) == *(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -499,7 +487,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -508,8 +497,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) != *(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -534,7 +523,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -543,8 +533,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int64_t)*(X+rs1) < (int64_t)*(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -569,7 +559,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -578,8 +569,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if((int64_t)*(X+rs1) >= (int64_t)*(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -604,7 +595,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -613,8 +605,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) < *(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -639,7 +631,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -648,8 +641,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(*(X+rs1) >= *(X+rs2)) {
-                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC ) + (uint128_t)((int16_t)sext<13>(imm) ));
-                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT )) {
+                                            uint64_t new_pc = (uint64_t)((uint128_t)(*PC) + (int128_t)((int16_t)sext<13>(imm)));
+                                            if(new_pc % (uint64_t)(traits::INSTR_ALIGNMENT)) {
                                                 set_tval(new_pc);
                                                 raise(0, 0);
                                             }
@@ -674,7 +667,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -682,10 +676,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        int8_t res_27 = super::template read_mem<int8_t>(traits::MEM, load_address);
+                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        int8_t res_1 = super::template read_mem<int8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int8_t res = (int8_t)res_27;
+                                        int8_t res = (int8_t)res_1;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -705,7 +699,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -713,10 +708,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        int16_t res_28 = super::template read_mem<int16_t>(traits::MEM, load_address);
+                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        int16_t res_2 = super::template read_mem<int16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int16_t res = (int16_t)res_28;
+                                        int16_t res = (int16_t)res_2;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -736,7 +731,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -744,10 +740,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        int32_t res_29 = super::template read_mem<int32_t>(traits::MEM, load_address);
+                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        int32_t res_3 = super::template read_mem<int32_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int32_t res = (int32_t)res_29;
+                                        int32_t res = (int32_t)res_3;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -767,7 +763,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -775,10 +772,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        uint8_t res_30 = super::template read_mem<uint8_t>(traits::MEM, load_address);
+                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        uint8_t res_4 = super::template read_mem<uint8_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint8_t res = res_30;
+                                        uint8_t res = res_4;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -798,7 +795,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -806,10 +804,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        uint16_t res_31 = super::template read_mem<uint16_t>(traits::MEM, load_address);
+                                        uint64_t load_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        uint16_t res_5 = super::template read_mem<uint16_t>(traits::MEM, load_address);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint16_t res = res_31;
+                                        uint16_t res = res_5;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -829,7 +827,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -837,7 +836,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint8_t>(traits::MEM, store_address, (uint8_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -856,7 +855,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -864,7 +864,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint16_t>(traits::MEM, store_address, (uint16_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -883,7 +883,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -891,7 +892,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        uint64_t store_address = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint32_t>(traits::MEM, store_address, (uint32_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -910,7 +911,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -919,7 +921,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                         }
                                     }
                                 }
@@ -937,7 +939,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -964,7 +967,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -991,7 +995,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1018,7 +1023,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1045,7 +1051,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1072,7 +1079,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1099,7 +1107,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1126,7 +1135,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1153,7 +1163,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1162,7 +1173,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)(*(X+rs2) ));
+                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1)) + (uint128_t)(*(X+rs2)));
                                         }
                                     }
                                 }
@@ -1180,7 +1191,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1189,7 +1201,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1) ) - (uint128_t)(*(X+rs2) ));
+                                            *(X+rd) = (uint64_t)((uint128_t)(*(X+rs1)) - (uint128_t)(*(X+rs2)));
                                         }
                                     }
                                 }
@@ -1207,7 +1219,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1216,7 +1229,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = *(X+rs1) << (*(X+rs2) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 )));
+                                            *(X+rd) = *(X+rs1) << (*(X+rs2) & ((uint64_t)(traits::XLEN) - (uint64_t)(1)));
                                         }
                                     }
                                 }
@@ -1234,7 +1247,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1261,7 +1275,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1288,7 +1303,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1315,7 +1331,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1324,7 +1341,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = *(X+rs1) >> (*(X+rs2) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 )));
+                                            *(X+rd) = *(X+rs1) >> (*(X+rs2) & ((uint64_t)(traits::XLEN) - (uint64_t)(1)));
                                         }
                                     }
                                 }
@@ -1342,7 +1359,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1351,7 +1369,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            *(X+rd) = (uint64_t)((int64_t)*(X+rs1) >> (*(X+rs2) & ((uint64_t)(traits::XLEN ) - (uint64_t)(1 ))));
+                                            *(X+rd) = (uint64_t)((int64_t)*(X+rs1) >> (*(X+rs2) & ((uint64_t)(traits::XLEN) - (uint64_t)(1))));
                                         }
                                     }
                                 }
@@ -1369,7 +1387,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1396,7 +1415,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1424,7 +1444,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             fmt::arg("pred", pred), fmt::arg("succ", succ), fmt::arg("fm", fm), fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1440,7 +1461,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "ecall";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1455,7 +1477,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "ebreak";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1470,7 +1493,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "mret";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1485,7 +1509,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         std::string mnemonic = "wfi";
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1505,7 +1530,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1513,10 +1539,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        uint32_t res_32 = super::template read_mem<uint32_t>(traits::MEM, offs);
+                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        uint32_t res_6 = super::template read_mem<uint32_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint32_t res = (uint32_t)res_32;
+                                        uint32_t res = (uint32_t)res_6;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -1536,7 +1562,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1544,10 +1571,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
-                                        int64_t res_33 = super::template read_mem<int64_t>(traits::MEM, offs);
+                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
+                                        int64_t res_7 = super::template read_mem<int64_t>(traits::MEM, offs);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        int64_t res = (int64_t)res_33;
+                                        int64_t res = (int64_t)res_7;
                                         if(rd != 0) {
                                             *(X+rd) = (uint64_t)res;
                                         }
@@ -1567,7 +1594,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1575,7 +1603,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                        uint64_t offs = (uint64_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint64_t>(traits::MEM, offs, (uint64_t)*(X+rs2));
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
@@ -1594,7 +1622,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1603,7 +1632,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            int32_t res = (int32_t)((uint128_t)(*(X+rs1) ) + (uint128_t)((int16_t)sext<12>(imm) ));
+                                            int32_t res = (int32_t)((uint128_t)(*(X+rs1)) + (int128_t)((int16_t)sext<12>(imm)));
                                             *(X+rd) = (uint64_t)res;
                                         }
                                     }
@@ -1622,7 +1651,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1650,7 +1680,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1678,7 +1709,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1705,7 +1737,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1714,7 +1747,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            int32_t res = (int32_t)((int64_t)((int32_t)*(X+rs1) ) + (int64_t)((int32_t)*(X+rs2) ));
+                                            int32_t res = (int32_t)((int64_t)((int32_t)*(X+rs1)) + (int64_t)((int32_t)*(X+rs2)));
                                             *(X+rd) = (uint64_t)res;
                                         }
                                     }
@@ -1732,7 +1765,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1741,7 +1775,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            int32_t res = (int32_t)((int64_t)((int32_t)*(X+rs1) ) - (int64_t)((int32_t)*(X+rs2) ));
+                                            int32_t res = (int32_t)((int64_t)((int32_t)*(X+rs1)) - (int64_t)((int32_t)*(X+rs2)));
                                             *(X+rd) = (uint64_t)res;
                                         }
                                     }
@@ -1760,7 +1794,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1769,7 +1804,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31 );
+                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31);
                                             uint32_t sh_val = ((uint32_t)*(X+rs1)) << count;
                                             *(X+rd) = (uint64_t)(int32_t)sh_val;
                                         }
@@ -1789,7 +1824,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1798,7 +1834,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31 );
+                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31);
                                             uint32_t sh_val = ((uint32_t)*(X+rs1)) >> count;
                                             *(X+rd) = (uint64_t)(int32_t)sh_val;
                                         }
@@ -1818,7 +1854,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1827,7 +1864,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         if(rd != 0) {
-                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31 );
+                                            uint32_t count = (uint32_t)*(X+rs2) & (uint32_t)(31);
                                             int32_t sh_val = ((int32_t)*(X+rs1)) >> count;
                                             *(X+rd) = (uint64_t)sh_val;
                                         }
@@ -1847,7 +1884,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1857,9 +1895,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint64_t xrs1 = *(X+rs1);
                                         if(rd != 0) {
-                                            uint64_t res_34 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                            uint64_t res_8 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                            uint64_t xrd = res_34;
+                                            uint64_t xrd = res_8;
                                             super::template write_mem<uint64_t>(traits::CSR, csr, xrs1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                             *(X+rd) = xrd;
@@ -1884,7 +1922,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1892,9 +1931,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res_35 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                        uint64_t res_9 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t xrd = res_35;
+                                        uint64_t xrd = res_9;
                                         uint64_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint64_t>(traits::CSR, csr, xrd | xrs1);
@@ -1919,7 +1958,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1927,9 +1967,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res_36 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                        uint64_t res_10 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t xrd = res_36;
+                                        uint64_t xrd = res_10;
                                         uint64_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint64_t>(traits::CSR, csr, xrd & ~ xrs1);
@@ -1954,7 +1994,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1962,9 +2003,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res_37 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                        uint64_t res_11 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t xrd = res_37;
+                                        uint64_t xrd = res_11;
                                         super::template write_mem<uint64_t>(traits::CSR, csr, (uint64_t)zimm);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         if(rd != 0) {
@@ -1986,7 +2027,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -1994,9 +2036,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res_38 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                        uint64_t res_12 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t xrd = res_38;
+                                        uint64_t xrd = res_12;
                                         if(zimm != 0) {
                                             super::template write_mem<uint64_t>(traits::CSR, csr, xrd | (uint64_t)zimm);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -2020,7 +2062,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
-                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);// calculate next pc value
+                    auto* X = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::X0]);
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
@@ -2028,9 +2071,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint64_t res_39 = super::template read_mem<uint64_t>(traits::CSR, csr);
+                                        uint64_t res_13 = super::template read_mem<uint64_t>(traits::CSR, csr);
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                        uint64_t xrd = res_39;
+                                        uint64_t xrd = res_13;
                                         if(zimm != 0) {
                                             super::template write_mem<uint64_t>(traits::CSR, csr, xrd & ~ ((uint64_t)zimm));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
@@ -2053,7 +2096,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                             fmt::arg("rs1", name(rs1)), fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
-                    // used registers// calculate next pc value
+                    // used registers
+                    // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {

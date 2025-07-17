@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2024 MINRES Technologies GmbH
+ * Copyright (C) 2020-2024 MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
  *
  *******************************************************************************/
 // clang-format off
-#include <iss/arch/rv32i.h>
+#include <iss/arch/tgc5c.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
@@ -49,7 +49,7 @@
 
 namespace iss {
 namespace tcc {
-namespace rv32i {
+namespace tgc5c {
 using namespace iss::arch;
 using namespace iss::debugger;
 
@@ -81,16 +81,18 @@ protected:
     using vm_base<ARCH>::get_reg_ptr;
 
     using this_class = vm_impl<ARCH>;
-    using compile_ret_t = std::tuple<continuation_e>;
+    using compile_ret_t = continuation_e;
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr, tu_builder&);
 
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+
+    void add_prologue(tu_builder& tu) override;
 
     void setup_module(std::string m) override {
         super::setup_module(m);
     }
 
-    compile_ret_t gen_single_inst_behavior(virt_addr_t &, unsigned int &, tu_builder&) override;
+    compile_ret_t gen_single_inst_behavior(virt_addr_t &, tu_builder&) override;
 
     void gen_trap_behavior(tu_builder& tu) override;
 
@@ -129,7 +131,7 @@ protected:
         auto mask = (1ULL<<W) - 1;
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
-    }    
+    }
 
 
 private:
@@ -143,7 +145,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 49> instr_descr = {{
+    const std::array<instruction_descriptor, 87> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -243,11 +245,87 @@ private:
         {32, 0b00000000000000000111000001110011, 0b00000000000000000111000001111111, &this_class::__csrrci},
         /* instruction FENCE_I, encoding '0b00000000000000000001000000001111' */
         {32, 0b00000000000000000001000000001111, 0b00000000000000000111000001111111, &this_class::__fence_i},
+        /* instruction MUL, encoding '0b00000010000000000000000000110011' */
+        {32, 0b00000010000000000000000000110011, 0b11111110000000000111000001111111, &this_class::__mul},
+        /* instruction MULH, encoding '0b00000010000000000001000000110011' */
+        {32, 0b00000010000000000001000000110011, 0b11111110000000000111000001111111, &this_class::__mulh},
+        /* instruction MULHSU, encoding '0b00000010000000000010000000110011' */
+        {32, 0b00000010000000000010000000110011, 0b11111110000000000111000001111111, &this_class::__mulhsu},
+        /* instruction MULHU, encoding '0b00000010000000000011000000110011' */
+        {32, 0b00000010000000000011000000110011, 0b11111110000000000111000001111111, &this_class::__mulhu},
+        /* instruction DIV, encoding '0b00000010000000000100000000110011' */
+        {32, 0b00000010000000000100000000110011, 0b11111110000000000111000001111111, &this_class::__div},
+        /* instruction DIVU, encoding '0b00000010000000000101000000110011' */
+        {32, 0b00000010000000000101000000110011, 0b11111110000000000111000001111111, &this_class::__divu},
+        /* instruction REM, encoding '0b00000010000000000110000000110011' */
+        {32, 0b00000010000000000110000000110011, 0b11111110000000000111000001111111, &this_class::__rem},
+        /* instruction REMU, encoding '0b00000010000000000111000000110011' */
+        {32, 0b00000010000000000111000000110011, 0b11111110000000000111000001111111, &this_class::__remu},
+        /* instruction C__ADDI4SPN, encoding '0b0000000000000000' */
+        {16, 0b0000000000000000, 0b1110000000000011, &this_class::__c__addi4spn},
+        /* instruction C__LW, encoding '0b0100000000000000' */
+        {16, 0b0100000000000000, 0b1110000000000011, &this_class::__c__lw},
+        /* instruction C__SW, encoding '0b1100000000000000' */
+        {16, 0b1100000000000000, 0b1110000000000011, &this_class::__c__sw},
+        /* instruction C__ADDI, encoding '0b0000000000000001' */
+        {16, 0b0000000000000001, 0b1110000000000011, &this_class::__c__addi},
+        /* instruction C__NOP, encoding '0b0000000000000001' */
+        {16, 0b0000000000000001, 0b1110111110000011, &this_class::__c__nop},
+        /* instruction C__JAL, encoding '0b0010000000000001' */
+        {16, 0b0010000000000001, 0b1110000000000011, &this_class::__c__jal},
+        /* instruction C__LI, encoding '0b0100000000000001' */
+        {16, 0b0100000000000001, 0b1110000000000011, &this_class::__c__li},
+        /* instruction C__LUI, encoding '0b0110000000000001' */
+        {16, 0b0110000000000001, 0b1110000000000011, &this_class::__c__lui},
+        /* instruction C__ADDI16SP, encoding '0b0110000100000001' */
+        {16, 0b0110000100000001, 0b1110111110000011, &this_class::__c__addi16sp},
+        /* instruction __reserved_clui, encoding '0b0110000000000001' */
+        {16, 0b0110000000000001, 0b1111000001111111, &this_class::____reserved_clui},
+        /* instruction C__SRLI, encoding '0b1000000000000001' */
+        {16, 0b1000000000000001, 0b1111110000000011, &this_class::__c__srli},
+        /* instruction C__SRAI, encoding '0b1000010000000001' */
+        {16, 0b1000010000000001, 0b1111110000000011, &this_class::__c__srai},
+        /* instruction C__ANDI, encoding '0b1000100000000001' */
+        {16, 0b1000100000000001, 0b1110110000000011, &this_class::__c__andi},
+        /* instruction C__SUB, encoding '0b1000110000000001' */
+        {16, 0b1000110000000001, 0b1111110001100011, &this_class::__c__sub},
+        /* instruction C__XOR, encoding '0b1000110000100001' */
+        {16, 0b1000110000100001, 0b1111110001100011, &this_class::__c__xor},
+        /* instruction C__OR, encoding '0b1000110001000001' */
+        {16, 0b1000110001000001, 0b1111110001100011, &this_class::__c__or},
+        /* instruction C__AND, encoding '0b1000110001100001' */
+        {16, 0b1000110001100001, 0b1111110001100011, &this_class::__c__and},
+        /* instruction C__J, encoding '0b1010000000000001' */
+        {16, 0b1010000000000001, 0b1110000000000011, &this_class::__c__j},
+        /* instruction C__BEQZ, encoding '0b1100000000000001' */
+        {16, 0b1100000000000001, 0b1110000000000011, &this_class::__c__beqz},
+        /* instruction C__BNEZ, encoding '0b1110000000000001' */
+        {16, 0b1110000000000001, 0b1110000000000011, &this_class::__c__bnez},
+        /* instruction C__SLLI, encoding '0b0000000000000010' */
+        {16, 0b0000000000000010, 0b1111000000000011, &this_class::__c__slli},
+        /* instruction C__LWSP, encoding '0b0100000000000010' */
+        {16, 0b0100000000000010, 0b1110000000000011, &this_class::__c__lwsp},
+        /* instruction C__MV, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111000000000011, &this_class::__c__mv},
+        /* instruction C__JR, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111000001111111, &this_class::__c__jr},
+        /* instruction __reserved_cmv, encoding '0b1000000000000010' */
+        {16, 0b1000000000000010, 0b1111111111111111, &this_class::____reserved_cmv},
+        /* instruction C__ADD, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111000000000011, &this_class::__c__add},
+        /* instruction C__JALR, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111000001111111, &this_class::__c__jalr},
+        /* instruction C__EBREAK, encoding '0b1001000000000010' */
+        {16, 0b1001000000000010, 0b1111111111111111, &this_class::__c__ebreak},
+        /* instruction C__SWSP, encoding '0b1100000000000010' */
+        {16, 0b1100000000000010, 0b1110000000000011, &this_class::__c__swsp},
+        /* instruction DII, encoding '0b0000000000000000' */
+        {16, 0b0000000000000000, 0b1111111111111111, &this_class::__dii},
     }};
 
     //needs to be declared after instr_descr
     decoder instr_decoder;
- 
+
     /* instruction definitions */
     /* instruction 0: LUI */
     compile_ret_t __lui(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
@@ -266,17 +344,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
         	    tu.store(rd + traits::X0, tu.constant((uint32_t)((int32_t)imm),32));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,0);
@@ -301,17 +380,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
         	    tu.store(rd + traits::X0, tu.constant((uint32_t)(PC+(int32_t)imm),32));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,1);
@@ -336,11 +416,12 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto new_pc = (uint32_t)(PC+(int32_t)sext<21>(imm));
@@ -356,7 +437,7 @@ private:
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,2);
@@ -382,11 +463,12 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto addr_mask = (uint32_t)- 2;
@@ -398,18 +480,22 @@ private:
         	tu.open_if(tu.urem(
         	   new_pc,
         	   tu.constant(static_cast<uint32_t>(traits:: INSTR_ALIGNMENT),32)));
+        	{
         	this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
+        	}
         	tu.open_else();
+        	{
         	if(rd!=0) {
         	    tu.store(rd + traits::X0, tu.constant((uint32_t)(PC+4),32));
         	}
         	auto PC_val_v = tu.assignment("PC_val", new_pc,32);
         	tu.store(traits::NEXT_PC, PC_val_v);
         	tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP), 2));
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,3);
@@ -435,16 +521,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_EQ,
         	   tu.load(rs1 + traits::X0, 0),
         	   tu.load(rs2 + traits::X0, 0)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -454,9 +542,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,4);
@@ -482,16 +571,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
         	   tu.load(rs1 + traits::X0, 0),
         	   tu.load(rs2 + traits::X0, 0)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -501,9 +592,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,5);
@@ -529,16 +621,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_SLT,
         	   tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
         	   tu.ext(tu.load(rs2 + traits::X0, 0),32,true)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -548,9 +642,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,6);
@@ -576,16 +671,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_SGE,
         	   tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
         	   tu.ext(tu.load(rs2 + traits::X0, 0),32,true)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -595,9 +692,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,7);
@@ -623,16 +721,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_ULT,
         	   tu.load(rs1 + traits::X0, 0),
         	   tu.load(rs2 + traits::X0, 0)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -642,9 +742,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,8);
@@ -670,16 +771,18 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	tu.open_if(tu.icmp(ICmpInst::ICMP_UGE,
         	   tu.load(rs1 + traits::X0, 0),
         	   tu.load(rs2 + traits::X0, 0)));
+        	{
         	auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
         	if(new_pc%static_cast<uint32_t>(traits:: INSTR_ALIGNMENT)){ this->gen_set_tval(tu, new_pc);
         	this->gen_raise_trap(tu, 0, 0);
@@ -689,9 +792,10 @@ private:
         		tu.store(traits::NEXT_PC, PC_val_v);
         		tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
         	}
+        	}
         	tu.close_scope();
         }
-        auto returnValue = std::make_tuple(BRANCH);
+        auto returnValue = BRANCH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,9);
@@ -717,10 +821,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto load_address = tu.assignment(tu.ext((tu.add(
@@ -731,7 +836,7 @@ private:
         	    tu.store(rd + traits::X0, tu.ext(res,32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,10);
@@ -757,10 +862,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto load_address = tu.assignment(tu.ext((tu.add(
@@ -771,7 +877,7 @@ private:
         	    tu.store(rd + traits::X0, tu.ext(res,32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,11);
@@ -797,10 +903,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto load_address = tu.assignment(tu.ext((tu.add(
@@ -811,7 +918,7 @@ private:
         	    tu.store(rd + traits::X0, tu.ext(res,32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,12);
@@ -837,10 +944,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto load_address = tu.assignment(tu.ext((tu.add(
@@ -851,7 +959,7 @@ private:
         	    tu.store(rd + traits::X0, tu.ext(res,32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,13);
@@ -877,10 +985,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto load_address = tu.assignment(tu.ext((tu.add(
@@ -891,7 +1000,7 @@ private:
         	    tu.store(rd + traits::X0, tu.ext(res,32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,14);
@@ -917,10 +1026,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto store_address = tu.assignment(tu.ext((tu.add(
@@ -928,7 +1038,7 @@ private:
         	   tu.constant((int16_t)sext<12>(imm),16))),32,false),32);
         	tu.write_mem(traits::MEM, store_address, tu.ext(tu.load(rs2 + traits::X0, 0),8,false));
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,15);
@@ -954,10 +1064,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto store_address = tu.assignment(tu.ext((tu.add(
@@ -965,7 +1076,7 @@ private:
         	   tu.constant((int16_t)sext<12>(imm),16))),32,false),32);
         	tu.write_mem(traits::MEM, store_address, tu.ext(tu.load(rs2 + traits::X0, 0),16,false));
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,16);
@@ -991,10 +1102,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rs2>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto store_address = tu.assignment(tu.ext((tu.add(
@@ -1002,7 +1114,7 @@ private:
         	   tu.constant((int16_t)sext<12>(imm),16))),32,false),32);
         	tu.write_mem(traits::MEM, store_address, tu.ext(tu.load(rs2 + traits::X0, 0),32,false));
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,17);
@@ -1028,10 +1140,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1040,7 +1153,7 @@ private:
         	       tu.constant((int16_t)sext<12>(imm),16))),32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,18);
@@ -1066,10 +1179,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1078,7 +1192,7 @@ private:
         	       tu.constant((int16_t)sext<12>(imm),16))), tu.constant(1,8),tu.constant(0,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,19);
@@ -1104,10 +1218,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1116,7 +1231,7 @@ private:
         	       tu.constant((uint32_t)((int16_t)sext<12>(imm)),32))), tu.constant(1,8),tu.constant(0,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,20);
@@ -1142,10 +1257,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1154,7 +1270,7 @@ private:
         	       tu.constant((uint32_t)((int16_t)sext<12>(imm)),32)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,21);
@@ -1180,10 +1296,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1192,7 +1309,7 @@ private:
         	       tu.constant((uint32_t)((int16_t)sext<12>(imm)),32)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,22);
@@ -1218,10 +1335,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1230,7 +1348,7 @@ private:
         	       tu.constant((uint32_t)((int16_t)sext<12>(imm)),32)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,23);
@@ -1256,10 +1374,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1268,7 +1387,7 @@ private:
         	       tu.constant(shamt,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,24);
@@ -1294,10 +1413,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1306,7 +1426,7 @@ private:
         	       tu.constant(shamt,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,25);
@@ -1332,10 +1452,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1344,7 +1465,7 @@ private:
         	       tu.constant(shamt,8))),32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,26);
@@ -1370,10 +1491,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1382,7 +1504,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0))),32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,27);
@@ -1408,10 +1530,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1420,7 +1543,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0))),32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,28);
@@ -1446,10 +1569,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1460,7 +1584,7 @@ private:
         	          tu.constant((static_cast<uint32_t>(traits:: XLEN)-1),64)))));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,29);
@@ -1486,10 +1610,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1498,7 +1623,7 @@ private:
         	       tu.ext(tu.load(rs2 + traits::X0, 0),32,true)), tu.constant(1,8),tu.constant(0,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,30);
@@ -1524,10 +1649,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1536,7 +1662,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0)), tu.constant(1,8),tu.constant(0,8)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,31);
@@ -1562,10 +1688,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1574,7 +1701,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,32);
@@ -1600,10 +1727,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1614,7 +1742,7 @@ private:
         	          tu.constant((static_cast<uint32_t>(traits:: XLEN)-1),64)))));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,33);
@@ -1640,10 +1768,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1654,7 +1783,7 @@ private:
         	          tu.constant((static_cast<uint32_t>(traits:: XLEN)-1),64))))),32,false));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,34);
@@ -1680,10 +1809,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1692,7 +1822,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,35);
@@ -1718,10 +1848,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	if(rd!=0) {
@@ -1730,7 +1861,7 @@ private:
         	       tu.load(rs2 + traits::X0, 0)));
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,36);
@@ -1758,10 +1889,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.write_mem(traits::FENCE, static_cast<uint32_t>(traits:: fence), tu.constant((uint8_t)pred<<4|succ,8));
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,37);
@@ -1783,11 +1915,12 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         this->gen_raise_trap(tu, 0, 11);
-        auto returnValue = std::make_tuple(TRAP);
+        auto returnValue = TRAP;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,38);
@@ -1809,11 +1942,12 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         this->gen_raise_trap(tu, 0, 3);
-        auto returnValue = std::make_tuple(TRAP);
+        auto returnValue = TRAP;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,39);
@@ -1835,11 +1969,12 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
         this->gen_leave_trap(tu, 3);
-        auto returnValue = std::make_tuple(TRAP);
+        auto returnValue = TRAP;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,40);
@@ -1861,10 +1996,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.callf("wait", tu.constant(1,8));
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,41);
@@ -1890,10 +2026,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrs1 = tu.assignment(tu.load(rs1 + traits::X0, 0),32);
@@ -1905,7 +2042,7 @@ private:
         		tu.write_mem(traits::CSR, csr, xrs1);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,42);
@@ -1931,10 +2068,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrd = tu.assignment(tu.read_mem(traits::CSR, csr, 32),32);
@@ -1948,7 +2086,7 @@ private:
         	    tu.store(rd + traits::X0, xrd);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,43);
@@ -1974,10 +2112,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrd = tu.assignment(tu.read_mem(traits::CSR, csr, 32),32);
@@ -1991,7 +2130,7 @@ private:
         	    tu.store(rd + traits::X0, xrd);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,44);
@@ -2017,10 +2156,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrd = tu.assignment(tu.read_mem(traits::CSR, csr, 32),32);
@@ -2029,7 +2169,7 @@ private:
         	    tu.store(rd + traits::X0, xrd);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,45);
@@ -2055,10 +2195,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrd = tu.assignment(tu.read_mem(traits::CSR, csr, 32),32);
@@ -2071,7 +2212,7 @@ private:
         	    tu.store(rd + traits::X0, xrd);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,46);
@@ -2097,10 +2238,11 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         if(rd>=static_cast<uint32_t>(traits:: RFS)) {
-            this->gen_raise_trap(tu, 0, static_cast<int32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
         	auto xrd = tu.assignment(tu.read_mem(traits::CSR, csr, 32),32);
@@ -2113,7 +2255,7 @@ private:
         	    tu.store(rd + traits::X0, xrd);
         	}
         }
-        auto returnValue = std::make_tuple(CONT);
+        auto returnValue = CONT;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,47);
@@ -2139,13 +2281,1419 @@ private:
         auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
         pc=pc+ 4;
         gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
         tu.open_scope();
         this->gen_set_tval(tu, instr);
         tu.write_mem(traits::FENCE, static_cast<uint32_t>(traits:: fencei), tu.constant(imm,16));
-        auto returnValue = std::make_tuple(FLUSH);
+        auto returnValue = FLUSH;
         
         tu.close_scope();
         vm_base<ARCH>::gen_sync(tu, POST_SYNC,48);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 49: MUL */
+    compile_ret_t __mul(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MUL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,49);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mul"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto res = tu.assignment(tu.mul(
+        	   tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
+        	   tu.ext(tu.load(rs2 + traits::X0, 0),32,true)),64);
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext(res,32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,49);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 50: MULH */
+    compile_ret_t __mulh(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULH_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,50);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulh"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto res = tu.assignment(tu.mul(
+        	   tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
+        	   tu.ext(tu.load(rs2 + traits::X0, 0),32,true)),64);
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext((tu.ashr(
+        	       res,
+        	       tu.constant(static_cast<uint32_t>(traits:: XLEN),32))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,50);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 51: MULHSU */
+    compile_ret_t __mulhsu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULHSU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,51);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhsu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto res = tu.assignment(tu.mul(
+        	   tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
+        	   tu.load(rs2 + traits::X0, 0)),64);
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext((tu.ashr(
+        	       res,
+        	       tu.constant(static_cast<uint32_t>(traits:: XLEN),32))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,51);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 52: MULHU */
+    compile_ret_t __mulhu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("MULHU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,52);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "mulhu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto res = tu.assignment(tu.mul(
+        	   tu.load(rs1 + traits::X0, 0),
+        	   tu.load(rs2 + traits::X0, 0)),64);
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext((tu.lshr(
+        	       res,
+        	       tu.constant(static_cast<uint32_t>(traits:: XLEN),32))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,52);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 53: DIV */
+    compile_ret_t __div(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIV_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,53);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "div"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto dividend = tu.assignment(tu.ext(tu.load(rs1 + traits::X0, 0),32,true),32);
+        	auto divisor = tu.assignment(tu.ext(tu.load(rs2 + traits::X0, 0),32,true),32);
+        	if(rd!=0){ tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
+        	   divisor,
+        	   tu.constant(0,8)));
+        	{
+        	auto MMIN = ((uint32_t)1)<<(static_cast<uint32_t>(traits:: XLEN)-1);
+        	tu.open_if(tu.logical_and(
+        	   tu.icmp(ICmpInst::ICMP_EQ,
+        	      tu.load(rs1 + traits::X0, 0),
+        	      tu.constant(MMIN,32)),
+        	   tu.icmp(ICmpInst::ICMP_EQ,
+        	      divisor,
+        	      tu.constant(- 1,8))));
+        	{
+        	tu.store(rd + traits::X0, tu.constant(MMIN,32));
+        	}
+        	tu.open_else();
+        	{
+        	tu.store(rd + traits::X0, tu.ext((tu.sdiv(
+        	   dividend,
+        	   divisor)),32,false));
+        	}
+        	tu.close_scope();
+        	}
+        	tu.open_else();
+        	{
+        	tu.store(rd + traits::X0, tu.constant((uint32_t)- 1,32));
+        	}
+        	tu.close_scope();
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,53);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 54: DIVU */
+    compile_ret_t __divu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DIVU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,54);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "divu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
+        	   tu.load(rs2 + traits::X0, 0),
+        	   tu.constant(0,8)));
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.udiv(
+        	       tu.load(rs1 + traits::X0, 0),
+        	       tu.load(rs2 + traits::X0, 0)));
+        	}
+        	}
+        	tu.open_else();
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.constant((uint32_t)- 1,32));
+        	}
+        	}
+        	tu.close_scope();
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,54);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 55: REM */
+    compile_ret_t __rem(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REM_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,55);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "rem"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
+        	   tu.load(rs2 + traits::X0, 0),
+        	   tu.constant(0,8)));
+        	{
+        	auto MMIN = (uint32_t)1<<(static_cast<uint32_t>(traits:: XLEN)-1);
+        	tu.open_if(tu.logical_and(
+        	   tu.icmp(ICmpInst::ICMP_EQ,
+        	      tu.load(rs1 + traits::X0, 0),
+        	      tu.constant(MMIN,32)),
+        	   tu.icmp(ICmpInst::ICMP_EQ,
+        	      tu.ext(tu.load(rs2 + traits::X0, 0),32,true),
+        	      tu.constant(- 1,8))));
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.constant(0,8));
+        	}
+        	}
+        	tu.open_else();
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext((tu.srem(
+        	       tu.ext(tu.load(rs1 + traits::X0, 0),32,true),
+        	       tu.ext(tu.load(rs2 + traits::X0, 0),32,true))),32,false));
+        	}
+        	}
+        	tu.close_scope();
+        	}
+        	tu.open_else();
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.load(rs1 + traits::X0, 0));
+        	}
+        	}
+        	tu.close_scope();
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,55);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 56: REMU */
+    compile_ret_t __remu(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("REMU_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,56);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "remu"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 4;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rs1>=static_cast<uint32_t>(traits:: RFS)||rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
+        	   tu.load(rs2 + traits::X0, 0),
+        	   tu.constant(0,8)));
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.urem(
+        	       tu.load(rs1 + traits::X0, 0),
+        	       tu.load(rs2 + traits::X0, 0)));
+        	}
+        	}
+        	tu.open_else();
+        	{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.load(rs1 + traits::X0, 0));
+        	}
+        	}
+        	tu.close_scope();
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,56);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 57: C__ADDI4SPN */
+    compile_ret_t __c__addi4spn(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__ADDI4SPN_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,57);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint16_t imm = ((bit_sub<5,1>(instr) << 3) | (bit_sub<6,1>(instr) << 2) | (bit_sub<7,4>(instr) << 6) | (bit_sub<11,2>(instr) << 4));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.addi4spn"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(imm) {
+            tu.store(rd+8 + traits::X0, tu.ext((tu.add(
+               tu.load(2 + traits::X0, 0),
+               tu.constant(imm,16))),32,false));
+        }
+        else{
+        	this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,57);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 58: C__LW */
+    compile_ret_t __c__lw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__LW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,58);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.lw"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        auto offs = tu.assignment(tu.ext((tu.add(
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant(uimm,8))),32,false),32);
+        tu.store(rd+8 + traits::X0, tu.ext(tu.ext(tu.read_mem(traits::MEM, offs, 32),32,true),32,false));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,58);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 59: C__SW */
+    compile_ret_t __c__sw(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SW_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,59);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t uimm = ((bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 2) | (bit_sub<10,3>(instr) << 3));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}({rs1})", fmt::arg("mnemonic", "c.sw"),
+                fmt::arg("rs2", name(8+rs2)), fmt::arg("uimm", uimm), fmt::arg("rs1", name(8+rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        auto offs = tu.assignment(tu.ext((tu.add(
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant(uimm,8))),32,false),32);
+        tu.write_mem(traits::MEM, offs, tu.ext(tu.load(rs2+8 + traits::X0, 0),32,false));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,59);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 60: C__ADDI */
+    compile_ret_t __c__addi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__ADDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,60);
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.addi"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rs1>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	if(rs1!=0) {
+        	    tu.store(rs1 + traits::X0, tu.ext((tu.add(
+        	       tu.load(rs1 + traits::X0, 0),
+        	       tu.constant((int8_t)sext<6>(imm),8))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,60);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 61: C__NOP */
+    compile_ret_t __c__nop(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__NOP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,61);
+        uint64_t PC = pc.val;
+        uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.nop";
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,61);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 62: C__JAL */
+    compile_ret_t __c__jal(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__JAL_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,62);
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.jal"),
+                fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        tu.store(1 + traits::X0, tu.constant((uint32_t)(PC+2),32));
+        auto PC_val_v = tu.assignment("PC_val", (uint32_t)(PC+(int16_t)sext<12>(imm)),32);
+        tu.store(traits::NEXT_PC, PC_val_v);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,62);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 63: C__LI */
+    compile_ret_t __c__li(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__LI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,63);
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.li"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.constant((uint32_t)((int8_t)sext<6>(imm)),32));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,63);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 64: C__LUI */
+    compile_ret_t __c__lui(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__LUI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,64);
+        uint64_t PC = pc.val;
+        uint32_t imm = ((bit_sub<2,5>(instr) << 12) | (bit_sub<12,1>(instr) << 17));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {imm:#05x}", fmt::arg("mnemonic", "c.lui"),
+                fmt::arg("rd", name(rd)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(imm==0||rd>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        if(rd!=0) {
+            tu.store(rd + traits::X0, tu.constant((uint32_t)((int32_t)sext<18>(imm)),32));
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,64);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 65: C__ADDI16SP */
+    compile_ret_t __c__addi16sp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__ADDI16SP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,65);
+        uint64_t PC = pc.val;
+        uint16_t nzimm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 7) | (bit_sub<5,1>(instr) << 6) | (bit_sub<6,1>(instr) << 4) | (bit_sub<12,1>(instr) << 9));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {nzimm:#05x}", fmt::arg("mnemonic", "c.addi16sp"),
+                fmt::arg("nzimm", nzimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(nzimm) {
+            tu.store(2 + traits::X0, tu.ext((tu.add(
+               tu.load(2 + traits::X0, 0),
+               tu.constant((int16_t)sext<10>(nzimm),16))),32,false));
+        }
+        else{
+        	this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,65);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 66: __reserved_clui */
+    compile_ret_t ____reserved_clui(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("__reserved_clui_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,66);
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = ".reserved_clui";
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,66);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 67: C__SRLI */
+    compile_ret_t __c__srli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SRLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,67);
+        uint64_t PC = pc.val;
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rs1+8 + traits::X0, tu.lshr(
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant(shamt,8)));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,67);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 68: C__SRAI */
+    compile_ret_t __c__srai(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SRAI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,68);
+        uint64_t PC = pc.val;
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srai"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(shamt){ tu.store(rs1+8 + traits::X0, tu.ext((tu.ashr(
+           (tu.ext(tu.load(rs1+8 + traits::X0, 0),32,true)),
+           tu.constant(shamt,8))),32,false));
+        }
+        else{
+        	if(static_cast<uint32_t>(traits:: XLEN)==128){ tu.store(rs1+8 + traits::X0, tu.ext((tu.ashr(
+        	   (tu.ext(tu.load(rs1+8 + traits::X0, 0),32,true)),
+        	   tu.constant(64,8))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,68);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 69: C__ANDI */
+    compile_ret_t __c__andi(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__ANDI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,69);
+        uint64_t PC = pc.val;
+        uint8_t imm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.andi"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rs1+8 + traits::X0, tu.ext((tu.bitwise_and(
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant((int8_t)sext<6>(imm),8))),32,false));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,69);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 70: C__SUB */
+    compile_ret_t __c__sub(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SUB_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,70);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.sub"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rd+8 + traits::X0, tu.ext((tu.sub(
+           tu.load(rd+8 + traits::X0, 0),
+           tu.load(rs2+8 + traits::X0, 0))),32,false));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,70);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 71: C__XOR */
+    compile_ret_t __c__xor(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__XOR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,71);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.xor"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rd+8 + traits::X0, tu.bitwise_xor(
+           tu.load(rd+8 + traits::X0, 0),
+           tu.load(rs2+8 + traits::X0, 0)));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,71);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 72: C__OR */
+    compile_ret_t __c__or(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__OR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,72);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.or"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rd+8 + traits::X0, tu.bitwise_or(
+           tu.load(rd+8 + traits::X0, 0),
+           tu.load(rs2+8 + traits::X0, 0)));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,72);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 73: C__AND */
+    compile_ret_t __c__and(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__AND_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,73);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,3>(instr)));
+        uint8_t rd = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.and"),
+                fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(rd+8 + traits::X0, tu.bitwise_and(
+           tu.load(rd+8 + traits::X0, 0),
+           tu.load(rs2+8 + traits::X0, 0)));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,73);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 74: C__J */
+    compile_ret_t __c__j(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__J_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,74);
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,3>(instr) << 1) | (bit_sub<6,1>(instr) << 7) | (bit_sub<7,1>(instr) << 6) | (bit_sub<8,1>(instr) << 10) | (bit_sub<9,2>(instr) << 8) | (bit_sub<11,1>(instr) << 4) | (bit_sub<12,1>(instr) << 11));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {imm:#05x}", fmt::arg("mnemonic", "c.j"),
+                fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        auto PC_val_v = tu.assignment("PC_val", (uint32_t)(PC+(int16_t)sext<12>(imm)),32);
+        tu.store(traits::NEXT_PC, PC_val_v);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,74);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 75: C__BEQZ */
+    compile_ret_t __c__beqz(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__BEQZ_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,75);
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.beqz"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        tu.open_if(tu.icmp(ICmpInst::ICMP_EQ,
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant(0,8)));
+        {
+        auto PC_val_v = tu.assignment("PC_val", (uint32_t)(PC+(int16_t)sext<9>(imm)),32);
+        tu.store(traits::NEXT_PC, PC_val_v);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
+        }
+        tu.close_scope();
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,75);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 76: C__BNEZ */
+    compile_ret_t __c__bnez(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__BNEZ_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,76);
+        uint64_t PC = pc.val;
+        uint16_t imm = ((bit_sub<2,1>(instr) << 5) | (bit_sub<3,2>(instr) << 1) | (bit_sub<5,2>(instr) << 6) | (bit_sub<10,2>(instr) << 3) | (bit_sub<12,1>(instr) << 8));
+        uint8_t rs1 = ((bit_sub<7,3>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {imm:#05x}", fmt::arg("mnemonic", "c.bnez"),
+                fmt::arg("rs1", name(8+rs1)), fmt::arg("imm", imm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        tu.open_if(tu.icmp(ICmpInst::ICMP_NE,
+           tu.load(rs1+8 + traits::X0, 0),
+           tu.constant(0,8)));
+        {
+        auto PC_val_v = tu.assignment("PC_val", (uint32_t)(PC+(int16_t)sext<9>(imm)),32);
+        tu.store(traits::NEXT_PC, PC_val_v);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(KNOWN_JUMP), 2));
+        }
+        tu.close_scope();
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,76);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 77: C__SLLI */
+    compile_ret_t __c__slli(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SLLI_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,77);
+        uint64_t PC = pc.val;
+        uint8_t nzuimm = ((bit_sub<2,5>(instr)));
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.slli"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("nzuimm", nzuimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rs1>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	if(rs1!=0) {
+        	    tu.store(rs1 + traits::X0, tu.shl(
+        	       tu.load(rs1 + traits::X0, 0),
+        	       tu.constant(nzuimm,8)));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,77);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 78: C__LWSP */
+    compile_ret_t __c__lwsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__LWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,78);
+        uint64_t PC = pc.val;
+        uint8_t uimm = ((bit_sub<2,2>(instr) << 6) | (bit_sub<4,3>(instr) << 2) | (bit_sub<12,1>(instr) << 5));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)||rd==0) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto offs = tu.assignment(tu.ext((tu.add(
+        	   tu.load(2 + traits::X0, 0),
+        	   tu.constant(uimm,8))),32,false),32);
+        	tu.store(rd + traits::X0, tu.ext(tu.ext(tu.read_mem(traits::MEM, offs, 32),32,true),32,false));
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,78);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 79: C__MV */
+    compile_ret_t __c__mv(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__MV_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,79);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.mv"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.load(rs2 + traits::X0, 0));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,79);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 80: C__JR */
+    compile_ret_t __c__jr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__JR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,80);
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jr"),
+                fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        if(rs1&&rs1<static_cast<uint32_t>(traits:: RFS)){ auto addr_mask = (uint32_t)- 2;
+        auto PC_val_v = tu.assignment("PC_val", tu.bitwise_and(
+           tu.load(rs1%static_cast<uint32_t>(traits:: RFS) + traits::X0, 0),
+           tu.constant(addr_mask,32)),32);
+        tu.store(traits::NEXT_PC, PC_val_v);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP), 2));
+        }
+        else{
+        	this->gen_raise_trap(tu, 0, 2);
+        }
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,80);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 81: __reserved_cmv */
+    compile_ret_t ____reserved_cmv(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("__reserved_cmv_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,81);
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = ".reserved_cmv";
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        this->gen_raise_trap(tu, 0, 2);
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,81);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 82: C__ADD */
+    compile_ret_t __c__add(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__ADD_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,82);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.add"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs2", name(rs2)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rd>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	if(rd!=0) {
+        	    tu.store(rd + traits::X0, tu.ext((tu.add(
+        	       tu.load(rd + traits::X0, 0),
+        	       tu.load(rs2 + traits::X0, 0))),32,false));
+        	}
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,82);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 83: C__JALR */
+    compile_ret_t __c__jalr(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__JALR_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,83);
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<7,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}", fmt::arg("mnemonic", "c.jalr"),
+                fmt::arg("rs1", name(rs1)));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(NO_JUMP),32));
+        if(rs1>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto addr_mask = (uint32_t)- 2;
+        	auto new_pc = tu.assignment(tu.load(rs1 + traits::X0, 0),32);
+        	tu.store(1 + traits::X0, tu.constant((uint32_t)(PC+2),32));
+        	auto PC_val_v = tu.assignment("PC_val", tu.bitwise_and(
+        	   new_pc,
+        	   tu.constant(addr_mask,32)),32);
+        	tu.store(traits::NEXT_PC, PC_val_v);
+        	tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP), 2));
+        }
+        auto returnValue = BRANCH;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,83);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 84: C__EBREAK */
+    compile_ret_t __c__ebreak(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__EBREAK_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,84);
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = "c.ebreak";
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        this->gen_raise_trap(tu, 0, 3);
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,84);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 85: C__SWSP */
+    compile_ret_t __c__swsp(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("C__SWSP_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,85);
+        uint64_t PC = pc.val;
+        uint8_t rs2 = ((bit_sub<2,5>(instr)));
+        uint8_t uimm = ((bit_sub<7,2>(instr) << 6) | (bit_sub<9,4>(instr) << 2));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs2}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.swsp"),
+                fmt::arg("rs2", name(rs2)), fmt::arg("uimm", uimm));
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        if(rs2>=static_cast<uint32_t>(traits:: RFS)) {
+            this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+        	auto offs = tu.assignment(tu.ext((tu.add(
+        	   tu.load(2 + traits::X0, 0),
+        	   tu.constant(uimm,8))),32,false),32);
+        	tu.write_mem(traits::MEM, offs, tu.ext(tu.load(rs2 + traits::X0, 0),32,false));
+        }
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,85);
+        gen_trap_check(tu);        
+        return returnValue;
+    }
+    
+    /* instruction 86: DII */
+    compile_ret_t __dii(virt_addr_t& pc, code_word_t instr, tu_builder& tu){
+        tu("DII_{:#010x}:", pc.val);
+        vm_base<ARCH>::gen_sync(tu, PRE_SYNC,86);
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = "dii";
+            tu("print_disass(core_ptr, {:#x}, \"{}\");", pc.val, mnemonic);
+        }
+        auto cur_pc_val = tu.constant(pc.val, traits::reg_bit_widths[traits::PC]);
+        pc=pc+ 2;
+        gen_set_pc(tu, pc, traits::NEXT_PC);
+        tu("(*cycle)++;");
+        tu.open_scope();
+        this->gen_set_tval(tu, instr);
+        this->gen_raise_trap(tu, 0, static_cast<uint32_t>(traits:: RV_CAUSE_ILLEGAL_INSTRUCTION));
+        auto returnValue = CONT;
+        
+        tu.close_scope();
+        vm_base<ARCH>::gen_sync(tu, POST_SYNC,86);
         gen_trap_check(tu);        
         return returnValue;
     }
@@ -2184,25 +3732,22 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
         for (uint32_t i = 0; i < instr_descr.size(); ++i) {
             generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
             g_instr_descr.push_back(new_instr_descr);
-    }
+        }
         return std::move(g_instr_descr);
     }()) {}
 
 template <typename ARCH>
-std::tuple<continuation_e>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, tu_builder& tu) {
+continuation_e
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, tu_builder& tu) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
     phys_addr_t paddr(pc);
-    if(this->core.has_mmu())
-        paddr = this->core.virt2phys(pc);
-        auto res = this->core.read(paddr, 4, reinterpret_cast<uint8_t*>(&instr));
+    auto res = this->core.read(paddr, 4, reinterpret_cast<uint8_t*>(&instr));
     if (res != iss::Ok)
         return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001) 
         return JUMP_TO_SELF;
-    ++inst_cnt;
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
@@ -2237,13 +3782,20 @@ template <typename ARCH> void vm_impl<ARCH>::gen_trap_behavior(tu_builder& tu) {
     tu.store(traits::LAST_BRANCH, tu.constant(static_cast<int>(UNKNOWN_JUMP),32));
     tu("return *next_pc;");
 }
+template <typename ARCH> void vm_impl<ARCH>::add_prologue(tu_builder& tu){
+    std::ostringstream os;
+    os << tu.add_reg_ptr("trap_state", arch::traits<ARCH>::TRAP_STATE, this->regs_base_ptr);
+    os << tu.add_reg_ptr("pending_trap", arch::traits<ARCH>::PENDING_TRAP, this->regs_base_ptr);
+    os << tu.add_reg_ptr("cycle", arch::traits<ARCH>::CYCLE, this->regs_base_ptr);
 
+    tu.add_prologue(os.str());
+}
 
-} // namespace rv32i
+} // namespace tgc5c
 
 template <>
-std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short port, bool dump) {
-    auto ret = new rv32i::vm_impl<arch::rv32i>(*core, dump);
+std::unique_ptr<vm_if> create<arch::tgc5c>(arch::tgc5c *core, unsigned short port, bool dump) {
+    auto ret = new tgc5c::vm_impl<arch::tgc5c>(*core, dump);
     if (port != 0) debugger::server<debugger::gdb_session>::run_server(ret, port);
     return std::unique_ptr<vm_if>(ret);
 }
@@ -2256,22 +3808,22 @@ std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short por
 namespace iss {
 namespace {
 volatile std::array<bool, 2> dummy = {
-        core_factory::instance().register_creator("rv32i|m_p|tcc", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
-            auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32i>();
-		    auto vm = new tcc::rv32i::vm_impl<arch::rv32i>(*cpu, false);
+        core_factory::instance().register_creator("tgc5c|m_p|tcc", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::tgc5c>();
+		    auto vm = new tcc::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32i>::reg_t>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::tgc5c>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("rv32i|mu_p|tcc", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
-            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv32i>();
-		    auto vm = new tcc::rv32i::vm_impl<arch::rv32i>(*cpu, false);
+        core_factory::instance().register_creator("tgc5c|mu_p|tcc", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::tgc5c>();
+		    auto vm = new tcc::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
-                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32i>::reg_t>*>(init_data);
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::tgc5c>::reg_t>*>(init_data);
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};

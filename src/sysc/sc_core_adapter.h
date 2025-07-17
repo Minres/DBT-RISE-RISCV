@@ -1,9 +1,36 @@
-/*
- * sc_core_adapter.h
+/*******************************************************************************
+ * Copyright (C) 2023 - 2025 MINRES Technologies GmbH
+ * All rights reserved.
  *
- *  Created on: Jul 5, 2023
- *      Author: eyck
- */
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Contributors:
+ *       eyck@minres.com - initial implementation
+ ******************************************************************************/
 
 #ifndef _SYSC_SC_CORE_ADAPTER_H_
 #define _SYSC_SC_CORE_ADAPTER_H_
@@ -11,6 +38,7 @@
 #include "sc_core_adapter_if.h"
 #include <iostream>
 #include <iss/iss.h>
+#include <iss/mem/memory_if.h>
 #include <iss/vm_types.h>
 #include <scc/report.h>
 #include <util/ities.h>
@@ -18,11 +46,16 @@
 namespace sysc {
 template <typename PLAT> class sc_core_adapter : public PLAT, public sc_core_adapter_if {
 public:
+    using this_class = sc_core_adapter<PLAT>;
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
     using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
-    using heart_state_t = typename PLAT::hart_state_type;
     sc_core_adapter(sysc::riscv_vp::core_complex_if* owner)
-    : owner(owner) {}
+    : owner(owner) {
+        this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
+        if(sizeof(reg_t) == 4)
+            this->csr_rd_cb[iss::arch::timeh] = MK_CSR_RD_CB(read_time);
+        this->memories.replace_last(*this);
+    }
 
     iss::arch_if* get_arch_if() override { return this; }
 
@@ -56,65 +89,76 @@ public:
             std::stringstream s;
             s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
               << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCINFO(owner->hier_name()) << "disass: "
+            SCCDEBUG(owner->hier_name()) << "disass: "
                                          << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc << "\t\t"
                                          << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
         }
     };
 
-    iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t* const data) override {
-        if(addr.access && iss::access_type::DEBUG)
-            return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+    iss::mem::memory_if get_mem_if() override {
+        return iss::mem::memory_if{.rd_mem{util::delegate<iss::mem::rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
+                                   .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
+    }
+
+    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
+        if(access && iss::access_type::DEBUG)
+            return owner->read_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         else {
-            return owner->read_mem(addr.val, length, data, is_fetch(addr.access)) ? iss::Ok : iss::Err;
+            return owner->read_mem(addr, length, data, is_fetch(access)) ? iss::Ok : iss::Err;
         }
     }
 
-    iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t* const data) override {
-        if(addr.access && iss::access_type::DEBUG)
-            return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
-        else {
-            auto tohost_upper = (sizeof(reg_t) == 4 && addr.val == (this->tohost + 4)) || (sizeof(reg_t) == 8 && addr.val == this->tohost);
-            auto tohost_lower = (sizeof(reg_t) == 4 && addr.val == this->tohost) || (sizeof(reg_t) == 64 && addr.val == this->tohost);
-            if(tohost_lower || tohost_upper) {
-                if(tohost_upper || (tohost_lower && to_host_wr_cnt > 0)) {
-                    switch(hostvar >> 48) {
-                    case 0:
-                        if(hostvar != 0x1) {
-                            SCCINFO(owner->hier_name())
-                                << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar << "), stopping simulation";
+    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
+        if(access && iss::access_type::DEBUG)
+            return owner->write_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
+        if(addr == this->tohost) {
+            reg_t cur_data = *reinterpret_cast<const reg_t*>(data);
+            // Extract Device (bits 63:56)
+            uint8_t device = sizeof(reg_t) == 4 ? 0 : (cur_data >> 56) & 0xFF;
+            // Extract Command (bits 55:48)
+            uint8_t command = sizeof(reg_t) == 4 ? 0 : (cur_data >> 48) & 0xFF;
+            // Extract payload (bits 47:0)
+            uint64_t payload_addr = cur_data & 0xFFFFFFFFFFFFULL; // 24bits
+            if(payload_addr & 1) {
+                if(payload_addr != 0x1) {
+                    SCCERR(owner->hier_name()) << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr
+                                               << "), stopping simulation";
                         } else {
                             SCCINFO(owner->hier_name())
-                                << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar << "), stopping simulation";
+                        << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr << "), stopping simulation";
                         }
                         this->reg.trap_state = std::numeric_limits<uint32_t>::max();
-                        this->interrupt_sim = hostvar;
-#ifndef WITH_TCC
-                        throw(iss::simulation_stopped(hostvar));
-#endif
-                        break;
-                    default:
-                        break;
-                    }
-                } else if(tohost_lower)
-                    to_host_wr_cnt++;
+                this->interrupt_sim = payload_addr;
                 return iss::Ok;
-            } else {
-                auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
-                // clear MTIP on mtimecmp write
-                if(addr.val == 0x2004000) {
-                    reg_t val;
-                    this->read_csr(iss::arch::mip, val);
-                    if(val & (1ULL << 7))
-                        this->write_csr(iss::arch::mip, val & ~(1ULL << 7));
+                    }
+            if(device == 0 && command == 0) {
+                std::array<uint64_t, 8> loaded_payload;
+                auto res = owner->read_mem(payload_addr, 8 * sizeof(uint64_t), reinterpret_cast<uint8_t*>(loaded_payload.data()), false)
+                               ? iss::Ok
+                               : iss::Err;
+                if(res == iss::Err) {
+                    SCCERR(owner->hier_name()) << "Syscall read went wrong";
+                return iss::Ok;
                 }
-                return res;
+                uint64_t syscall_num = loaded_payload.at(0);
+                if(syscall_num == 64) // SYS_WRITE
+                    return this->execute_sys_write(this, loaded_payload, PLAT::MEM);
+                SCCERR(owner->hier_name()) << "tohost syscall with number 0x" << std::hex << syscall_num << std::dec << " (" << syscall_num
+                                           << ") not implemented";
+                this->reg.trap_state = std::numeric_limits<uint32_t>::max();
+                this->interrupt_sim = payload_addr;
+                return iss::Ok;
             }
+            SCCERR(owner->hier_name()) << "tohost functionality not implemented for device " << device << " and command " << command;
+            this->reg.trap_state = std::numeric_limits<uint32_t>::max();
+            this->interrupt_sim = payload_addr;
+            return iss::Ok;
         }
+        auto res = owner->write_mem(addr, length, data) ? iss::Ok : iss::Err;
+        return res;
     }
 
-    iss::status read_csr(unsigned addr, reg_t& val) override {
-        if((addr == iss::arch::time || addr == iss::arch::timeh)) {
+    iss::status read_time(unsigned addr, reg_t& val) {
             uint64_t time_val = owner->mtime_i.get_interface() ? owner->mtime_i.read() : 0;
             if(addr == iss::arch::time) {
                 val = static_cast<reg_t>(time_val);
@@ -124,17 +168,14 @@ public:
                 val = static_cast<reg_t>(time_val >> 32);
             }
             return iss::Ok;
-        } else {
-            return PLAT::read_csr(addr, val);
-        }
     }
 
     void wait_until(uint64_t flags) override {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
+        PLAT::wait_until(flags);
         while(this->reg.pending_trap == 0 && (this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
             sc_core::wait(wfi_evt);
         }
-        PLAT::wait_until(flags);
     }
 
     void local_irq(short id, bool value) override {
@@ -167,7 +208,6 @@ public:
 private:
     sysc::riscv_vp::core_complex_if* const owner{nullptr};
     sc_core::sc_event wfi_evt;
-    uint64_t hostvar{std::numeric_limits<uint64_t>::max()};
     unsigned to_host_wr_cnt = 0;
     bool first{true};
 };

@@ -31,12 +31,14 @@
  *******************************************************************************/
 // clang-format off
 #include <iss/arch/rv32gc.h>
+// vm_base needs to be included before gdb_session as termios.h (via boost and gdb_server) has a define which clashes with a variable
+// name in ConstantRange.h
+#include <iss/llvm/vm_base.h>
+#include <iss/iss.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
-#include <iss/iss.h>
-#include <iss/llvm/vm_base.h>
-#include <util/logging.h>
 #include <iss/instruction_decoder.h>
+#include <util/logging.h>
 
 #include <vm/fp_functions.h>
 #ifndef FMT_HEADER_ONLY
@@ -100,7 +102,7 @@ protected:
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
-    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &, BasicBlock *) override;
+    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, BasicBlock *) override;
 
     void gen_leave_behavior(BasicBlock *leave_blk) override;
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
@@ -153,13 +155,32 @@ protected:
         ), bb_then,  bb_merge);
         this->builder.SetInsertPoint(bb_then);
         {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         this->builder.CreateBr(bb_merge);
         this->builder.SetInsertPoint(bb_merge);
         }
         return rm_eff;
     }
+    Value* NaNBox16(BasicBlock* bb, Value* NaNBox16_val){
+        if(static_cast<uint32_t>(traits::FLEN) == 16)
+            return this->gen_ext(NaNBox16_val, traits::FLEN, false);
+        auto box = this->builder.CreateNot((this->gen_ext(0, 32, false)));
+        return this->gen_ext((this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(box, traits::FLEN), 16), this->gen_ext(NaNBox16_val, traits::FLEN))), traits::FLEN, false);
+    }
+    Value* NaNBox32(BasicBlock* bb, Value* NaNBox32_val){
+        if(static_cast<uint32_t>(traits::FLEN) == 32)
+            return this->gen_ext(NaNBox32_val, traits::FLEN, false);
+        auto box = this->builder.CreateNot((this->gen_ext(0, 64, false)));
+        return this->gen_ext((this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(box, traits::FLEN), 32), this->gen_ext(NaNBox32_val, traits::FLEN))), traits::FLEN, false);
+    }
+    Value* NaNBox64(BasicBlock* bb, Value* NaNBox64_val){
+        if(static_cast<uint32_t>(traits::FLEN) == 64)
+            return this->gen_ext(NaNBox64_val, traits::FLEN, false);
+        auto box = this->builder.CreateNot((this->gen_ext(0, 128, false)));
+        return this->gen_ext((this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(box, traits::FLEN), 64), this->gen_ext(NaNBox64_val, traits::FLEN))), traits::FLEN, false);
+    }
+
 
 private:
     /****************************************************************************
@@ -374,14 +395,6 @@ private:
         {32, 0b00000000000000000010000000000111, 0b00000000000000000111000001111111, &this_class::__flw},
         /* instruction FSW, encoding '0b00000000000000000010000000100111' */
         {32, 0b00000000000000000010000000100111, 0b00000000000000000111000001111111, &this_class::__fsw},
-        /* instruction FMADD__S, encoding '0b00000000000000000000000001000011' */
-        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__s},
-        /* instruction FMSUB__S, encoding '0b00000000000000000000000001000111' */
-        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__s},
-        /* instruction FNMADD__S, encoding '0b00000000000000000000000001001111' */
-        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__s},
-        /* instruction FNMSUB__S, encoding '0b00000000000000000000000001001011' */
-        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__s},
         /* instruction FADD__S, encoding '0b00000000000000000000000001010011' */
         {32, 0b00000000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd__s},
         /* instruction FSUB__S, encoding '0b00001000000000000000000001010011' */
@@ -390,22 +403,38 @@ private:
         {32, 0b00010000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul__s},
         /* instruction FDIV__S, encoding '0b00011000000000000000000001010011' */
         {32, 0b00011000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv__s},
+        /* instruction FMIN__S, encoding '0b00101000000000000000000001010011' */
+        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__s},
+        /* instruction FMAX__S, encoding '0b00101000000000000001000001010011' */
+        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__s},
         /* instruction FSQRT__S, encoding '0b01011000000000000000000001010011' */
         {32, 0b01011000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt__s},
+        /* instruction FMADD__S, encoding '0b00000000000000000000000001000011' */
+        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__s},
+        /* instruction FMSUB__S, encoding '0b00000000000000000000000001000111' */
+        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__s},
+        /* instruction FNMADD__S, encoding '0b00000000000000000000000001001111' */
+        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__s},
+        /* instruction FNMSUB__S, encoding '0b00000000000000000000000001001011' */
+        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__s},
+        /* instruction FCVT__W__S, encoding '0b11000000000000000000000001010011' */
+        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__s},
+        /* instruction FCVT__WU__S, encoding '0b11000000000100000000000001010011' */
+        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__s},
+        /* instruction FCVT__S__W, encoding '0b11010000000000000000000001010011' */
+        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__w},
+        /* instruction FCVT__S__WU, encoding '0b11010000000100000000000001010011' */
+        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__wu},
         /* instruction FSGNJ__S, encoding '0b00100000000000000000000001010011' */
         {32, 0b00100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj__s},
         /* instruction FSGNJN__S, encoding '0b00100000000000000001000001010011' */
         {32, 0b00100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn__s},
         /* instruction FSGNJX__S, encoding '0b00100000000000000010000001010011' */
         {32, 0b00100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx__s},
-        /* instruction FMIN__S, encoding '0b00101000000000000000000001010011' */
-        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__s},
-        /* instruction FMAX__S, encoding '0b00101000000000000001000001010011' */
-        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__s},
-        /* instruction FCVT__W__S, encoding '0b11000000000000000000000001010011' */
-        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__s},
-        /* instruction FCVT__WU__S, encoding '0b11000000000100000000000001010011' */
-        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__s},
+        /* instruction FMV__X__W, encoding '0b11100000000000000000000001010011' */
+        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__x__w},
+        /* instruction FMV__W__X, encoding '0b11110000000000000000000001010011' */
+        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__w__x},
         /* instruction FEQ__S, encoding '0b10100000000000000010000001010011' */
         {32, 0b10100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq__s},
         /* instruction FLT__S, encoding '0b10100000000000000001000001010011' */
@@ -414,14 +443,6 @@ private:
         {32, 0b10100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle__s},
         /* instruction FCLASS__S, encoding '0b11100000000000000001000001010011' */
         {32, 0b11100000000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass__s},
-        /* instruction FCVT__S__W, encoding '0b11010000000000000000000001010011' */
-        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__w},
-        /* instruction FCVT__S__WU, encoding '0b11010000000100000000000001010011' */
-        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__wu},
-        /* instruction FMV__X__W, encoding '0b11100000000000000000000001010011' */
-        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__x__w},
-        /* instruction FMV__W__X, encoding '0b11110000000000000000000001010011' */
-        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__w__x},
         /* instruction C__FLW, encoding '0b0110000000000000' */
         {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c__flw},
         /* instruction C__FSW, encoding '0b1110000000000000' */
@@ -434,54 +455,54 @@ private:
         {32, 0b00000000000000000011000000000111, 0b00000000000000000111000001111111, &this_class::__fld},
         /* instruction FSD, encoding '0b00000000000000000011000000100111' */
         {32, 0b00000000000000000011000000100111, 0b00000000000000000111000001111111, &this_class::__fsd},
-        /* instruction FMADD_D, encoding '0b00000010000000000000000001000011' */
-        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd_d},
-        /* instruction FMSUB_D, encoding '0b00000010000000000000000001000111' */
-        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub_d},
-        /* instruction FNMADD_D, encoding '0b00000010000000000000000001001111' */
-        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd_d},
-        /* instruction FNMSUB_D, encoding '0b00000010000000000000000001001011' */
-        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub_d},
-        /* instruction FADD_D, encoding '0b00000010000000000000000001010011' */
-        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd_d},
-        /* instruction FSUB_D, encoding '0b00001010000000000000000001010011' */
-        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub_d},
-        /* instruction FMUL_D, encoding '0b00010010000000000000000001010011' */
-        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul_d},
-        /* instruction FDIV_D, encoding '0b00011010000000000000000001010011' */
-        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv_d},
-        /* instruction FSQRT_D, encoding '0b01011010000000000000000001010011' */
-        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt_d},
-        /* instruction FSGNJ_D, encoding '0b00100010000000000000000001010011' */
-        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj_d},
-        /* instruction FSGNJN_D, encoding '0b00100010000000000001000001010011' */
-        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn_d},
-        /* instruction FSGNJX_D, encoding '0b00100010000000000010000001010011' */
-        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx_d},
-        /* instruction FMIN_D, encoding '0b00101010000000000000000001010011' */
-        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin_d},
-        /* instruction FMAX_D, encoding '0b00101010000000000001000001010011' */
-        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax_d},
-        /* instruction FCVT_S_D, encoding '0b01000000000100000000000001010011' */
-        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_d},
-        /* instruction FCVT_D_S, encoding '0b01000010000000000000000001010011' */
-        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_s},
-        /* instruction FEQ_D, encoding '0b10100010000000000010000001010011' */
-        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq_d},
-        /* instruction FLT_D, encoding '0b10100010000000000001000001010011' */
-        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt_d},
-        /* instruction FLE_D, encoding '0b10100010000000000000000001010011' */
-        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle_d},
-        /* instruction FCLASS_D, encoding '0b11100010000000000001000001010011' */
-        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass_d},
-        /* instruction FCVT_W_D, encoding '0b11000010000000000000000001010011' */
-        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_w_d},
-        /* instruction FCVT_WU_D, encoding '0b11000010000100000000000001010011' */
-        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_wu_d},
-        /* instruction FCVT_D_W, encoding '0b11010010000000000000000001010011' */
-        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_w},
-        /* instruction FCVT_D_WU, encoding '0b11010010000100000000000001010011' */
-        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_wu},
+        /* instruction FADD__D, encoding '0b00000010000000000000000001010011' */
+        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd__d},
+        /* instruction FSUB__D, encoding '0b00001010000000000000000001010011' */
+        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub__d},
+        /* instruction FMUL__D, encoding '0b00010010000000000000000001010011' */
+        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul__d},
+        /* instruction FDIV__D, encoding '0b00011010000000000000000001010011' */
+        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv__d},
+        /* instruction FMIN__D, encoding '0b00101010000000000000000001010011' */
+        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__d},
+        /* instruction FMAX__D, encoding '0b00101010000000000001000001010011' */
+        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__d},
+        /* instruction FSQRT__D, encoding '0b01011010000000000000000001010011' */
+        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt__d},
+        /* instruction FMADD__D, encoding '0b00000010000000000000000001000011' */
+        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__d},
+        /* instruction FMSUB__D, encoding '0b00000010000000000000000001000111' */
+        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__d},
+        /* instruction FNMADD__D, encoding '0b00000010000000000000000001001111' */
+        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__d},
+        /* instruction FNMSUB__D, encoding '0b00000010000000000000000001001011' */
+        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__d},
+        /* instruction FCVT__W__D, encoding '0b11000010000000000000000001010011' */
+        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__d},
+        /* instruction FCVT__WU__D, encoding '0b11000010000100000000000001010011' */
+        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__d},
+        /* instruction FCVT__D__W, encoding '0b11010010000000000000000001010011' */
+        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__w},
+        /* instruction FCVT__D__WU, encoding '0b11010010000100000000000001010011' */
+        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__wu},
+        /* instruction FCVT__S__D, encoding '0b01000000000100000000000001010011' */
+        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__d},
+        /* instruction FCVT__D__S, encoding '0b01000010000000000000000001010011' */
+        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__s},
+        /* instruction FSGNJ__D, encoding '0b00100010000000000000000001010011' */
+        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj__d},
+        /* instruction FSGNJN__D, encoding '0b00100010000000000001000001010011' */
+        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn__d},
+        /* instruction FSGNJX__D, encoding '0b00100010000000000010000001010011' */
+        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx__d},
+        /* instruction FEQ__D, encoding '0b10100010000000000010000001010011' */
+        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq__d},
+        /* instruction FLT__D, encoding '0b10100010000000000001000001010011' */
+        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt__d},
+        /* instruction FLE__D, encoding '0b10100010000000000000000001010011' */
+        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle__d},
+        /* instruction FCLASS__D, encoding '0b11100010000000000001000001010011' */
+        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass__d},
         /* instruction C__FLD, encoding '0b0010000000000000' */
         {16, 0b0010000000000000, 0b1110000000000011, &this_class::__c__fld},
         /* instruction C__FSD, encoding '0b1010000000000000' */
@@ -524,7 +545,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -570,7 +591,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -617,7 +638,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto new_pc =(uint32_t)(PC+(int32_t)sext<21>(imm));
@@ -674,7 +695,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto addr_mask =(uint32_t)- 2;
@@ -755,7 +776,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -820,7 +841,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -885,7 +906,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -954,7 +975,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -1023,7 +1044,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -1088,7 +1109,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -1152,7 +1173,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1210,7 +1231,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1268,7 +1289,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1326,7 +1347,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1382,7 +1403,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1438,7 +1459,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1491,7 +1512,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1544,7 +1565,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1597,7 +1618,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1649,7 +1670,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1703,7 +1724,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1756,7 +1777,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1806,7 +1827,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1856,7 +1877,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1906,7 +1927,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1956,7 +1977,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2006,7 +2027,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2058,7 +2079,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2110,7 +2131,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2162,7 +2183,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2215,7 +2236,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2270,7 +2291,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2323,7 +2344,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2373,7 +2394,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2426,7 +2447,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2482,7 +2503,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2532,7 +2553,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2724,10 +2745,10 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> wait_585_args{
+        std::vector<Value*> wait_57_args{
             this->gen_ext(this->gen_const(8,1), 32)
         };
-        this->builder.CreateCall(this->mod->getFunction("wait"), wait_585_args);
+        this->builder.CreateCall(this->mod->getFunction("wait"), wait_57_args);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -2766,7 +2787,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrs1 =this->gen_reg_load(traits::X0+ rs1);
@@ -2822,7 +2843,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2879,7 +2900,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2936,7 +2957,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2987,7 +3008,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -3043,7 +3064,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -3139,7 +3160,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3194,7 +3215,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3252,7 +3273,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3309,7 +3330,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3365,7 +3386,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto dividend =this->gen_ext(
@@ -3469,7 +3490,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3542,7 +3563,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3650,7 +3671,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3724,7 +3745,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3780,7 +3801,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3852,7 +3873,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3912,7 +3933,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3978,7 +3999,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4042,7 +4063,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4106,7 +4127,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4170,7 +4191,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4240,7 +4261,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4310,7 +4331,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4379,7 +4400,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4455,7 +4476,7 @@ private:
             get_reg_ptr(rd+8 + traits::X0), false);
         }
         else{
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -4592,7 +4613,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rs1!=0) {
@@ -4719,7 +4740,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -4765,7 +4786,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(imm==0||rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         if(rd!=0) {
             this->builder.CreateStore(
@@ -4818,7 +4839,7 @@ private:
             get_reg_ptr(2 + traits::X0), false);
         }
         else{
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -4854,7 +4875,7 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5353,7 +5374,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rs1!=0) {
@@ -5402,7 +5423,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5456,7 +5477,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -5583,7 +5604,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -5634,7 +5655,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto addr_mask =(uint32_t)- 2;
@@ -5720,7 +5741,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5768,7 +5789,7 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5807,7 +5828,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5816,16 +5837,8 @@ private:
                    this->gen_ext(this->gen_const(16,(int16_t)sext<12>(imm)), 64,true))
                 ),
                 32, true);
-            auto res =this->gen_ext(
-                this->gen_read_mem(traits::MEM, offs, 4),
-                32, false);
             this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-               this->gen_ext(
-                   res,
-                   64, false))
-            ,
+            NaNBox32(bb, this->gen_read_mem(traits::MEM, offs, 4)),
             get_reg_ptr(rd + traits::F0), false);
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
@@ -5866,7 +5879,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5890,19 +5903,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 100: FMADD__S */
-    std::tuple<continuation_e, BasicBlock*> __fmadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 100: FADD__S */
+    std::tuple<continuation_e, BasicBlock*> __fadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5910,7 +5922,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMADD__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FADD__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,100);
         
         this->gen_set_pc(pc, traits::PC);
@@ -5920,31 +5932,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_630_args{
+        std::vector<Value*> unbox_s_104_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };std::vector<Value*> unbox_s_631_args{
+        };std::vector<Value*> unbox_s_105_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
-        };std::vector<Value*> unbox_s_632_args{
-            this->gen_reg_load(traits::F0+ rs3)
-        };std::vector<Value*> fmadd_s_629_args{
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_630_args),
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_631_args),
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_632_args),
-            this->gen_ext(this->gen_const(8,0), 32),
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
+        };std::vector<Value*> fadd_s_103_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_104_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_105_args),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_629_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fadd_s"), fadd_s_103_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_634_args{
+        std::vector<Value*> fget_flags_107_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_634_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_107_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -5966,19 +5970,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 101: FMSUB__S */
-    std::tuple<continuation_e, BasicBlock*> __fmsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 101: FSUB__S */
+    std::tuple<continuation_e, BasicBlock*> __fsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5986,7 +5989,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMSUB__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSUB__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,101);
         
         this->gen_set_pc(pc, traits::PC);
@@ -5996,31 +5999,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_636_args{
+        std::vector<Value*> unbox_s_110_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };std::vector<Value*> unbox_s_637_args{
+        };std::vector<Value*> unbox_s_111_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
-        };std::vector<Value*> unbox_s_638_args{
-            this->gen_reg_load(traits::F0+ rs3)
-        };std::vector<Value*> fmadd_s_635_args{
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_636_args),
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_637_args),
-            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_638_args),
-            this->gen_ext(this->gen_const(8,1), 32),
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
+        };std::vector<Value*> fsub_s_109_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_110_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_111_args),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_635_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fsub_s"), fsub_s_109_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_640_args{
+        std::vector<Value*> fget_flags_113_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_640_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_113_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6042,19 +6037,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 102: FNMADD__S */
-    std::tuple<continuation_e, BasicBlock*> __fnmadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 102: FMUL__S */
+    std::tuple<continuation_e, BasicBlock*> __fmul__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, name(rd), {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6062,7 +6056,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FNMADD__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMUL__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,102);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6072,37 +6066,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_641_args{
+        std::vector<Value*> unbox_s_116_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_641_args);
-        std::vector<Value*> unbox_s_642_args{
+        };std::vector<Value*> unbox_s_117_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fmul_s_115_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_116_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_117_args),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_642_args);
-        std::vector<Value*> unbox_s_643_args{
-            this->gen_reg_load(traits::F0+ rs3)
-        };
-        auto frs3 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_643_args);
-        std::vector<Value*> fmadd_s_644_args{
-            frs1,
-            frs2,
-            frs3,
-            this->gen_ext(this->gen_const(8,2), 32),
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_644_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fmul_s"), fmul_s_115_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_646_args{
+        std::vector<Value*> fget_flags_119_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_646_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_119_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6124,19 +6104,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 103: FNMSUB__S */
-    std::tuple<continuation_e, BasicBlock*> __fnmsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 103: FDIV__S */
+    std::tuple<continuation_e, BasicBlock*> __fdiv__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6144,7 +6123,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FNMSUB__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FDIV__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,103);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6154,37 +6133,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_647_args{
+        std::vector<Value*> unbox_s_122_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_647_args);
-        std::vector<Value*> unbox_s_648_args{
+        };std::vector<Value*> unbox_s_123_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fdiv_s_121_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_122_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_123_args),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_648_args);
-        std::vector<Value*> unbox_s_649_args{
-            this->gen_reg_load(traits::F0+ rs3)
-        };
-        auto frs3 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_649_args);
-        std::vector<Value*> fmadd_s_650_args{
-            frs1,
-            frs2,
-            frs3,
-            this->gen_ext(this->gen_const(8,3), 32),
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_650_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fdiv_s"), fdiv_s_121_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_652_args{
+        std::vector<Value*> fget_flags_125_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_652_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_125_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6206,18 +6171,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 104: FADD__S */
-    std::tuple<continuation_e, BasicBlock*> __fadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 104: FMIN__S */
+    std::tuple<continuation_e, BasicBlock*> __fmin__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6225,7 +6189,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FADD__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMIN__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,104);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6235,31 +6199,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_653_args{
+        std::vector<Value*> unbox_s_128_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_653_args);
-        std::vector<Value*> unbox_s_654_args{
+        };std::vector<Value*> unbox_s_129_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fsel_s_127_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_128_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_129_args),
+            this->gen_ext(this->gen_const(8,0), 32)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_654_args);
-        std::vector<Value*> fadd_s_655_args{
-            frs1,
-            frs2,
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fadd_s"), fadd_s_655_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fsel_s"), fsel_s_127_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_657_args{
+        std::vector<Value*> fget_flags_130_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_657_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_130_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6281,18 +6237,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 105: FSUB__S */
-    std::tuple<continuation_e, BasicBlock*> __fsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 105: FMAX__S */
+    std::tuple<continuation_e, BasicBlock*> __fmax__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6300,7 +6255,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSUB__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMAX__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,105);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6310,31 +6265,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_658_args{
+        std::vector<Value*> unbox_s_133_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_658_args);
-        std::vector<Value*> unbox_s_659_args{
+        };std::vector<Value*> unbox_s_134_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fsel_s_132_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_133_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_134_args),
+            this->gen_ext(this->gen_const(8,1), 32)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_659_args);
-        std::vector<Value*> fsub_s_660_args{
-            frs1,
-            frs2,
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fsub_s"), fsub_s_660_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fsel_s"), fsel_s_132_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_662_args{
+        std::vector<Value*> fget_flags_135_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_662_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_135_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6356,18 +6303,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 106: FMUL__S */
-    std::tuple<continuation_e, BasicBlock*> __fmul__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 106: FSQRT__S */
+    std::tuple<continuation_e, BasicBlock*> __fsqrt__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6375,7 +6321,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMUL__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSQRT__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,106);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6385,31 +6331,19 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_663_args{
+        std::vector<Value*> unbox_s_138_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> fsqrt_s_137_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_138_args),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_663_args);
-        std::vector<Value*> unbox_s_664_args{
-            this->gen_reg_load(traits::F0+ rs2)
-        };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_664_args);
-        std::vector<Value*> fmul_s_665_args{
-            frs1,
-            frs2,
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fmul_s"), fmul_s_665_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fsqrt_s"), fsqrt_s_137_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_667_args{
+        std::vector<Value*> fget_flags_140_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_667_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_140_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6431,18 +6365,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 107: FDIV__S */
-    std::tuple<continuation_e, BasicBlock*> __fdiv__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 107: FMADD__S */
+    std::tuple<continuation_e, BasicBlock*> __fmadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6450,7 +6385,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FDIV__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMADD__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,107);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6460,31 +6395,28 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_668_args{
+        std::vector<Value*> unbox_s_143_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_668_args);
-        std::vector<Value*> unbox_s_669_args{
+        };std::vector<Value*> unbox_s_144_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_145_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_s_142_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_143_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_144_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_145_args),
+            this->gen_ext(this->gen_const(8,0), 32),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_669_args);
-        std::vector<Value*> fdiv_s_670_args{
-            frs1,
-            frs2,
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fdiv_s"), fdiv_s_670_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_142_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_672_args{
+        std::vector<Value*> fget_flags_147_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_672_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_147_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6506,17 +6438,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 108: FSQRT__S */
-    std::tuple<continuation_e, BasicBlock*> __fsqrt__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 108: FMSUB__S */
+    std::tuple<continuation_e, BasicBlock*> __fmsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6524,7 +6458,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSQRT__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMSUB__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,108);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6534,26 +6468,28 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_673_args{
+        std::vector<Value*> unbox_s_150_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_s_151_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_152_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_s_149_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_150_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_151_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_152_args),
+            this->gen_ext(this->gen_const(8,1), 32),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_673_args);
-        std::vector<Value*> fsqrt_s_674_args{
-            frs1,
-            this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fsqrt_s"), fsqrt_s_674_args);
         this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_149_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_676_args{
+        std::vector<Value*> fget_flags_154_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_676_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_154_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -6575,17 +6511,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 109: FSGNJ__S */
-    std::tuple<continuation_e, BasicBlock*> __fsgnj__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 109: FNMADD__S */
+    std::tuple<continuation_e, BasicBlock*> __fnmadd__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6593,7 +6531,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJ__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FNMADD__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,109);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6603,23 +6541,40 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_677_args{
+        std::vector<Value*> unbox_s_157_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_677_args);
-        std::vector<Value*> unbox_s_678_args{
+        };std::vector<Value*> unbox_s_158_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_159_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_s_156_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_157_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_158_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_159_args),
+            this->gen_ext(this->gen_const(8,2), 32),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_678_args);
-        auto res =this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(frs2, 31, 31-31+1), 32), 31), this->gen_slice(frs1, 0, 30-0+1));
+        this->builder.CreateStore(
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_156_args)),
+        get_reg_ptr(rd + traits::F0), false);
+        std::vector<Value*> fget_flags_161_args{
+        };
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_161_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)(- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
+           (this->builder.CreateAnd(
+              this->gen_reg_load(traits::FCSR),
+              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ),
+           (this->builder.CreateAnd(
+              flags,
+              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ))
         ,
-        get_reg_ptr(rd + traits::F0), false);
+        get_reg_ptr(traits::FCSR), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -6629,17 +6584,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 110: FSGNJN__S */
-    std::tuple<continuation_e, BasicBlock*> __fsgnjn__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 110: FNMSUB__S */
+    std::tuple<continuation_e, BasicBlock*> __fnmsub__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6647,7 +6604,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJN__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FNMSUB__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,110);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6657,23 +6614,40 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_679_args{
+        std::vector<Value*> unbox_s_164_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_679_args);
-        std::vector<Value*> unbox_s_680_args{
+        };std::vector<Value*> unbox_s_165_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_166_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_s_163_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_164_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_165_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_166_args),
+            this->gen_ext(this->gen_const(8,3), 32),
+            this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_680_args);
-        auto res =this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(frs2, 31, 31-31+1)), 32), 31), this->gen_slice(frs1, 0, 30-0+1));
+        this->builder.CreateStore(
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_s"), fmadd_s_163_args)),
+        get_reg_ptr(rd + traits::F0), false);
+        std::vector<Value*> fget_flags_168_args{
+        };
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_168_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)(- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
+           (this->builder.CreateAnd(
+              this->gen_reg_load(traits::FCSR),
+              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ),
+           (this->builder.CreateAnd(
+              flags,
+              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ))
         ,
-        get_reg_ptr(rd + traits::F0), false);
+        get_reg_ptr(traits::FCSR), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -6683,17 +6657,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 111: FSGNJX__S */
-    std::tuple<continuation_e, BasicBlock*> __fsgnjx__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 111: FCVT__W__S */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__w__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6701,7 +6675,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJX__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__W__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,111);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6711,29 +6685,45 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_681_args{
-            this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_681_args);
-        std::vector<Value*> unbox_s_682_args{
-            this->gen_reg_load(traits::F0+ rs2)
-        };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_682_args);
-        auto res =this->builder.CreateXor(
-           frs1,
-           (this->builder.CreateAnd(
-              frs2,
-              this->gen_const(32,(uint32_t)2147483648))
-           ))
-        ;
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
-        get_reg_ptr(rd + traits::F0), false);
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> unbox_s_171_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> f32toi32_170_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_171_args),
+                get_rm(bb, rm)
+            };
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("f32toi32"), f32toi32_170_args),
+                    32, false),
+                32, true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_173_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_173_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -6743,17 +6733,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 112: FMIN__S */
-    std::tuple<continuation_e, BasicBlock*> __fmin__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 112: FCVT__WU__S */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__wu__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6761,7 +6751,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMIN__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__WU__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,112);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6771,43 +6761,45 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_683_args{
-            this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_683_args);
-        std::vector<Value*> unbox_s_684_args{
-            this->gen_reg_load(traits::F0+ rs2)
-        };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_684_args);
-        std::vector<Value*> fsel_s_685_args{
-            frs1,
-            frs2,
-            this->gen_ext(this->gen_const(8,0), 32)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fsel_s"), fsel_s_685_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
-        get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_686_args{
-        };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_686_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           (this->builder.CreateAnd(
-              this->gen_reg_load(traits::FCSR),
-              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ),
-           (this->builder.CreateAnd(
-              flags,
-              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ))
-        ,
-        get_reg_ptr(traits::FCSR), false);
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> unbox_s_176_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> f32toui32_175_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_176_args),
+                get_rm(bb, rm)
+            };
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("f32toui32"), f32toui32_175_args),
+                    32, false),
+                32, true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_178_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_178_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -6817,17 +6809,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 113: FMAX__S */
-    std::tuple<continuation_e, BasicBlock*> __fmax__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 113: FCVT__S__W */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__s__w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.w"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6835,7 +6827,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMAX__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__S__W_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,113);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6845,43 +6837,35 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_s_687_args{
-            this->gen_reg_load(traits::F0+ rs1)
-        };
-        auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_687_args);
-        std::vector<Value*> unbox_s_688_args{
-            this->gen_reg_load(traits::F0+ rs2)
-        };
-        auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_688_args);
-        std::vector<Value*> fsel_s_689_args{
-            frs1,
-            frs2,
-            this->gen_ext(this->gen_const(8,1), 32)
-        };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fsel_s"), fsel_s_689_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-           this->gen_ext(
-               res,
-               64, false))
-        ,
-        get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_690_args{
-        };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_690_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           (this->builder.CreateAnd(
-              this->gen_reg_load(traits::FCSR),
-              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ),
-           (this->builder.CreateAnd(
-              flags,
-              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ))
-        ,
-        get_reg_ptr(traits::FCSR), false);
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> i32tof32_181_args{
+                this->gen_ext(
+                    this->gen_reg_load(traits::X0+ rs1),
+                    32, false),
+                get_rm(bb, rm)
+            };
+            this->builder.CreateStore(
+            NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("i32tof32"), i32tof32_181_args)),
+            get_reg_ptr(rd + traits::F0), false);
+            std::vector<Value*> fget_flags_183_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_183_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -6891,8 +6875,8 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 114: FCVT__W__S */
-    std::tuple<continuation_e, BasicBlock*> __fcvt__w__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 114: FCVT__S__WU */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__s__wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
@@ -6900,8 +6884,8 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.w.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.wu"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6909,7 +6893,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT__W__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__S__WU_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,114);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6919,34 +6903,22 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> unbox_s_692_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };
-            auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_692_args);
-            std::vector<Value*> fcvt_s_693_args{
-                frs1,
-                this->gen_ext(this->gen_const(8,0), 32),
-                this->gen_ext(get_rm(bb, rm), 8)
-            };
-            auto res =this->gen_ext(
+            std::vector<Value*> ui32tof32_186_args{
                 this->gen_ext(
-                    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_693_args),
+                    this->gen_reg_load(traits::X0+ rs1),
                     32, false),
-                32, true);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res,
-                    32, true),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_695_args{
+                get_rm(bb, rm)
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_695_args);
+            this->builder.CreateStore(
+            NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("ui32tof32"), ui32tof32_186_args)),
+            get_reg_ptr(rd + traits::F0), false);
+            std::vector<Value*> fget_flags_188_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_188_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -6969,17 +6941,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 115: FCVT__WU__S */
-    std::tuple<continuation_e, BasicBlock*> __fcvt__wu__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 115: FSGNJ__S */
+    std::tuple<continuation_e, BasicBlock*> __fsgnj__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -6987,7 +6959,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT__WU__S_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSGNJ__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,115);
         
         this->gen_set_pc(pc, traits::PC);
@@ -6997,47 +6969,16 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> unbox_s_697_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };
-            auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_697_args);
-            std::vector<Value*> fcvt_s_698_args{
-                frs1,
-                this->gen_ext(this->gen_const(8,1), 32),
-                this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
-            };
-            auto res =this->gen_ext(
-                this->gen_ext(
-                    this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_698_args),
-                    32, false),
-                32, true);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res,
-                    32, true),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_700_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_700_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
+        std::vector<Value*> unbox_s_190_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_191_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox32(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_190_args), 31, 31-31+1), 64), 31), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_191_args), 0, 30-0+1), 64))),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -7047,7 +6988,205 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 116: FEQ__S */
+    /* instruction 116: FSGNJN__S */
+    std::tuple<continuation_e, BasicBlock*> __fsgnjn__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("FSGNJN__S_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,116);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        std::vector<Value*> unbox_s_193_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_194_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox32(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_193_args), 31, 31-31+1)), 64), 31), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_194_args), 0, 30-0+1), 64))),
+        get_reg_ptr(rd + traits::F0), false);
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 116);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 117: FSGNJX__S */
+    std::tuple<continuation_e, BasicBlock*> __fsgnjx__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("FSGNJX__S_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,117);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        std::vector<Value*> unbox_s_196_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_s_197_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox32(bb, this->builder.CreateXor(
+           (this->builder.CreateAnd(
+              this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_196_args),
+              this->gen_const(32,((uint32_t)1<<31)))
+           ),
+           this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_197_args))
+        ),
+        get_reg_ptr(rd + traits::F0), false);
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 117);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 118: FMV__X__W */
+    std::tuple<continuation_e, BasicBlock*> __fmv__x__w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("FMV__X__W_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,118);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    this->gen_ext(
+                        this->gen_ext(
+                            this->gen_reg_load(traits::F0+ rs1),
+                            32, false),
+                        32, true),
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+        }
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 118);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 119: FMV__W__X */
+    std::tuple<continuation_e, BasicBlock*> __fmv__w__x(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("FMV__W__X_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,119);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            this->builder.CreateStore(
+            NaNBox32(bb, this->gen_ext(
+                this->gen_reg_load(traits::X0+ rs1),
+                32, false)),
+            get_reg_ptr(rd + traits::F0), false);
+        }
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 119);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 120: FEQ__S */
     std::tuple<continuation_e, BasicBlock*> __feq__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -7066,286 +7205,6 @@ private:
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
         bb->setName(fmt::format("FEQ__S_0x{:X}",pc.val));
-        this->gen_sync(PRE_SYNC,116);
-        
-        this->gen_set_pc(pc, traits::PC);
-        this->set_tval(instr);
-        pc=pc+ 4;
-        this->gen_set_pc(pc, traits::NEXT_PC);
-        
-        this->gen_instr_prologue();
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> unbox_s_702_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };
-            auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_702_args);
-            std::vector<Value*> unbox_s_703_args{
-                this->gen_reg_load(traits::F0+ rs2)
-            };
-            auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_703_args);
-            std::vector<Value*> fcmp_s_704_args{
-                frs1,
-                frs2,
-                this->gen_ext(this->gen_const(8,0), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_704_args);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                res,
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_705_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_705_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
-        
-        this->gen_sync(POST_SYNC, 116);
-        this->gen_instr_epilogue(bb);
-        this->builder.CreateBr(bb);
-    	return returnValue;        
-    }
-    
-    /* instruction 117: FLT__S */
-    std::tuple<continuation_e, BasicBlock*> __flt__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.s"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            std::vector<Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder.CreateGlobalStringPtr(mnemonic),
-            };
-            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        bb->setName(fmt::format("FLT__S_0x{:X}",pc.val));
-        this->gen_sync(PRE_SYNC,117);
-        
-        this->gen_set_pc(pc, traits::PC);
-        this->set_tval(instr);
-        pc=pc+ 4;
-        this->gen_set_pc(pc, traits::NEXT_PC);
-        
-        this->gen_instr_prologue();
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> unbox_s_707_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };
-            auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_707_args);
-            std::vector<Value*> unbox_s_708_args{
-                this->gen_reg_load(traits::F0+ rs2)
-            };
-            auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_708_args);
-            std::vector<Value*> fcmp_s_709_args{
-                frs1,
-                frs2,
-                this->gen_ext(this->gen_const(8,2), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_709_args);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                res,
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_710_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_710_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
-        
-        this->gen_sync(POST_SYNC, 117);
-        this->gen_instr_epilogue(bb);
-        this->builder.CreateBr(bb);
-    	return returnValue;        
-    }
-    
-    /* instruction 118: FLE__S */
-    std::tuple<continuation_e, BasicBlock*> __fle__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.s"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            std::vector<Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder.CreateGlobalStringPtr(mnemonic),
-            };
-            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        bb->setName(fmt::format("FLE__S_0x{:X}",pc.val));
-        this->gen_sync(PRE_SYNC,118);
-        
-        this->gen_set_pc(pc, traits::PC);
-        this->set_tval(instr);
-        pc=pc+ 4;
-        this->gen_set_pc(pc, traits::NEXT_PC);
-        
-        this->gen_instr_prologue();
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> unbox_s_712_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };
-            auto frs1 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_712_args);
-            std::vector<Value*> unbox_s_713_args{
-                this->gen_reg_load(traits::F0+ rs2)
-            };
-            auto frs2 =this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_713_args);
-            std::vector<Value*> fcmp_s_714_args{
-                frs1,
-                frs2,
-                this->gen_ext(this->gen_const(8,1), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_714_args);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                res,
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_715_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_715_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
-        
-        this->gen_sync(POST_SYNC, 118);
-        this->gen_instr_epilogue(bb);
-        this->builder.CreateBr(bb);
-    	return returnValue;        
-    }
-    
-    /* instruction 119: FCLASS__S */
-    std::tuple<continuation_e, BasicBlock*> __fclass__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass.s"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-            std::vector<Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder.CreateGlobalStringPtr(mnemonic),
-            };
-            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        bb->setName(fmt::format("FCLASS__S_0x{:X}",pc.val));
-        this->gen_sync(PRE_SYNC,119);
-        
-        this->gen_set_pc(pc, traits::PC);
-        this->set_tval(instr);
-        pc=pc+ 4;
-        this->gen_set_pc(pc, traits::NEXT_PC);
-        
-        this->gen_instr_prologue();
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> unbox_s_718_args{
-                this->gen_reg_load(traits::F0+ rs1)
-            };std::vector<Value*> fclass_s_717_args{
-                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_718_args)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fclass_s"), fclass_s_717_args);
-            if((rd)!=0) {
-                this->builder.CreateStore(
-                res,
-                get_reg_ptr(rd + traits::X0), false);
-            }
-        }
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
-        
-        this->gen_sync(POST_SYNC, 119);
-        this->gen_instr_epilogue(bb);
-        this->builder.CreateBr(bb);
-    	return returnValue;        
-    }
-    
-    /* instruction 120: FCVT__S__W */
-    std::tuple<continuation_e, BasicBlock*> __fcvt__s__w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.w"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-            std::vector<Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder.CreateGlobalStringPtr(mnemonic),
-            };
-            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        bb->setName(fmt::format("FCVT__S__W_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,120);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7355,29 +7214,30 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_s_720_args{
-                this->gen_ext(
-                    this->gen_reg_load(traits::X0+ rs1),
-                    32, false),
-                this->gen_ext(this->gen_const(8,2), 32),
-                this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
+            std::vector<Value*> unbox_s_203_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_s_204_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_s_202_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_203_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_204_args),
+                this->gen_ext(this->gen_const(8,0), 32)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_720_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-               this->gen_ext(
-                   res,
-                   64, false))
-            ,
-            get_reg_ptr(rd + traits::F0), false);
-            std::vector<Value*> fget_flags_722_args{
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_202_args);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res,
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_205_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_722_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_205_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -7400,17 +7260,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 121: FCVT__S__WU */
-    std::tuple<continuation_e, BasicBlock*> __fcvt__s__wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 121: FLT__S */
+    std::tuple<continuation_e, BasicBlock*> __flt__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.wu"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -7418,7 +7278,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT__S__WU_0x{:X}",pc.val));
+        bb->setName(fmt::format("FLT__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,121);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7428,29 +7288,30 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_s_724_args{
-                this->gen_ext(
-                    this->gen_reg_load(traits::X0+ rs1),
-                    32, false),
-                this->gen_ext(this->gen_const(8,3), 32),
-                this->gen_ext(get_rm(bb, (uint8_t)rm), 8)
+            std::vector<Value*> unbox_s_208_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_s_209_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_s_207_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_208_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_209_args),
+                this->gen_ext(this->gen_const(8,2), 32)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcvt_s"), fcvt_s_724_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-               this->gen_ext(
-                   res,
-                   64, false))
-            ,
-            get_reg_ptr(rd + traits::F0), false);
-            std::vector<Value*> fget_flags_726_args{
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_207_args);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res,
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_210_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_726_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_210_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -7473,16 +7334,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 122: FMV__X__W */
-    std::tuple<continuation_e, BasicBlock*> __fmv__x__w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 122: FLE__S */
+    std::tuple<continuation_e, BasicBlock*> __fle__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -7490,7 +7352,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMV__X__W_0x{:X}",pc.val));
+        bb->setName(fmt::format("FLE__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,122);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7501,20 +7363,41 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            if((rd)!=0) {
+            std::vector<Value*> unbox_s_213_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_s_214_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_s_212_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_213_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_214_args),
+                this->gen_ext(this->gen_const(8,1), 32)
+            };
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_s"), fcmp_s_212_args);
+            if(rd!=0) {
                 this->builder.CreateStore(
-                this->gen_ext(
-                    this->gen_ext(
-                        this->gen_ext(
-                            this->gen_reg_load(traits::F0+ rs1),
-                            32, false),
-                        32, true),
-                    32, true),
+                res,
                 get_reg_ptr(rd + traits::X0), false);
             }
+            std::vector<Value*> fget_flags_215_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_215_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -7525,15 +7408,15 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 123: FMV__W__X */
-    std::tuple<continuation_e, BasicBlock*> __fmv__w__x(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 123: FCLASS__S */
+    std::tuple<continuation_e, BasicBlock*> __fclass__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass.s"),
                 fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
             std::vector<Value*> args {
                 this->core_ptr,
@@ -7542,7 +7425,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMV__W__X_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCLASS__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,123);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7552,18 +7435,22 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,(uint64_t)((int64_t)- 1<<32)),
-               this->gen_ext(
-                   this->gen_reg_load(traits::X0+ rs1),
-                   64, false))
-            ,
-            get_reg_ptr(rd + traits::F0), false);
+            std::vector<Value*> unbox_s_218_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> fclass_s_217_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_218_args)
+            };
+            auto res =this->builder.CreateCall(this->mod->getFunction("fclass_s"), fclass_s_217_args);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                res,
+                get_reg_ptr(rd + traits::X0), false);
+            }
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -7611,19 +7498,9 @@ private:
         auto res =this->gen_ext(
             this->gen_read_mem(traits::MEM, offs, 4),
             32, false);
-        if(static_cast<uint32_t>(traits::FLEN)==32) {
-            this->builder.CreateStore(
-            this->gen_ext(res, 64),
-            get_reg_ptr(rd+8 + traits::F0), false);
-        }
-        else{
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,((uint64_t)((int64_t)- 1<<32))),
-               this->gen_ext(res, 64,false))
-            ,
-            get_reg_ptr(rd+8 + traits::F0), false);
-        }
+        this->builder.CreateStore(
+        NaNBox32(bb, res),
+        get_reg_ptr(rd+8 + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -7717,19 +7594,9 @@ private:
         auto res =this->gen_ext(
             this->gen_read_mem(traits::MEM, offs, 4),
             32, false);
-        if(static_cast<uint32_t>(traits::FLEN)==32) {
-            this->builder.CreateStore(
-            this->gen_ext(res, 64),
-            get_reg_ptr(rd + traits::F0), false);
-        }
-        else{
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_const(64,((uint64_t)((int64_t)- 1<<32))),
-               this->gen_ext(res, 64,false))
-            ,
-            get_reg_ptr(rd + traits::F0), false);
-        }
+        this->builder.CreateStore(
+        NaNBox32(bb, res),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -7815,7 +7682,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -7825,7 +7692,7 @@ private:
                 ),
                 32, true);
             this->builder.CreateStore(
-            this->gen_ext(this->gen_read_mem(traits::MEM, offs, 8), 64),
+            NaNBox64(bb, this->gen_read_mem(traits::MEM, offs, 8)),
             get_reg_ptr(rd + traits::F0), false);
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
@@ -7866,7 +7733,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -7877,7 +7744,9 @@ private:
                 32, true);
             this->gen_write_mem(traits::MEM,
             offs,
-            this->gen_reg_load(traits::F0+ rs2));
+            this->gen_ext(
+                this->gen_reg_load(traits::F0+ rs2),
+                64, false));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -7888,19 +7757,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 130: FMADD_D */
-    std::tuple<continuation_e, BasicBlock*> __fmadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 130: FADD__D */
+    std::tuple<continuation_e, BasicBlock*> __fadd__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -7908,7 +7776,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMADD_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FADD__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,130);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7918,19 +7786,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fmadd_d_731_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_reg_load(traits::F0+ rs3),
-            this->gen_ext(this->gen_const(8,0), 32),
+        std::vector<Value*> unbox_d_226_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_227_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fadd_d_225_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_226_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_227_args),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_731_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fadd_d"), fadd_d_225_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_733_args{
+        std::vector<Value*> fget_flags_229_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_733_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_229_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -7952,19 +7824,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 131: FMSUB_D */
-    std::tuple<continuation_e, BasicBlock*> __fmsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 131: FSUB__D */
+    std::tuple<continuation_e, BasicBlock*> __fsub__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -7972,7 +7843,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMSUB_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSUB__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,131);
         
         this->gen_set_pc(pc, traits::PC);
@@ -7982,19 +7853,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fmadd_d_734_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_reg_load(traits::F0+ rs3),
-            this->gen_ext(this->gen_const(8,1), 32),
+        std::vector<Value*> unbox_d_232_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_233_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fsub_d_231_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_232_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_233_args),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_734_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fsub_d"), fsub_d_231_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_736_args{
+        std::vector<Value*> fget_flags_235_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_736_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_235_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8016,19 +7891,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 132: FNMADD_D */
-    std::tuple<continuation_e, BasicBlock*> __fnmadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 132: FMUL__D */
+    std::tuple<continuation_e, BasicBlock*> __fmul__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8036,7 +7910,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FNMADD_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMUL__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,132);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8046,19 +7920,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fmadd_d_737_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_reg_load(traits::F0+ rs3),
-            this->gen_ext(this->gen_const(8,2), 32),
+        std::vector<Value*> unbox_d_238_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_239_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fmul_d_237_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_238_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_239_args),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_737_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmul_d"), fmul_d_237_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_739_args{
+        std::vector<Value*> fget_flags_241_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_739_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_241_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8080,19 +7958,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 133: FNMSUB_D */
-    std::tuple<continuation_e, BasicBlock*> __fnmsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 133: FDIV__D */
+    std::tuple<continuation_e, BasicBlock*> __fdiv__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8100,7 +7977,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FNMSUB_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FDIV__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,133);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8110,19 +7987,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fmadd_d_740_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_reg_load(traits::F0+ rs3),
-            this->gen_ext(this->gen_const(8,3), 32),
+        std::vector<Value*> unbox_d_244_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_245_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fdiv_d_243_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_244_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_245_args),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_740_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fdiv_d"), fdiv_d_243_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_742_args{
+        std::vector<Value*> fget_flags_247_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_742_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_247_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8144,18 +8025,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 134: FADD_D */
-    std::tuple<continuation_e, BasicBlock*> __fadd_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 134: FMIN__D */
+    std::tuple<continuation_e, BasicBlock*> __fmin__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8163,7 +8043,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FADD_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMIN__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,134);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8173,17 +8053,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fadd_d_743_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_ext(get_rm(bb, rm), 8)
+        std::vector<Value*> unbox_d_250_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_251_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fsel_d_249_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_250_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_251_args),
+            this->gen_ext(this->gen_const(8,0), 32)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fadd_d"), fadd_d_743_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fsel_d"), fsel_d_249_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_745_args{
+        std::vector<Value*> fget_flags_252_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_745_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_252_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8205,18 +8091,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 135: FSUB_D */
-    std::tuple<continuation_e, BasicBlock*> __fsub_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 135: FMAX__D */
+    std::tuple<continuation_e, BasicBlock*> __fmax__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8224,7 +8109,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSUB_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMAX__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,135);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8234,17 +8119,23 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fsub_d_746_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_ext(get_rm(bb, rm), 8)
+        std::vector<Value*> unbox_d_255_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_256_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> fsel_d_254_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_255_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_256_args),
+            this->gen_ext(this->gen_const(8,1), 32)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fsub_d"), fsub_d_746_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fsel_d"), fsel_d_254_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_748_args{
+        std::vector<Value*> fget_flags_257_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_748_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_257_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8266,18 +8157,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 136: FMUL_D */
-    std::tuple<continuation_e, BasicBlock*> __fmul_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 136: FSQRT__D */
+    std::tuple<continuation_e, BasicBlock*> __fsqrt__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8285,7 +8175,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMUL_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSQRT__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,136);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8295,17 +8185,19 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fmul_d_749_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
+        std::vector<Value*> unbox_d_260_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> fsqrt_d_259_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_260_args),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fmul_d"), fmul_d_749_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fsqrt_d"), fsqrt_d_259_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_751_args{
+        std::vector<Value*> fget_flags_262_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_751_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_262_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8327,18 +8219,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 137: FDIV_D */
-    std::tuple<continuation_e, BasicBlock*> __fdiv_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 137: FMADD__D */
+    std::tuple<continuation_e, BasicBlock*> __fmadd__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8346,7 +8239,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FDIV_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMADD__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,137);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8356,17 +8249,28 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fdiv_d_752_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
+        std::vector<Value*> unbox_d_265_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_266_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_267_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_d_264_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_265_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_266_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_267_args),
+            this->gen_ext(this->gen_const(8,0), 64),
             this->gen_ext(get_rm(bb, rm), 8)
         };
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fdiv_d"), fdiv_d_752_args),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_264_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_754_args{
+        std::vector<Value*> fget_flags_269_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_754_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_269_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8388,17 +8292,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 138: FSQRT_D */
-    std::tuple<continuation_e, BasicBlock*> __fsqrt_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 138: FMSUB__D */
+    std::tuple<continuation_e, BasicBlock*> __fmsub__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8406,7 +8312,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSQRT_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FMSUB__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,138);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8416,16 +8322,29 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fsqrt_d_755_args{
-            this->gen_reg_load(traits::F0+ rs1),
+        std::vector<Value*> unbox_d_272_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_273_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_274_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_d_271_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_272_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_273_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_274_args),
+            this->gen_ext(this->gen_const(8,1), 64),
             this->gen_ext(get_rm(bb, rm), 8)
         };
+        auto res =NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_271_args));
         this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fsqrt_d"), fsqrt_d_755_args),
+        res,
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_757_args{
+        std::vector<Value*> fget_flags_276_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_757_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_276_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8447,17 +8366,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 139: FSGNJ_D */
-    std::tuple<continuation_e, BasicBlock*> __fsgnj_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 139: FNMADD__D */
+    std::tuple<continuation_e, BasicBlock*> __fnmadd__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8465,7 +8386,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJ_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FNMADD__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,139);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8475,9 +8396,40 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
+        std::vector<Value*> unbox_d_279_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_280_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_281_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_d_278_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_279_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_280_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_281_args),
+            this->gen_ext(this->gen_const(8,2), 64),
+            this->gen_ext(get_rm(bb, rm), 8)
+        };
         this->builder.CreateStore(
-        this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(this->gen_reg_load(traits::F0+ rs2), 63, 63-63+1), 64), 63), this->gen_slice(this->gen_reg_load(traits::F0+ rs1), 0, 62-0+1)),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_278_args)),
         get_reg_ptr(rd + traits::F0), false);
+        std::vector<Value*> fget_flags_283_args{
+        };
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_283_args);
+        this->builder.CreateStore(
+        this->builder.CreateOr(
+           (this->builder.CreateAnd(
+              this->gen_reg_load(traits::FCSR),
+              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ),
+           (this->builder.CreateAnd(
+              flags,
+              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ))
+        ,
+        get_reg_ptr(traits::FCSR), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8487,17 +8439,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 140: FSGNJN_D */
-    std::tuple<continuation_e, BasicBlock*> __fsgnjn_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 140: FNMSUB__D */
+    std::tuple<continuation_e, BasicBlock*> __fnmsub__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8505,7 +8459,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJN_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FNMSUB__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,140);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8515,9 +8469,40 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
+        std::vector<Value*> unbox_d_286_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> unbox_d_287_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_288_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs3)
+        };std::vector<Value*> fmadd_d_285_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_286_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_287_args),
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_288_args),
+            this->gen_ext(this->gen_const(8,3), 64),
+            this->gen_ext(get_rm(bb, rm), 8)
+        };
         this->builder.CreateStore(
-        this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(this->gen_reg_load(traits::F0+ rs2), 63, 63-63+1)), 64), 63), this->gen_slice(this->gen_reg_load(traits::F0+ rs1), 0, 62-0+1)),
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_285_args)),
         get_reg_ptr(rd + traits::F0), false);
+        std::vector<Value*> fget_flags_290_args{
+        };
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_290_args);
+        this->builder.CreateStore(
+        this->builder.CreateOr(
+           (this->builder.CreateAnd(
+              this->gen_reg_load(traits::FCSR),
+              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ),
+           (this->builder.CreateAnd(
+              flags,
+              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ))
+        ,
+        get_reg_ptr(traits::FCSR), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8527,17 +8512,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 141: FSGNJX_D */
-    std::tuple<continuation_e, BasicBlock*> __fsgnjx_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 141: FCVT__W__D */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__w__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8545,7 +8530,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FSGNJX_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__W__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,141);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8555,15 +8540,45 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->builder.CreateStore(
-        this->builder.CreateXor(
-           this->gen_reg_load(traits::F0+ rs1),
-           (this->builder.CreateAnd(
-              this->gen_reg_load(traits::F0+ rs2),
-              this->gen_const(64,((uint64_t)1<<63)))
-           ))
-        ,
-        get_reg_ptr(rd + traits::F0), false);
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> unbox_d_293_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> f64toi32_292_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_293_args),
+                get_rm(bb, rm)
+            };
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("f64toi32"), f64toi32_292_args),
+                    32, false),
+                32, true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_295_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_295_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8573,17 +8588,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 142: FMIN_D */
-    std::tuple<continuation_e, BasicBlock*> __fmin_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 142: FCVT__WU__D */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__wu__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8591,7 +8606,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMIN_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__WU__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,142);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8601,29 +8616,45 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fsel_d_758_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_ext(this->gen_const(8,0), 32)
-        };
-        this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fsel_d"), fsel_d_758_args),
-        get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_759_args{
-        };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_759_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           (this->builder.CreateAnd(
-              this->gen_reg_load(traits::FCSR),
-              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ),
-           (this->builder.CreateAnd(
-              flags,
-              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ))
-        ,
-        get_reg_ptr(traits::FCSR), false);
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> unbox_d_298_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> f64toui32_297_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_298_args),
+                get_rm(bb, rm)
+            };
+            auto res =this->gen_ext(
+                this->gen_ext(
+                    this->builder.CreateCall(this->mod->getFunction("f64toui32"), f64toui32_297_args),
+                    32, false),
+                32, true);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, true),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_300_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_300_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8633,17 +8664,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 143: FMAX_D */
-    std::tuple<continuation_e, BasicBlock*> __fmax_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 143: FCVT__D__W */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__d__w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.w"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8651,7 +8682,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FMAX_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__D__W_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,143);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8661,29 +8692,35 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fsel_d_760_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_reg_load(traits::F0+ rs2),
-            this->gen_ext(this->gen_const(8,1), 32)
-        };
-        this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fsel_d"), fsel_d_760_args),
-        get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_761_args{
-        };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_761_args);
-        this->builder.CreateStore(
-        this->builder.CreateOr(
-           (this->builder.CreateAnd(
-              this->gen_reg_load(traits::FCSR),
-              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ),
-           (this->builder.CreateAnd(
-              flags,
-              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-           ))
-        ,
-        get_reg_ptr(traits::FCSR), false);
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> i32tof64_303_args{
+                this->gen_ext(
+                    this->gen_reg_load(traits::X0+ rs1),
+                    32, false),
+                get_rm(bb, rm)
+            };
+            this->builder.CreateStore(
+            NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("i32tof64"), i32tof64_303_args)),
+            get_reg_ptr(rd + traits::F0), false);
+            std::vector<Value*> fget_flags_305_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_305_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8693,8 +8730,8 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 144: FCVT_S_D */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_s_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 144: FCVT__D__WU */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__d__wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
@@ -8702,8 +8739,8 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_s_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.wu"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8711,7 +8748,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_S_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__D__WU_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,144);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8721,22 +8758,85 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> fconv_d2f_762_args{
-            this->gen_reg_load(traits::F0+ rs1),
-            this->gen_ext(get_rm(bb, rm), 8)
+        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else{
+            std::vector<Value*> ui32tof64_308_args{
+                this->gen_ext(
+                    this->gen_reg_load(traits::X0+ rs1),
+                    32, false),
+                get_rm(bb, rm)
+            };
+            this->builder.CreateStore(
+            NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("ui32tof64"), ui32tof64_308_args)),
+            get_reg_ptr(rd + traits::F0), false);
+            std::vector<Value*> fget_flags_310_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_310_args);
+            this->builder.CreateStore(
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
+        }
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 144);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 145: FCVT__S__D */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__s__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("FCVT__S__D_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,145);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        std::vector<Value*> unbox_d_313_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> f64tof32_312_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_313_args),
+            get_rm(bb, rm)
         };
-        auto res =this->builder.CreateCall(this->mod->getFunction("fconv_d2f"), fconv_d2f_762_args);
         this->builder.CreateStore(
-        this->gen_ext(
-            (this->builder.CreateAdd(
-               this->gen_ext(this->gen_const(64,((int64_t)- 1<<32)), 128,true),
-               this->gen_ext(res, 128,false))
-            ),
-            64, true),
+        NaNBox32(bb, this->builder.CreateCall(this->mod->getFunction("f64tof32"), f64tof32_312_args)),
         get_reg_ptr(rd + traits::F0), false);
-        std::vector<Value*> fget_flags_764_args{
+        std::vector<Value*> fget_flags_315_args{
         };
-        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_764_args);
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_315_args);
         this->builder.CreateStore(
         this->builder.CreateOr(
            (this->builder.CreateAnd(
@@ -8752,14 +8852,14 @@ private:
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
-        this->gen_sync(POST_SYNC, 144);
+        this->gen_sync(POST_SYNC, 145);
         this->gen_instr_epilogue(bb);
         this->builder.CreateBr(bb);
     	return returnValue;        
     }
     
-    /* instruction 145: FCVT_D_S */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_d_s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 146: FCVT__D__S */
+    std::tuple<continuation_e, BasicBlock*> __fcvt__d__s(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
@@ -8767,8 +8867,8 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8776,53 +8876,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_D_S_0x{:X}",pc.val));
-        this->gen_sync(PRE_SYNC,145);
-        
-        this->gen_set_pc(pc, traits::PC);
-        this->set_tval(instr);
-        pc=pc+ 4;
-        this->gen_set_pc(pc, traits::NEXT_PC);
-        
-        this->gen_instr_prologue();
-        /*generate behavior*/
-        std::vector<Value*> fconv_f2d_765_args{
-            this->gen_ext(
-                this->gen_reg_load(traits::F0+ rs1),
-                32, false),
-            this->gen_ext(get_rm(bb, rm), 8)
-        };
-        this->builder.CreateStore(
-        this->builder.CreateCall(this->mod->getFunction("fconv_f2d"), fconv_f2d_765_args),
-        get_reg_ptr(rd + traits::F0), false);
-        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
-        auto returnValue = std::make_tuple(CONT,bb);
-        
-        this->gen_sync(POST_SYNC, 145);
-        this->gen_instr_epilogue(bb);
-        this->builder.CreateBr(bb);
-    	return returnValue;        
-    }
-    
-    /* instruction 146: FEQ_D */
-    std::tuple<continuation_e, BasicBlock*> __feq_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate console output when executing the command */
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            std::vector<Value*> args {
-                this->core_ptr,
-                this->gen_const(64, pc.val),
-                this->builder.CreateGlobalStringPtr(mnemonic),
-            };
-            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
-        }
-        bb->setName(fmt::format("FEQ_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCVT__D__S_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,146);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8832,39 +8886,16 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> fcmp_d_768_args{
-                this->gen_reg_load(traits::F0+ rs1),
-                this->gen_reg_load(traits::F0+ rs2),
-                this->gen_ext(this->gen_const(8,0), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_768_args);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res,
-                    32, false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_769_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_769_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
+        std::vector<Value*> unbox_s_318_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };std::vector<Value*> f32tof64_317_args{
+            this->builder.CreateCall(this->mod->getFunction("unbox_s"), unbox_s_318_args),
+            get_rm(bb, rm)
+        };
+        this->builder.CreateStore(
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("f32tof64"), f32tof64_317_args)),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8874,8 +8905,8 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 147: FLT_D */
-    std::tuple<continuation_e, BasicBlock*> __flt_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 147: FSGNJ__D */
+    std::tuple<continuation_e, BasicBlock*> __fsgnj__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -8883,8 +8914,8 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8892,7 +8923,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FLT_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSGNJ__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,147);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8902,39 +8933,16 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> fcmp_d_771_args{
-                this->gen_reg_load(traits::F0+ rs1),
-                this->gen_reg_load(traits::F0+ rs2),
-                this->gen_ext(this->gen_const(8,2), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_771_args);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res,
-                    32, false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_772_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_772_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
+        std::vector<Value*> unbox_d_321_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_322_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_321_args), 63, 63-63+1), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_322_args), 0, 62-0+1), 64))),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8944,8 +8952,8 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 148: FLE_D */
-    std::tuple<continuation_e, BasicBlock*> __fle_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 148: FSGNJN__D */
+    std::tuple<continuation_e, BasicBlock*> __fsgnjn__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -8953,8 +8961,8 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -8962,7 +8970,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FLE_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSGNJN__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,148);
         
         this->gen_set_pc(pc, traits::PC);
@@ -8972,39 +8980,16 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            std::vector<Value*> fcmp_d_774_args{
-                this->gen_reg_load(traits::F0+ rs1),
-                this->gen_reg_load(traits::F0+ rs2),
-                this->gen_ext(this->gen_const(8,1), 32)
-            };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_774_args);
-            if(rd!=0) {
-                this->builder.CreateStore(
-                this->gen_ext(
-                    res,
-                    32, false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-            std::vector<Value*> fget_flags_775_args{
-            };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_775_args);
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               (this->builder.CreateAnd(
-                  this->gen_reg_load(traits::FCSR),
-                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ),
-               (this->builder.CreateAnd(
-                  flags,
-                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
-               ))
-            ,
-            get_reg_ptr(traits::FCSR), false);
-        }
+        std::vector<Value*> unbox_d_324_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_325_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_324_args), 63, 63-63+1)), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_325_args), 0, 62-0+1), 64))),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -9014,16 +8999,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 149: FCLASS_D */
-    std::tuple<continuation_e, BasicBlock*> __fclass_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 149: FSGNJX__D */
+    std::tuple<continuation_e, BasicBlock*> __fsgnjx__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -9031,7 +9017,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCLASS_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FSGNJX__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,149);
         
         this->gen_set_pc(pc, traits::PC);
@@ -9041,21 +9027,22 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            if(rd!=0) {
-                std::vector<Value*> fclass_d_777_args{
-                    this->gen_reg_load(traits::F0+ rs1)
-                };
-                this->builder.CreateStore(
-                this->gen_ext(
-                    this->builder.CreateCall(this->mod->getFunction("fclass_d"), fclass_d_777_args),
-                    32, false),
-                get_reg_ptr(rd + traits::X0), false);
-            }
-        }
+        std::vector<Value*> unbox_d_327_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs2)
+        };std::vector<Value*> unbox_d_328_args{
+            this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+            this->gen_reg_load(traits::F0+ rs1)
+        };
+        this->builder.CreateStore(
+        NaNBox64(bb, this->builder.CreateXor(
+           (this->builder.CreateAnd(
+              this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_327_args),
+              this->gen_const(64,((uint64_t)1<<63)))
+           ),
+           this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_328_args))
+        ),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -9065,17 +9052,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 150: FCVT_W_D */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_w_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 150: FEQ__D */
+    std::tuple<continuation_e, BasicBlock*> __feq__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_w_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -9083,7 +9070,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_W_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FEQ__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,150);
         
         this->gen_set_pc(pc, traits::PC);
@@ -9094,29 +9081,31 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_64_32_779_args{
-                this->gen_reg_load(traits::F0+ rs1),
-                this->gen_ext(this->gen_const(8,0), 32),
-                this->gen_ext(get_rm(bb, rm), 8)
+            std::vector<Value*> unbox_d_331_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_d_332_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_d_330_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_331_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_332_args),
+                this->gen_ext(this->gen_const(8,0), 32)
             };
-            auto res =this->gen_ext(
-                this->gen_ext(
-                    this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_779_args),
-                    32, false),
-                32, true);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_330_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
                     res,
-                    32, true),
+                    32, false),
                 get_reg_ptr(rd + traits::X0), false);
             }
-            std::vector<Value*> fget_flags_781_args{
+            std::vector<Value*> fget_flags_333_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_781_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_333_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -9139,17 +9128,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 151: FCVT_WU_D */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 151: FLT__D */
+    std::tuple<continuation_e, BasicBlock*> __flt__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_wu_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -9157,7 +9146,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_WU_D_0x{:X}",pc.val));
+        bb->setName(fmt::format("FLT__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,151);
         
         this->gen_set_pc(pc, traits::PC);
@@ -9168,29 +9157,31 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_64_32_783_args{
-                this->gen_reg_load(traits::F0+ rs1),
-                this->gen_ext(this->gen_const(8,1), 32),
-                this->gen_ext(get_rm(bb, rm), 8)
+            std::vector<Value*> unbox_d_336_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_d_337_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_d_335_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_336_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_337_args),
+                this->gen_ext(this->gen_const(8,2), 32)
             };
-            auto res =this->gen_ext(
-                this->gen_ext(
-                    this->builder.CreateCall(this->mod->getFunction("fcvt_64_32"), fcvt_64_32_783_args),
-                    32, false),
-                32, true);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_335_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
                     res,
-                    32, true),
+                    32, false),
                 get_reg_ptr(rd + traits::X0), false);
             }
-            std::vector<Value*> fget_flags_785_args{
+            std::vector<Value*> fget_flags_338_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_785_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_338_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -9213,17 +9204,17 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 152: FCVT_D_W */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_d_w(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 152: FLE__D */
+    std::tuple<continuation_e, BasicBlock*> __fle__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_w"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -9231,7 +9222,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_D_W_0x{:X}",pc.val));
+        bb->setName(fmt::format("FLE__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,152);
         
         this->gen_set_pc(pc, traits::PC);
@@ -9241,20 +9232,44 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_32_64_787_args{
-                this->gen_ext(
-                    this->gen_reg_load(traits::X0+ rs1),
-                    32, false),
-                this->gen_ext(this->gen_const(8,2), 32),
-                this->gen_ext(get_rm(bb, rm), 8)
+            std::vector<Value*> unbox_d_341_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> unbox_d_342_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs2)
+            };std::vector<Value*> fcmp_d_340_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_341_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_342_args),
+                this->gen_ext(this->gen_const(8,1), 32)
             };
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_340_args);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, false),
+                get_reg_ptr(rd + traits::X0), false);
+            }
+            std::vector<Value*> fget_flags_343_args{
+            };
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_343_args);
             this->builder.CreateStore(
-            this->builder.CreateCall(this->mod->getFunction("fcvt_32_64"), fcvt_32_64_787_args),
-            get_reg_ptr(rd + traits::F0), false);
+            this->builder.CreateOr(
+               (this->builder.CreateAnd(
+                  this->gen_reg_load(traits::FCSR),
+                  this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ),
+               (this->builder.CreateAnd(
+                  flags,
+                  this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+               ))
+            ,
+            get_reg_ptr(traits::FCSR), false);
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -9265,17 +9280,16 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 153: FCVT_D_WU */
-    std::tuple<continuation_e, BasicBlock*> __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+    /* instruction 153: FCLASS__D */
+    std::tuple<continuation_e, BasicBlock*> __fclass__d(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_wu"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -9283,7 +9297,7 @@ private:
             };
             this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
         }
-        bb->setName(fmt::format("FCVT_D_WU_0x{:X}",pc.val));
+        bb->setName(fmt::format("FCLASS__D_0x{:X}",pc.val));
         this->gen_sync(PRE_SYNC,153);
         
         this->gen_set_pc(pc, traits::PC);
@@ -9293,20 +9307,24 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)) {
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> fcvt_32_64_790_args{
-                this->gen_ext(
-                    this->gen_reg_load(traits::X0+ rs1),
-                    32, false),
-                this->gen_ext(this->gen_const(8,3), 32),
-                this->gen_ext(get_rm(bb, rm), 8)
+            std::vector<Value*> unbox_d_346_args{
+                this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
+                this->gen_reg_load(traits::F0+ rs1)
+            };std::vector<Value*> fclass_d_345_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_346_args)
             };
-            this->builder.CreateStore(
-            this->builder.CreateCall(this->mod->getFunction("fcvt_32_64"), fcvt_32_64_790_args),
-            get_reg_ptr(rd + traits::F0), false);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fclass_d"), fclass_d_345_args);
+            if(rd!=0) {
+                this->builder.CreateStore(
+                this->gen_ext(
+                    res,
+                    32, false),
+                get_reg_ptr(rd + traits::X0), false);
+            }
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -9354,19 +9372,9 @@ private:
         auto res =this->gen_ext(
             this->gen_read_mem(traits::MEM, offs, 8),
             64, false);
-        if(static_cast<uint32_t>(traits::FLEN)==64) {
-            this->builder.CreateStore(
-            res,
-            get_reg_ptr(rd+8 + traits::F0), false);
-        }
-        else{
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_ext(this->gen_const(8,((uint8_t)(- 1<<64))), 64,false),
-               res)
-            ,
-            get_reg_ptr(rd+8 + traits::F0), false);
-        }
+        this->builder.CreateStore(
+        NaNBox64(bb, res),
+        get_reg_ptr(rd+8 + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -9460,19 +9468,9 @@ private:
         auto res =this->gen_ext(
             this->gen_read_mem(traits::MEM, offs, 8),
             64, false);
-        if(static_cast<uint32_t>(traits::FLEN)==64) {
-            this->builder.CreateStore(
-            res,
-            get_reg_ptr(rd + traits::F0), false);
-        }
-        else{
-            this->builder.CreateStore(
-            this->builder.CreateOr(
-               this->gen_ext(this->gen_const(8,((uint8_t)(- 1<<64))), 64,false),
-               res)
-            ,
-            get_reg_ptr(rd + traits::F0), false);
-        }
+        this->builder.CreateStore(
+        NaNBox64(bb, res),
+        get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -9582,21 +9580,20 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 
 template <typename ARCH>
 std::tuple<continuation_e, BasicBlock *>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, BasicBlock *this_block) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
     // const typename traits::addr_t upper_bits = ~traits::PGMASK;
     phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    if(this->core.has_mmu())
-        paddr = this->core.virt2phys(pc);
     auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok) 
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
-    if (instr == 0x0000006f || (instr&0xffff)==0xa001)
+    if (instr == 0x0000006f || (instr&0xffff)==0xa001){
+        this->builder.CreateBr(this->leave_blk);
         return std::make_tuple(JUMP_TO_SELF, nullptr);
-    ++inst_cnt;
+        }
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
@@ -9678,6 +9675,10 @@ void vm_impl<ARCH>::gen_instr_epilogue(BasicBlock *bb) {
     auto* icount_val = this->builder.CreateAdd(
         this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::ICOUNT), get_reg_ptr(arch::traits<ARCH>::ICOUNT)), this->gen_const(64U, 1));
     this->builder.CreateStore(icount_val, get_reg_ptr(arch::traits<ARCH>::ICOUNT), false);
+    //increment cyclecount
+    auto* cycle_val = this->builder.CreateAdd(
+        this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::CYCLE), get_reg_ptr(arch::traits<ARCH>::CYCLE)), this->gen_const(64U, 1));
+    this->builder.CreateStore(cycle_val, get_reg_ptr(arch::traits<ARCH>::CYCLE), false);
 }
 
 } // namespace rv32gc

@@ -35,132 +35,43 @@
 #ifndef _RISCV_HART_MU_P_H
 #define _RISCV_HART_MU_P_H
 
-#include "iss/arch/traits.h"
-#include "iss/instrumentation_if.h"
-#include "iss/log_categories.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
 #include "riscv_hart_common.h"
-#include <stdexcept>
+#include "util/logging.h"
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <elfio/elf_types.hpp>
+#include <elfio/elfio.hpp>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
-#include <array>
-#include <elfio/elfio.hpp>
 #include <fmt/format.h>
-#include <functional>
-#include <iomanip>
-#include <sstream>
-#include <type_traits>
+#include <iss/mem/memory_with_htif.h>
 #include <unordered_map>
-#include <util/bit_field.h>
-#include <util/ities.h>
-#include <util/sparse_array.h>
-
-#include <iss/semihosting/semihosting.h>
 
 namespace iss {
 namespace arch {
 
 template <typename BASE, features_e FEAT = FEAT_NONE, typename LOGCAT = logging::disass>
-class riscv_hart_mu_p : public BASE, public riscv_hart_common {
-protected:
-    const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
-    const std::array<const char*, 16> trap_str = {{""
-                                                   "Instruction address misaligned", // 0
-                                                   "Instruction access fault",       // 1
-                                                   "Illegal instruction",            // 2
-                                                   "Breakpoint",                     // 3
-                                                   "Load address misaligned",        // 4
-                                                   "Load access fault",              // 5
-                                                   "Store/AMO address misaligned",   // 6
-                                                   "Store/AMO access fault",         // 7
-                                                   "Environment call from U-mode",   // 8
-                                                   "Environment call from S-mode",   // 9
-                                                   "Reserved",                       // a
-                                                   "Environment call from M-mode",   // b
-                                                   "Instruction page fault",         // c
-                                                   "Load page fault",                // d
-                                                   "Reserved",                       // e
-                                                   "Store/AMO page fault"}};
-    const std::array<const char*, 12> irq_str = {{"User software interrupt", "Supervisor software interrupt", "Reserved",
-                                                  "Machine software interrupt", "User timer interrupt", "Supervisor timer interrupt",
-                                                  "Reserved", "Machine timer interrupt", "User external interrupt",
-                                                  "Supervisor external interrupt", "Reserved", "Machine external interrupt"}};
-
+class riscv_hart_mu_p : public riscv_hart_common<BASE> {
 public:
     using core = BASE;
+    using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_mu_p<BASE, FEAT, LOGCAT>;
     using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
     using addr_t = typename core::addr_t;
 
-    using rd_csr_f = iss::status (this_class::*)(unsigned addr, reg_t&);
-    using wr_csr_f = iss::status (this_class::*)(unsigned addr, reg_t);
-    using mem_read_f = iss::status(phys_addr_t addr, unsigned, uint8_t* const);
-    using mem_write_f = iss::status(phys_addr_t addr, unsigned, uint8_t const* const);
-
-    // primary template
-    template <class T, class Enable = void> struct hart_state {};
-    // specialization 32bit
-    template <typename T> class hart_state<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
-    public:
-        BEGIN_BF_DECL(mstatus_t, T);
-        // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR
-        // XS==11)))
-        BF_FIELD(SD, 31, 1);
-        // Trap SRET
-        BF_FIELD(TSR, 22, 1);
-        // Timeout Wait
-        BF_FIELD(TW, 21, 1);
-        // Trap Virtual Memory
-        BF_FIELD(TVM, 20, 1);
-        // Make eXecutable Readable
-        BF_FIELD(MXR, 19, 1);
-        // permit Supervisor User Memory access
-        BF_FIELD(SUM, 18, 1);
-        // Modify PRiVilege
-        BF_FIELD(MPRV, 17, 1);
-        // status of additional user-mode extensions and associated state, All off/None dirty or clean, some on/None
-        // dirty, some clean/Some dirty
-        BF_FIELD(XS, 15, 2);
-        // floating-point unit status Off/Initial/Clean/Dirty
-        BF_FIELD(FS, 13, 2);
-        // machine previous privilege
-        BF_FIELD(MPP, 11, 2);
-        // supervisor previous privilege
-        BF_FIELD(SPP, 8, 1);
-        // previous machine interrupt-enable
-        BF_FIELD(MPIE, 7, 1);
-        // previous supervisor interrupt-enable
-        BF_FIELD(SPIE, 5, 1);
-        // previous user interrupt-enable
-        BF_FIELD(UPIE, 4, 1);
-        // machine interrupt-enable
-        BF_FIELD(MIE, 3, 1);
-        // supervisor interrupt-enable
-        BF_FIELD(SIE, 1, 1);
-        // user interrupt-enable
-        BF_FIELD(UIE, 0, 1);
-        END_BF_DECL();
-
-        mstatus_t mstatus;
-
-        static const reg_t mstatus_reset_val = 0x1800; // MPP set to 1
-
-        void write_mstatus(T val, unsigned priv_lvl) {
-            auto mask = get_mask(priv_lvl);
-            auto new_val = (mstatus.backing.val & ~mask) | (val & mask);
-            mstatus = new_val;
-        }
-
-        static constexpr uint32_t get_mask(unsigned priv_lvl) {
+    static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
+        if(sizeof(reg_t) == 4) {
 #if __cplusplus < 201402L
             return priv_lvl == PRIV_U ? 0x80000011UL : priv_lvl == PRIV_S ? 0x800de133UL : 0x807ff9ddUL;
 #else
             switch(priv_lvl) {
             case PRIV_U:
-                return 0x00000011UL; // 0b1000 0000 0000 0000 0000 0000 0001 0001
+                return FEAT & features_e::FEAT_EXT_N ? 0x00000011UL : 0UL; // 0b1...0 0001 0001
             default:
                 //       +-SD
                 //       |        +-TSR
@@ -177,98 +88,43 @@ public:
                 //       |        |||||| | | |  ||  +-UPIE
                 //       |        ||||||/|/|/|  ||  |+-MIE
                 //       |        ||||||/|/|/|  ||  ||  +-UIE
-                return 0b00000000000000000001100010011001;
+                return 0b10000000001000000001100010011001;
             }
 #endif
-        }
-    };
-
-    // specialization 64bit
-    template <typename T> class hart_state<T, typename std::enable_if<std::is_same<T, uint64_t>::value>::type> {
-    public:
-        BEGIN_BF_DECL(mstatus_t, T);
-        // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR
-        // XS==11)))
-        BF_FIELD(SD, 63, 1);
-        // value of XLEN for S-mode
-        BF_FIELD(SXL, 34, 2);
-        // value of XLEN for U-mode
-        BF_FIELD(UXL, 32, 2);
-        // Trap SRET
-        BF_FIELD(TSR, 22, 1);
-        // Timeout Wait
-        BF_FIELD(TW, 21, 1);
-        // Trap Virtual Memory
-        BF_FIELD(TVM, 20, 1);
-        // Make eXecutable Readable
-        BF_FIELD(MXR, 19, 1);
-        // permit Supervisor User Memory access
-        BF_FIELD(SUM, 18, 1);
-        // Modify PRiVilege
-        BF_FIELD(MPRV, 17, 1);
-        // status of additional user-mode extensions and associated state, All off/None dirty or clean, some on/None
-        // dirty, some clean/Some dirty
-        BF_FIELD(XS, 15, 2);
-        // floating-point unit status Off/Initial/Clean/Dirty
-        BF_FIELD(FS, 13, 2);
-        // machine previous privilege
-        BF_FIELD(MPP, 11, 2);
-        // supervisor previous privilege
-        BF_FIELD(SPP, 8, 1);
-        // previous machine interrupt-enable
-        BF_FIELD(MPIE, 7, 1);
-        // previous supervisor interrupt-enable
-        BF_FIELD(SPIE, 5, 1);
-        // previous user interrupt-enable
-        BF_FIELD(UPIE, 4, 1);
-        // machine interrupt-enable
-        BF_FIELD(MIE, 3, 1);
-        // supervisor interrupt-enable
-        BF_FIELD(SIE, 1, 1);
-        // user interrupt-enable
-        BF_FIELD(UIE, 0, 1);
-        END_BF_DECL();
-
-        mstatus_t mstatus;
-
-        static const reg_t mstatus_reset_val = 0x1800;
-
-        void write_mstatus(T val, unsigned priv_lvl) {
-            auto mask = get_mask(priv_lvl);
-            auto new_val = (mstatus.backing.val & ~mask) | (val & mask);
-            mstatus = new_val;
-        }
-
-        static constexpr uint64_t get_mask(unsigned priv_lvl) {
+        } else if(sizeof(reg_t) == 8) {
 #if __cplusplus < 201402L
             return priv_lvl == PRIV_U ? 0x011ULL : priv_lvl == PRIV_S ? 0x000de133ULL : 0x007ff9ddULL;
 #else
             switch(priv_lvl) {
             case PRIV_U:
-                return 0x00000011UL; // 0b1000 0000 0000 0000 0000 0000 0001 0001
+                return FEAT & features_e::FEAT_EXT_N ? 0x8000000000000011ULL : 0ULL; // 0b1...0 0001 0001
             default:
-                //       +-SD
-                //       |        +-TSR
-                //       |        |+-TW
-                //       |        ||+-TVM
-                //       |        |||+-MXR
-                //       |        ||||+-SUM
-                //       |        |||||+-MPRV
-                //       |        |||||| +-XS
-                //       |        |||||| | +-FS
-                //       |        |||||| | | +-MPP
-                //       |        |||||| | | |  +-SPP
-                //       |        |||||| | | |  |+-MPIE
-                //       |        |||||| | | |  ||  +-UPIE
-                //       |        ||||||/|/|/|  ||  |+-MIE
-                //       |        ||||||/|/|/|  ||  ||  +-UIE
-                return 0b00000000000000000001100010011001;
+                //                +-TSR
+                //                |+-TW
+                //                ||+-TVM
+                //                |||+-MXR
+                //                ||||+-SUM
+                //                |||||+-MPRV
+                //                |||||| +-XS
+                //                |||||| | +-FS
+                //                |||||| | | +-MPP
+                //                |||||| | | |  +-SPP
+                //                |||||| | | |  |+-MPIE
+                //                |||||| | | |  ||  +-UPIE
+                //                ||||||/|/|/|  ||  |+-MIE
+                //                ||||||/|/|/|  ||  ||  +-UIE
+                return 0b00000000001000000001100010011001 | 0x8000000000000000ULL;
             }
 #endif
-        }
-    };
+        } else
+            assert(false && "Unsupported XLEN value");
+    }
 
-    using hart_state_type = hart_state<reg_t>;
+    void write_mstatus(reg_t val, unsigned priv_lvl) {
+        auto mask = get_mstatus_mask(priv_lvl);
+        auto new_val = (this->state.mstatus() & ~mask) | (val & mask);
+        this->state.mstatus = new_val;
+    }
 
     constexpr reg_t get_irq_mask(size_t mode) {
         std::array<const reg_t, 4> m = {{
@@ -280,138 +136,32 @@ public:
         return m[mode];
     }
 
-    constexpr bool has_compressed() { return traits<BASE>::MISA_VAL & 0b0100; }
-    constexpr reg_t get_pc_mask() { return has_compressed() ? ~1 : ~3; }
-
-    riscv_hart_mu_p(feature_config cfg = feature_config{});
+    riscv_hart_mu_p();
 
     virtual ~riscv_hart_mu_p() = default;
 
     void reset(uint64_t address) override;
 
-    std::pair<uint64_t, bool> load_file(std::string name, int type = -1) override;
-
     iss::status read(const address_type type, const access_type access, const uint32_t space, const uint64_t addr, const unsigned length,
-                     uint8_t* const data) override;
+                     uint8_t* const data);
     iss::status write(const address_type type, const access_type access, const uint32_t space, const uint64_t addr, const unsigned length,
-                      const uint8_t* const data) override;
+                      const uint8_t* const data);
 
-    uint64_t enter_trap(uint64_t flags) override { return riscv_hart_mu_p::enter_trap(flags, fault_data, fault_data); }
+    uint64_t enter_trap(uint64_t flags) override { return riscv_hart_mu_p::enter_trap(flags, this->fault_data, this->fault_data); }
     uint64_t enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) override;
     uint64_t leave_trap(uint64_t flags) override;
+    void wait_until(uint64_t flags) override;
 
-    const reg_t& get_mhartid() const { return mhartid_reg; }
-    void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
-
-    void disass_output(uint64_t pc, const std::string instr) override {
-        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV], (reg_t)state.mstatus,
-                                            this->reg.cycle + cycle_offset);
-    };
-
-    iss::instrumentation_if* get_instrumentation_if() override { return &instr_if; }
-
-    void set_csr(unsigned addr, reg_t val) { csr[addr & csr.page_addr_mask] = val; }
-
-    void set_irq_num(unsigned i) { mcause_max_irq = 1 << util::ilog2(i); }
-
-    void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
+    void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
 
 protected:
-    struct riscv_instrumentation_if : public iss::instrumentation_if {
+    using mem_read_f = iss::status(phys_addr_t addr, unsigned, uint8_t* const);
+    using mem_write_f = iss::status(phys_addr_t addr, unsigned, uint8_t const* const);
 
-        riscv_instrumentation_if(riscv_hart_mu_p<BASE, FEAT, LOGCAT>& arch)
-        : arch(arch) {}
-        /**
-         * get the name of this architecture
-         *
-         * @return the name of this architecture
-         */
-        const std::string core_type_name() const override { return traits<BASE>::core_type; }
+    hart_state<reg_t> state;
 
-        uint64_t get_pc() override { return arch.reg.PC; }
-
-        uint64_t get_next_pc() override { return arch.reg.NEXT_PC; }
-
-        uint64_t get_instr_word() override { return arch.reg.instruction; }
-
-        uint64_t get_instr_count() override { return arch.reg.icount; }
-
-        uint64_t get_pendig_traps() override { return arch.reg.trap_state; }
-
-        uint64_t get_total_cycles() override { return arch.reg.cycle + arch.cycle_offset; }
-
-        void update_last_instr_cycles(unsigned cycles) override { arch.cycle_offset += cycles - 1; }
-
-        bool is_branch_taken() override { return arch.reg.last_branch; }
-
-        unsigned get_reg_num() override { return traits<BASE>::NUM_REGS; }
-
-        unsigned get_reg_size(unsigned num) override { return traits<BASE>::reg_bit_widths[num]; }
-
-        std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
-
-        riscv_hart_mu_p<BASE, FEAT, LOGCAT>& arch;
-    };
-
-    friend struct riscv_instrumentation_if;
-
-    virtual iss::status read_mem(phys_addr_t addr, unsigned length, uint8_t* const data);
-    virtual iss::status write_mem(phys_addr_t addr, unsigned length, const uint8_t* const data);
-
-    iss::status read_clic(uint64_t addr, unsigned length, uint8_t* const data);
-    iss::status write_clic(uint64_t addr, unsigned length, const uint8_t* const data);
-
-    virtual iss::status read_csr(unsigned addr, reg_t& val);
-    virtual iss::status write_csr(unsigned addr, reg_t val);
-
-    hart_state_type state;
-    int64_t cycle_offset{0};
-    uint64_t mcycle_csr{0};
-    int64_t instret_offset{0};
-    uint64_t minstret_csr{0};
-    reg_t fault_data;
-    bool tohost_lower_written = false;
-    riscv_instrumentation_if instr_if;
-
-    semihosting_cb_t<reg_t> semihosting_cb;
-
-    using mem_type = util::sparse_array<uint8_t, 1ULL << 32>;
-    using csr_type = util::sparse_array<typename traits<BASE>::reg_t, 1ULL << 12, 12>;
-    using csr_page_type = typename csr_type::page_type;
-    mem_type mem;
-    csr_type csr;
-    std::stringstream uart_buf;
-    std::unordered_map<reg_t, uint64_t> ptw;
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
-    std::unordered_map<unsigned, rd_csr_f> csr_rd_cb;
-    std::unordered_map<unsigned, wr_csr_f> csr_wr_cb;
-    uint8_t clic_cfg_reg{0};
-    std::array<uint32_t, 32> clic_inttrig_reg;
-    union clic_int_reg_t {
-        struct {
-            uint8_t ip;
-            uint8_t ie;
-            uint8_t attr;
-            uint8_t ctl;
-        };
-        uint32_t raw;
-    };
-    std::vector<clic_int_reg_t> clic_int_reg;
-    uint8_t clic_mprev_lvl{0}, clic_uprev_lvl{0};
-    uint8_t clic_mact_lvl{0}, clic_uact_lvl{0};
 
-    std::vector<uint8_t> tcm;
-
-    iss::status read_plain(unsigned addr, reg_t& val);
-    iss::status write_plain(unsigned addr, reg_t val);
-    iss::status read_null(unsigned addr, reg_t& val);
-    iss::status write_null(unsigned addr, reg_t val) { return iss::status::Ok; }
-    iss::status read_cycle(unsigned addr, reg_t& val);
-    iss::status write_cycle(unsigned addr, reg_t val);
-    iss::status read_instret(unsigned addr, reg_t& val);
-    iss::status write_instret(unsigned addr, reg_t val);
-    iss::status read_tvec(unsigned addr, reg_t& val);
-    iss::status read_time(unsigned addr, reg_t& val);
     iss::status read_status(unsigned addr, reg_t& val);
     iss::status write_status(unsigned addr, reg_t val);
     iss::status read_cause(unsigned addr, reg_t& val);
@@ -419,93 +169,23 @@ protected:
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
-    iss::status write_ideleg(unsigned addr, reg_t val);
-    iss::status write_edeleg(unsigned addr, reg_t val);
-    iss::status read_hartid(unsigned addr, reg_t& val);
-    iss::status write_epc(unsigned addr, reg_t val);
-    iss::status read_intstatus(unsigned addr, reg_t& val);
-    iss::status write_intthresh(unsigned addr, reg_t val);
     iss::status write_xtvt(unsigned addr, reg_t val);
     iss::status write_dcsr(unsigned addr, reg_t val);
     iss::status read_debug(unsigned addr, reg_t& val);
     iss::status write_dscratch(unsigned addr, reg_t val);
     iss::status read_dpc(unsigned addr, reg_t& val);
     iss::status write_dpc(unsigned addr, reg_t val);
-    iss::status read_fcsr(unsigned addr, reg_t& val);
-    iss::status write_fcsr(unsigned addr, reg_t val);
-    iss::status write_pmpcfg(unsigned addr, reg_t val);
-
-    virtual iss::status read_custom_csr(unsigned addr, reg_t& val) { return iss::status::Err; };
-    virtual iss::status write_custom_csr(unsigned addr, reg_t val) { return iss::status::Err; };
-
-    void register_custom_csr_rd(unsigned addr) { csr_rd_cb[addr] = &this_class::read_custom_csr_reg; }
-    void register_custom_csr_wr(unsigned addr) { csr_wr_cb[addr] = &this_class::write_custom_csr_reg; }
-
-    reg_t mhartid_reg{0x0};
+    iss::status write_ideleg(unsigned addr, reg_t val);
+    iss::status write_edeleg(unsigned addr, reg_t val);
 
     void check_interrupt();
-    bool pmp_check(const access_type type, const uint64_t addr, const unsigned len);
-    std::vector<std::tuple<uint64_t, uint64_t>> memfn_range;
-    std::vector<std::function<mem_read_f>> memfn_read;
-    std::vector<std::function<mem_write_f>> memfn_write;
-    void insert_mem_range(uint64_t, uint64_t, std::function<mem_read_f>, std::function<mem_write_f>);
-    feature_config cfg;
-    unsigned mcause_max_irq{(FEAT & features_e::FEAT_CLIC) ? std::max(16U, static_cast<unsigned>(traits<BASE>::CLIC_NUM_IRQ)) : 16U};
-    inline bool debug_mode_active() { return this->reg.PRIV & 0x4; }
-
-    std::pair<std::function<mem_read_f>, std::function<mem_write_f>> replace_mem_access(std::function<mem_read_f> rd,
-                                                                                        std::function<mem_write_f> wr) {
-        std::pair<std::function<mem_read_f>, std::function<mem_write_f>> ret{hart_mem_rd_delegate, hart_mem_wr_delegate};
-        hart_mem_rd_delegate = rd;
-        hart_mem_wr_delegate = wr;
-        return ret;
-    }
-    std::function<mem_read_f> hart_mem_rd_delegate;
-    std::function<mem_write_f> hart_mem_wr_delegate;
+    mem::memory_with_htif<reg_t> default_mem;
 };
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
-riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p(feature_config cfg)
+riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
 : state()
-, instr_if(*this)
-, cfg(cfg) {
-    // reset values
-    csr[misa] = traits<BASE>::MISA_VAL;
-    csr[mvendorid] = 0x669;
-    csr[marchid] = traits<BASE>::MARCHID_VAL;
-    csr[mimpid] = 1;
-
-    uart_buf.str("");
-    if(traits<BASE>::FLEN > 0) {
-        csr_rd_cb[fcsr] = &this_class::read_fcsr;
-        csr_wr_cb[fcsr] = &this_class::write_fcsr;
-    }
-    for(unsigned addr = mhpmcounter3; addr <= mhpmcounter31; ++addr) {
-        csr_rd_cb[addr] = &this_class::read_null;
-        csr_wr_cb[addr] = &this_class::write_plain;
-    }
-    if(traits<BASE>::XLEN == 32)
-        for(unsigned addr = mhpmcounter3h; addr <= mhpmcounter31h; ++addr) {
-            csr_rd_cb[addr] = &this_class::read_null;
-            csr_wr_cb[addr] = &this_class::write_plain;
-        }
-    for(unsigned addr = mhpmevent3; addr <= mhpmevent31; ++addr) {
-        csr_rd_cb[addr] = &this_class::read_null;
-        csr_wr_cb[addr] = &this_class::write_plain;
-    }
-    for(unsigned addr = hpmcounter3; addr <= hpmcounter31; ++addr) {
-        csr_rd_cb[addr] = &this_class::read_null;
-    }
-    if(traits<BASE>::XLEN == 32)
-        for(unsigned addr = hpmcounter3h; addr <= hpmcounter31h; ++addr) {
-            csr_rd_cb[addr] = &this_class::read_null;
-        }
-    // common regs
-    const std::array<unsigned, 4> roaddrs{{misa, mvendorid, marchid, mimpid}};
-    for(auto addr : roaddrs) {
-        csr_rd_cb[addr] = &this_class::read_plain;
-        csr_wr_cb[addr] = &this_class::write_null;
-    }
+, default_mem(base::get_priv_if()) {
     const std::array<unsigned, 8> rwaddrs{{
         mepc,
         mtvec,
@@ -517,246 +197,56 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p(feature_config cfg)
         utval,
     }};
     for(auto addr : rwaddrs) {
-        csr_rd_cb[addr] = &this_class::read_plain;
-        csr_wr_cb[addr] = &this_class::write_plain;
+        this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_plain);
     }
-    // special handling & overrides
-    csr_rd_cb[time] = &this_class::read_time;
-    if(traits<BASE>::XLEN == 32)
-        csr_rd_cb[timeh] = &this_class::read_time;
-    csr_rd_cb[cycle] = &this_class::read_cycle;
-    if(traits<BASE>::XLEN == 32)
-        csr_rd_cb[cycleh] = &this_class::read_cycle;
-    csr_rd_cb[instret] = &this_class::read_instret;
-    if(traits<BASE>::XLEN == 32)
-        csr_rd_cb[instreth] = &this_class::read_instret;
+    this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
+    this->csr_wr_cb[mstatus] = MK_CSR_WR_CB(write_status);
+    this->csr_rd_cb[mcause] = MK_CSR_RD_CB(read_cause);
+    this->csr_wr_cb[mcause] = MK_CSR_WR_CB(write_cause);
+    this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
+    this->csr_wr_cb[mepc] = MK_CSR_WR_CB(write_epc);
+    this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
+    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_null);
+    this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
+    this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
+    this->csr_rd_cb[mcounteren] = MK_CSR_RD_CB(read_null);
+    this->csr_wr_cb[mcounteren] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[misa] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[mvendorid] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[marchid] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
 
-    csr_rd_cb[mcycle] = &this_class::read_cycle;
-    csr_wr_cb[mcycle] = &this_class::write_cycle;
-    if(traits<BASE>::XLEN == 32)
-        csr_rd_cb[mcycleh] = &this_class::read_cycle;
-    if(traits<BASE>::XLEN == 32)
-        csr_wr_cb[mcycleh] = &this_class::write_cycle;
-    csr_rd_cb[minstret] = &this_class::read_instret;
-    csr_wr_cb[minstret] = &this_class::write_instret;
-    if(traits<BASE>::XLEN == 32)
-        csr_rd_cb[minstreth] = &this_class::read_instret;
-    if(traits<BASE>::XLEN == 32)
-        csr_wr_cb[minstreth] = &this_class::write_instret;
-    csr_rd_cb[mstatus] = &this_class::read_status;
-    csr_wr_cb[mstatus] = &this_class::write_status;
-    csr_rd_cb[mcause] = &this_class::read_cause;
-    csr_wr_cb[mcause] = &this_class::write_cause;
-    csr_rd_cb[mtvec] = &this_class::read_tvec;
-    csr_wr_cb[mepc] = &this_class::write_epc;
-    csr_rd_cb[mip] = &this_class::read_ip;
-    csr_wr_cb[mip] = &this_class::write_null;
-    csr_rd_cb[mie] = &this_class::read_ie;
-    csr_wr_cb[mie] = &this_class::write_ie;
-    csr_rd_cb[mhartid] = &this_class::read_hartid;
-    csr_rd_cb[mcounteren] = &this_class::read_null;
-    csr_wr_cb[mcounteren] = &this_class::write_null;
-    csr_wr_cb[misa] = &this_class::write_null;
-    csr_wr_cb[mvendorid] = &this_class::write_null;
-    csr_wr_cb[marchid] = &this_class::write_null;
-    csr_wr_cb[mimpid] = &this_class::write_null;
-
-    if(FEAT & FEAT_PMP) {
-        for(size_t i = pmpaddr0; i <= pmpaddr15; ++i) {
-            csr_rd_cb[i] = &this_class::read_plain;
-            csr_wr_cb[i] = &this_class::write_plain;
-        }
-        for(size_t i = pmpcfg0; i < pmpcfg0 + 16 / sizeof(reg_t); ++i) {
-            csr_rd_cb[i] = &this_class::read_plain;
-            csr_wr_cb[i] = &this_class::write_pmpcfg;
-        }
-    }
     if(FEAT & FEAT_EXT_N) {
-        csr_rd_cb[mideleg] = &this_class::read_plain;
-        csr_wr_cb[mideleg] = &this_class::write_ideleg;
-        csr_rd_cb[medeleg] = &this_class::read_plain;
-        csr_wr_cb[medeleg] = &this_class::write_edeleg;
-        csr_rd_cb[uie] = &this_class::read_ie;
-        csr_wr_cb[uie] = &this_class::write_ie;
-        csr_rd_cb[uip] = &this_class::read_ip;
-        csr_wr_cb[uip] = &this_class::write_null;
-        csr_wr_cb[uepc] = &this_class::write_epc;
-        csr_rd_cb[ustatus] = &this_class::read_status;
-        csr_wr_cb[ustatus] = &this_class::write_status;
-        csr_rd_cb[ucause] = &this_class::read_cause;
-        csr_wr_cb[ucause] = &this_class::write_cause;
-        csr_rd_cb[utvec] = &this_class::read_tvec;
-    }
-    if(FEAT & FEAT_CLIC) {
-        csr_rd_cb[mtvt] = &this_class::read_plain;
-        csr_wr_cb[mtvt] = &this_class::write_xtvt;
-        //        csr_rd_cb[mxnti] = &this_class::read_csr_reg;
-        //        csr_wr_cb[mxnti] = &this_class::write_csr_reg;
-        csr_rd_cb[mintstatus] = &this_class::read_intstatus;
-        csr_wr_cb[mintstatus] = &this_class::write_null;
-        //        csr_rd_cb[mscratchcsw] = &this_class::read_csr_reg;
-        //        csr_wr_cb[mscratchcsw] = &this_class::write_csr_reg;
-        //        csr_rd_cb[mscratchcswl] = &this_class::read_csr_reg;
-        //        csr_wr_cb[mscratchcswl] = &this_class::write_csr_reg;
-        csr_rd_cb[mintthresh] = &this_class::read_plain;
-        csr_wr_cb[mintthresh] = &this_class::write_intthresh;
-        if(FEAT & FEAT_EXT_N) {
-            csr_rd_cb[utvt] = &this_class::read_plain;
-            csr_wr_cb[utvt] = &this_class::write_xtvt;
-            csr_rd_cb[uintstatus] = &this_class::read_intstatus;
-            csr_wr_cb[uintstatus] = &this_class::write_null;
-            csr_rd_cb[uintthresh] = &this_class::read_plain;
-            csr_wr_cb[uintthresh] = &this_class::write_intthresh;
-        }
-        clic_int_reg.resize(cfg.clic_num_irq, clic_int_reg_t{.raw = 0});
-        clic_cfg_reg = 0x30;
-        clic_mact_lvl = clic_mprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        clic_uact_lvl = clic_uprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        csr[mintthresh] = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        csr[uintthresh] = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        insert_mem_range(
-            cfg.clic_base, 0x5000UL,
-            [this](phys_addr_t addr, unsigned length, uint8_t* const data) { return read_clic(addr.val, length, data); },
-            [this](phys_addr_t addr, unsigned length, uint8_t const* const data) { return write_clic(addr.val, length, data); });
-    }
-    if(FEAT & FEAT_TCM) {
-        tcm.resize(cfg.tcm_size);
-        std::function<mem_read_f> read_clic_cb = [this](phys_addr_t addr, unsigned length, uint8_t* const data) {
-            auto offset = addr.val - this->cfg.tcm_base;
-            std::copy(tcm.data() + offset, tcm.data() + offset + length, data);
-            return iss::Ok;
-        };
-        std::function<mem_write_f> write_clic_cb = [this](phys_addr_t addr, unsigned length, uint8_t const* const data) {
-            auto offset = addr.val - this->cfg.tcm_base;
-            std::copy(data, data + length, tcm.data() + offset);
-            return iss::Ok;
-        };
-        insert_mem_range(cfg.tcm_base, cfg.tcm_size, read_clic_cb, write_clic_cb);
+        this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
+        this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
+        this->csr_rd_cb[uie] = MK_CSR_RD_CB(read_ie);
+        this->csr_wr_cb[uie] = MK_CSR_WR_CB(write_ie);
+        this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
+        this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_null);
+        this->csr_wr_cb[uepc] = MK_CSR_WR_CB(write_epc);
+        this->csr_rd_cb[ustatus] = MK_CSR_RD_CB(read_status);
+        this->csr_wr_cb[ustatus] = MK_CSR_WR_CB(write_status);
+        this->csr_rd_cb[ucause] = MK_CSR_RD_CB(read_cause);
+        this->csr_wr_cb[ucause] = MK_CSR_WR_CB(write_cause);
+        this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
     }
     if(FEAT & FEAT_DEBUG) {
-        csr_wr_cb[dscratch0] = &this_class::write_dscratch;
-        csr_rd_cb[dscratch0] = &this_class::read_debug;
-        csr_wr_cb[dscratch1] = &this_class::write_dscratch;
-        csr_rd_cb[dscratch1] = &this_class::read_debug;
-        csr_wr_cb[dpc] = &this_class::write_dpc;
-        csr_rd_cb[dpc] = &this_class::read_dpc;
-        csr_wr_cb[dcsr] = &this_class::write_dcsr;
-        csr_rd_cb[dcsr] = &this_class::read_debug;
+        this->csr_wr_cb[dscratch0] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch0] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dscratch1] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch1] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dpc] = MK_CSR_WR_CB(write_dpc);
+        this->csr_rd_cb[dpc] = MK_CSR_RD_CB(read_dpc);
+        this->csr_wr_cb[dcsr] = MK_CSR_WR_CB(write_dcsr);
+        this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
     }
-    hart_mem_rd_delegate = [this](phys_addr_t a, unsigned l, uint8_t* const d) -> iss::status { return this->read_mem(a, l, d); };
-    hart_mem_wr_delegate = [this](phys_addr_t a, unsigned l, uint8_t const* const d) -> iss::status { return this->write_mem(a, l, d); };
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-std::pair<uint64_t, bool> riscv_hart_mu_p<BASE, FEAT, LOGCAT>::load_file(std::string name, int type) {
-    if(read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64,
-                     [this](uint64_t addr, uint64_t size, const uint8_t* const data) -> iss::status {
-                         return this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM, addr, size,
-                                            data);
-                     })) {
-        return std::make_pair(entry_address, true);
-    }
-    return std::make_pair(entry_address, false);
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::insert_mem_range(uint64_t base, uint64_t size, std::function<mem_read_f> rd_f,
-                                                                  std::function<mem_write_f> wr_fn) {
-    std::tuple<uint64_t, uint64_t> entry{base, size};
-    auto it = std::upper_bound(
-        memfn_range.begin(), memfn_range.end(), entry,
-        [](std::tuple<uint64_t, uint64_t> const& a, std::tuple<uint64_t, uint64_t> const& b) { return std::get<0>(a) < std::get<0>(b); });
-    auto idx = std::distance(memfn_range.begin(), it);
-    memfn_range.insert(it, entry);
-    memfn_read.insert(std::begin(memfn_read) + idx, rd_f);
-    memfn_write.insert(std::begin(memfn_write) + idx, wr_fn);
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-inline iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_pmpcfg(unsigned addr, reg_t val) {
-    csr[addr] = val & 0x9f9f9f9f;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-bool riscv_hart_mu_p<BASE, FEAT, LOGCAT>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
-    constexpr auto PMP_SHIFT = 2U;
-    constexpr auto PMP_R = 0x1U;
-    constexpr auto PMP_W = 0x2U;
-    constexpr auto PMP_X = 0x4U;
-    constexpr auto PMP_A = 0x18U;
-    constexpr auto PMP_L = 0x80U;
-    constexpr auto PMP_TOR = 0x1U;
-    constexpr auto PMP_NA4 = 0x2U;
-    constexpr auto PMP_NAPOT = 0x3U;
-    reg_t base = 0;
-    auto any_active = false;
-    auto const cfg_reg_size = sizeof(reg_t);
-    for(size_t i = 0; i < 16; i++) {
-        reg_t tor = csr[pmpaddr0 + i] << PMP_SHIFT;
-        uint8_t cfg = csr[pmpcfg0 + (i / cfg_reg_size)] >> (i % cfg_reg_size);
-        if(cfg & PMP_A) {
-            any_active = true;
-            auto pmp_a = (cfg & PMP_A) >> 3;
-            auto is_tor = pmp_a == PMP_TOR;
-            auto is_na4 = pmp_a == PMP_NA4;
-
-            reg_t mask = (csr[pmpaddr0 + i] << 1) | (!is_na4);
-            mask = ~(mask & ~(mask + 1)) << PMP_SHIFT;
-
-            // Check each 4-byte sector of the access
-            auto any_match = false;
-            auto all_match = true;
-            for(reg_t offset = 0; offset < len; offset += 1 << PMP_SHIFT) {
-                reg_t cur_addr = addr + offset;
-                auto napot_match = ((cur_addr ^ tor) & mask) == 0;
-                auto tor_match = base <= (cur_addr + len - 1) && cur_addr < tor;
-                auto match = is_tor ? tor_match : napot_match;
-                any_match |= match;
-                all_match &= match;
-            }
-            if(any_match) {
-                // If the PMP matches only a strict subset of the access, fail it
-                if(!all_match)
-                    return false;
-                return (this->reg.PRIV == PRIV_M && !(cfg & PMP_L)) || (type == access_type::READ && (cfg & PMP_R)) ||
-                       (type == access_type::WRITE && (cfg & PMP_W)) || (type == access_type::FETCH && (cfg & PMP_X));
-            }
-        }
-        base = tor;
-    }
-    //    constexpr auto pmp_num_regs = 16;
-    //    reg_t tor_base = 0;
-    //    auto any_active = false;
-    //    auto lower_addr = addr >>2;
-    //    auto upper_addr = (addr+len-1)>>2;
-    //    for (size_t i = 0; i < pmp_num_regs; i++) {
-    //        uint8_t cfg = csr[pmpcfg0+(i/4)]>>(i%4);
-    //        uint8_t cfg_next = i==(pmp_num_regs-1)? 0 : csr[pmpcfg0+((i+1)/4)]>>((i+1)%4);
-    //        auto pmpaddr = csr[pmpaddr0+i];
-    //        if (cfg & PMP_A) {
-    //            any_active=true;
-    //            auto is_tor = bit_sub<3, 2>(cfg) == PMP_TOR;
-    //            auto is_napot = bit_sub<4, 1>(cfg) && bit_sub<3, 2>(cfg_next)!= PMP_TOR;
-    //            if(is_napot) {
-    //                reg_t mask = bit_sub<3, 1>(cfg)?~( pmpaddr & ~(pmpaddr + 1)): 0x3fffffff;
-    //                auto mpmpaddr = pmpaddr & mask;
-    //                if((lower_addr&mask) == mpmpaddr && (upper_addr&mask)==mpmpaddr)
-    //                    return  (this->reg.PRIV == PRIV_M && !(cfg & PMP_L)) ||
-    //                            (type == access_type::READ && (cfg & PMP_R)) ||
-    //                            (type == access_type::WRITE && (cfg & PMP_W)) ||
-    //                            (type == access_type::FETCH && (cfg & PMP_X));
-    //            } else if(is_tor) {
-    //                if(lower_addr>=tor_base && upper_addr<=pmpaddr)
-    //                    return  (this->reg.PRIV == PRIV_M && !(cfg & PMP_L)) ||
-    //                            (type == access_type::READ && (cfg & PMP_R)) ||
-    //                            (type == access_type::WRITE && (cfg & PMP_W)) ||
-    //                            (type == access_type::FETCH && (cfg & PMP_X));
-    //            }
-    //        }
-    //        tor_base = pmpaddr;
-    //    }
-    return !any_active || this->reg.PRIV == PRIV_M;
+    this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
+    this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
+    this->memories.root(*this);
+    this->memories.append(default_mem);
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
@@ -774,18 +264,9 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
     try {
         switch(space) {
         case traits<BASE>::MEM: {
-            if(FEAT & FEAT_PMP) {
-                if(!pmp_check(access, addr, length) && !is_debug(access)) {
-                    fault_data = addr;
-                    if(is_debug(access))
-                        throw trap_access(0, addr);
-                    this->reg.trap_state = (1UL << 31) | ((access == access_type::FETCH ? 1 : 5) << 16); // issue trap 1
-                    return iss::Err;
-                }
-            }
-            auto alignment = is_fetch(access) ? (has_compressed() ? 2 : 4) : length;
+            auto alignment = is_fetch(access) ? (this->has_compressed() ? 2 : 4) : std::min<unsigned>(length, sizeof(reg_t));
             if(unlikely(is_fetch(access) && (addr & (alignment - 1)))) {
-                fault_data = addr;
+                this->fault_data = addr;
                 if(is_debug(access))
                     throw trap_access(0, addr);
                 this->reg.trap_state = (1UL << 31); // issue trap 0
@@ -794,33 +275,19 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
             try {
                 if(!is_debug(access) && (addr & (alignment - 1))) {
                     this->reg.trap_state = (1UL << 31) | 4 << 16;
-                    fault_data = addr;
+                    this->fault_data = addr;
                     return iss::Err;
                 }
-                phys_addr_t phys_addr{access, space, addr};
-                auto res = iss::Err;
-                if(!is_fetch(access) && memfn_range.size()) {
-                    auto it =
-                        std::find_if(std::begin(memfn_range), std::end(memfn_range), [phys_addr](std::tuple<uint64_t, uint64_t> const& a) {
-                            return std::get<0>(a) <= phys_addr.val && (std::get<0>(a) + std::get<1>(a)) > phys_addr.val;
-                        });
-                    if(it != std::end(memfn_range)) {
-                        auto idx = std::distance(std::begin(memfn_range), it);
-                        res = memfn_read[idx](phys_addr, length, data);
-                    } else
-                        res = hart_mem_rd_delegate(phys_addr, length, data);
-                } else {
-                    res = hart_mem_rd_delegate(phys_addr, length, data);
-                }
+                auto res = this->memory.rd_mem(access, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
                     this->reg.trap_state = (1UL << 31) | (5 << 16); // issue trap 5 (load access fault
-                    fault_data = addr;
+                    this->fault_data = addr;
                 }
                 return res;
             } catch(trap_access& ta) {
                 if((access & access_type::DEBUG) == 0) {
                     this->reg.trap_state = (1UL << 31) | ta.id;
-                    fault_data = ta.addr;
+                    this->fault_data = ta.addr;
                 }
                 return iss::Err;
             }
@@ -828,11 +295,9 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
-            return read_csr(addr, *reinterpret_cast<reg_t* const>(data));
+            return this->read_csr(addr, *reinterpret_cast<reg_t* const>(data));
         } break;
         case traits<BASE>::FENCE: {
-            if((addr + length) > mem.size())
-                return iss::Err;
             return iss::Ok;
         } break;
         case traits<BASE>::RES: {
@@ -850,7 +315,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
     } catch(trap_access& ta) {
         if((access & access_type::DEBUG) == 0) {
             this->reg.trap_state = (1UL << 31) | ta.id;
-            fault_data = ta.addr;
+            this->fault_data = ta.addr;
         }
         return iss::Err;
     }
@@ -879,109 +344,45 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, 
                       << std::hex << addr;
         break;
     default:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;
+        CPPLOG(TRACE) << prefix << "write of " << length << " bytes @addr 0x" << std::hex << addr;
     }
 #endif
     try {
         switch(space) {
         case traits<BASE>::MEM: {
-            if(FEAT & FEAT_PMP) {
-                if(!pmp_check(access, addr, length) && (access & access_type::DEBUG) != access_type::DEBUG) {
-                    fault_data = addr;
-                    if(access && iss::access_type::DEBUG)
-                        throw trap_access(0, addr);
-                    this->reg.trap_state = (1UL << 31) | (7 << 16); // issue trap 1
-                    return iss::Err;
-                }
-            }
             if(unlikely(is_fetch(access) && (addr & 0x1) == 1)) {
-                fault_data = addr;
+                this->fault_data = addr;
                 if(access && iss::access_type::DEBUG)
                     throw trap_access(0, addr);
                 this->reg.trap_state = (1UL << 31); // issue trap 0
                 return iss::Err;
             }
             try {
-                if(length > 1 && (addr & (length - 1)) && (access & access_type::DEBUG) != access_type::DEBUG) {
+                auto alignment = std::min<unsigned>(length, sizeof(reg_t));
+                if(length > 1 && (addr & (alignment - 1)) && !is_debug(access)) {
                     this->reg.trap_state = (1UL << 31) | 6 << 16;
-                    fault_data = addr;
+                    this->fault_data = addr;
                     return iss::Err;
                 }
-                phys_addr_t phys_addr{access, space, addr};
-                auto res = iss::Err;
-                if(!is_fetch(access) && memfn_range.size()) {
-                    auto it =
-                        std::find_if(std::begin(memfn_range), std::end(memfn_range), [phys_addr](std::tuple<uint64_t, uint64_t> const& a) {
-                            return std::get<0>(a) <= phys_addr.val && (std::get<0>(a) + std::get<1>(a)) > phys_addr.val;
-                        });
-                    if(it != std::end(memfn_range)) {
-                        auto idx = std::distance(std::begin(memfn_range), it);
-                        res = memfn_write[idx](phys_addr, length, data);
-                    } else
-                        res = hart_mem_wr_delegate(phys_addr, length, data);
-                } else {
-                    res = hart_mem_wr_delegate(phys_addr, length, data);
-                }
-                if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
+                auto res = this->memory.wr_mem(access, addr, length, data);
+                if(unlikely(res != iss::Ok && !is_debug(access))) {
                     this->reg.trap_state = (1UL << 31) | (7UL << 16); // issue trap 7 (Store/AMO access fault)
-                    fault_data = addr;
+                    this->fault_data = addr;
                 }
                 return res;
             } catch(trap_access& ta) {
                 this->reg.trap_state = (1UL << 31) | ta.id;
-                fault_data = ta.addr;
+                this->fault_data = ta.addr;
                 return iss::Err;
-            }
-
-            if((addr + length) > mem.size())
-                return iss::Err;
-            switch(addr) {
-            case 0x10013000: // UART0 base, TXFIFO reg
-            case 0x10023000: // UART1 base, TXFIFO reg
-                uart_buf << (char)data[0];
-                if(((char)data[0]) == '\n' || data[0] == 0) {
-                    std::cout << uart_buf.str();
-                    uart_buf.str("");
-                }
-                return iss::Ok;
-            case 0x10008000: { // HFROSC base, hfrosccfg reg
-                auto& p = mem(addr / mem.page_size);
-                auto offs = addr & mem.page_addr_mask;
-                std::copy(data, data + length, p.data() + offs);
-                auto& x = *(p.data() + offs + 3);
-                if(x & 0x40)
-                    x |= 0x80; // hfroscrdy = 1 if hfroscen==1
-                return iss::Ok;
-            }
-            case 0x10008008: { // HFROSC base, pllcfg reg
-                auto& p = mem(addr / mem.page_size);
-                auto offs = addr & mem.page_addr_mask;
-                std::copy(data, data + length, p.data() + offs);
-                auto& x = *(p.data() + offs + 3);
-                x |= 0x80; // set pll lock upon writing
-                return iss::Ok;
-            } break;
-            default: {
-            }
             }
         } break;
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
-            return write_csr(addr, *reinterpret_cast<const reg_t*>(data));
+            return this->write_csr(addr, *reinterpret_cast<const reg_t*>(data));
         } break;
-        case traits<BASE>::FENCE: {
-            if((addr + length) > mem.size())
-                return iss::Err;
-            switch(addr) {
-            case 2:
-            case 3: {
-                ptw.clear();
-                auto tvm = state.mstatus.TVM;
-                return iss::Ok;
-            }
-            }
-        } break;
+        case traits<BASE>::FENCE:
+            break;
         case traits<BASE>::RES: {
             atomic_reservation[addr] = data[0];
         } break;
@@ -992,205 +393,51 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, 
     } catch(trap_access& ta) {
         if((access & access_type::DEBUG) == 0) {
             this->reg.trap_state = (1UL << 31) | ta.id;
-            fault_data = ta.addr;
+            this->fault_data = ta.addr;
         }
         return iss::Err;
     }
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_csr(unsigned addr, reg_t& val) {
-    if(addr >= csr.size())
-        return iss::Err;
-    auto req_priv_lvl = (addr >> 8) & 0x3;
-    if(this->reg.PRIV < req_priv_lvl) // not having required privileges
-        throw illegal_instruction_fault(this->fault_data);
-    auto it = csr_rd_cb.find(addr);
-    if(it == csr_rd_cb.end() || !it->second) // non existent register
-        throw illegal_instruction_fault(this->fault_data);
-    return (this->*(it->second))(addr, val);
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_csr(unsigned addr, reg_t val) {
-    if(addr >= csr.size())
-        return iss::Err;
-    auto req_priv_lvl = (addr >> 8) & 0x3;
-    if(this->reg.PRIV < req_priv_lvl) // not having required privileges
-        throw illegal_instruction_fault(this->fault_data);
-    if((addr & 0xc00) == 0xc00) // writing to read-only region
-        throw illegal_instruction_fault(this->fault_data);
-    auto it = csr_wr_cb.find(addr);
-    if(it == csr_wr_cb.end() || !it->second) // non existent register
-        throw illegal_instruction_fault(this->fault_data);
-    return (this->*(it->second))(addr, val);
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_null(unsigned addr, reg_t& val) {
-    val = 0;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_plain(unsigned addr, reg_t& val) {
-    val = csr[addr];
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_plain(unsigned addr, reg_t val) {
-    csr[addr] = val;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cycle(unsigned addr, reg_t& val) {
-    auto cycle_val = this->reg.cycle + cycle_offset;
-    if(addr == mcycle) {
-        val = static_cast<reg_t>(cycle_val);
-    } else if(addr == mcycleh) {
-        val = static_cast<reg_t>(cycle_val >> 32);
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cycle(unsigned addr, reg_t val) {
-    if(sizeof(typename traits<BASE>::reg_t) != 4) {
-        mcycle_csr = static_cast<uint64_t>(val);
-    } else {
-        if(addr == mcycle) {
-            mcycle_csr = (mcycle_csr & 0xffffffff00000000) + val;
-        } else {
-            mcycle_csr = (static_cast<uint64_t>(val) << 32) + (mcycle_csr & 0xffffffff);
-        }
-    }
-    cycle_offset = mcycle_csr - this->reg.cycle; // TODO: relying on wrap-around
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_instret(unsigned addr, reg_t& val) {
-    if((addr & 0xff) == (minstret & 0xff)) {
-        val = static_cast<reg_t>(this->reg.instret);
-    } else if((addr & 0xff) == (minstreth & 0xff)) {
-        val = static_cast<reg_t>(this->reg.instret >> 32);
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_instret(unsigned addr, reg_t val) {
-    if(sizeof(typename traits<BASE>::reg_t) != 4) {
-        this->reg.instret = static_cast<uint64_t>(val);
-    } else {
-        if((addr & 0xff) == (minstret & 0xff)) {
-            this->reg.instret = (this->reg.instret & 0xffffffff00000000) + val;
-        } else {
-            this->reg.instret = (static_cast<uint64_t>(val) << 32) + (this->reg.instret & 0xffffffff);
-        }
-    }
-    this->reg.instret--;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_time(unsigned addr, reg_t& val) {
-    uint64_t time_val = this->reg.cycle / (100000000 / 32768 - 1); //-> ~3052;
-    if(addr == time) {
-        val = static_cast<reg_t>(time_val);
-    } else if(addr == timeh) {
-        if(sizeof(typename traits<BASE>::reg_t) != 4)
-            return iss::Err;
-        val = static_cast<reg_t>(time_val >> 32);
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_tvec(unsigned addr, reg_t& val) {
-    val = FEAT & features_e::FEAT_CLIC ? csr[addr] : csr[addr] & ~2;
-    return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
-    val = state.mstatus & hart_state_type::get_mask((addr >> 8) & 0x3);
+    val = state.mstatus & get_mstatus_mask((addr >> 8) & 0x3);
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_status(unsigned addr, reg_t val) {
-    state.write_mstatus(val, (addr >> 8) & 0x3);
+    write_mstatus(val, (addr >> 8) & 0x3);
     check_interrupt();
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cause(unsigned addr, reg_t& val) {
-    if((FEAT & features_e::FEAT_CLIC) && (csr[mtvec] & 0x3) == 3) {
-        val = csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1) | (0xfUL << 16));
-        auto mode = (addr >> 8) & 0x3;
-        switch(mode) {
-        case 0:
-            val |= clic_uprev_lvl << 16;
-            val |= state.mstatus.UPIE << 27;
-            break;
-        default:
-            val |= clic_mprev_lvl << 16;
-            val |= state.mstatus.MPIE << 27;
-            val |= state.mstatus.MPP << 28;
-            break;
-        }
-    } else
-        val = csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
+    val = this->csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (this->mcause_max_irq - 1));
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cause(unsigned addr, reg_t val) {
-    if((FEAT & features_e::FEAT_CLIC) && (csr[mtvec] & 0x3) == 3) {
-        auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1) | (0xfUL << 16));
-        csr[addr] = (val & mask) | (csr[addr] & ~mask);
-        auto mode = (addr >> 8) & 0x3;
-        switch(mode) {
-        case 0:
-            clic_uprev_lvl = ((val >> 16) & 0xff) | (1 << (8 - cfg.clic_int_ctl_bits)) - 1;
-            state.mstatus.UPIE = (val >> 27) & 0x1;
-            break;
-        default:
-            clic_mprev_lvl = ((val >> 16) & 0xff) | (1 << (8 - cfg.clic_int_ctl_bits)) - 1;
-            state.mstatus.MPIE = (val >> 27) & 0x1;
-            state.mstatus.MPP = (val >> 28) & 0x3;
-            break;
-        }
-    } else {
-        auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
-        csr[addr] = (val & mask) | (csr[addr] & ~mask);
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_hartid(unsigned addr, reg_t& val) {
-    val = mhartid_reg;
+    auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (this->mcause_max_irq - 1));
+    this->csr[addr] = (val & mask) | (this->csr[addr] & ~mask);
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
-    val = csr[mie] & mask;
+    val = this->csr[mie] & mask;
     if(this->reg.PRIV != 3)
-        val &= csr[mideleg];
+        val &= this->csr[mideleg];
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
-    csr[mie] = (csr[mie] & ~mask) | (val & mask);
+    this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
 }
@@ -1198,232 +445,39 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t v
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
-    val = csr[mip] & mask;
+    val = this->csr[mip] & mask;
     if(this->reg.PRIV != 3)
-        val &= csr[mideleg];
+        val &= this->csr[mideleg];
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ideleg(unsigned addr, reg_t val) {
     auto mask = 0b000100010001; // only U mode supported
-    csr[mideleg] = (csr[mideleg] & ~mask) | (val & mask);
+    this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, reg_t val) {
     auto mask = 0b1011001111110111; // bit 14/10 (reserved), bit 11 (Env call), and 3 (break) are hardwired to 0
-    csr[medeleg] = (csr[medeleg] & ~mask) | (val & mask);
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_epc(unsigned addr, reg_t val) {
-    csr[addr] = val & get_pc_mask();
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dcsr(unsigned addr, reg_t val) {
-    if(!debug_mode_active())
-        throw illegal_instruction_fault(this->fault_data);
-    //                  +-------------- ebreakm
-    //                  |   +---------- stepi
-    //                  |   |  +++----- cause
-    //                  |   |  |||   +- step
-    csr[addr] = val & 0b1000100111000100U;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_debug(unsigned addr, reg_t& val) {
-    if(!debug_mode_active())
-        throw illegal_instruction_fault(this->fault_data);
-    val = csr[addr];
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dscratch(unsigned addr, reg_t val) {
-    if(!debug_mode_active())
-        throw illegal_instruction_fault(this->fault_data);
-    csr[addr] = val;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_dpc(unsigned addr, reg_t& val) {
-    if(!debug_mode_active())
-        throw illegal_instruction_fault(this->fault_data);
-    val = this->reg.DPC;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_dpc(unsigned addr, reg_t val) {
-    if(!debug_mode_active())
-        throw illegal_instruction_fault(this->fault_data);
-    this->reg.DPC = val;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_intstatus(unsigned addr, reg_t& val) {
-    auto mode = (addr >> 8) & 0x3;
-    val = clic_uact_lvl & 0xff;
-    if(mode == 0x3)
-        val += (clic_mact_lvl & 0xff) << 24;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_fcsr(unsigned addr, reg_t& val) {
-    val = this->get_fcsr();
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_fcsr(unsigned addr, reg_t val) {
-    this->set_fcsr(val);
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_intthresh(unsigned addr, reg_t val) {
-    csr[addr] = (val & 0xff) | (1 << (cfg.clic_int_ctl_bits)) - 1;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_xtvt(unsigned addr, reg_t val) {
-    csr[addr] = val & ~0x3fULL;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_mem(phys_addr_t paddr, unsigned length, uint8_t* const data) {
-    switch(paddr.val) {
-    default: {
-        for(auto offs = 0U; offs < length; ++offs) {
-            *(data + offs) = mem[(paddr.val + offs) % mem.size()];
-        }
-    }
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_mem(phys_addr_t paddr, unsigned length, const uint8_t* const data) {
-    switch(paddr.val) {
-    // TODO remove UART, Peripherals should not be part of the ISS
-    case 0xFFFF0000: // UART0 base, TXFIFO reg
-        if(((char)data[0]) == '\n' || data[0] == 0) {
-            CPPLOG(INFO) << "UART" << ((paddr.val >> 12) & 0x3) << " send '" << uart_buf.str() << "'";
-            uart_buf.str("");
-        } else if(((char)data[0]) != '\r')
-            uart_buf << (char)data[0];
-        break;
-    default: {
-        mem_type::page_type& p = mem(paddr.val / mem.page_size);
-        std::copy(data, data + length, p.data() + (paddr.val & mem.page_addr_mask));
-        // tohost handling in case of riscv-test
-        if(paddr.access && iss::access_type::FUNC) {
-            auto tohost_upper =
-                (traits<BASE>::XLEN == 32 && paddr.val == (tohost + 4)) || (traits<BASE>::XLEN == 64 && paddr.val == tohost);
-            auto tohost_lower = (traits<BASE>::XLEN == 32 && paddr.val == tohost) || (traits<BASE>::XLEN == 64 && paddr.val == tohost);
-            if(tohost_lower || tohost_upper) {
-                uint64_t hostvar = *reinterpret_cast<uint64_t*>(p.data() + (tohost & mem.page_addr_mask));
-                // in case of 32 bit system, two writes to tohost are needed, only evaluate on the second (high) write
-                if(tohost_upper && (tohost_lower || tohost_lower_written)) {
-                    switch(hostvar >> 48) {
-                    case 0:
-                        if(hostvar != 0x1) {
-                            CPPLOG(FATAL) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
-                                          << "), stopping simulation";
-                        } else {
-                            CPPLOG(INFO) << "tohost value is 0x" << std::hex << hostvar << std::dec << " (" << hostvar
-                                         << "), stopping simulation";
-                        }
-                        this->reg.trap_state = std::numeric_limits<uint32_t>::max();
-                        this->interrupt_sim = hostvar;
-#ifndef WITH_TCC
-                        throw(iss::simulation_stopped(hostvar));
-#endif
-                        break;
-                    case 0x0101: {
-                        char c = static_cast<char>(hostvar & 0xff);
-                        if(c == '\n' || c == 0) {
-                            CPPLOG(INFO) << "tohost send '" << uart_buf.str() << "'";
-                            uart_buf.str("");
-                        } else
-                            uart_buf << c;
-                    } break;
-                    default:
-                        break;
-                    }
-                    tohost_lower_written = false;
-                } else if(tohost_lower)
-                    tohost_lower_written = true;
-            } else if((traits<BASE>::XLEN == 32 && paddr.val == fromhost + 4) || (traits<BASE>::XLEN == 64 && paddr.val == fromhost)) {
-                uint64_t fhostvar = *reinterpret_cast<uint64_t*>(p.data() + (fromhost & mem.page_addr_mask));
-                *reinterpret_cast<uint64_t*>(p.data() + (tohost & mem.page_addr_mask)) = fhostvar;
-            }
-        }
-    }
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
-    if(addr == cfg.clic_base) { // cliccfg
-        *data = clic_cfg_reg;
-        for(auto i = 1; i < length; ++i)
-            *(data + i) = 0;
-    } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
-        auto offset = ((addr & 0x7fff) - 0x40) / 4;
-        read_reg_uint32(addr, clic_inttrig_reg[offset], data, length);
-    } else if(addr >= (cfg.clic_base + 0x1000) &&
-              (addr + length) <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
-        auto offset = ((addr & 0x7fff) - 0x1000) / 4;
-        read_reg_uint32(addr, clic_int_reg[offset].raw, data, length);
-    } else {
-        for(auto i = 0U; i < length; ++i)
-            *(data + i) = 0;
-    }
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
-    if(addr == cfg.clic_base) { // cliccfg
-        clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
-    } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
-        auto offset = ((addr & 0x7fff) - 0x40) / 4;
-        write_reg_uint32(addr, clic_inttrig_reg[offset], data, length);
-    } else if(addr >= (cfg.clic_base + 0x1000) &&
-              (addr + length) <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
-        auto offset = ((addr & 0x7fff) - 0x1000) / 4;
-        write_reg_uint32(addr, clic_int_reg[offset].raw, data, length);
-        clic_int_reg[offset].raw &= 0xf0c70101; // clicIntCtlBits->0xf0, clicintattr->0xc7, clicintie->0x1, clicintip->0x1
-    }
+    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
     BASE::reset(address);
-    state.mstatus = hart_state_type::mstatus_reset_val;
+    state.mstatus = hart_state<reg_t>::mstatus_reset_val;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::check_interrupt() {
     // TODO: Implement CLIC functionality
-    auto ideleg = csr[mideleg];
+    auto ideleg = this->csr[mideleg];
     // Multiple simultaneous interrupts and traps at the same privilege level are
     // handled in the following decreasing priority order:
     // external interrupts, software interrupts, timer interrupts, then finally
     // any synchronous traps.
-    auto ena_irq = csr[mip] & csr[mie];
+    auto ena_irq = this->csr[mip] & this->csr[mie];
 
     bool mstatus_mie = state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
@@ -1440,22 +494,22 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
-uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
+uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
     if(flags == std::numeric_limits<uint64_t>::max())
         flags = this->reg.trap_state;
-    auto trap_id = bit_sub<0, 16>(flags);
+    auto const trap_id = bit_sub<0, 16>(flags);
     auto cause = bit_sub<16, 15>(flags);
     if(trap_id == 0 && cause == 11)
         cause = 0x8 + this->reg.PRIV; // adjust environment call cause
     // calculate effective privilege level
     unsigned new_priv = PRIV_M;
     if(trap_id == 0) { // exception
-        if(this->reg.PRIV != PRIV_M && ((csr[medeleg] >> cause) & 0x1) != 0)
+        if(this->reg.PRIV != PRIV_M && ((this->csr[medeleg] >> cause) & 0x1) != 0)
             new_priv = PRIV_U;
         // store ret addr in xepc register
-        csr[uepc | (new_priv << 8)] = static_cast<reg_t>(addr); // store actual address instruction of exception
+        this->csr[uepc | (new_priv << 8)] = static_cast<reg_t>(addr); // store actual address instruction of exception
         /*
          * write mtval if new_priv=M_MODE, spec says:
          * When a hardware breakpoint is triggered, or an instruction-fetch, load,
@@ -1465,27 +519,26 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
          */
         switch(cause) {
         case 0:
-            csr[utval | (new_priv << 8)] = static_cast<reg_t>(addr);
+            this->csr[utval | (new_priv << 8)] = static_cast<reg_t>(addr);
             break;
         case 2:
-            csr[utval | (new_priv << 8)] = (!has_compressed() || (instr & 0x3) == 3) ? instr : instr & 0xffff;
+            this->csr[utval | (new_priv << 8)] = (!this->has_compressed() || (tval & 0x3) == 3) ? tval : tval & 0xffff;
             break;
         case 3:
-            if((FEAT & FEAT_DEBUG) && (csr[dcsr] & 0x8000)) {
+            if((FEAT & FEAT_DEBUG) && (this->csr[dcsr] & 0x8000)) {
                 this->reg.DPC = addr;
-                csr[dcsr] = (csr[dcsr] & ~0x1c3) | (1 << 6) | PRIV_M; // FIXME: cause should not be 4 (stepi)
+                this->csr[dcsr] = (this->csr[dcsr] & ~0x1c3) | (1 << 6) | PRIV_M; // FIXME: cause should not be 4 (stepi)
                 new_priv = this->reg.PRIV | PRIV_D;
             } else {
-                csr[utval | (new_priv << 8)] = addr;
+                this->csr[utval | (new_priv << 8)] = addr;
             }
-            if(semihosting_cb) {
+            if(this->semihosting_cb) {
                 // Check for semihosting call
-                phys_addr_t p_addr(access_type::DEBUG_READ, traits<BASE>::MEM, addr - 4);
                 std::array<uint8_t, 8> data;
                 // check for SLLI_X0_X0_0X1F and SRAI_X0_X0_0X07
-                this->read_mem(p_addr, 4, data.data());
-                p_addr.val += 8;
-                this->read_mem(p_addr, 4, data.data() + 4);
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data());
+                addr += 8;
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data() + 4);
 
                 const std::array<uint8_t, 8> ref_data = {0x13, 0x10, 0xf0, 0x01, 0x13, 0x50, 0x70, 0x40};
                 if(data == ref_data) {
@@ -1497,9 +550,9 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
 #else
                     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-                    CLOG(INFO, disass) << "Semihosting call at address " << buffer.data() << " occurred ";
+                    NSCLOG(INFO, LOGCAT) << "Semihosting call at address " << buffer.data() << " occurred ";
 
-                    semihosting_cb(this, &(this->reg.X10) /*a0*/, &(this->reg.X11) /*a1*/);
+                    this->semihosting_cb(this, &(this->reg.X10) /*a0*/, &(this->reg.X11) /*a1*/);
                     return this->reg.NEXT_PC;
                 }
             }
@@ -1507,20 +560,20 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
         case 4:
         case 6:
         case 7:
-            csr[utval | (new_priv << 8)] = fault_data;
+            this->csr[utval | (new_priv << 8)] = this->fault_data;
             break;
         default:
-            csr[utval | (new_priv << 8)] = 0;
+            this->csr[utval | (new_priv << 8)] = 0;
         }
-        fault_data = 0;
+        this->fault_data = 0;
     } else {
-        if(this->reg.PRIV != PRIV_M && ((csr[mideleg] >> cause) & 0x1) != 0)
+        if(this->reg.PRIV != PRIV_M && ((this->csr[mideleg] >> cause) & 0x1) != 0)
             new_priv = PRIV_U;
-        csr[uepc | (new_priv << 8)] = this->reg.NEXT_PC; // store next address if interrupt
+        this->csr[uepc | (new_priv << 8)] = this->reg.NEXT_PC; // store next address if interrupt
         this->reg.pending_trap = 0;
     }
     size_t adr = ucause | (new_priv << 8);
-    csr[adr] = (trap_id << (traits<BASE>::XLEN - 1)) + cause;
+    this->csr[adr] = (trap_id << (traits<BASE>::XLEN - 1)) + cause;
     // update mstatus
     // xPP field of mstatus is written with the active privilege mode at the time
     // of the trap; the x PIE field of mstatus
@@ -1543,18 +596,18 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
     }
 
     // get trap vector
-    auto xtvec = csr[utvec | (new_priv << 8)];
+    auto xtvec = this->csr[utvec | (new_priv << 8)];
     // calculate addr// set NEXT_PC to trap addressess to jump to based on MODE
     // bits in mtvec
-    if((FEAT & features_e::FEAT_CLIC) && trap_id != 0 && (xtvec & 0x3UL) == 3UL) {
-        reg_t data;
-        auto ret = read(address_type::LOGICAL, access_type::READ, 0, csr[mtvt], sizeof(reg_t), reinterpret_cast<uint8_t*>(&data));
-        if(ret == iss::Err)
-            return this->reg.PC;
-        this->reg.NEXT_PC = data;
-    } else {
-        this->reg.NEXT_PC = xtvec & ~0x3UL;
-        if((xtvec & 0x1) == 1 && trap_id != 0)
+    this->reg.NEXT_PC = xtvec & ~0x3UL;
+    if(trap_id != 0) {
+        if((xtvec & 0x3UL) == 3UL) {
+            reg_t data;
+            auto ret = read(address_type::LOGICAL, access_type::READ, 0, this->csr[mtvt], sizeof(reg_t), reinterpret_cast<uint8_t*>(&data));
+            if(ret == iss::Err)
+                return this->reg.PC;
+            this->reg.NEXT_PC = data;
+        } else if((xtvec & 0x3UL) == 1UL)
             this->reg.NEXT_PC += 4 * cause;
     }
     std::array<char, 32> buffer;
@@ -1564,10 +617,10 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
-        CLOG(INFO, disass) << (trap_id ? "Interrupt" : "Trap") << " with cause '" << (trap_id ? irq_str[cause] : trap_str[cause]) << "' ("
-                           << cause << ")"
-                           << " at address " << buffer.data() << " occurred, changing privilege level from " << lvl[this->reg.PRIV]
-                           << " to " << lvl[new_priv];
+        NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
+                             << " to " << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
@@ -1578,8 +631,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = (flags & 0x3) ? 3 : 0;
     if(inst_priv > cur_priv) {
-        auto trap_val = 0x80ULL << 24 | (2 << 16); // illegal instruction
-        this->reg.trap_state = trap_val;
+        this->reg.trap_state = 0x80ULL << 24 | (2 << 16); // illegal instruction
         this->reg.NEXT_PC = std::numeric_limits<uint32_t>::max();
     } else {
         auto status = state.mstatus;
@@ -1599,13 +651,23 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
             break;
         }
         // sets the pc to the value stored in the x epc register.
-        this->reg.NEXT_PC = csr[uepc | inst_priv << 8];
-        CLOG(INFO, disass) << "Executing xRET , changing privilege level from " << lvl[cur_priv] << " to " << lvl[this->reg.PRIV];
+        this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
+        NSCLOG(INFO, LOGCAT) << "Executing xRET , changing privilege level from " << this->lvl[cur_priv] << " to "
+                             << this->lvl[this->reg.PRIV];
         check_interrupt();
     }
+    this->reg.trap_state = this->reg.pending_trap;
     return this->reg.NEXT_PC;
 }
 
+template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::wait_until(uint64_t flags) {
+    auto status = state.mstatus;
+    auto tw = status.TW;
+    if(this->reg.PRIV == PRIV_S && tw != 0) {
+        this->reg.trap_state = (1 << 31) | (2 << 16);
+        this->fault_data = this->reg.PC;
+    }
+}
 } // namespace arch
 } // namespace iss
 

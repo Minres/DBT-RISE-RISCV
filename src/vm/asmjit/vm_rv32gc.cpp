@@ -48,6 +48,22 @@
 #include <array>
 #include <iss/debugger/riscv_target_adapter.h>
 
+#ifndef _MSC_VER
+using int128_t = __int128;
+using uint128_t = unsigned __int128;
+namespace std {
+template <> struct make_unsigned<__int128> { typedef unsigned __int128 type; };
+template <> class __make_unsigned_selector<__int128 unsigned, false, false> {
+public:
+    typedef unsigned __int128 __type;
+};
+template <> struct is_signed<int128_t> { static constexpr bool value = true; };
+template <> struct is_signed<uint128_t> { static constexpr bool value = false; };
+template <> struct is_unsigned<int128_t> { static constexpr bool value = false; };
+template <> struct is_unsigned<uint128_t> { static constexpr bool value = true; };
+} // namespace std
+#endif
+
 namespace iss {
 namespace asmjit {
 
@@ -95,7 +111,7 @@ protected:
     using this_class = vm_impl<ARCH>;
     using compile_func = continuation_e (this_class::*)(virt_addr_t&, code_word_t, jit_holder&);
 
-    continuation_e gen_single_inst_behavior(virt_addr_t&, unsigned int &, jit_holder&) override;
+    continuation_e gen_single_inst_behavior(virt_addr_t&, jit_holder&) override;
     enum globals_e {TVAL = 0, GLOBALS_SIZE};
     void gen_block_prologue(jit_holder& jh) override;
     void gen_block_epilogue(jit_holder& jh) override;
@@ -115,36 +131,47 @@ protected:
         auto sign_mask = 1ULL<<(W-1);
         return (from & mask) | ((from & sign_mask) ? ~mask : 0);
     }
+    inline void raise(uint16_t trap_id, uint16_t cause){
+        auto trap_val =  0x80ULL << 24 | (cause << 16) | trap_id;
+        this->core.reg.trap_state = trap_val;
+    }
 
-    x86_reg_t get_rm(jit_holder& jh , uint8_t get_rm_rm){
-        x86::Compiler& cc = jh.cc;
-        x86_reg_t rm = get_reg(cc, 8, false);
-        mov(cc, rm, get_rm_rm);
-        auto label_then378 = cc.newLabel();
-        auto label_merge378 = cc.newLabel();
-        auto tmp_reg378 = get_reg(cc, 8, false);
-        cmp(cc, rm, 7);
-        cc.je(label_then378);
-        mov(cc, tmp_reg378,rm);
-        cc.jmp(label_merge378);
-        cc.bind(label_then378);
-        mov(cc, tmp_reg378, gen_slice(jh.cc, load_reg_from_mem(jh, traits::FCSR), 5, 7-5+1));
-        cc.bind(label_merge378);
-        auto rm_eff = tmp_reg378
-        ;
-        {
-        auto label_merge = cc.newLabel();
-        cmp(cc, gen_operation(cc, gtu, rm_eff, 4)
-        ,0);
-        cc.je(label_merge);
-        {
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+
+    static uint64_t _NaNBox32(void* vm_impl_ptr , uint32_t val){
+         return reinterpret_cast<this_class*>(vm_impl_ptr)->NaNBox32(val);
+    }
+    uint64_t NaNBox32(uint32_t val){
+        if(traits::FLEN == 32) {
+            return (uint64_t)val;
         }
-        cc.bind(label_merge);
+        else {
+            uint64_t box = ~ ((uint64_t)0);
+            return (uint64_t)(((uint128_t)box<<32)|val);
+        }
+    }
+    static uint8_t _get_rm(void* vm_impl_ptr , uint8_t rm){
+         return reinterpret_cast<this_class*>(vm_impl_ptr)->get_rm(rm);
+    }
+    uint8_t get_rm(uint8_t rm){
+        auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+::iss::arch::traits<ARCH>::reg_byte_offsets[::iss::arch::traits<ARCH>::FCSR]); 
+        uint8_t rm_eff = rm == 7? bit_sub<5, 7-5+1>(*FCSR) : rm;
+        if(rm_eff > 4) {
+            raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
         }
         return rm_eff;
     }
-
+    static uint64_t _NaNBox64(void* vm_impl_ptr , uint64_t val){
+         return reinterpret_cast<this_class*>(vm_impl_ptr)->NaNBox64(val);
+    }
+    uint64_t NaNBox64(uint64_t val){
+        if(traits::FLEN == 64) {
+            return (uint64_t)val;
+        }
+        else {
+            uint64_t box = ~ ((uint64_t)0);
+            return (uint64_t)(((uint128_t)box<<64)|val);
+        }
+    }
 private:
     /****************************************************************************
      * start opcode definitions
@@ -358,14 +385,6 @@ private:
         {32, 0b00000000000000000010000000000111, 0b00000000000000000111000001111111, &this_class::__flw},
         /* instruction FSW, encoding '0b00000000000000000010000000100111' */
         {32, 0b00000000000000000010000000100111, 0b00000000000000000111000001111111, &this_class::__fsw},
-        /* instruction FMADD__S, encoding '0b00000000000000000000000001000011' */
-        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__s},
-        /* instruction FMSUB__S, encoding '0b00000000000000000000000001000111' */
-        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__s},
-        /* instruction FNMADD__S, encoding '0b00000000000000000000000001001111' */
-        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__s},
-        /* instruction FNMSUB__S, encoding '0b00000000000000000000000001001011' */
-        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__s},
         /* instruction FADD__S, encoding '0b00000000000000000000000001010011' */
         {32, 0b00000000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd__s},
         /* instruction FSUB__S, encoding '0b00001000000000000000000001010011' */
@@ -374,22 +393,38 @@ private:
         {32, 0b00010000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul__s},
         /* instruction FDIV__S, encoding '0b00011000000000000000000001010011' */
         {32, 0b00011000000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv__s},
+        /* instruction FMIN__S, encoding '0b00101000000000000000000001010011' */
+        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__s},
+        /* instruction FMAX__S, encoding '0b00101000000000000001000001010011' */
+        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__s},
         /* instruction FSQRT__S, encoding '0b01011000000000000000000001010011' */
         {32, 0b01011000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt__s},
+        /* instruction FMADD__S, encoding '0b00000000000000000000000001000011' */
+        {32, 0b00000000000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__s},
+        /* instruction FMSUB__S, encoding '0b00000000000000000000000001000111' */
+        {32, 0b00000000000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__s},
+        /* instruction FNMADD__S, encoding '0b00000000000000000000000001001111' */
+        {32, 0b00000000000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__s},
+        /* instruction FNMSUB__S, encoding '0b00000000000000000000000001001011' */
+        {32, 0b00000000000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__s},
+        /* instruction FCVT__W__S, encoding '0b11000000000000000000000001010011' */
+        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__s},
+        /* instruction FCVT__WU__S, encoding '0b11000000000100000000000001010011' */
+        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__s},
+        /* instruction FCVT__S__W, encoding '0b11010000000000000000000001010011' */
+        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__w},
+        /* instruction FCVT__S__WU, encoding '0b11010000000100000000000001010011' */
+        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__wu},
         /* instruction FSGNJ__S, encoding '0b00100000000000000000000001010011' */
         {32, 0b00100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj__s},
         /* instruction FSGNJN__S, encoding '0b00100000000000000001000001010011' */
         {32, 0b00100000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn__s},
         /* instruction FSGNJX__S, encoding '0b00100000000000000010000001010011' */
         {32, 0b00100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx__s},
-        /* instruction FMIN__S, encoding '0b00101000000000000000000001010011' */
-        {32, 0b00101000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__s},
-        /* instruction FMAX__S, encoding '0b00101000000000000001000001010011' */
-        {32, 0b00101000000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__s},
-        /* instruction FCVT__W__S, encoding '0b11000000000000000000000001010011' */
-        {32, 0b11000000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__s},
-        /* instruction FCVT__WU__S, encoding '0b11000000000100000000000001010011' */
-        {32, 0b11000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__s},
+        /* instruction FMV__X__W, encoding '0b11100000000000000000000001010011' */
+        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__x__w},
+        /* instruction FMV__W__X, encoding '0b11110000000000000000000001010011' */
+        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__w__x},
         /* instruction FEQ__S, encoding '0b10100000000000000010000001010011' */
         {32, 0b10100000000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq__s},
         /* instruction FLT__S, encoding '0b10100000000000000001000001010011' */
@@ -398,14 +433,6 @@ private:
         {32, 0b10100000000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle__s},
         /* instruction FCLASS__S, encoding '0b11100000000000000001000001010011' */
         {32, 0b11100000000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass__s},
-        /* instruction FCVT__S__W, encoding '0b11010000000000000000000001010011' */
-        {32, 0b11010000000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__w},
-        /* instruction FCVT__S__WU, encoding '0b11010000000100000000000001010011' */
-        {32, 0b11010000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__wu},
-        /* instruction FMV__X__W, encoding '0b11100000000000000000000001010011' */
-        {32, 0b11100000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__x__w},
-        /* instruction FMV__W__X, encoding '0b11110000000000000000000001010011' */
-        {32, 0b11110000000000000000000001010011, 0b11111111111100000111000001111111, &this_class::__fmv__w__x},
         /* instruction C__FLW, encoding '0b0110000000000000' */
         {16, 0b0110000000000000, 0b1110000000000011, &this_class::__c__flw},
         /* instruction C__FSW, encoding '0b1110000000000000' */
@@ -418,54 +445,54 @@ private:
         {32, 0b00000000000000000011000000000111, 0b00000000000000000111000001111111, &this_class::__fld},
         /* instruction FSD, encoding '0b00000000000000000011000000100111' */
         {32, 0b00000000000000000011000000100111, 0b00000000000000000111000001111111, &this_class::__fsd},
-        /* instruction FMADD_D, encoding '0b00000010000000000000000001000011' */
-        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd_d},
-        /* instruction FMSUB_D, encoding '0b00000010000000000000000001000111' */
-        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub_d},
-        /* instruction FNMADD_D, encoding '0b00000010000000000000000001001111' */
-        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd_d},
-        /* instruction FNMSUB_D, encoding '0b00000010000000000000000001001011' */
-        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub_d},
-        /* instruction FADD_D, encoding '0b00000010000000000000000001010011' */
-        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd_d},
-        /* instruction FSUB_D, encoding '0b00001010000000000000000001010011' */
-        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub_d},
-        /* instruction FMUL_D, encoding '0b00010010000000000000000001010011' */
-        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul_d},
-        /* instruction FDIV_D, encoding '0b00011010000000000000000001010011' */
-        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv_d},
-        /* instruction FSQRT_D, encoding '0b01011010000000000000000001010011' */
-        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt_d},
-        /* instruction FSGNJ_D, encoding '0b00100010000000000000000001010011' */
-        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj_d},
-        /* instruction FSGNJN_D, encoding '0b00100010000000000001000001010011' */
-        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn_d},
-        /* instruction FSGNJX_D, encoding '0b00100010000000000010000001010011' */
-        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx_d},
-        /* instruction FMIN_D, encoding '0b00101010000000000000000001010011' */
-        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin_d},
-        /* instruction FMAX_D, encoding '0b00101010000000000001000001010011' */
-        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax_d},
-        /* instruction FCVT_S_D, encoding '0b01000000000100000000000001010011' */
-        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_s_d},
-        /* instruction FCVT_D_S, encoding '0b01000010000000000000000001010011' */
-        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_s},
-        /* instruction FEQ_D, encoding '0b10100010000000000010000001010011' */
-        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq_d},
-        /* instruction FLT_D, encoding '0b10100010000000000001000001010011' */
-        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt_d},
-        /* instruction FLE_D, encoding '0b10100010000000000000000001010011' */
-        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle_d},
-        /* instruction FCLASS_D, encoding '0b11100010000000000001000001010011' */
-        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass_d},
-        /* instruction FCVT_W_D, encoding '0b11000010000000000000000001010011' */
-        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_w_d},
-        /* instruction FCVT_WU_D, encoding '0b11000010000100000000000001010011' */
-        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_wu_d},
-        /* instruction FCVT_D_W, encoding '0b11010010000000000000000001010011' */
-        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_w},
-        /* instruction FCVT_D_WU, encoding '0b11010010000100000000000001010011' */
-        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt_d_wu},
+        /* instruction FADD__D, encoding '0b00000010000000000000000001010011' */
+        {32, 0b00000010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fadd__d},
+        /* instruction FSUB__D, encoding '0b00001010000000000000000001010011' */
+        {32, 0b00001010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fsub__d},
+        /* instruction FMUL__D, encoding '0b00010010000000000000000001010011' */
+        {32, 0b00010010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fmul__d},
+        /* instruction FDIV__D, encoding '0b00011010000000000000000001010011' */
+        {32, 0b00011010000000000000000001010011, 0b11111110000000000000000001111111, &this_class::__fdiv__d},
+        /* instruction FMIN__D, encoding '0b00101010000000000000000001010011' */
+        {32, 0b00101010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fmin__d},
+        /* instruction FMAX__D, encoding '0b00101010000000000001000001010011' */
+        {32, 0b00101010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fmax__d},
+        /* instruction FSQRT__D, encoding '0b01011010000000000000000001010011' */
+        {32, 0b01011010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fsqrt__d},
+        /* instruction FMADD__D, encoding '0b00000010000000000000000001000011' */
+        {32, 0b00000010000000000000000001000011, 0b00000110000000000000000001111111, &this_class::__fmadd__d},
+        /* instruction FMSUB__D, encoding '0b00000010000000000000000001000111' */
+        {32, 0b00000010000000000000000001000111, 0b00000110000000000000000001111111, &this_class::__fmsub__d},
+        /* instruction FNMADD__D, encoding '0b00000010000000000000000001001111' */
+        {32, 0b00000010000000000000000001001111, 0b00000110000000000000000001111111, &this_class::__fnmadd__d},
+        /* instruction FNMSUB__D, encoding '0b00000010000000000000000001001011' */
+        {32, 0b00000010000000000000000001001011, 0b00000110000000000000000001111111, &this_class::__fnmsub__d},
+        /* instruction FCVT__W__D, encoding '0b11000010000000000000000001010011' */
+        {32, 0b11000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__w__d},
+        /* instruction FCVT__WU__D, encoding '0b11000010000100000000000001010011' */
+        {32, 0b11000010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__wu__d},
+        /* instruction FCVT__D__W, encoding '0b11010010000000000000000001010011' */
+        {32, 0b11010010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__w},
+        /* instruction FCVT__D__WU, encoding '0b11010010000100000000000001010011' */
+        {32, 0b11010010000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__wu},
+        /* instruction FCVT__S__D, encoding '0b01000000000100000000000001010011' */
+        {32, 0b01000000000100000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__s__d},
+        /* instruction FCVT__D__S, encoding '0b01000010000000000000000001010011' */
+        {32, 0b01000010000000000000000001010011, 0b11111111111100000000000001111111, &this_class::__fcvt__d__s},
+        /* instruction FSGNJ__D, encoding '0b00100010000000000000000001010011' */
+        {32, 0b00100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnj__d},
+        /* instruction FSGNJN__D, encoding '0b00100010000000000001000001010011' */
+        {32, 0b00100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjn__d},
+        /* instruction FSGNJX__D, encoding '0b00100010000000000010000001010011' */
+        {32, 0b00100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__fsgnjx__d},
+        /* instruction FEQ__D, encoding '0b10100010000000000010000001010011' */
+        {32, 0b10100010000000000010000001010011, 0b11111110000000000111000001111111, &this_class::__feq__d},
+        /* instruction FLT__D, encoding '0b10100010000000000001000001010011' */
+        {32, 0b10100010000000000001000001010011, 0b11111110000000000111000001111111, &this_class::__flt__d},
+        /* instruction FLE__D, encoding '0b10100010000000000000000001010011' */
+        {32, 0b10100010000000000000000001010011, 0b11111110000000000111000001111111, &this_class::__fle__d},
+        /* instruction FCLASS__D, encoding '0b11100010000000000001000001010011' */
+        {32, 0b11100010000000000001000001010011, 0b11111111111100000111000001111111, &this_class::__fclass__d},
         /* instruction C__FLD, encoding '0b0010000000000000' */
         {16, 0b0010000000000000, 0b1110000000000011, &this_class::__c__fld},
         /* instruction C__FSD, encoding '0b1010000000000000' */
@@ -509,12 +536,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)((int32_t)imm));
@@ -556,12 +582,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)(PC+(int32_t)imm));
@@ -603,19 +628,18 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto new_pc = (uint32_t)(PC+(int32_t)sext<21>(imm));
             if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
                 gen_set_tval(jh, new_pc);
                 gen_raise(jh, 0, 0);
             }
-            else{
+            else {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
                           (uint32_t)(PC+4));
@@ -662,22 +686,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto addr_mask = (uint32_t)- 2;
             auto new_pc = gen_ext(cc, 
-                (gen_operation(cc, band, (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), addr_mask)
-                ), 32, true);
+                (gen_operation(cc, band, (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), addr_mask)), 32, true);
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, urem, new_pc, static_cast<uint32_t>(traits::INSTR_ALIGNMENT))
-            ,0);
+            auto cond =  gen_operation(cc, urem, new_pc, static_cast<uint32_t>(traits::INSTR_ALIGNMENT));
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
@@ -735,17 +756,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -753,7 +773,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -799,17 +819,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -817,7 +836,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -863,19 +882,18 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, lt, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ,0);
+            auto cond =  gen_operation(cc, lt, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -883,7 +901,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -929,19 +947,18 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, gte, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ,0);
+            auto cond =  gen_operation(cc, gte, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -949,7 +966,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -995,17 +1012,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ltu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, ltu, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -1013,7 +1029,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -1059,17 +1075,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, gteu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, gteu, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -1077,7 +1092,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -1123,15 +1138,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 1), 8, false);
             if(rd!=0){
@@ -1177,15 +1190,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 2), 16, false);
             if(rd!=0){
@@ -1231,15 +1242,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 4), 32, false);
             if(rd!=0){
@@ -1285,15 +1294,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_read_mem(jh, traits::MEM, load_address, 1);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -1338,15 +1345,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_read_mem(jh, traits::MEM, load_address, 2);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -1391,17 +1396,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 8, false), 1);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 8, false), 1);
         }
         auto returnValue = CONT;
         
@@ -1440,17 +1443,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 16, false), 2);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 16, false), 2);
         }
         auto returnValue = CONT;
         
@@ -1489,17 +1490,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), 4);
         }
         auto returnValue = CONT;
         
@@ -1538,17 +1537,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                          ), 32, true));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -1588,26 +1585,24 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
-                auto label_then253 = cc.newLabel();
-                auto label_merge253 = cc.newLabel();
-                auto tmp_reg253 = get_reg(cc, 8, false);
-                cmp(cc, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs1), 32, true), (int16_t)sext<12>(imm));
-                cc.jl(label_then253);
-                mov(cc, tmp_reg253,0);
-                cc.jmp(label_merge253);
-                cc.bind(label_then253);
-                mov(cc, tmp_reg253, 1);
-                cc.bind(label_merge253);
+                auto label_then1 = cc.newLabel();
+                auto label_merge1 = cc.newLabel();
+                auto tmp_reg1 = get_reg_Gp(cc, 8, false);
+                cmp(cc, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), (int16_t)sext<12>(imm));
+                cc.jl(label_then1);
+                mov(cc, tmp_reg1,0);
+                cc.jmp(label_merge1);
+                cc.bind(label_then1);
+                mov(cc, tmp_reg1, 1);
+                cc.bind(label_merge1);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg253
+                      gen_ext(cc, tmp_reg1
                       , 32, false)
                 );
             }
@@ -1649,25 +1644,24 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
-                auto label_then254 = cc.newLabel();
-                auto label_merge254 = cc.newLabel();
-                auto tmp_reg254 = get_reg(cc, 8, false);
-                cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)));
-                cc.jb(label_then254);
-                mov(cc, tmp_reg254,0);
-                cc.jmp(label_merge254);
-                cc.bind(label_then254);
-                mov(cc, tmp_reg254, 1);
-                cc.bind(label_merge254);
+                auto label_then2 = cc.newLabel();
+                auto label_merge2 = cc.newLabel();
+                auto tmp_reg2 = get_reg_Gp(cc, 8, false);
+                cmp(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)));
+                cc.jb(label_then2);
+                mov(cc, tmp_reg2,0);
+                cc.jmp(label_merge2);
+                cc.bind(label_then2);
+                mov(cc, tmp_reg2, 1);
+                cc.bind(label_merge2);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg254
+                      gen_ext(cc, tmp_reg2
                       , 32, false)
                 );
             }
@@ -1709,16 +1703,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1758,16 +1750,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1807,16 +1797,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1856,16 +1844,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), shamt)
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), shamt));
             }
         }
         auto returnValue = CONT;
@@ -1905,16 +1891,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1), shamt)
-                      );
+                      gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1), shamt));
             }
         }
         auto returnValue = CONT;
@@ -1954,18 +1938,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          (gen_operation(cc, sar, gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1), 32, true), shamt)
-                          ), 32, false));
+                      gen_ext(cc, (gen_operation(cc, sar, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), shamt)), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -2005,17 +1985,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, false));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -2055,17 +2033,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sub, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, true));
+                          (gen_operation(cc, sub, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -2105,17 +2081,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                      ))
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1)))));
             }
         }
         auto returnValue = CONT;
@@ -2155,27 +2128,24 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
-                auto label_then255 = cc.newLabel();
-                auto label_merge255 = cc.newLabel();
-                auto tmp_reg255 = get_reg(cc, 8, false);
-                cmp(cc, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs2), 32, true));
-                cc.jl(label_then255);
-                mov(cc, tmp_reg255,0);
-                cc.jmp(label_merge255);
-                cc.bind(label_then255);
-                mov(cc, tmp_reg255, 1);
-                cc.bind(label_merge255);
+                auto label_then3 = cc.newLabel();
+                auto label_merge3 = cc.newLabel();
+                auto tmp_reg3 = get_reg_Gp(cc, 8, false);
+                cmp(cc, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
+                cc.jl(label_then3);
+                mov(cc, tmp_reg3,0);
+                cc.jmp(label_merge3);
+                cc.bind(label_then3);
+                mov(cc, tmp_reg3, 1);
+                cc.bind(label_merge3);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg255
+                      gen_ext(cc, tmp_reg3
                       , 32, false)
                 );
             }
@@ -2217,25 +2187,24 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
-                auto label_then256 = cc.newLabel();
-                auto label_merge256 = cc.newLabel();
-                auto tmp_reg256 = get_reg(cc, 8, false);
-                cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2));
-                cc.jb(label_then256);
-                mov(cc, tmp_reg256,0);
-                cc.jmp(label_merge256);
-                cc.bind(label_then256);
-                mov(cc, tmp_reg256, 1);
-                cc.bind(label_merge256);
+                auto label_then4 = cc.newLabel();
+                auto label_merge4 = cc.newLabel();
+                auto tmp_reg4 = get_reg_Gp(cc, 8, false);
+                cmp(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+                cc.jb(label_then4);
+                mov(cc, tmp_reg4,0);
+                cc.jmp(label_merge4);
+                cc.bind(label_then4);
+                mov(cc, tmp_reg4, 1);
+                cc.bind(label_merge4);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg256
+                      gen_ext(cc, tmp_reg4
                       , 32, false)
                 );
             }
@@ -2277,16 +2246,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2326,17 +2293,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                      ))
-                      );
+                      gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1)))));
             }
         }
         auto returnValue = CONT;
@@ -2376,19 +2340,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1), 32, true), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                          ))
-                          ), 32, true));
+                          (gen_operation(cc, sar, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -2428,16 +2388,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2477,16 +2435,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2528,7 +2484,6 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         gen_write_mem(jh, traits::FENCE, static_cast<uint32_t>(traits::fence), (uint8_t)pred<<4|succ, 4);
         auto returnValue = CONT;
@@ -2564,9 +2519,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, 11);
         auto returnValue = TRAP;
         
@@ -2601,9 +2555,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, 3);
         auto returnValue = TRAP;
         
@@ -2638,9 +2591,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_leave(jh, 3);
         auto returnValue = TRAP;
         
@@ -2675,12 +2627,10 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_wait_257;
-        jh.cc.comment("//call_wait");
-        jh.cc.invoke(&call_wait_257, &wait, FuncSignature::build<void, int32_t>());
-        setArg(call_wait_257, 0, 1);
+        InvokeNode* call_wait_5;
+        cc.invoke(&call_wait_5,  &wait, FuncSignature::build<void, uint32_t>());
+        setArg(call_wait_5, 0, 1);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 41);
@@ -2718,20 +2668,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rd!=0){
                 auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
                 gen_write_mem(jh, traits::CSR, csr, xrs1, 4);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       xrd);
             }
-            else{
+            else {
                 gen_write_mem(jh, traits::CSR, csr, xrs1, 4);
             }
         }
@@ -2772,17 +2721,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rs1!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, xrs1)
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, xrs1), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2826,17 +2773,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rs1!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, gen_operation(cc, bnot, xrs1))
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, gen_operation(cc, bnot, xrs1)), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2880,12 +2825,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             gen_write_mem(jh, traits::CSR, csr, (uint32_t)zimm, 4);
             if(rd!=0){
@@ -2930,16 +2874,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             if(zimm!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, (uint32_t)zimm)
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, (uint32_t)zimm), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2983,16 +2925,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             if(zimm!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, ~ ((uint32_t)zimm))
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, ~ ((uint32_t)zimm)), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -3036,7 +2976,6 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         gen_write_mem(jh, traits::FENCE, static_cast<uint32_t>(traits::fencei), imm, 4);
         auto returnValue = FLUSH;
@@ -3076,16 +3015,12 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, smul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-            ;
+        else {
+            auto res = gen_operation(cc, smul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
@@ -3129,21 +3064,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, smul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-            ;
+        else {
+            auto res = gen_operation(cc, smul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, true));
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -3183,20 +3113,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, sumul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), load_reg_from_mem(jh, traits::X0 + rs2))
-            ;
+        else {
+            auto res = gen_operation(cc, sumul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, true));
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -3236,19 +3162,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, umul, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ;
+        else {
+            auto res = gen_operation(cc, umul, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, shr, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, false));
+                          (gen_operation(cc, shr, res, static_cast<uint32_t>(traits::XLEN))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -3288,31 +3211,26 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto dividend = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true);
-            auto divisor = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true);
+        else {
+            auto dividend = gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true);
+            auto divisor = gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true);
             if(rd!=0){
                 {
                 auto label_merge = cc.newLabel();
-                cmp(cc, gen_operation(cc, ne, divisor, 0)
-                ,0);
+                auto cond =  gen_operation(cc, ne, divisor, 0);
+                cmp(cc, cond, 0);
                 auto label_else = cc.newLabel();
                 cc.je(label_else);
                 {
                     auto MMIN = ((uint32_t)1)<<(static_cast<uint32_t>(traits::XLEN)-1);
                     {
                     auto label_merge = cc.newLabel();
-                    cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
-                    , gen_operation(cc, eq, divisor, - 1)
-                    )
-                    ,0);
+                    auto cond =  gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), MMIN), gen_operation(cc, eq, divisor, - 1));
+                    cmp(cc, cond, 0);
                     auto label_else = cc.newLabel();
                     cc.je(label_else);
                     {
@@ -3324,8 +3242,7 @@ private:
                         {
                             mov(cc, get_ptr_for(jh, traits::X0+ rd),
                                   gen_ext(cc, 
-                                      (gen_operation(cc, sdiv, dividend, divisor)
-                                      ), 32, true));
+                                      (gen_operation(cc, sdiv, dividend, divisor)), 32, true));
                         }
                     cc.bind(label_merge);
                     }
@@ -3377,23 +3294,21 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                          gen_operation(cc, udiv, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          );
+                          gen_operation(cc, udiv, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
                 }
             }
             cc.jmp(label_merge);
@@ -3444,27 +3359,24 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 auto MMIN = (uint32_t)1<<(static_cast<uint32_t>(traits::XLEN)-1);
                 {
                 auto label_merge = cc.newLabel();
-                cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
-                , gen_operation(cc, eq, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs2), 32, false), - 1)
-                )
-                ,0);
+                auto cond =  gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), MMIN), gen_operation(cc, eq, gen_ext(cc, 
+                    load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), - 1));
+                cmp(cc, cond, 0);
                 auto label_else = cc.newLabel();
                 cc.je(label_else);
                 {
@@ -3479,11 +3391,7 @@ private:
                     {
                         if(rd!=0){
                             mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                                  gen_ext(cc, 
-                                      (gen_operation(cc, srem, gen_ext(cc, 
-                                          load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                                          load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-                                      ), 32, false));
+                                  gen_ext(cc, (gen_operation(cc, srem, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true))), 32, false));
                         }
                     }
                 cc.bind(label_merge);
@@ -3494,7 +3402,7 @@ private:
                 {
                     if(rd!=0){
                         mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                              load_reg_from_mem(jh, traits::X0 + rs1));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1));
                     }
                 }
             cc.bind(label_merge);
@@ -3537,23 +3445,21 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                          gen_operation(cc, urem, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          );
+                          gen_operation(cc, urem, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
                 }
             }
             cc.jmp(label_merge);
@@ -3561,7 +3467,7 @@ private:
                 {
                     if(rd!=0){
                         mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                              load_reg_from_mem(jh, traits::X0 + rs1));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1));
                     }
                 }
             cc.bind(label_merge);
@@ -3605,14 +3511,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
-                auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+                auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
                           (gen_ext(cc, 
@@ -3659,38 +3564,37 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::RES, offs, 1);
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, res1, 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, res1, 0);
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+                    load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), 4);
             }
             cc.bind(label_merge);
             }
             if(rd!=0){
-                auto label_then258 = cc.newLabel();
-                auto label_merge258 = cc.newLabel();
-                auto tmp_reg258 = get_reg(cc, 8, false);
+                auto label_then6 = cc.newLabel();
+                auto label_merge6 = cc.newLabel();
+                auto tmp_reg6 = get_reg_Gp(cc, 8, false);
                 cmp(cc, res1, 0);
-                cc.jne(label_then258);
-                mov(cc, tmp_reg258,1);
-                cc.jmp(label_merge258);
-                cc.bind(label_then258);
-                mov(cc, tmp_reg258, 0);
-                cc.bind(label_merge258);
+                cc.jne(label_then6);
+                mov(cc, tmp_reg6,1);
+                cc.jmp(label_merge6);
+                cc.bind(label_then6);
+                mov(cc, tmp_reg6, 0);
+                cc.bind(label_merge6);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, tmp_reg258
+                      gen_ext(cc, tmp_reg6
                       , 32, false)
                 );
             }
@@ -3734,14 +3638,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
-            auto res = load_reg_from_mem(jh, traits::X0 + rs2);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
+            auto res = load_reg_from_mem_Gp(jh, traits::X0 + rs2);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
@@ -3790,18 +3693,16 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
             auto res2 = gen_operation(cc, add, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ;
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
@@ -3849,23 +3750,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
             auto res2 = gen_operation(cc, bxor, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ;
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  res1, 32, true), 32, true), 32, false));
+                      gen_ext(cc, gen_ext(cc, 
+                          gen_ext(cc, res1, 32, true), 32, true), 32, false));
             }
             gen_write_mem(jh, traits::MEM, offs, res2, 4);
         }
@@ -3908,23 +3805,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
             auto res2 = gen_operation(cc, band, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ;
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  res1, 32, true), 32, true), 32, false));
+                      gen_ext(cc, gen_ext(cc, 
+                          gen_ext(cc, res1, 32, true), 32, true), 32, false));
             }
             gen_write_mem(jh, traits::MEM, offs, res2, 4);
         }
@@ -3967,23 +3860,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
             auto res2 = gen_operation(cc, bor, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ;
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  res1, 32, true), 32, true), 32, false));
+                      gen_ext(cc, gen_ext(cc, 
+                          gen_ext(cc, res1, 32, true), 32, true), 32, false));
             }
             gen_write_mem(jh, traits::MEM, offs, res2, 4);
         }
@@ -4026,29 +3915,27 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
-            auto label_then259 = cc.newLabel();
-            auto label_merge259 = cc.newLabel();
-            auto tmp_reg259 = get_reg(cc, 32, false);
+            auto label_then7 = cc.newLabel();
+            auto label_merge7 = cc.newLabel();
+            auto tmp_reg7 = get_reg_Gp(cc, 32, false);
             cmp(cc, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.jg(label_then259);
-            mov(cc, tmp_reg259,gen_ext(cc, 
-                res1, 32, false));
-            cc.jmp(label_merge259);
-            cc.bind(label_then259);
-            mov(cc, tmp_reg259, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.bind(label_merge259);
-            auto res2 = tmp_reg259
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.jg(label_then7);
+            mov(cc, tmp_reg7,gen_ext(cc, res1, 32, false));
+            cc.jmp(label_merge7);
+            cc.bind(label_then7);
+            mov(cc, tmp_reg7, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge7);
+            auto res2 = tmp_reg7
             ;
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -4096,29 +3983,27 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
-            auto label_then260 = cc.newLabel();
-            auto label_merge260 = cc.newLabel();
-            auto tmp_reg260 = get_reg(cc, 32, false);
+            auto label_then8 = cc.newLabel();
+            auto label_merge8 = cc.newLabel();
+            auto tmp_reg8 = get_reg_Gp(cc, 32, false);
             cmp(cc, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.jl(label_then260);
-            mov(cc, tmp_reg260,gen_ext(cc, 
-                res1, 32, false));
-            cc.jmp(label_merge260);
-            cc.bind(label_then260);
-            mov(cc, tmp_reg260, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.bind(label_merge260);
-            auto res2 = tmp_reg260
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.jl(label_then8);
+            mov(cc, tmp_reg8,gen_ext(cc, res1, 32, false));
+            cc.jmp(label_merge8);
+            cc.bind(label_then8);
+            mov(cc, tmp_reg8, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge8);
+            auto res2 = tmp_reg8
             ;
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -4166,34 +4051,31 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
-            auto label_then261 = cc.newLabel();
-            auto label_merge261 = cc.newLabel();
-            auto tmp_reg261 = get_reg(cc, 32, false);
+            auto label_then9 = cc.newLabel();
+            auto label_merge9 = cc.newLabel();
+            auto tmp_reg9 = get_reg_Gp(cc, 32, false);
             cmp(cc, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.ja(label_then261);
-            mov(cc, tmp_reg261,res1);
-            cc.jmp(label_merge261);
-            cc.bind(label_then261);
-            mov(cc, tmp_reg261, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.bind(label_merge261);
-            auto res2 = tmp_reg261
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.ja(label_then9);
+            mov(cc, tmp_reg9,res1);
+            cc.jmp(label_merge9);
+            cc.bind(label_then9);
+            mov(cc, tmp_reg9, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge9);
+            auto res2 = tmp_reg9
             ;
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  res1, 32, true), 32, true), 32, false));
+                      gen_ext(cc, gen_ext(cc, 
+                          gen_ext(cc, res1, 32, true), 32, true), 32, false));
             }
             gen_write_mem(jh, traits::MEM, offs, res2, 4);
         }
@@ -4236,34 +4118,31 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto offs = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto offs = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto res1 = gen_read_mem(jh, traits::MEM, offs, 4);
-            auto label_then262 = cc.newLabel();
-            auto label_merge262 = cc.newLabel();
-            auto tmp_reg262 = get_reg(cc, 32, false);
+            auto label_then10 = cc.newLabel();
+            auto label_merge10 = cc.newLabel();
+            auto tmp_reg10 = get_reg_Gp(cc, 32, false);
             cmp(cc, res1, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.jb(label_then262);
-            mov(cc, tmp_reg262,res1);
-            cc.jmp(label_merge262);
-            cc.bind(label_then262);
-            mov(cc, tmp_reg262, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false));
-            cc.bind(label_merge262);
-            auto res2 = tmp_reg262
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.jb(label_then10);
+            mov(cc, tmp_reg10,res1);
+            cc.jmp(label_merge10);
+            cc.bind(label_then10);
+            mov(cc, tmp_reg10, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cc.bind(label_merge10);
+            auto res2 = tmp_reg10
             ;
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  res1, 32, true), 32, true), 32, false));
+                      gen_ext(cc, gen_ext(cc, 
+                          gen_ext(cc, res1, 32, true), 32, true), 32, false));
             }
             gen_write_mem(jh, traits::MEM, offs, res2, 4);
         }
@@ -4303,16 +4182,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(imm){
             mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
                   gen_ext(cc, 
-                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), imm)
-                      ), 32, false));
+                      (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), imm)), 32, false));
         }
-        else{
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        else {
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         auto returnValue = CONT;
         
@@ -4351,11 +4228,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
               gen_ext(cc, 
                   gen_ext(cc, 
@@ -4397,13 +4272,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::X0 + rs2+8), 32, false), 4);
+            load_reg_from_mem_Gp(jh, traits::X0 + rs2+8), 32, false), 4);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 70);
@@ -4440,17 +4313,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rs1!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int8_t)sext<6>(imm))
-                          ), 32, true));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int8_t)sext<6>(imm))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -4487,7 +4358,6 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto returnValue = CONT;
         
@@ -4524,9 +4394,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         mov(cc, get_ptr_for(jh, traits::X0+ 1),
               (uint32_t)(PC+2));
         auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
@@ -4568,12 +4437,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)((int8_t)sext<6>(imm)));
@@ -4615,10 +4483,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(imm==0||rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         if(rd!=0){
             mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -4659,16 +4526,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(nzimm){
             mov(cc, get_ptr_for(jh, traits::X0+ 2),
                   gen_ext(cc, 
-                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), (int16_t)sext<10>(nzimm))
-                      ), 32, true));
+                      (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), (int16_t)sext<10>(nzimm))), 32, true));
         }
-        else{
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        else {
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         auto returnValue = CONT;
         
@@ -4704,9 +4569,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 77);
@@ -4743,11 +4607,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
-              gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1+8), shamt)
-              );
+              gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), shamt));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 78);
@@ -4784,22 +4646,19 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(shamt){
             mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
                   gen_ext(cc, 
                       (gen_operation(cc, sar, (gen_ext(cc, 
-                          load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), shamt)
-                      ), 32, true));
+                          load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 32, false)), shamt)), 32, true));
         }
-        else{
+        else {
             if(static_cast<uint32_t>(traits::XLEN)==128){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
                       gen_ext(cc, 
                           (gen_operation(cc, sar, (gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), 64)
-                          ), 32, true));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 32, false)), 64)), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -4838,12 +4697,10 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
               gen_ext(cc, 
-                  (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1+8), (int8_t)sext<6>(imm))
-                  ), 32, true));
+                  (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), (int8_t)sext<6>(imm))), 32, true));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 80);
@@ -4880,12 +4737,10 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
               gen_ext(cc, 
-                  (gen_operation(cc, sub, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-                  ), 32, true));
+                  (gen_operation(cc, sub, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8))), 32, true));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 81);
@@ -4922,11 +4777,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 82);
@@ -4963,11 +4816,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 83);
@@ -5004,11 +4855,9 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 84);
@@ -5044,9 +4893,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
         mov(cc, jh.next_pc, PC_val_v);
         mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -5086,13 +4934,12 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         {
         auto label_merge = cc.newLabel();
-        cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
-        ,0);
+        auto cond =  gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 0);
+        cmp(cc, cond, 0);
         cc.je(label_merge);
         {
             auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
@@ -5137,13 +4984,12 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         {
         auto label_merge = cc.newLabel();
-        cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
-        ,0);
+        auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 0);
+        cmp(cc, cond, 0);
         cc.je(label_merge);
         {
             auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
@@ -5188,16 +5034,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rs1!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), nzuimm)
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), nzuimm));
             }
         }
         auto returnValue = CONT;
@@ -5236,15 +5080,13 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-                ), 32, false);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
             mov(cc, get_ptr_for(jh, traits::X0+ rd),
                   gen_ext(cc, 
                       gen_ext(cc, 
@@ -5286,15 +5128,14 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      load_reg_from_mem(jh, traits::X0 + rs2));
+                      load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             }
         }
         auto returnValue = CONT;
@@ -5332,17 +5173,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs1&&rs1<static_cast<uint32_t>(traits::RFS)){
             auto addr_mask = (uint32_t)- 2;
-            auto PC_val_v = gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1%static_cast<uint32_t>(traits::RFS)), addr_mask)
-            ;
+            auto PC_val_v = gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1%static_cast<uint32_t>(traits::RFS)), addr_mask);
             mov(cc, jh.next_pc, PC_val_v);
             mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
         }
-        else{
+        else {
             gen_raise(jh, 0, 2);
         }
         auto returnValue = BRANCH;
@@ -5378,7 +5217,6 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         gen_raise(jh, 0, 2);
         auto returnValue = CONT;
@@ -5417,17 +5255,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rd), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, false));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rd), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -5465,19 +5301,17 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto addr_mask = (uint32_t)- 2;
-            auto new_pc = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto new_pc = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             mov(cc, get_ptr_for(jh, traits::X0+ 1),
                   (uint32_t)(PC+2));
-            auto PC_val_v = gen_operation(cc, band, new_pc, addr_mask)
-            ;
+            auto PC_val_v = gen_operation(cc, band, new_pc, addr_mask);
             mov(cc, jh.next_pc, PC_val_v);
             mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
         }
@@ -5514,7 +5348,6 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         gen_raise(jh, 0, 3);
         auto returnValue = CONT;
@@ -5553,17 +5386,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-                ), 32, false);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
             gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), 4);
         }
         auto returnValue = CONT;
         
@@ -5598,9 +5429,8 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 97);
@@ -5638,21 +5468,22 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
-            auto res = gen_ext(cc, 
-                gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
+            InvokeNode* call_NaNBox32_11;
+            auto NaNBox32_11_arg0 = gen_read_mem(jh, traits::MEM, offs, 4);
+            x86::Gp ret_val_NaNBox32_11 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox32_11, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
             mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, gen_ext(cc, 
-                      res, 64, false), (uint64_t)((int64_t)- 1<<32))
-                  );
+                  ret_val_NaNBox32_11);
+            setArg(call_NaNBox32_11, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox32_11, 1, NaNBox32_11_arg0);
+            setRet(call_NaNBox32_11, 0, ret_val_NaNBox32_11);
         }
         auto returnValue = CONT;
         
@@ -5691,17 +5522,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::F0 + rs2), 32, false), 4);
+                load_reg_from_mem_Gp(jh, traits::F0 + rs2), 32, false), 4);
         }
         auto returnValue = CONT;
         
@@ -5710,375 +5539,7 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 100: FMADD__S */
-    continuation_e __fmadd__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMADD__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 100);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_264;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_264_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_264 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_264, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_unbox_s_265;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_265_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_265 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_265, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_unbox_s_266;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_266_arg0 = load_reg_from_mem(jh, traits::F0 + rs3);
-        x86::Gp ret_val_unbox_s_266 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_266, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_fmadd_s_263;
-        jh.cc.comment("//call_fmadd_s");
-        auto fmadd_s_263_arg0 = ret_val_unbox_s_264;
-        auto fmadd_s_263_arg1 = ret_val_unbox_s_265;
-        auto fmadd_s_263_arg2 = ret_val_unbox_s_266;
-        auto fmadd_s_263_arg4 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fmadd_s_263 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fmadd_s_263, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fmadd_s_263;
-        setArg(call_unbox_s_264, 0, unbox_s_264_arg0);
-        setRet(call_unbox_s_264, 0, ret_val_unbox_s_264);setArg(call_unbox_s_265, 0, unbox_s_265_arg0);
-        setRet(call_unbox_s_265, 0, ret_val_unbox_s_265);setArg(call_unbox_s_266, 0, unbox_s_266_arg0);
-        setRet(call_unbox_s_266, 0, ret_val_unbox_s_266);setArg(call_fmadd_s_263, 0, fmadd_s_263_arg0);
-        setArg(call_fmadd_s_263, 1, fmadd_s_263_arg1);
-        setArg(call_fmadd_s_263, 2, fmadd_s_263_arg2);
-        setArg(call_fmadd_s_263, 3, 0);
-        setArg(call_fmadd_s_263, 4, fmadd_s_263_arg4);
-        setRet(call_fmadd_s_263, 0, ret_val_fmadd_s_263);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_267;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_267 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_267, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_267;
-        setRet(call_fget_flags_267, 0, ret_val_fget_flags_267);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 100);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 101: FMSUB__S */
-    continuation_e __fmsub__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMSUB__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 101);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_269;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_269_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_269 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_269, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_unbox_s_270;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_270_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_270 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_270, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_unbox_s_271;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_271_arg0 = load_reg_from_mem(jh, traits::F0 + rs3);
-        x86::Gp ret_val_unbox_s_271 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_271, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        InvokeNode* call_fmadd_s_268;
-        jh.cc.comment("//call_fmadd_s");
-        auto fmadd_s_268_arg0 = ret_val_unbox_s_269;
-        auto fmadd_s_268_arg1 = ret_val_unbox_s_270;
-        auto fmadd_s_268_arg2 = ret_val_unbox_s_271;
-        auto fmadd_s_268_arg4 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fmadd_s_268 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fmadd_s_268, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fmadd_s_268;
-        setArg(call_unbox_s_269, 0, unbox_s_269_arg0);
-        setRet(call_unbox_s_269, 0, ret_val_unbox_s_269);setArg(call_unbox_s_270, 0, unbox_s_270_arg0);
-        setRet(call_unbox_s_270, 0, ret_val_unbox_s_270);setArg(call_unbox_s_271, 0, unbox_s_271_arg0);
-        setRet(call_unbox_s_271, 0, ret_val_unbox_s_271);setArg(call_fmadd_s_268, 0, fmadd_s_268_arg0);
-        setArg(call_fmadd_s_268, 1, fmadd_s_268_arg1);
-        setArg(call_fmadd_s_268, 2, fmadd_s_268_arg2);
-        setArg(call_fmadd_s_268, 3, 1);
-        setArg(call_fmadd_s_268, 4, fmadd_s_268_arg4);
-        setRet(call_fmadd_s_268, 0, ret_val_fmadd_s_268);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_272;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_272 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_272, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_272;
-        setRet(call_fget_flags_272, 0, ret_val_fget_flags_272);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 101);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 102: FNMADD__S */
-    continuation_e __fnmadd__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, name(rd), {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FNMADD__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 102);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_273;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_273_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_273 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_273, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_273;
-        setArg(call_unbox_s_273, 0, unbox_s_273_arg0);
-        setRet(call_unbox_s_273, 0, ret_val_unbox_s_273);
-        InvokeNode* call_unbox_s_274;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_274_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_274 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_274, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_274;
-        setArg(call_unbox_s_274, 0, unbox_s_274_arg0);
-        setRet(call_unbox_s_274, 0, ret_val_unbox_s_274);
-        InvokeNode* call_unbox_s_275;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_275_arg0 = load_reg_from_mem(jh, traits::F0 + rs3);
-        x86::Gp ret_val_unbox_s_275 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_275, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs3 = ret_val_unbox_s_275;
-        setArg(call_unbox_s_275, 0, unbox_s_275_arg0);
-        setRet(call_unbox_s_275, 0, ret_val_unbox_s_275);
-        InvokeNode* call_fmadd_s_276;
-        jh.cc.comment("//call_fmadd_s");
-        auto fmadd_s_276_arg0 = frs1;
-        auto fmadd_s_276_arg1 = frs2;
-        auto fmadd_s_276_arg2 = frs3;
-        auto fmadd_s_276_arg4 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fmadd_s_276 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fmadd_s_276, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fmadd_s_276;
-        setArg(call_fmadd_s_276, 0, fmadd_s_276_arg0);
-        setArg(call_fmadd_s_276, 1, fmadd_s_276_arg1);
-        setArg(call_fmadd_s_276, 2, fmadd_s_276_arg2);
-        setArg(call_fmadd_s_276, 3, 2);
-        setArg(call_fmadd_s_276, 4, fmadd_s_276_arg4);
-        setRet(call_fmadd_s_276, 0, ret_val_fmadd_s_276);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_277;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_277 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_277, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_277;
-        setRet(call_fget_flags_277, 0, ret_val_fget_flags_277);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 102);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 103: FNMSUB__S */
-    continuation_e __fnmsub__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FNMSUB__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 103);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_278;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_278_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_278 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_278, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_278;
-        setArg(call_unbox_s_278, 0, unbox_s_278_arg0);
-        setRet(call_unbox_s_278, 0, ret_val_unbox_s_278);
-        InvokeNode* call_unbox_s_279;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_279_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_279 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_279, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_279;
-        setArg(call_unbox_s_279, 0, unbox_s_279_arg0);
-        setRet(call_unbox_s_279, 0, ret_val_unbox_s_279);
-        InvokeNode* call_unbox_s_280;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_280_arg0 = load_reg_from_mem(jh, traits::F0 + rs3);
-        x86::Gp ret_val_unbox_s_280 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_280, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs3 = ret_val_unbox_s_280;
-        setArg(call_unbox_s_280, 0, unbox_s_280_arg0);
-        setRet(call_unbox_s_280, 0, ret_val_unbox_s_280);
-        InvokeNode* call_fmadd_s_281;
-        jh.cc.comment("//call_fmadd_s");
-        auto fmadd_s_281_arg0 = frs1;
-        auto fmadd_s_281_arg1 = frs2;
-        auto fmadd_s_281_arg2 = frs3;
-        auto fmadd_s_281_arg4 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fmadd_s_281 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fmadd_s_281, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fmadd_s_281;
-        setArg(call_fmadd_s_281, 0, fmadd_s_281_arg0);
-        setArg(call_fmadd_s_281, 1, fmadd_s_281_arg1);
-        setArg(call_fmadd_s_281, 2, fmadd_s_281_arg2);
-        setArg(call_fmadd_s_281, 3, 3);
-        setArg(call_fmadd_s_281, 4, fmadd_s_281_arg4);
-        setRet(call_fmadd_s_281, 0, ret_val_fmadd_s_281);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_282;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_282 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_282, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_282;
-        setRet(call_fget_flags_282, 0, ret_val_fget_flags_282);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 103);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 104: FADD__S */
+    /* instruction 100: FADD__S */
     continuation_e __fadd__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6089,8 +5550,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6102,66 +5563,67 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FADD__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 104);
+        gen_sync(jh, PRE_SYNC, 100);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_283;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_283_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_283 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_283, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_283;
-        setArg(call_unbox_s_283, 0, unbox_s_283_arg0);
-        setRet(call_unbox_s_283, 0, ret_val_unbox_s_283);
-        InvokeNode* call_unbox_s_284;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_284_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_284 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_284, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_284;
-        setArg(call_unbox_s_284, 0, unbox_s_284_arg0);
-        setRet(call_unbox_s_284, 0, ret_val_unbox_s_284);
-        InvokeNode* call_fadd_s_285;
-        jh.cc.comment("//call_fadd_s");
-        auto fadd_s_285_arg0 = frs1;
-        auto fadd_s_285_arg1 = frs2;
-        auto fadd_s_285_arg2 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fadd_s_285 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fadd_s_285, &fadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fadd_s_285;
-        setArg(call_fadd_s_285, 0, fadd_s_285_arg0);
-        setArg(call_fadd_s_285, 1, fadd_s_285_arg1);
-        setArg(call_fadd_s_285, 2, fadd_s_285_arg2);
-        setRet(call_fadd_s_285, 0, ret_val_fadd_s_285);
+        InvokeNode* call_unbox_s_14;
+        auto unbox_s_14_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_14 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_14,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_15;
+        auto unbox_s_15_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_15 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_15,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_16;
+        x86::Gp ret_val_get_rm_16 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_16, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fadd_s_13;
+        auto fadd_s_13_arg0 = ret_val_unbox_s_14;
+        auto fadd_s_13_arg1 = ret_val_unbox_s_15;
+        auto fadd_s_13_arg2 = ret_val_get_rm_16;
+        x86::Gp ret_val_fadd_s_13 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fadd_s_13,  &fadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_12;
+        auto NaNBox32_12_arg0 = ret_val_fadd_s_13;
+        x86::Gp ret_val_NaNBox32_12 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_12, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_286;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_286 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_286, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_286;
-        setRet(call_fget_flags_286, 0, ret_val_fget_flags_286);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_12);
+        setArg(call_unbox_s_14, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_14, 1, unbox_s_14_arg1);
+        setRet(call_unbox_s_14, 0, ret_val_unbox_s_14);
+        setArg(call_unbox_s_15, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_15, 1, unbox_s_15_arg1);
+        setRet(call_unbox_s_15, 0, ret_val_unbox_s_15);
+        setArg(call_get_rm_16, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_16, 1, rm);
+        setRet(call_get_rm_16, 0, ret_val_get_rm_16);
+        setArg(call_fadd_s_13, 0, fadd_s_13_arg0);
+        setArg(call_fadd_s_13, 1, fadd_s_13_arg1);
+        setArg(call_fadd_s_13, 2, fadd_s_13_arg2);
+        setRet(call_fadd_s_13, 0, ret_val_fadd_s_13);
+        setArg(call_NaNBox32_12, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_12, 1, NaNBox32_12_arg0);
+        setRet(call_NaNBox32_12, 0, ret_val_NaNBox32_12);
+        InvokeNode* call_fget_flags_17;
+        x86::Gp ret_val_fget_flags_17 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_17,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_17;
+        setRet(call_fget_flags_17, 0, ret_val_fget_flags_17);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 104);
+        gen_sync(jh, POST_SYNC, 100);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 105: FSUB__S */
+    /* instruction 101: FSUB__S */
     continuation_e __fsub__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6172,8 +5634,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6185,66 +5647,67 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FSUB__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 105);
+        gen_sync(jh, PRE_SYNC, 101);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_287;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_287_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_287 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_287, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_287;
-        setArg(call_unbox_s_287, 0, unbox_s_287_arg0);
-        setRet(call_unbox_s_287, 0, ret_val_unbox_s_287);
-        InvokeNode* call_unbox_s_288;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_288_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_288 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_288, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_288;
-        setArg(call_unbox_s_288, 0, unbox_s_288_arg0);
-        setRet(call_unbox_s_288, 0, ret_val_unbox_s_288);
-        InvokeNode* call_fsub_s_289;
-        jh.cc.comment("//call_fsub_s");
-        auto fsub_s_289_arg0 = frs1;
-        auto fsub_s_289_arg1 = frs2;
-        auto fsub_s_289_arg2 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fsub_s_289 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fsub_s_289, &fsub_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fsub_s_289;
-        setArg(call_fsub_s_289, 0, fsub_s_289_arg0);
-        setArg(call_fsub_s_289, 1, fsub_s_289_arg1);
-        setArg(call_fsub_s_289, 2, fsub_s_289_arg2);
-        setRet(call_fsub_s_289, 0, ret_val_fsub_s_289);
+        InvokeNode* call_unbox_s_20;
+        auto unbox_s_20_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_20 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_20,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_21;
+        auto unbox_s_21_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_21 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_21,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_22;
+        x86::Gp ret_val_get_rm_22 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_22, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fsub_s_19;
+        auto fsub_s_19_arg0 = ret_val_unbox_s_20;
+        auto fsub_s_19_arg1 = ret_val_unbox_s_21;
+        auto fsub_s_19_arg2 = ret_val_get_rm_22;
+        x86::Gp ret_val_fsub_s_19 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fsub_s_19,  &fsub_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_18;
+        auto NaNBox32_18_arg0 = ret_val_fsub_s_19;
+        x86::Gp ret_val_NaNBox32_18 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_18, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_290;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_290 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_290, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_290;
-        setRet(call_fget_flags_290, 0, ret_val_fget_flags_290);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_18);
+        setArg(call_unbox_s_20, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_20, 1, unbox_s_20_arg1);
+        setRet(call_unbox_s_20, 0, ret_val_unbox_s_20);
+        setArg(call_unbox_s_21, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_21, 1, unbox_s_21_arg1);
+        setRet(call_unbox_s_21, 0, ret_val_unbox_s_21);
+        setArg(call_get_rm_22, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_22, 1, rm);
+        setRet(call_get_rm_22, 0, ret_val_get_rm_22);
+        setArg(call_fsub_s_19, 0, fsub_s_19_arg0);
+        setArg(call_fsub_s_19, 1, fsub_s_19_arg1);
+        setArg(call_fsub_s_19, 2, fsub_s_19_arg2);
+        setRet(call_fsub_s_19, 0, ret_val_fsub_s_19);
+        setArg(call_NaNBox32_18, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_18, 1, NaNBox32_18_arg0);
+        setRet(call_NaNBox32_18, 0, ret_val_NaNBox32_18);
+        InvokeNode* call_fget_flags_23;
+        x86::Gp ret_val_fget_flags_23 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_23,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_23;
+        setRet(call_fget_flags_23, 0, ret_val_fget_flags_23);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 105);
+        gen_sync(jh, POST_SYNC, 101);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 106: FMUL__S */
+    /* instruction 102: FMUL__S */
     continuation_e __fmul__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6255,8 +5718,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6268,66 +5731,67 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FMUL__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 106);
+        gen_sync(jh, PRE_SYNC, 102);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_291;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_291_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_291 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_291, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_291;
-        setArg(call_unbox_s_291, 0, unbox_s_291_arg0);
-        setRet(call_unbox_s_291, 0, ret_val_unbox_s_291);
-        InvokeNode* call_unbox_s_292;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_292_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_292 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_292, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_292;
-        setArg(call_unbox_s_292, 0, unbox_s_292_arg0);
-        setRet(call_unbox_s_292, 0, ret_val_unbox_s_292);
-        InvokeNode* call_fmul_s_293;
-        jh.cc.comment("//call_fmul_s");
-        auto fmul_s_293_arg0 = frs1;
-        auto fmul_s_293_arg1 = frs2;
-        auto fmul_s_293_arg2 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fmul_s_293 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fmul_s_293, &fmul_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fmul_s_293;
-        setArg(call_fmul_s_293, 0, fmul_s_293_arg0);
-        setArg(call_fmul_s_293, 1, fmul_s_293_arg1);
-        setArg(call_fmul_s_293, 2, fmul_s_293_arg2);
-        setRet(call_fmul_s_293, 0, ret_val_fmul_s_293);
+        InvokeNode* call_unbox_s_26;
+        auto unbox_s_26_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_26 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_26,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_27;
+        auto unbox_s_27_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_27 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_27,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_28;
+        x86::Gp ret_val_get_rm_28 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_28, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmul_s_25;
+        auto fmul_s_25_arg0 = ret_val_unbox_s_26;
+        auto fmul_s_25_arg1 = ret_val_unbox_s_27;
+        auto fmul_s_25_arg2 = ret_val_get_rm_28;
+        x86::Gp ret_val_fmul_s_25 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fmul_s_25,  &fmul_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_24;
+        auto NaNBox32_24_arg0 = ret_val_fmul_s_25;
+        x86::Gp ret_val_NaNBox32_24 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_24, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_294;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_294 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_294, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_294;
-        setRet(call_fget_flags_294, 0, ret_val_fget_flags_294);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_24);
+        setArg(call_unbox_s_26, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_26, 1, unbox_s_26_arg1);
+        setRet(call_unbox_s_26, 0, ret_val_unbox_s_26);
+        setArg(call_unbox_s_27, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_27, 1, unbox_s_27_arg1);
+        setRet(call_unbox_s_27, 0, ret_val_unbox_s_27);
+        setArg(call_get_rm_28, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_28, 1, rm);
+        setRet(call_get_rm_28, 0, ret_val_get_rm_28);
+        setArg(call_fmul_s_25, 0, fmul_s_25_arg0);
+        setArg(call_fmul_s_25, 1, fmul_s_25_arg1);
+        setArg(call_fmul_s_25, 2, fmul_s_25_arg2);
+        setRet(call_fmul_s_25, 0, ret_val_fmul_s_25);
+        setArg(call_NaNBox32_24, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_24, 1, NaNBox32_24_arg0);
+        setRet(call_NaNBox32_24, 0, ret_val_NaNBox32_24);
+        InvokeNode* call_fget_flags_29;
+        x86::Gp ret_val_fget_flags_29 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_29,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_29;
+        setRet(call_fget_flags_29, 0, ret_val_fget_flags_29);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 106);
+        gen_sync(jh, POST_SYNC, 102);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 107: FDIV__S */
+    /* instruction 103: FDIV__S */
     continuation_e __fdiv__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6338,8 +5802,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6351,320 +5815,67 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FDIV__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 107);
+        gen_sync(jh, PRE_SYNC, 103);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_295;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_295_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_295 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_295, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_295;
-        setArg(call_unbox_s_295, 0, unbox_s_295_arg0);
-        setRet(call_unbox_s_295, 0, ret_val_unbox_s_295);
-        InvokeNode* call_unbox_s_296;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_296_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_296 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_296, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_296;
-        setArg(call_unbox_s_296, 0, unbox_s_296_arg0);
-        setRet(call_unbox_s_296, 0, ret_val_unbox_s_296);
-        InvokeNode* call_fdiv_s_297;
-        jh.cc.comment("//call_fdiv_s");
-        auto fdiv_s_297_arg0 = frs1;
-        auto fdiv_s_297_arg1 = frs2;
-        auto fdiv_s_297_arg2 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fdiv_s_297 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fdiv_s_297, &fdiv_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fdiv_s_297;
-        setArg(call_fdiv_s_297, 0, fdiv_s_297_arg0);
-        setArg(call_fdiv_s_297, 1, fdiv_s_297_arg1);
-        setArg(call_fdiv_s_297, 2, fdiv_s_297_arg2);
-        setRet(call_fdiv_s_297, 0, ret_val_fdiv_s_297);
+        InvokeNode* call_unbox_s_32;
+        auto unbox_s_32_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_32 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_32,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_33;
+        auto unbox_s_33_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_33 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_33,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_34;
+        x86::Gp ret_val_get_rm_34 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_34, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fdiv_s_31;
+        auto fdiv_s_31_arg0 = ret_val_unbox_s_32;
+        auto fdiv_s_31_arg1 = ret_val_unbox_s_33;
+        auto fdiv_s_31_arg2 = ret_val_get_rm_34;
+        x86::Gp ret_val_fdiv_s_31 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fdiv_s_31,  &fdiv_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_30;
+        auto NaNBox32_30_arg0 = ret_val_fdiv_s_31;
+        x86::Gp ret_val_NaNBox32_30 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_30, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_298;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_298 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_298, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_298;
-        setRet(call_fget_flags_298, 0, ret_val_fget_flags_298);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_30);
+        setArg(call_unbox_s_32, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_32, 1, unbox_s_32_arg1);
+        setRet(call_unbox_s_32, 0, ret_val_unbox_s_32);
+        setArg(call_unbox_s_33, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_33, 1, unbox_s_33_arg1);
+        setRet(call_unbox_s_33, 0, ret_val_unbox_s_33);
+        setArg(call_get_rm_34, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_34, 1, rm);
+        setRet(call_get_rm_34, 0, ret_val_get_rm_34);
+        setArg(call_fdiv_s_31, 0, fdiv_s_31_arg0);
+        setArg(call_fdiv_s_31, 1, fdiv_s_31_arg1);
+        setArg(call_fdiv_s_31, 2, fdiv_s_31_arg2);
+        setRet(call_fdiv_s_31, 0, ret_val_fdiv_s_31);
+        setArg(call_NaNBox32_30, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_30, 1, NaNBox32_30_arg0);
+        setRet(call_NaNBox32_30, 0, ret_val_NaNBox32_30);
+        InvokeNode* call_fget_flags_35;
+        x86::Gp ret_val_fget_flags_35 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_35,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_35;
+        setRet(call_fget_flags_35, 0, ret_val_fget_flags_35);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 107);
+        gen_sync(jh, POST_SYNC, 103);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 108: FSQRT__S */
-    continuation_e __fsqrt__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSQRT__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 108);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_299;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_299_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_299 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_299, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_299;
-        setArg(call_unbox_s_299, 0, unbox_s_299_arg0);
-        setRet(call_unbox_s_299, 0, ret_val_unbox_s_299);
-        InvokeNode* call_fsqrt_s_300;
-        jh.cc.comment("//call_fsqrt_s");
-        auto fsqrt_s_300_arg0 = frs1;
-        auto fsqrt_s_300_arg1 = get_rm(jh, (uint8_t)rm);
-        x86::Gp ret_val_fsqrt_s_300 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fsqrt_s_300, &fsqrt_s, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
-        auto res = ret_val_fsqrt_s_300;
-        setArg(call_fsqrt_s_300, 0, fsqrt_s_300_arg0);
-        setArg(call_fsqrt_s_300, 1, fsqrt_s_300_arg1);
-        setRet(call_fsqrt_s_300, 0, ret_val_fsqrt_s_300);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_301;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_301 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_301, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_301;
-        setRet(call_fget_flags_301, 0, ret_val_fget_flags_301);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 108);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 109: FSGNJ__S */
-    continuation_e __fsgnj__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJ__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 109);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_302;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_302_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_302 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_302, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_302;
-        setArg(call_unbox_s_302, 0, unbox_s_302_arg0);
-        setRet(call_unbox_s_302, 0, ret_val_unbox_s_302);
-        InvokeNode* call_unbox_s_303;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_303_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_303 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_303, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_303;
-        setArg(call_unbox_s_303, 0, unbox_s_303_arg0);
-        setRet(call_unbox_s_303, 0, ret_val_unbox_s_303);
-        auto res = gen_operation(jh.cc, bor, gen_ext(jh.cc, gen_operation(jh.cc, shl, gen_slice(jh.cc, frs2, 31, 31-31+1), 31), 32, false), gen_slice(jh.cc, frs1, 0, 30-0+1));
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)(- 1<<32))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 109);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 110: FSGNJN__S */
-    continuation_e __fsgnjn__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJN__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 110);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_304;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_304_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_304 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_304, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_304;
-        setArg(call_unbox_s_304, 0, unbox_s_304_arg0);
-        setRet(call_unbox_s_304, 0, ret_val_unbox_s_304);
-        InvokeNode* call_unbox_s_305;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_305_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_305 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_305, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_305;
-        setArg(call_unbox_s_305, 0, unbox_s_305_arg0);
-        setRet(call_unbox_s_305, 0, ret_val_unbox_s_305);
-        auto res = gen_operation(jh.cc, bor, gen_ext(jh.cc, gen_operation(jh.cc, shl, gen_operation(cc, bnot, gen_slice(jh.cc, frs2, 31, 31-31+1)), 31), 32, false), gen_slice(jh.cc, frs1, 0, 30-0+1));
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)(- 1<<32))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 110);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 111: FSGNJX__S */
-    continuation_e __fsgnjx__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJX__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 111);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_unbox_s_306;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_306_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_306 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_306, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_306;
-        setArg(call_unbox_s_306, 0, unbox_s_306_arg0);
-        setRet(call_unbox_s_306, 0, ret_val_unbox_s_306);
-        InvokeNode* call_unbox_s_307;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_307_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_307 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_307, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_307;
-        setArg(call_unbox_s_307, 0, unbox_s_307_arg0);
-        setRet(call_unbox_s_307, 0, ret_val_unbox_s_307);
-        auto res = gen_operation(cc, bxor, frs1, (gen_operation(cc, band, frs2, (uint32_t)2147483648)
-        ))
-        ;
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 111);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 112: FMIN__S */
+    /* instruction 104: FMIN__S */
     continuation_e __fmin__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6687,65 +5898,60 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FMIN__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 112);
+        gen_sync(jh, PRE_SYNC, 104);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_308;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_308_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_308 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_308, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_308;
-        setArg(call_unbox_s_308, 0, unbox_s_308_arg0);
-        setRet(call_unbox_s_308, 0, ret_val_unbox_s_308);
-        InvokeNode* call_unbox_s_309;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_309_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_309 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_309, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_309;
-        setArg(call_unbox_s_309, 0, unbox_s_309_arg0);
-        setRet(call_unbox_s_309, 0, ret_val_unbox_s_309);
-        InvokeNode* call_fsel_s_310;
-        jh.cc.comment("//call_fsel_s");
-        auto fsel_s_310_arg0 = frs1;
-        auto fsel_s_310_arg1 = frs2;
-        x86::Gp ret_val_fsel_s_310 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fsel_s_310, &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
-        auto res = ret_val_fsel_s_310;
-        setArg(call_fsel_s_310, 0, fsel_s_310_arg0);
-        setArg(call_fsel_s_310, 1, fsel_s_310_arg1);
-        setArg(call_fsel_s_310, 2, 0);
-        setRet(call_fsel_s_310, 0, ret_val_fsel_s_310);
+        InvokeNode* call_unbox_s_38;
+        auto unbox_s_38_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_38 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_38,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_39;
+        auto unbox_s_39_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_39 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_39,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_fsel_s_37;
+        auto fsel_s_37_arg0 = ret_val_unbox_s_38;
+        auto fsel_s_37_arg1 = ret_val_unbox_s_39;
+        x86::Gp ret_val_fsel_s_37 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fsel_s_37,  &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+        InvokeNode* call_NaNBox32_36;
+        auto NaNBox32_36_arg0 = ret_val_fsel_s_37;
+        x86::Gp ret_val_NaNBox32_36 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_36, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_311;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_311 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_311, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_311;
-        setRet(call_fget_flags_311, 0, ret_val_fget_flags_311);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_36);
+        setArg(call_unbox_s_38, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_38, 1, unbox_s_38_arg1);
+        setRet(call_unbox_s_38, 0, ret_val_unbox_s_38);
+        setArg(call_unbox_s_39, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_39, 1, unbox_s_39_arg1);
+        setRet(call_unbox_s_39, 0, ret_val_unbox_s_39);
+        setArg(call_fsel_s_37, 0, fsel_s_37_arg0);
+        setArg(call_fsel_s_37, 1, fsel_s_37_arg1);
+        setArg(call_fsel_s_37, 2, 0);
+        setRet(call_fsel_s_37, 0, ret_val_fsel_s_37);
+        setArg(call_NaNBox32_36, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_36, 1, NaNBox32_36_arg0);
+        setRet(call_NaNBox32_36, 0, ret_val_NaNBox32_36);
+        InvokeNode* call_fget_flags_40;
+        x86::Gp ret_val_fget_flags_40 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_40,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_40;
+        setRet(call_fget_flags_40, 0, ret_val_fget_flags_40);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 112);
+        gen_sync(jh, POST_SYNC, 104);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 113: FMAX__S */
+    /* instruction 105: FMAX__S */
     continuation_e __fmax__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6768,65 +5974,514 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FMAX__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 113);
+        gen_sync(jh, PRE_SYNC, 105);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_unbox_s_312;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_312_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        x86::Gp ret_val_unbox_s_312 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_312, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs1 = ret_val_unbox_s_312;
-        setArg(call_unbox_s_312, 0, unbox_s_312_arg0);
-        setRet(call_unbox_s_312, 0, ret_val_unbox_s_312);
-        InvokeNode* call_unbox_s_313;
-        jh.cc.comment("//call_unbox_s");
-        auto unbox_s_313_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_unbox_s_313 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_unbox_s_313, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-        auto frs2 = ret_val_unbox_s_313;
-        setArg(call_unbox_s_313, 0, unbox_s_313_arg0);
-        setRet(call_unbox_s_313, 0, ret_val_unbox_s_313);
-        InvokeNode* call_fsel_s_314;
-        jh.cc.comment("//call_fsel_s");
-        auto fsel_s_314_arg0 = frs1;
-        auto fsel_s_314_arg1 = frs2;
-        x86::Gp ret_val_fsel_s_314 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fsel_s_314, &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
-        auto res = ret_val_fsel_s_314;
-        setArg(call_fsel_s_314, 0, fsel_s_314_arg0);
-        setArg(call_fsel_s_314, 1, fsel_s_314_arg1);
-        setArg(call_fsel_s_314, 2, 1);
-        setRet(call_fsel_s_314, 0, ret_val_fsel_s_314);
+        InvokeNode* call_unbox_s_43;
+        auto unbox_s_43_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_43 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_43,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_44;
+        auto unbox_s_44_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_44 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_44,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_fsel_s_42;
+        auto fsel_s_42_arg0 = ret_val_unbox_s_43;
+        auto fsel_s_42_arg1 = ret_val_unbox_s_44;
+        x86::Gp ret_val_fsel_s_42 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fsel_s_42,  &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+        InvokeNode* call_NaNBox32_41;
+        auto NaNBox32_41_arg0 = ret_val_fsel_s_42;
+        x86::Gp ret_val_NaNBox32_41 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_41, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bor, gen_ext(cc, 
-                  res, 64, false), (uint64_t)((int64_t)- 1<<32))
-              );
-        InvokeNode* call_fget_flags_315;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_315 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_315, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_315;
-        setRet(call_fget_flags_315, 0, ret_val_fget_flags_315);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox32_41);
+        setArg(call_unbox_s_43, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_43, 1, unbox_s_43_arg1);
+        setRet(call_unbox_s_43, 0, ret_val_unbox_s_43);
+        setArg(call_unbox_s_44, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_44, 1, unbox_s_44_arg1);
+        setRet(call_unbox_s_44, 0, ret_val_unbox_s_44);
+        setArg(call_fsel_s_42, 0, fsel_s_42_arg0);
+        setArg(call_fsel_s_42, 1, fsel_s_42_arg1);
+        setArg(call_fsel_s_42, 2, 1);
+        setRet(call_fsel_s_42, 0, ret_val_fsel_s_42);
+        setArg(call_NaNBox32_41, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_41, 1, NaNBox32_41_arg0);
+        setRet(call_NaNBox32_41, 0, ret_val_NaNBox32_41);
+        InvokeNode* call_fget_flags_45;
+        x86::Gp ret_val_fget_flags_45 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_45,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_45;
+        setRet(call_fget_flags_45, 0, ret_val_fget_flags_45);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 113);
+        gen_sync(jh, POST_SYNC, 105);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 114: FCVT__W__S */
+    /* instruction 106: FSQRT__S */
+    continuation_e __fsqrt__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSQRT__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 106);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_48;
+        auto unbox_s_48_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_48 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_48,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_49;
+        x86::Gp ret_val_get_rm_49 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_49, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fsqrt_s_47;
+        auto fsqrt_s_47_arg0 = ret_val_unbox_s_48;
+        auto fsqrt_s_47_arg1 = ret_val_get_rm_49;
+        x86::Gp ret_val_fsqrt_s_47 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fsqrt_s_47,  &fsqrt_s, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_46;
+        auto NaNBox32_46_arg0 = ret_val_fsqrt_s_47;
+        x86::Gp ret_val_NaNBox32_46 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_46, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_46);
+        setArg(call_unbox_s_48, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_48, 1, unbox_s_48_arg1);
+        setRet(call_unbox_s_48, 0, ret_val_unbox_s_48);
+        setArg(call_get_rm_49, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_49, 1, rm);
+        setRet(call_get_rm_49, 0, ret_val_get_rm_49);
+        setArg(call_fsqrt_s_47, 0, fsqrt_s_47_arg0);
+        setArg(call_fsqrt_s_47, 1, fsqrt_s_47_arg1);
+        setRet(call_fsqrt_s_47, 0, ret_val_fsqrt_s_47);
+        setArg(call_NaNBox32_46, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_46, 1, NaNBox32_46_arg0);
+        setRet(call_NaNBox32_46, 0, ret_val_NaNBox32_46);
+        InvokeNode* call_fget_flags_50;
+        x86::Gp ret_val_fget_flags_50 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_50,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_50;
+        setRet(call_fget_flags_50, 0, ret_val_fget_flags_50);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 106);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 107: FMADD__S */
+    continuation_e __fmadd__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMADD__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 107);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_53;
+        auto unbox_s_53_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_53 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_53,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_54;
+        auto unbox_s_54_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_54 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_54,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_55;
+        auto unbox_s_55_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_s_55 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_55,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_56;
+        x86::Gp ret_val_get_rm_56 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_56, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_s_52;
+        auto fmadd_s_52_arg0 = ret_val_unbox_s_53;
+        auto fmadd_s_52_arg1 = ret_val_unbox_s_54;
+        auto fmadd_s_52_arg2 = ret_val_unbox_s_55;
+        auto fmadd_s_52_arg4 = ret_val_get_rm_56;
+        x86::Gp ret_val_fmadd_s_52 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fmadd_s_52,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_51;
+        auto NaNBox32_51_arg0 = ret_val_fmadd_s_52;
+        x86::Gp ret_val_NaNBox32_51 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_51, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_51);
+        setArg(call_unbox_s_53, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_53, 1, unbox_s_53_arg1);
+        setRet(call_unbox_s_53, 0, ret_val_unbox_s_53);
+        setArg(call_unbox_s_54, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_54, 1, unbox_s_54_arg1);
+        setRet(call_unbox_s_54, 0, ret_val_unbox_s_54);
+        setArg(call_unbox_s_55, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_55, 1, unbox_s_55_arg1);
+        setRet(call_unbox_s_55, 0, ret_val_unbox_s_55);
+        setArg(call_get_rm_56, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_56, 1, rm);
+        setRet(call_get_rm_56, 0, ret_val_get_rm_56);
+        setArg(call_fmadd_s_52, 0, fmadd_s_52_arg0);
+        setArg(call_fmadd_s_52, 1, fmadd_s_52_arg1);
+        setArg(call_fmadd_s_52, 2, fmadd_s_52_arg2);
+        setArg(call_fmadd_s_52, 3, 0);
+        setArg(call_fmadd_s_52, 4, fmadd_s_52_arg4);
+        setRet(call_fmadd_s_52, 0, ret_val_fmadd_s_52);
+        setArg(call_NaNBox32_51, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_51, 1, NaNBox32_51_arg0);
+        setRet(call_NaNBox32_51, 0, ret_val_NaNBox32_51);
+        InvokeNode* call_fget_flags_57;
+        x86::Gp ret_val_fget_flags_57 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_57,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_57;
+        setRet(call_fget_flags_57, 0, ret_val_fget_flags_57);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 107);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 108: FMSUB__S */
+    continuation_e __fmsub__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMSUB__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 108);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_60;
+        auto unbox_s_60_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_60 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_60,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_61;
+        auto unbox_s_61_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_61 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_61,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_62;
+        auto unbox_s_62_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_s_62 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_62,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_63;
+        x86::Gp ret_val_get_rm_63 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_63, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_s_59;
+        auto fmadd_s_59_arg0 = ret_val_unbox_s_60;
+        auto fmadd_s_59_arg1 = ret_val_unbox_s_61;
+        auto fmadd_s_59_arg2 = ret_val_unbox_s_62;
+        auto fmadd_s_59_arg4 = ret_val_get_rm_63;
+        x86::Gp ret_val_fmadd_s_59 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fmadd_s_59,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_58;
+        auto NaNBox32_58_arg0 = ret_val_fmadd_s_59;
+        x86::Gp ret_val_NaNBox32_58 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_58, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_58);
+        setArg(call_unbox_s_60, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_60, 1, unbox_s_60_arg1);
+        setRet(call_unbox_s_60, 0, ret_val_unbox_s_60);
+        setArg(call_unbox_s_61, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_61, 1, unbox_s_61_arg1);
+        setRet(call_unbox_s_61, 0, ret_val_unbox_s_61);
+        setArg(call_unbox_s_62, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_62, 1, unbox_s_62_arg1);
+        setRet(call_unbox_s_62, 0, ret_val_unbox_s_62);
+        setArg(call_get_rm_63, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_63, 1, rm);
+        setRet(call_get_rm_63, 0, ret_val_get_rm_63);
+        setArg(call_fmadd_s_59, 0, fmadd_s_59_arg0);
+        setArg(call_fmadd_s_59, 1, fmadd_s_59_arg1);
+        setArg(call_fmadd_s_59, 2, fmadd_s_59_arg2);
+        setArg(call_fmadd_s_59, 3, 1);
+        setArg(call_fmadd_s_59, 4, fmadd_s_59_arg4);
+        setRet(call_fmadd_s_59, 0, ret_val_fmadd_s_59);
+        setArg(call_NaNBox32_58, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_58, 1, NaNBox32_58_arg0);
+        setRet(call_NaNBox32_58, 0, ret_val_NaNBox32_58);
+        InvokeNode* call_fget_flags_64;
+        x86::Gp ret_val_fget_flags_64 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_64,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_64;
+        setRet(call_fget_flags_64, 0, ret_val_fget_flags_64);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 108);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 109: FNMADD__S */
+    continuation_e __fnmadd__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FNMADD__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 109);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_67;
+        auto unbox_s_67_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_67 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_67,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_68;
+        auto unbox_s_68_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_68 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_68,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_69;
+        auto unbox_s_69_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_s_69 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_69,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_70;
+        x86::Gp ret_val_get_rm_70 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_70, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_s_66;
+        auto fmadd_s_66_arg0 = ret_val_unbox_s_67;
+        auto fmadd_s_66_arg1 = ret_val_unbox_s_68;
+        auto fmadd_s_66_arg2 = ret_val_unbox_s_69;
+        auto fmadd_s_66_arg4 = ret_val_get_rm_70;
+        x86::Gp ret_val_fmadd_s_66 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fmadd_s_66,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_65;
+        auto NaNBox32_65_arg0 = ret_val_fmadd_s_66;
+        x86::Gp ret_val_NaNBox32_65 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_65, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_65);
+        setArg(call_unbox_s_67, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_67, 1, unbox_s_67_arg1);
+        setRet(call_unbox_s_67, 0, ret_val_unbox_s_67);
+        setArg(call_unbox_s_68, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_68, 1, unbox_s_68_arg1);
+        setRet(call_unbox_s_68, 0, ret_val_unbox_s_68);
+        setArg(call_unbox_s_69, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_69, 1, unbox_s_69_arg1);
+        setRet(call_unbox_s_69, 0, ret_val_unbox_s_69);
+        setArg(call_get_rm_70, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_70, 1, rm);
+        setRet(call_get_rm_70, 0, ret_val_get_rm_70);
+        setArg(call_fmadd_s_66, 0, fmadd_s_66_arg0);
+        setArg(call_fmadd_s_66, 1, fmadd_s_66_arg1);
+        setArg(call_fmadd_s_66, 2, fmadd_s_66_arg2);
+        setArg(call_fmadd_s_66, 3, 2);
+        setArg(call_fmadd_s_66, 4, fmadd_s_66_arg4);
+        setRet(call_fmadd_s_66, 0, ret_val_fmadd_s_66);
+        setArg(call_NaNBox32_65, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_65, 1, NaNBox32_65_arg0);
+        setRet(call_NaNBox32_65, 0, ret_val_NaNBox32_65);
+        InvokeNode* call_fget_flags_71;
+        x86::Gp ret_val_fget_flags_71 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_71,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_71;
+        setRet(call_fget_flags_71, 0, ret_val_fget_flags_71);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 109);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 110: FNMSUB__S */
+    continuation_e __fnmsub__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FNMSUB__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 110);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_74;
+        auto unbox_s_74_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_74 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_74,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_75;
+        auto unbox_s_75_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_75 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_75,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_76;
+        auto unbox_s_76_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_s_76 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_76,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_77;
+        x86::Gp ret_val_get_rm_77 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_77, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_s_73;
+        auto fmadd_s_73_arg0 = ret_val_unbox_s_74;
+        auto fmadd_s_73_arg1 = ret_val_unbox_s_75;
+        auto fmadd_s_73_arg2 = ret_val_unbox_s_76;
+        auto fmadd_s_73_arg4 = ret_val_get_rm_77;
+        x86::Gp ret_val_fmadd_s_73 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fmadd_s_73,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox32_72;
+        auto NaNBox32_72_arg0 = ret_val_fmadd_s_73;
+        x86::Gp ret_val_NaNBox32_72 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_72, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_72);
+        setArg(call_unbox_s_74, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_74, 1, unbox_s_74_arg1);
+        setRet(call_unbox_s_74, 0, ret_val_unbox_s_74);
+        setArg(call_unbox_s_75, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_75, 1, unbox_s_75_arg1);
+        setRet(call_unbox_s_75, 0, ret_val_unbox_s_75);
+        setArg(call_unbox_s_76, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_76, 1, unbox_s_76_arg1);
+        setRet(call_unbox_s_76, 0, ret_val_unbox_s_76);
+        setArg(call_get_rm_77, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_77, 1, rm);
+        setRet(call_get_rm_77, 0, ret_val_get_rm_77);
+        setArg(call_fmadd_s_73, 0, fmadd_s_73_arg0);
+        setArg(call_fmadd_s_73, 1, fmadd_s_73_arg1);
+        setArg(call_fmadd_s_73, 2, fmadd_s_73_arg2);
+        setArg(call_fmadd_s_73, 3, 3);
+        setArg(call_fmadd_s_73, 4, fmadd_s_73_arg4);
+        setRet(call_fmadd_s_73, 0, ret_val_fmadd_s_73);
+        setArg(call_NaNBox32_72, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_72, 1, NaNBox32_72_arg0);
+        setRet(call_NaNBox32_72, 0, ret_val_NaNBox32_72);
+        InvokeNode* call_fget_flags_78;
+        x86::Gp ret_val_fget_flags_78 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_78,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_78;
+        setRet(call_fget_flags_78, 0, ret_val_fget_flags_78);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 110);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 111: FCVT__W__S */
     continuation_e __fcvt__w__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6836,8 +6491,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.w.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6849,65 +6504,62 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FCVT__W__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 114);
+        gen_sync(jh, PRE_SYNC, 111);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_unbox_s_316;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_316_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_316 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_316, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs1 = ret_val_unbox_s_316;
-            setArg(call_unbox_s_316, 0, unbox_s_316_arg0);
-            setRet(call_unbox_s_316, 0, ret_val_unbox_s_316);
-            InvokeNode* call_fcvt_s_317;
-            jh.cc.comment("//call_fcvt_s");
-            auto fcvt_s_317_arg0 = frs1;
-            auto fcvt_s_317_arg2 = get_rm(jh, rm);
-            x86::Gp ret_val_fcvt_s_317 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_s_317, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        else {
+            InvokeNode* call_unbox_s_80;
+            auto unbox_s_80_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_80 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_80,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_get_rm_81;
+            x86::Gp ret_val_get_rm_81 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_81, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_f32toi32_79;
+            auto f32toi32_79_arg0 = ret_val_unbox_s_80;
+            auto f32toi32_79_arg1 = ret_val_get_rm_81;
+            x86::Gp ret_val_f32toi32_79 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_f32toi32_79,  &f32toi32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
-                    ret_val_fcvt_s_317, 32, false), 32, true);
-            setArg(call_fcvt_s_317, 0, fcvt_s_317_arg0);
-            setArg(call_fcvt_s_317, 1, 0);
-            setArg(call_fcvt_s_317, 2, fcvt_s_317_arg2);
-            setRet(call_fcvt_s_317, 0, ret_val_fcvt_s_317);
-            if((rd)!=0){
+                    ret_val_f32toi32_79, 32, false), 32, true);
+            setArg(call_unbox_s_80, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_80, 1, unbox_s_80_arg1);
+            setRet(call_unbox_s_80, 0, ret_val_unbox_s_80);
+            setArg(call_get_rm_81, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_81, 1, rm);
+            setRet(call_get_rm_81, 0, ret_val_get_rm_81);
+            setArg(call_f32toi32_79, 0, f32toi32_79_arg0);
+            setArg(call_f32toi32_79, 1, f32toi32_79_arg1);
+            setRet(call_f32toi32_79, 0, ret_val_f32toi32_79);
+            if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
                           res, 32, true));
             }
-            InvokeNode* call_fget_flags_318;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_318 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_318, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_318;
-            setRet(call_fget_flags_318, 0, ret_val_fget_flags_318);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
+            InvokeNode* call_fget_flags_82;
+            x86::Gp ret_val_fget_flags_82 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_82,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_82;
+            setRet(call_fget_flags_82, 0, ret_val_fget_flags_82);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         }
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 114);
+        gen_sync(jh, POST_SYNC, 111);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 115: FCVT__WU__S */
+    /* instruction 112: FCVT__WU__S */
     continuation_e __fcvt__wu__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -6917,8 +6569,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.wu.s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.s"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -6930,6 +6582,230 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FCVT__WU__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 112);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_unbox_s_84;
+            auto unbox_s_84_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_84 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_84,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_get_rm_85;
+            x86::Gp ret_val_get_rm_85 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_85, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_f32toui32_83;
+            auto f32toui32_83_arg0 = ret_val_unbox_s_84;
+            auto f32toui32_83_arg1 = ret_val_get_rm_85;
+            x86::Gp ret_val_f32toui32_83 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_f32toui32_83,  &f32toui32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_f32toui32_83, 32, false), 32, true);
+            setArg(call_unbox_s_84, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_84, 1, unbox_s_84_arg1);
+            setRet(call_unbox_s_84, 0, ret_val_unbox_s_84);
+            setArg(call_get_rm_85, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_85, 1, rm);
+            setRet(call_get_rm_85, 0, ret_val_get_rm_85);
+            setArg(call_f32toui32_83, 0, f32toui32_83_arg0);
+            setArg(call_f32toui32_83, 1, f32toui32_83_arg1);
+            setRet(call_f32toui32_83, 0, ret_val_f32toui32_83);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, true));
+            }
+            InvokeNode* call_fget_flags_86;
+            x86::Gp ret_val_fget_flags_86 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_86,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_86;
+            setRet(call_fget_flags_86, 0, ret_val_fget_flags_86);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 112);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 113: FCVT__S__W */
+    continuation_e __fcvt__s__w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.w"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__S__W_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 113);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_get_rm_89;
+            x86::Gp ret_val_get_rm_89 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_89, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_i32tof32_88;
+            auto i32tof32_88_arg0 = gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
+            auto i32tof32_88_arg1 = ret_val_get_rm_89;
+            x86::Gp ret_val_i32tof32_88 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_i32tof32_88,  &i32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            InvokeNode* call_NaNBox32_87;
+            auto NaNBox32_87_arg0 = ret_val_i32tof32_88;
+            x86::Gp ret_val_NaNBox32_87 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox32_87, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+            mov(cc, get_ptr_for(jh, traits::F0+ rd),
+                  ret_val_NaNBox32_87);
+            setArg(call_get_rm_89, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_89, 1, rm);
+            setRet(call_get_rm_89, 0, ret_val_get_rm_89);
+            setArg(call_i32tof32_88, 0, i32tof32_88_arg0);
+            setArg(call_i32tof32_88, 1, i32tof32_88_arg1);
+            setRet(call_i32tof32_88, 0, ret_val_i32tof32_88);
+            setArg(call_NaNBox32_87, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox32_87, 1, NaNBox32_87_arg0);
+            setRet(call_NaNBox32_87, 0, ret_val_NaNBox32_87);
+            InvokeNode* call_fget_flags_90;
+            x86::Gp ret_val_fget_flags_90 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_90,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_90;
+            setRet(call_fget_flags_90, 0, ret_val_fget_flags_90);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 113);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 114: FCVT__S__WU */
+    continuation_e __fcvt__s__wu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.wu"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__S__WU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 114);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_get_rm_93;
+            x86::Gp ret_val_get_rm_93 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_93, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_ui32tof32_92;
+            auto ui32tof32_92_arg0 = gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
+            auto ui32tof32_92_arg1 = ret_val_get_rm_93;
+            x86::Gp ret_val_ui32tof32_92 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_ui32tof32_92,  &ui32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            InvokeNode* call_NaNBox32_91;
+            auto NaNBox32_91_arg0 = ret_val_ui32tof32_92;
+            x86::Gp ret_val_NaNBox32_91 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox32_91, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+            mov(cc, get_ptr_for(jh, traits::F0+ rd),
+                  ret_val_NaNBox32_91);
+            setArg(call_get_rm_93, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_93, 1, rm);
+            setRet(call_get_rm_93, 0, ret_val_get_rm_93);
+            setArg(call_ui32tof32_92, 0, ui32tof32_92_arg0);
+            setArg(call_ui32tof32_92, 1, ui32tof32_92_arg1);
+            setRet(call_ui32tof32_92, 0, ret_val_ui32tof32_92);
+            setArg(call_NaNBox32_91, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox32_91, 1, NaNBox32_91_arg0);
+            setRet(call_NaNBox32_91, 0, ret_val_NaNBox32_91);
+            InvokeNode* call_fget_flags_94;
+            x86::Gp ret_val_fget_flags_94 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_94,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_94;
+            setRet(call_fget_flags_94, 0, ret_val_fget_flags_94);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 114);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 115: FSGNJ__S */
+    continuation_e __fsgnj__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSGNJ__S_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 115);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -6937,50 +6813,30 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_unbox_s_319;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_319_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_319 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_319, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs1 = ret_val_unbox_s_319;
-            setArg(call_unbox_s_319, 0, unbox_s_319_arg0);
-            setRet(call_unbox_s_319, 0, ret_val_unbox_s_319);
-            InvokeNode* call_fcvt_s_320;
-            jh.cc.comment("//call_fcvt_s");
-            auto fcvt_s_320_arg0 = frs1;
-            auto fcvt_s_320_arg2 = get_rm(jh, (uint8_t)rm);
-            x86::Gp ret_val_fcvt_s_320 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_s_320, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-            auto res = gen_ext(cc, 
-                gen_ext(cc, 
-                    ret_val_fcvt_s_320, 32, false), 32, true);
-            setArg(call_fcvt_s_320, 0, fcvt_s_320_arg0);
-            setArg(call_fcvt_s_320, 1, 1);
-            setArg(call_fcvt_s_320, 2, fcvt_s_320_arg2);
-            setRet(call_fcvt_s_320, 0, ret_val_fcvt_s_320);
-            if((rd)!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          res, 32, true));
-            }
-            InvokeNode* call_fget_flags_321;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_321 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_321, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_321;
-            setRet(call_fget_flags_321, 0, ret_val_fget_flags_321);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
+        InvokeNode* call_unbox_s_96;
+        auto unbox_s_96_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_96 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_96,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_97;
+        auto unbox_s_97_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_97 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_97,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox32_95;
+        auto NaNBox32_95_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_s_96, 31, 31-31+1), 32, false), 31), gen_ext(cc, gen_slice(cc, ret_val_unbox_s_97, 0, 30-0+1), 32, false));
+        x86::Gp ret_val_NaNBox32_95 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_95, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_95);
+        setArg(call_unbox_s_96, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_96, 1, unbox_s_96_arg1);
+        setRet(call_unbox_s_96, 0, ret_val_unbox_s_96);
+        setArg(call_unbox_s_97, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_97, 1, unbox_s_97_arg1);
+        setRet(call_unbox_s_97, 0, ret_val_unbox_s_97);
+        setArg(call_NaNBox32_95, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_95, 1, NaNBox32_95_arg0);
+        setRet(call_NaNBox32_95, 0, ret_val_NaNBox32_95);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 115);
@@ -6988,7 +6844,230 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 116: FEQ__S */
+    /* instruction 116: FSGNJN__S */
+    continuation_e __fsgnjn__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSGNJN__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 116);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_99;
+        auto unbox_s_99_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_99 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_99,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_100;
+        auto unbox_s_100_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_100 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_100,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox32_98;
+        auto NaNBox32_98_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_s_99, 31, 31-31+1)), 32, false), 31), gen_ext(cc, gen_slice(cc, ret_val_unbox_s_100, 0, 30-0+1), 32, false));
+        x86::Gp ret_val_NaNBox32_98 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_98, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_98);
+        setArg(call_unbox_s_99, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_99, 1, unbox_s_99_arg1);
+        setRet(call_unbox_s_99, 0, ret_val_unbox_s_99);
+        setArg(call_unbox_s_100, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_100, 1, unbox_s_100_arg1);
+        setRet(call_unbox_s_100, 0, ret_val_unbox_s_100);
+        setArg(call_NaNBox32_98, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_98, 1, NaNBox32_98_arg0);
+        setRet(call_NaNBox32_98, 0, ret_val_NaNBox32_98);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 116);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 117: FSGNJX__S */
+    continuation_e __fsgnjx__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSGNJX__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 117);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_102;
+        auto unbox_s_102_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_s_102 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_102,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_s_103;
+        auto unbox_s_103_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_103 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_103,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox32_101;
+        auto NaNBox32_101_arg0 = gen_operation(cc, bxor, (gen_operation(cc, band, ret_val_unbox_s_102, ((uint32_t)1<<31))), ret_val_unbox_s_103);
+        x86::Gp ret_val_NaNBox32_101 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_101, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_101);
+        setArg(call_unbox_s_102, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_102, 1, unbox_s_102_arg1);
+        setRet(call_unbox_s_102, 0, ret_val_unbox_s_102);
+        setArg(call_unbox_s_103, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_103, 1, unbox_s_103_arg1);
+        setRet(call_unbox_s_103, 0, ret_val_unbox_s_103);
+        setArg(call_NaNBox32_101, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_101, 1, NaNBox32_101_arg0);
+        setRet(call_NaNBox32_101, 0, ret_val_NaNBox32_101);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 117);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 118: FMV__X__W */
+    continuation_e __fmv__x__w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMV__X__W_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 118);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          gen_ext(cc, 
+                              gen_ext(cc, 
+                                  load_reg_from_mem_Gp(jh, traits::F0 + rs1), 32, false), 32, true), 32, true));
+            }
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 118);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 119: FMV__W__X */
+    continuation_e __fmv__w__x(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMV__W__X_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 119);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_NaNBox32_104;
+            auto NaNBox32_104_arg0 = gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
+            x86::Gp ret_val_NaNBox32_104 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox32_104, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+            mov(cc, get_ptr_for(jh, traits::F0+ rd),
+                  ret_val_NaNBox32_104);
+            setArg(call_NaNBox32_104, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox32_104, 1, NaNBox32_104_arg0);
+            setRet(call_NaNBox32_104, 0, ret_val_NaNBox32_104);
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 119);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 120: FEQ__S */
     continuation_e __feq__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -7011,70 +7090,61 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FEQ__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 116);
+        gen_sync(jh, PRE_SYNC, 120);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_unbox_s_322;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_322_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_322 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_322, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs1 = ret_val_unbox_s_322;
-            setArg(call_unbox_s_322, 0, unbox_s_322_arg0);
-            setRet(call_unbox_s_322, 0, ret_val_unbox_s_322);
-            InvokeNode* call_unbox_s_323;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_323_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_unbox_s_323 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_323, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs2 = ret_val_unbox_s_323;
-            setArg(call_unbox_s_323, 0, unbox_s_323_arg0);
-            setRet(call_unbox_s_323, 0, ret_val_unbox_s_323);
-            InvokeNode* call_fcmp_s_324;
-            jh.cc.comment("//call_fcmp_s");
-            auto fcmp_s_324_arg0 = frs1;
-            auto fcmp_s_324_arg1 = frs2;
-            x86::Gp ret_val_fcmp_s_324 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcmp_s_324, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
-            auto res = ret_val_fcmp_s_324;
-            setArg(call_fcmp_s_324, 0, fcmp_s_324_arg0);
-            setArg(call_fcmp_s_324, 1, fcmp_s_324_arg1);
-            setArg(call_fcmp_s_324, 2, 0);
-            setRet(call_fcmp_s_324, 0, ret_val_fcmp_s_324);
-            if((rd)!=0){
+        else {
+            InvokeNode* call_unbox_s_106;
+            auto unbox_s_106_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_106 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_106,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_s_107;
+            auto unbox_s_107_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_s_107 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_107,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_s_105;
+            auto fcmp_s_105_arg0 = ret_val_unbox_s_106;
+            auto fcmp_s_105_arg1 = ret_val_unbox_s_107;
+            x86::Gp ret_val_fcmp_s_105 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fcmp_s_105,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            auto res = ret_val_fcmp_s_105;
+            setArg(call_unbox_s_106, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_106, 1, unbox_s_106_arg1);
+            setRet(call_unbox_s_106, 0, ret_val_unbox_s_106);
+            setArg(call_unbox_s_107, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_107, 1, unbox_s_107_arg1);
+            setRet(call_unbox_s_107, 0, ret_val_unbox_s_107);
+            setArg(call_fcmp_s_105, 0, fcmp_s_105_arg0);
+            setArg(call_fcmp_s_105, 1, fcmp_s_105_arg1);
+            setArg(call_fcmp_s_105, 2, 0);
+            setRet(call_fcmp_s_105, 0, ret_val_fcmp_s_105);
+            if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       res);
             }
-            InvokeNode* call_fget_flags_325;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_325 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_325, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_325;
-            setRet(call_fget_flags_325, 0, ret_val_fget_flags_325);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
+            InvokeNode* call_fget_flags_108;
+            x86::Gp ret_val_fget_flags_108 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_108,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_108;
+            setRet(call_fget_flags_108, 0, ret_val_fget_flags_108);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         }
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 116);
+        gen_sync(jh, POST_SYNC, 120);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 117: FLT__S */
+    /* instruction 121: FLT__S */
     continuation_e __flt__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -7097,70 +7167,61 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FLT__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 117);
+        gen_sync(jh, PRE_SYNC, 121);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_unbox_s_326;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_326_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_326 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_326, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs1 = ret_val_unbox_s_326;
-            setArg(call_unbox_s_326, 0, unbox_s_326_arg0);
-            setRet(call_unbox_s_326, 0, ret_val_unbox_s_326);
-            InvokeNode* call_unbox_s_327;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_327_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_unbox_s_327 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_327, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs2 = ret_val_unbox_s_327;
-            setArg(call_unbox_s_327, 0, unbox_s_327_arg0);
-            setRet(call_unbox_s_327, 0, ret_val_unbox_s_327);
-            InvokeNode* call_fcmp_s_328;
-            jh.cc.comment("//call_fcmp_s");
-            auto fcmp_s_328_arg0 = frs1;
-            auto fcmp_s_328_arg1 = frs2;
-            x86::Gp ret_val_fcmp_s_328 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcmp_s_328, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
-            auto res = ret_val_fcmp_s_328;
-            setArg(call_fcmp_s_328, 0, fcmp_s_328_arg0);
-            setArg(call_fcmp_s_328, 1, fcmp_s_328_arg1);
-            setArg(call_fcmp_s_328, 2, 2);
-            setRet(call_fcmp_s_328, 0, ret_val_fcmp_s_328);
-            if((rd)!=0){
+        else {
+            InvokeNode* call_unbox_s_110;
+            auto unbox_s_110_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_110 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_110,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_s_111;
+            auto unbox_s_111_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_s_111 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_111,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_s_109;
+            auto fcmp_s_109_arg0 = ret_val_unbox_s_110;
+            auto fcmp_s_109_arg1 = ret_val_unbox_s_111;
+            x86::Gp ret_val_fcmp_s_109 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fcmp_s_109,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            auto res = ret_val_fcmp_s_109;
+            setArg(call_unbox_s_110, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_110, 1, unbox_s_110_arg1);
+            setRet(call_unbox_s_110, 0, ret_val_unbox_s_110);
+            setArg(call_unbox_s_111, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_111, 1, unbox_s_111_arg1);
+            setRet(call_unbox_s_111, 0, ret_val_unbox_s_111);
+            setArg(call_fcmp_s_109, 0, fcmp_s_109_arg0);
+            setArg(call_fcmp_s_109, 1, fcmp_s_109_arg1);
+            setArg(call_fcmp_s_109, 2, 2);
+            setRet(call_fcmp_s_109, 0, ret_val_fcmp_s_109);
+            if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       res);
             }
-            InvokeNode* call_fget_flags_329;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_329 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_329, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_329;
-            setRet(call_fget_flags_329, 0, ret_val_fget_flags_329);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
+            InvokeNode* call_fget_flags_112;
+            x86::Gp ret_val_fget_flags_112 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_112,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_112;
+            setRet(call_fget_flags_112, 0, ret_val_fget_flags_112);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         }
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 117);
+        gen_sync(jh, POST_SYNC, 121);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 118: FLE__S */
+    /* instruction 122: FLE__S */
     continuation_e __fle__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -7183,70 +7244,61 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FLE__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 118);
+        gen_sync(jh, PRE_SYNC, 122);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_unbox_s_330;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_330_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_330 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_330, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs1 = ret_val_unbox_s_330;
-            setArg(call_unbox_s_330, 0, unbox_s_330_arg0);
-            setRet(call_unbox_s_330, 0, ret_val_unbox_s_330);
-            InvokeNode* call_unbox_s_331;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_331_arg0 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_unbox_s_331 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_331, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            auto frs2 = ret_val_unbox_s_331;
-            setArg(call_unbox_s_331, 0, unbox_s_331_arg0);
-            setRet(call_unbox_s_331, 0, ret_val_unbox_s_331);
-            InvokeNode* call_fcmp_s_332;
-            jh.cc.comment("//call_fcmp_s");
-            auto fcmp_s_332_arg0 = frs1;
-            auto fcmp_s_332_arg1 = frs2;
-            x86::Gp ret_val_fcmp_s_332 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcmp_s_332, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
-            auto res = ret_val_fcmp_s_332;
-            setArg(call_fcmp_s_332, 0, fcmp_s_332_arg0);
-            setArg(call_fcmp_s_332, 1, fcmp_s_332_arg1);
-            setArg(call_fcmp_s_332, 2, 1);
-            setRet(call_fcmp_s_332, 0, ret_val_fcmp_s_332);
-            if((rd)!=0){
+        else {
+            InvokeNode* call_unbox_s_114;
+            auto unbox_s_114_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_114 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_114,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_s_115;
+            auto unbox_s_115_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_s_115 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_115,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_s_113;
+            auto fcmp_s_113_arg0 = ret_val_unbox_s_114;
+            auto fcmp_s_113_arg1 = ret_val_unbox_s_115;
+            x86::Gp ret_val_fcmp_s_113 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fcmp_s_113,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            auto res = ret_val_fcmp_s_113;
+            setArg(call_unbox_s_114, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_114, 1, unbox_s_114_arg1);
+            setRet(call_unbox_s_114, 0, ret_val_unbox_s_114);
+            setArg(call_unbox_s_115, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_115, 1, unbox_s_115_arg1);
+            setRet(call_unbox_s_115, 0, ret_val_unbox_s_115);
+            setArg(call_fcmp_s_113, 0, fcmp_s_113_arg0);
+            setArg(call_fcmp_s_113, 1, fcmp_s_113_arg1);
+            setArg(call_fcmp_s_113, 2, 1);
+            setRet(call_fcmp_s_113, 0, ret_val_fcmp_s_113);
+            if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       res);
             }
-            InvokeNode* call_fget_flags_333;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_333 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_333, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_333;
-            setRet(call_fget_flags_333, 0, ret_val_fget_flags_333);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
+            InvokeNode* call_fget_flags_116;
+            x86::Gp ret_val_fget_flags_116 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_116,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_116;
+            setRet(call_fget_flags_116, 0, ret_val_fget_flags_116);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         }
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 118);
+        gen_sync(jh, POST_SYNC, 122);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 119: FCLASS__S */
+    /* instruction 123: FCLASS__S */
     continuation_e __fclass__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
@@ -7268,259 +7320,6 @@ private:
         }
         x86::Compiler& cc = jh.cc;
         cc.comment(fmt::format("FCLASS__S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 119);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_unbox_s_335;
-            jh.cc.comment("//call_unbox_s");
-            auto unbox_s_335_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            x86::Gp ret_val_unbox_s_335 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_unbox_s_335, &unbox_s, FuncSignature::build<uint32_t, uint64_t>());
-            InvokeNode* call_fclass_s_334;
-            jh.cc.comment("//call_fclass_s");
-            auto fclass_s_334_arg0 = ret_val_unbox_s_335;
-            x86::Gp ret_val_fclass_s_334 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fclass_s_334, &fclass_s, FuncSignature::build<uint32_t, uint32_t>());
-            auto res = ret_val_fclass_s_334;
-            setArg(call_unbox_s_335, 0, unbox_s_335_arg0);
-            setRet(call_unbox_s_335, 0, ret_val_unbox_s_335);setArg(call_fclass_s_334, 0, fclass_s_334_arg0);
-            setRet(call_fclass_s_334, 0, ret_val_fclass_s_334);
-            if((rd)!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      res);
-            }
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 119);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 120: FCVT__S__W */
-    continuation_e __fcvt__s__w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.w"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT__S__W_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 120);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcvt_s_336;
-            jh.cc.comment("//call_fcvt_s");
-            auto fcvt_s_336_arg0 = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false);
-            auto fcvt_s_336_arg2 = get_rm(jh, (uint8_t)rm);
-            x86::Gp ret_val_fcvt_s_336 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_s_336, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_s_336;
-            setArg(call_fcvt_s_336, 0, fcvt_s_336_arg0);
-            setArg(call_fcvt_s_336, 1, 2);
-            setArg(call_fcvt_s_336, 2, fcvt_s_336_arg2);
-            setRet(call_fcvt_s_336, 0, ret_val_fcvt_s_336);
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, gen_ext(cc, 
-                      res, 64, false), (uint64_t)((int64_t)- 1<<32))
-                  );
-            InvokeNode* call_fget_flags_337;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_337 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_337, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_337;
-            setRet(call_fget_flags_337, 0, ret_val_fget_flags_337);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 120);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 121: FCVT__S__WU */
-    continuation_e __fcvt__s__wu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt.s.wu"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT__S__WU_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 121);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcvt_s_338;
-            jh.cc.comment("//call_fcvt_s");
-            auto fcvt_s_338_arg0 = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false);
-            auto fcvt_s_338_arg2 = get_rm(jh, (uint8_t)rm);
-            x86::Gp ret_val_fcvt_s_338 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_s_338, &fcvt_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
-            auto res = ret_val_fcvt_s_338;
-            setArg(call_fcvt_s_338, 0, fcvt_s_338_arg0);
-            setArg(call_fcvt_s_338, 1, 3);
-            setArg(call_fcvt_s_338, 2, fcvt_s_338_arg2);
-            setRet(call_fcvt_s_338, 0, ret_val_fcvt_s_338);
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, gen_ext(cc, 
-                      res, 64, false), (uint64_t)((int64_t)- 1<<32))
-                  );
-            InvokeNode* call_fget_flags_339;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_339 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_339, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_339;
-            setRet(call_fget_flags_339, 0, ret_val_fget_flags_339);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 121);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 122: FMV__X__W */
-    continuation_e __fmv__x__w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.x.w"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMV__X__W_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 122);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            if((rd)!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          gen_ext(cc, 
-                              gen_ext(cc, 
-                                  load_reg_from_mem(jh, traits::F0 + rs1), 32, false), 32, true), 32, true));
-            }
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 122);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 123: FMV__W__X */
-    continuation_e __fmv__w__x(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fmv.w.x"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMV__W__X_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 123);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -7528,16 +7327,29 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, gen_ext(cc, 
-                      load_reg_from_mem(jh, traits::X0 + rs1), 64, false), (uint64_t)((int64_t)- 1<<32))
-                  );
+        else {
+            InvokeNode* call_unbox_s_118;
+            auto unbox_s_118_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_s_118 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_unbox_s_118,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            InvokeNode* call_fclass_s_117;
+            auto fclass_s_117_arg0 = ret_val_unbox_s_118;
+            x86::Gp ret_val_fclass_s_117 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fclass_s_117,  &fclass_s, FuncSignature::build<uint32_t, uint32_t>());
+            auto res = ret_val_fclass_s_117;
+            setArg(call_unbox_s_118, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_s_118, 1, unbox_s_118_arg1);
+            setRet(call_unbox_s_118, 0, ret_val_unbox_s_118);
+            setArg(call_fclass_s_117, 0, fclass_s_117_arg0);
+            setRet(call_fclass_s_117, 0, ret_val_fclass_s_117);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      res);
+            }
         }
         auto returnValue = CONT;
         
@@ -7576,23 +7388,20 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         auto res = gen_ext(cc, 
             gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
-        if(static_cast<uint32_t>(traits::FLEN)==32){
-            mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
-                  gen_ext(cc, res, 64, false)
-            );
-        }
-        else{
-            mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
-                  gen_operation(cc, bor, res, ((uint64_t)((int64_t)- 1<<32)))
-                  );
-        }
+        InvokeNode* call_NaNBox32_119;
+        auto NaNBox32_119_arg0 = res;
+        x86::Gp ret_val_NaNBox32_119 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_119, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
+              ret_val_NaNBox32_119);
+        setArg(call_NaNBox32_119, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_119, 1, NaNBox32_119_arg0);
+        setRet(call_NaNBox32_119, 0, ret_val_NaNBox32_119);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 124);
@@ -7630,13 +7439,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::F0 + rs2+8), 32, false), 4);
+            load_reg_from_mem_Gp(jh, traits::F0 + rs2+8), 32, false), 4);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 125);
@@ -7673,23 +7480,20 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
         auto res = gen_ext(cc, 
             gen_read_mem(jh, traits::MEM, offs, 4), 32, false);
-        if(static_cast<uint32_t>(traits::FLEN)==32){
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_ext(cc, res, 64, false)
-            );
-        }
-        else{
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, res, ((uint64_t)((int64_t)- 1<<32)))
-                  );
-        }
+        InvokeNode* call_NaNBox32_120;
+        auto NaNBox32_120_arg0 = res;
+        x86::Gp ret_val_NaNBox32_120 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_120, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_120);
+        setArg(call_NaNBox32_120, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_120, 1, NaNBox32_120_arg0);
+        setRet(call_NaNBox32_120, 0, ret_val_NaNBox32_120);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 126);
@@ -7726,13 +7530,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::F0 + rs2), 32, false), 4);
+            load_reg_from_mem_Gp(jh, traits::F0 + rs2), 32, false), 4);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 127);
@@ -7770,18 +7572,22 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
+            InvokeNode* call_NaNBox64_121;
+            auto NaNBox64_121_arg0 = gen_read_mem(jh, traits::MEM, offs, 8);
+            x86::Gp ret_val_NaNBox64_121 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox64_121, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
             mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_ext(cc, gen_read_mem(jh, traits::MEM, offs, 8), 64, false)
-            );
+                  ret_val_NaNBox64_121);
+            setArg(call_NaNBox64_121, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox64_121, 1, NaNBox64_121_arg0);
+            setRet(call_NaNBox64_121, 0, ret_val_NaNBox64_121);
         }
         auto returnValue = CONT;
         
@@ -7820,16 +7626,15 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
-            gen_write_mem(jh, traits::MEM, offs, load_reg_from_mem(jh, traits::F0 + rs2), 8);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
+            gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::F0 + rs2), 64, false), 8);
         }
         auto returnValue = CONT;
         
@@ -7838,20 +7643,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 130: FMADD_D */
-    continuation_e __fmadd_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 130: FADD__D */
+    continuation_e __fadd__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -7862,7 +7666,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMADD_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FADD__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 130);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -7870,35 +7674,52 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fmadd_d_340;
-        jh.cc.comment("//call_fmadd_d");
-        auto fmadd_d_340_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fmadd_d_340_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fmadd_d_340_arg2 = load_reg_from_mem(jh, traits::F0 + rs3);
-        auto fmadd_d_340_arg4 = get_rm(jh, rm);
-        x86::Gp ret_val_fmadd_d_340 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fmadd_d_340, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint32_t, uint8_t>());
+        InvokeNode* call_unbox_d_124;
+        auto unbox_d_124_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_124 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_124,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_125;
+        auto unbox_d_125_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_125 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_125,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_126;
+        x86::Gp ret_val_get_rm_126 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_126, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fadd_d_123;
+        auto fadd_d_123_arg0 = ret_val_unbox_d_124;
+        auto fadd_d_123_arg1 = ret_val_unbox_d_125;
+        auto fadd_d_123_arg2 = ret_val_get_rm_126;
+        x86::Gp ret_val_fadd_d_123 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fadd_d_123,  &fadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_122;
+        auto NaNBox64_122_arg0 = ret_val_fadd_d_123;
+        x86::Gp ret_val_NaNBox64_122 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_122, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fmadd_d_340);
-        setArg(call_fmadd_d_340, 0, fmadd_d_340_arg0);
-        setArg(call_fmadd_d_340, 1, fmadd_d_340_arg1);
-        setArg(call_fmadd_d_340, 2, fmadd_d_340_arg2);
-        setArg(call_fmadd_d_340, 3, 0);
-        setArg(call_fmadd_d_340, 4, fmadd_d_340_arg4);
-        setRet(call_fmadd_d_340, 0, ret_val_fmadd_d_340);
-        InvokeNode* call_fget_flags_341;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_341 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_341, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_341;
-        setRet(call_fget_flags_341, 0, ret_val_fget_flags_341);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox64_122);
+        setArg(call_unbox_d_124, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_124, 1, unbox_d_124_arg1);
+        setRet(call_unbox_d_124, 0, ret_val_unbox_d_124);
+        setArg(call_unbox_d_125, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_125, 1, unbox_d_125_arg1);
+        setRet(call_unbox_d_125, 0, ret_val_unbox_d_125);
+        setArg(call_get_rm_126, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_126, 1, rm);
+        setRet(call_get_rm_126, 0, ret_val_get_rm_126);
+        setArg(call_fadd_d_123, 0, fadd_d_123_arg0);
+        setArg(call_fadd_d_123, 1, fadd_d_123_arg1);
+        setArg(call_fadd_d_123, 2, fadd_d_123_arg2);
+        setRet(call_fadd_d_123, 0, ret_val_fadd_d_123);
+        setArg(call_NaNBox64_122, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_122, 1, NaNBox64_122_arg0);
+        setRet(call_NaNBox64_122, 0, ret_val_NaNBox64_122);
+        InvokeNode* call_fget_flags_127;
+        x86::Gp ret_val_fget_flags_127 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_127,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_127;
+        setRet(call_fget_flags_127, 0, ret_val_fget_flags_127);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 130);
@@ -7906,20 +7727,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 131: FMSUB_D */
-    continuation_e __fmsub_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 131: FSUB__D */
+    continuation_e __fsub__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fmsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -7930,7 +7750,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMSUB_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FSUB__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 131);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -7938,35 +7758,52 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fmadd_d_342;
-        jh.cc.comment("//call_fmadd_d");
-        auto fmadd_d_342_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fmadd_d_342_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fmadd_d_342_arg2 = load_reg_from_mem(jh, traits::F0 + rs3);
-        auto fmadd_d_342_arg4 = get_rm(jh, rm);
-        x86::Gp ret_val_fmadd_d_342 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fmadd_d_342, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint32_t, uint8_t>());
+        InvokeNode* call_unbox_d_130;
+        auto unbox_d_130_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_130 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_130,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_131;
+        auto unbox_d_131_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_131 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_131,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_132;
+        x86::Gp ret_val_get_rm_132 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_132, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fsub_d_129;
+        auto fsub_d_129_arg0 = ret_val_unbox_d_130;
+        auto fsub_d_129_arg1 = ret_val_unbox_d_131;
+        auto fsub_d_129_arg2 = ret_val_get_rm_132;
+        x86::Gp ret_val_fsub_d_129 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fsub_d_129,  &fsub_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_128;
+        auto NaNBox64_128_arg0 = ret_val_fsub_d_129;
+        x86::Gp ret_val_NaNBox64_128 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_128, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fmadd_d_342);
-        setArg(call_fmadd_d_342, 0, fmadd_d_342_arg0);
-        setArg(call_fmadd_d_342, 1, fmadd_d_342_arg1);
-        setArg(call_fmadd_d_342, 2, fmadd_d_342_arg2);
-        setArg(call_fmadd_d_342, 3, 1);
-        setArg(call_fmadd_d_342, 4, fmadd_d_342_arg4);
-        setRet(call_fmadd_d_342, 0, ret_val_fmadd_d_342);
-        InvokeNode* call_fget_flags_343;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_343 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_343, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_343;
-        setRet(call_fget_flags_343, 0, ret_val_fget_flags_343);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox64_128);
+        setArg(call_unbox_d_130, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_130, 1, unbox_d_130_arg1);
+        setRet(call_unbox_d_130, 0, ret_val_unbox_d_130);
+        setArg(call_unbox_d_131, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_131, 1, unbox_d_131_arg1);
+        setRet(call_unbox_d_131, 0, ret_val_unbox_d_131);
+        setArg(call_get_rm_132, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_132, 1, rm);
+        setRet(call_get_rm_132, 0, ret_val_get_rm_132);
+        setArg(call_fsub_d_129, 0, fsub_d_129_arg0);
+        setArg(call_fsub_d_129, 1, fsub_d_129_arg1);
+        setArg(call_fsub_d_129, 2, fsub_d_129_arg2);
+        setRet(call_fsub_d_129, 0, ret_val_fsub_d_129);
+        setArg(call_NaNBox64_128, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_128, 1, NaNBox64_128_arg0);
+        setRet(call_NaNBox64_128, 0, ret_val_NaNBox64_128);
+        InvokeNode* call_fget_flags_133;
+        x86::Gp ret_val_fget_flags_133 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_133,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_133;
+        setRet(call_fget_flags_133, 0, ret_val_fget_flags_133);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 131);
@@ -7974,20 +7811,19 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 132: FNMADD_D */
-    continuation_e __fnmadd_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 132: FMUL__D */
+    continuation_e __fmul__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fmul.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -7998,7 +7834,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FNMADD_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FMUL__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 132);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8006,35 +7842,52 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fmadd_d_344;
-        jh.cc.comment("//call_fmadd_d");
-        auto fmadd_d_344_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fmadd_d_344_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fmadd_d_344_arg2 = load_reg_from_mem(jh, traits::F0 + rs3);
-        auto fmadd_d_344_arg4 = get_rm(jh, rm);
-        x86::Gp ret_val_fmadd_d_344 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fmadd_d_344, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint32_t, uint8_t>());
+        InvokeNode* call_unbox_d_136;
+        auto unbox_d_136_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_136 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_136,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_137;
+        auto unbox_d_137_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_137 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_137,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_138;
+        x86::Gp ret_val_get_rm_138 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_138, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmul_d_135;
+        auto fmul_d_135_arg0 = ret_val_unbox_d_136;
+        auto fmul_d_135_arg1 = ret_val_unbox_d_137;
+        auto fmul_d_135_arg2 = ret_val_get_rm_138;
+        x86::Gp ret_val_fmul_d_135 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fmul_d_135,  &fmul_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_134;
+        auto NaNBox64_134_arg0 = ret_val_fmul_d_135;
+        x86::Gp ret_val_NaNBox64_134 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_134, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fmadd_d_344);
-        setArg(call_fmadd_d_344, 0, fmadd_d_344_arg0);
-        setArg(call_fmadd_d_344, 1, fmadd_d_344_arg1);
-        setArg(call_fmadd_d_344, 2, fmadd_d_344_arg2);
-        setArg(call_fmadd_d_344, 3, 2);
-        setArg(call_fmadd_d_344, 4, fmadd_d_344_arg4);
-        setRet(call_fmadd_d_344, 0, ret_val_fmadd_d_344);
-        InvokeNode* call_fget_flags_345;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_345 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_345, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_345;
-        setRet(call_fget_flags_345, 0, ret_val_fget_flags_345);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox64_134);
+        setArg(call_unbox_d_136, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_136, 1, unbox_d_136_arg1);
+        setRet(call_unbox_d_136, 0, ret_val_unbox_d_136);
+        setArg(call_unbox_d_137, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_137, 1, unbox_d_137_arg1);
+        setRet(call_unbox_d_137, 0, ret_val_unbox_d_137);
+        setArg(call_get_rm_138, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_138, 1, rm);
+        setRet(call_get_rm_138, 0, ret_val_get_rm_138);
+        setArg(call_fmul_d_135, 0, fmul_d_135_arg0);
+        setArg(call_fmul_d_135, 1, fmul_d_135_arg1);
+        setArg(call_fmul_d_135, 2, fmul_d_135_arg2);
+        setRet(call_fmul_d_135, 0, ret_val_fmul_d_135);
+        setArg(call_NaNBox64_134, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_134, 1, NaNBox64_134_arg0);
+        setRet(call_NaNBox64_134, 0, ret_val_NaNBox64_134);
+        InvokeNode* call_fget_flags_139;
+        x86::Gp ret_val_fget_flags_139 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_139,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_139;
+        setRet(call_fget_flags_139, 0, ret_val_fget_flags_139);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 132);
@@ -8042,8 +7895,318 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 133: FNMSUB_D */
-    continuation_e __fnmsub_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 133: FDIV__D */
+    continuation_e __fdiv__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rm}", fmt::arg("mnemonic", "fdiv.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FDIV__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 133);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_142;
+        auto unbox_d_142_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_142 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_142,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_143;
+        auto unbox_d_143_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_143 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_143,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_144;
+        x86::Gp ret_val_get_rm_144 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_144, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fdiv_d_141;
+        auto fdiv_d_141_arg0 = ret_val_unbox_d_142;
+        auto fdiv_d_141_arg1 = ret_val_unbox_d_143;
+        auto fdiv_d_141_arg2 = ret_val_get_rm_144;
+        x86::Gp ret_val_fdiv_d_141 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fdiv_d_141,  &fdiv_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_140;
+        auto NaNBox64_140_arg0 = ret_val_fdiv_d_141;
+        x86::Gp ret_val_NaNBox64_140 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_140, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_140);
+        setArg(call_unbox_d_142, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_142, 1, unbox_d_142_arg1);
+        setRet(call_unbox_d_142, 0, ret_val_unbox_d_142);
+        setArg(call_unbox_d_143, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_143, 1, unbox_d_143_arg1);
+        setRet(call_unbox_d_143, 0, ret_val_unbox_d_143);
+        setArg(call_get_rm_144, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_144, 1, rm);
+        setRet(call_get_rm_144, 0, ret_val_get_rm_144);
+        setArg(call_fdiv_d_141, 0, fdiv_d_141_arg0);
+        setArg(call_fdiv_d_141, 1, fdiv_d_141_arg1);
+        setArg(call_fdiv_d_141, 2, fdiv_d_141_arg2);
+        setRet(call_fdiv_d_141, 0, ret_val_fdiv_d_141);
+        setArg(call_NaNBox64_140, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_140, 1, NaNBox64_140_arg0);
+        setRet(call_NaNBox64_140, 0, ret_val_NaNBox64_140);
+        InvokeNode* call_fget_flags_145;
+        x86::Gp ret_val_fget_flags_145 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_145,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_145;
+        setRet(call_fget_flags_145, 0, ret_val_fget_flags_145);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 133);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 134: FMIN__D */
+    continuation_e __fmin__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMIN__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 134);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_148;
+        auto unbox_d_148_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_148 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_148,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_149;
+        auto unbox_d_149_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_149 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_149,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_fsel_d_147;
+        auto fsel_d_147_arg0 = ret_val_unbox_d_148;
+        auto fsel_d_147_arg1 = ret_val_unbox_d_149;
+        x86::Gp ret_val_fsel_d_147 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fsel_d_147,  &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+        InvokeNode* call_NaNBox64_146;
+        auto NaNBox64_146_arg0 = ret_val_fsel_d_147;
+        x86::Gp ret_val_NaNBox64_146 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_146, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_146);
+        setArg(call_unbox_d_148, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_148, 1, unbox_d_148_arg1);
+        setRet(call_unbox_d_148, 0, ret_val_unbox_d_148);
+        setArg(call_unbox_d_149, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_149, 1, unbox_d_149_arg1);
+        setRet(call_unbox_d_149, 0, ret_val_unbox_d_149);
+        setArg(call_fsel_d_147, 0, fsel_d_147_arg0);
+        setArg(call_fsel_d_147, 1, fsel_d_147_arg1);
+        setArg(call_fsel_d_147, 2, 0);
+        setRet(call_fsel_d_147, 0, ret_val_fsel_d_147);
+        setArg(call_NaNBox64_146, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_146, 1, NaNBox64_146_arg0);
+        setRet(call_NaNBox64_146, 0, ret_val_NaNBox64_146);
+        InvokeNode* call_fget_flags_150;
+        x86::Gp ret_val_fget_flags_150 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_150,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_150;
+        setRet(call_fget_flags_150, 0, ret_val_fget_flags_150);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 134);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 135: FMAX__D */
+    continuation_e __fmax__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FMAX__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 135);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_153;
+        auto unbox_d_153_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_153 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_153,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_154;
+        auto unbox_d_154_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_154 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_154,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_fsel_d_152;
+        auto fsel_d_152_arg0 = ret_val_unbox_d_153;
+        auto fsel_d_152_arg1 = ret_val_unbox_d_154;
+        x86::Gp ret_val_fsel_d_152 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fsel_d_152,  &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+        InvokeNode* call_NaNBox64_151;
+        auto NaNBox64_151_arg0 = ret_val_fsel_d_152;
+        x86::Gp ret_val_NaNBox64_151 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_151, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_151);
+        setArg(call_unbox_d_153, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_153, 1, unbox_d_153_arg1);
+        setRet(call_unbox_d_153, 0, ret_val_unbox_d_153);
+        setArg(call_unbox_d_154, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_154, 1, unbox_d_154_arg1);
+        setRet(call_unbox_d_154, 0, ret_val_unbox_d_154);
+        setArg(call_fsel_d_152, 0, fsel_d_152_arg0);
+        setArg(call_fsel_d_152, 1, fsel_d_152_arg1);
+        setArg(call_fsel_d_152, 2, 1);
+        setRet(call_fsel_d_152, 0, ret_val_fsel_d_152);
+        setArg(call_NaNBox64_151, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_151, 1, NaNBox64_151_arg0);
+        setRet(call_NaNBox64_151, 0, ret_val_NaNBox64_151);
+        InvokeNode* call_fget_flags_155;
+        x86::Gp ret_val_fget_flags_155 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_155,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_155;
+        setRet(call_fget_flags_155, 0, ret_val_fget_flags_155);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 135);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 136: FSQRT__D */
+    continuation_e __fsqrt__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fsqrt.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSQRT__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 136);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_158;
+        auto unbox_d_158_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_158 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_158,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_159;
+        x86::Gp ret_val_get_rm_159 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_159, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fsqrt_d_157;
+        auto fsqrt_d_157_arg0 = ret_val_unbox_d_158;
+        auto fsqrt_d_157_arg1 = ret_val_get_rm_159;
+        x86::Gp ret_val_fsqrt_d_157 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fsqrt_d_157,  &fsqrt_d, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_156;
+        auto NaNBox64_156_arg0 = ret_val_fsqrt_d_157;
+        x86::Gp ret_val_NaNBox64_156 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_156, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_156);
+        setArg(call_unbox_d_158, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_158, 1, unbox_d_158_arg1);
+        setRet(call_unbox_d_158, 0, ret_val_unbox_d_158);
+        setArg(call_get_rm_159, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_159, 1, rm);
+        setRet(call_get_rm_159, 0, ret_val_get_rm_159);
+        setArg(call_fsqrt_d_157, 0, fsqrt_d_157_arg0);
+        setArg(call_fsqrt_d_157, 1, fsqrt_d_157_arg1);
+        setRet(call_fsqrt_d_157, 0, ret_val_fsqrt_d_157);
+        setArg(call_NaNBox64_156, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_156, 1, NaNBox64_156_arg0);
+        setRet(call_NaNBox64_156, 0, ret_val_NaNBox64_156);
+        InvokeNode* call_fget_flags_160;
+        x86::Gp ret_val_fget_flags_160 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_160,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_160;
+        setRet(call_fget_flags_160, 0, ret_val_fget_flags_160);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 136);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 137: FMADD__D */
+    continuation_e __fmadd__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
@@ -8054,8 +8217,8 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}, {rs3}", fmt::arg("mnemonic", "fnmsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8066,266 +8229,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FNMSUB_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 133);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fmadd_d_346;
-        jh.cc.comment("//call_fmadd_d");
-        auto fmadd_d_346_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fmadd_d_346_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fmadd_d_346_arg2 = load_reg_from_mem(jh, traits::F0 + rs3);
-        auto fmadd_d_346_arg4 = get_rm(jh, rm);
-        x86::Gp ret_val_fmadd_d_346 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fmadd_d_346, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint32_t, uint8_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fmadd_d_346);
-        setArg(call_fmadd_d_346, 0, fmadd_d_346_arg0);
-        setArg(call_fmadd_d_346, 1, fmadd_d_346_arg1);
-        setArg(call_fmadd_d_346, 2, fmadd_d_346_arg2);
-        setArg(call_fmadd_d_346, 3, 3);
-        setArg(call_fmadd_d_346, 4, fmadd_d_346_arg4);
-        setRet(call_fmadd_d_346, 0, ret_val_fmadd_d_346);
-        InvokeNode* call_fget_flags_347;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_347 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_347, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_347;
-        setRet(call_fget_flags_347, 0, ret_val_fget_flags_347);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 133);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 134: FADD_D */
-    continuation_e __fadd_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fadd_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FADD_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 134);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fadd_d_348;
-        jh.cc.comment("//call_fadd_d");
-        auto fadd_d_348_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fadd_d_348_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fadd_d_348_arg2 = get_rm(jh, rm);
-        x86::Gp ret_val_fadd_d_348 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fadd_d_348, &fadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fadd_d_348);
-        setArg(call_fadd_d_348, 0, fadd_d_348_arg0);
-        setArg(call_fadd_d_348, 1, fadd_d_348_arg1);
-        setArg(call_fadd_d_348, 2, fadd_d_348_arg2);
-        setRet(call_fadd_d_348, 0, ret_val_fadd_d_348);
-        InvokeNode* call_fget_flags_349;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_349 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_349, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_349;
-        setRet(call_fget_flags_349, 0, ret_val_fget_flags_349);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 134);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 135: FSUB_D */
-    continuation_e __fsub_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsub_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSUB_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 135);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fsub_d_350;
-        jh.cc.comment("//call_fsub_d");
-        auto fsub_d_350_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fsub_d_350_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fsub_d_350_arg2 = get_rm(jh, rm);
-        x86::Gp ret_val_fsub_d_350 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fsub_d_350, &fsub_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fsub_d_350);
-        setArg(call_fsub_d_350, 0, fsub_d_350_arg0);
-        setArg(call_fsub_d_350, 1, fsub_d_350_arg1);
-        setArg(call_fsub_d_350, 2, fsub_d_350_arg2);
-        setRet(call_fsub_d_350, 0, ret_val_fsub_d_350);
-        InvokeNode* call_fget_flags_351;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_351 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_351, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_351;
-        setRet(call_fget_flags_351, 0, ret_val_fget_flags_351);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 135);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 136: FMUL_D */
-    continuation_e __fmul_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmul_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMUL_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 136);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fmul_d_352;
-        jh.cc.comment("//call_fmul_d");
-        auto fmul_d_352_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fmul_d_352_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fmul_d_352_arg2 = get_rm(jh, rm);
-        x86::Gp ret_val_fmul_d_352 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fmul_d_352, &fmul_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fmul_d_352);
-        setArg(call_fmul_d_352, 0, fmul_d_352_arg0);
-        setArg(call_fmul_d_352, 1, fmul_d_352_arg1);
-        setArg(call_fmul_d_352, 2, fmul_d_352_arg2);
-        setRet(call_fmul_d_352, 0, ret_val_fmul_d_352);
-        InvokeNode* call_fget_flags_353;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_353 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_353, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_353;
-        setRet(call_fget_flags_353, 0, ret_val_fget_flags_353);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 136);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 137: FDIV_D */
-    continuation_e __fdiv_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fdiv_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FDIV_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FMADD__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 137);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8333,32 +8237,62 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fdiv_d_354;
-        jh.cc.comment("//call_fdiv_d");
-        auto fdiv_d_354_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fdiv_d_354_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        auto fdiv_d_354_arg2 = get_rm(jh, rm);
-        x86::Gp ret_val_fdiv_d_354 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fdiv_d_354, &fdiv_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_unbox_d_163;
+        auto unbox_d_163_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_163 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_163,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_164;
+        auto unbox_d_164_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_164 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_164,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_165;
+        auto unbox_d_165_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_d_165 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_165,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_166;
+        x86::Gp ret_val_get_rm_166 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_166, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_d_162;
+        auto fmadd_d_162_arg0 = ret_val_unbox_d_163;
+        auto fmadd_d_162_arg1 = ret_val_unbox_d_164;
+        auto fmadd_d_162_arg2 = ret_val_unbox_d_165;
+        auto fmadd_d_162_arg4 = ret_val_get_rm_166;
+        x86::Gp ret_val_fmadd_d_162 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fmadd_d_162,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_161;
+        auto NaNBox64_161_arg0 = ret_val_fmadd_d_162;
+        x86::Gp ret_val_NaNBox64_161 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_161, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fdiv_d_354);
-        setArg(call_fdiv_d_354, 0, fdiv_d_354_arg0);
-        setArg(call_fdiv_d_354, 1, fdiv_d_354_arg1);
-        setArg(call_fdiv_d_354, 2, fdiv_d_354_arg2);
-        setRet(call_fdiv_d_354, 0, ret_val_fdiv_d_354);
-        InvokeNode* call_fget_flags_355;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_355 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_355, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_355;
-        setRet(call_fget_flags_355, 0, ret_val_fget_flags_355);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              ret_val_NaNBox64_161);
+        setArg(call_unbox_d_163, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_163, 1, unbox_d_163_arg1);
+        setRet(call_unbox_d_163, 0, ret_val_unbox_d_163);
+        setArg(call_unbox_d_164, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_164, 1, unbox_d_164_arg1);
+        setRet(call_unbox_d_164, 0, ret_val_unbox_d_164);
+        setArg(call_unbox_d_165, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_165, 1, unbox_d_165_arg1);
+        setRet(call_unbox_d_165, 0, ret_val_unbox_d_165);
+        setArg(call_get_rm_166, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_166, 1, rm);
+        setRet(call_get_rm_166, 0, ret_val_get_rm_166);
+        setArg(call_fmadd_d_162, 0, fmadd_d_162_arg0);
+        setArg(call_fmadd_d_162, 1, fmadd_d_162_arg1);
+        setArg(call_fmadd_d_162, 2, fmadd_d_162_arg2);
+        setArg(call_fmadd_d_162, 3, 0);
+        setArg(call_fmadd_d_162, 4, fmadd_d_162_arg4);
+        setRet(call_fmadd_d_162, 0, ret_val_fmadd_d_162);
+        setArg(call_NaNBox64_161, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_161, 1, NaNBox64_161_arg0);
+        setRet(call_NaNBox64_161, 0, ret_val_NaNBox64_161);
+        InvokeNode* call_fget_flags_167;
+        x86::Gp ret_val_fget_flags_167 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_167,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_167;
+        setRet(call_fget_flags_167, 0, ret_val_fget_flags_167);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 137);
@@ -8366,18 +8300,20 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 138: FSQRT_D */
-    continuation_e __fsqrt_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 138: FMSUB__D */
+    continuation_e __fmsub__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fsqrt_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fmsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8388,7 +8324,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSQRT_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FMSUB__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 138);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8396,30 +8332,63 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fsqrt_d_356;
-        jh.cc.comment("//call_fsqrt_d");
-        auto fsqrt_d_356_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fsqrt_d_356_arg1 = get_rm(jh, rm);
-        x86::Gp ret_val_fsqrt_d_356 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fsqrt_d_356, &fsqrt_d, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_unbox_d_170;
+        auto unbox_d_170_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_170 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_170,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_171;
+        auto unbox_d_171_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_171 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_171,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_172;
+        auto unbox_d_172_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_d_172 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_172,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_173;
+        x86::Gp ret_val_get_rm_173 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_173, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_d_169;
+        auto fmadd_d_169_arg0 = ret_val_unbox_d_170;
+        auto fmadd_d_169_arg1 = ret_val_unbox_d_171;
+        auto fmadd_d_169_arg2 = ret_val_unbox_d_172;
+        auto fmadd_d_169_arg4 = ret_val_get_rm_173;
+        x86::Gp ret_val_fmadd_d_169 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fmadd_d_169,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_168;
+        auto NaNBox64_168_arg0 = ret_val_fmadd_d_169;
+        x86::Gp ret_val_NaNBox64_168 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_168, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        auto res = ret_val_NaNBox64_168;
+        setArg(call_unbox_d_170, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_170, 1, unbox_d_170_arg1);
+        setRet(call_unbox_d_170, 0, ret_val_unbox_d_170);
+        setArg(call_unbox_d_171, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_171, 1, unbox_d_171_arg1);
+        setRet(call_unbox_d_171, 0, ret_val_unbox_d_171);
+        setArg(call_unbox_d_172, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_172, 1, unbox_d_172_arg1);
+        setRet(call_unbox_d_172, 0, ret_val_unbox_d_172);
+        setArg(call_get_rm_173, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_173, 1, rm);
+        setRet(call_get_rm_173, 0, ret_val_get_rm_173);
+        setArg(call_fmadd_d_169, 0, fmadd_d_169_arg0);
+        setArg(call_fmadd_d_169, 1, fmadd_d_169_arg1);
+        setArg(call_fmadd_d_169, 2, fmadd_d_169_arg2);
+        setArg(call_fmadd_d_169, 3, 1);
+        setArg(call_fmadd_d_169, 4, fmadd_d_169_arg4);
+        setRet(call_fmadd_d_169, 0, ret_val_fmadd_d_169);
+        setArg(call_NaNBox64_168, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_168, 1, NaNBox64_168_arg0);
+        setRet(call_NaNBox64_168, 0, ret_val_NaNBox64_168);
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fsqrt_d_356);
-        setArg(call_fsqrt_d_356, 0, fsqrt_d_356_arg0);
-        setArg(call_fsqrt_d_356, 1, fsqrt_d_356_arg1);
-        setRet(call_fsqrt_d_356, 0, ret_val_fsqrt_d_356);
-        InvokeNode* call_fget_flags_357;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_357 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_357, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_357;
-        setRet(call_fget_flags_357, 0, ret_val_fget_flags_357);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+              res);
+        InvokeNode* call_fget_flags_174;
+        x86::Gp ret_val_fget_flags_174 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_174,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_174;
+        setRet(call_fget_flags_174, 0, ret_val_fget_flags_174);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 138);
@@ -8427,18 +8396,20 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 139: FSGNJ_D */
-    continuation_e __fsgnj_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 139: FNMADD__D */
+    continuation_e __fnmadd__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmadd.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8449,7 +8420,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJ_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FNMADD__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 139);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8457,10 +8428,62 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
+        InvokeNode* call_unbox_d_177;
+        auto unbox_d_177_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_177 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_177,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_178;
+        auto unbox_d_178_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_178 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_178,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_179;
+        auto unbox_d_179_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_d_179 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_179,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_180;
+        x86::Gp ret_val_get_rm_180 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_180, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_d_176;
+        auto fmadd_d_176_arg0 = ret_val_unbox_d_177;
+        auto fmadd_d_176_arg1 = ret_val_unbox_d_178;
+        auto fmadd_d_176_arg2 = ret_val_unbox_d_179;
+        auto fmadd_d_176_arg4 = ret_val_get_rm_180;
+        x86::Gp ret_val_fmadd_d_176 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fmadd_d_176,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_175;
+        auto NaNBox64_175_arg0 = ret_val_fmadd_d_176;
+        x86::Gp ret_val_NaNBox64_175 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_175, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(jh.cc, bor, gen_ext(jh.cc, gen_operation(jh.cc, shl, gen_slice(jh.cc, load_reg_from_mem(jh, traits::F0 + rs2), 63, 63-63+1), 63), 64, false), gen_slice(jh.cc, load_reg_from_mem(jh, traits::F0 + rs1), 0, 62-0+1)));
+              ret_val_NaNBox64_175);
+        setArg(call_unbox_d_177, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_177, 1, unbox_d_177_arg1);
+        setRet(call_unbox_d_177, 0, ret_val_unbox_d_177);
+        setArg(call_unbox_d_178, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_178, 1, unbox_d_178_arg1);
+        setRet(call_unbox_d_178, 0, ret_val_unbox_d_178);
+        setArg(call_unbox_d_179, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_179, 1, unbox_d_179_arg1);
+        setRet(call_unbox_d_179, 0, ret_val_unbox_d_179);
+        setArg(call_get_rm_180, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_180, 1, rm);
+        setRet(call_get_rm_180, 0, ret_val_get_rm_180);
+        setArg(call_fmadd_d_176, 0, fmadd_d_176_arg0);
+        setArg(call_fmadd_d_176, 1, fmadd_d_176_arg1);
+        setArg(call_fmadd_d_176, 2, fmadd_d_176_arg2);
+        setArg(call_fmadd_d_176, 3, 2);
+        setArg(call_fmadd_d_176, 4, fmadd_d_176_arg4);
+        setRet(call_fmadd_d_176, 0, ret_val_fmadd_d_176);
+        setArg(call_NaNBox64_175, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_175, 1, NaNBox64_175_arg0);
+        setRet(call_NaNBox64_175, 0, ret_val_NaNBox64_175);
+        InvokeNode* call_fget_flags_181;
+        x86::Gp ret_val_fget_flags_181 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_181,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_181;
+        setRet(call_fget_flags_181, 0, ret_val_fget_flags_181);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 139);
@@ -8468,18 +8491,20 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 140: FSGNJN_D */
-    continuation_e __fsgnjn_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 140: FNMSUB__D */
+    continuation_e __fnmsub__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
         uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        uint8_t rs3 = ((bit_sub<27,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rs2}, {rs3}, {rm}", fmt::arg("mnemonic", "fnmsub.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)), fmt::arg("rs3", fname(rs3)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8490,7 +8515,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJN_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FNMSUB__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 140);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8498,10 +8523,62 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
+        InvokeNode* call_unbox_d_184;
+        auto unbox_d_184_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_184 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_184,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_185;
+        auto unbox_d_185_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_185 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_185,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_186;
+        auto unbox_d_186_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
+        x86::Gp ret_val_unbox_d_186 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_186,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_187;
+        x86::Gp ret_val_get_rm_187 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_187, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_fmadd_d_183;
+        auto fmadd_d_183_arg0 = ret_val_unbox_d_184;
+        auto fmadd_d_183_arg1 = ret_val_unbox_d_185;
+        auto fmadd_d_183_arg2 = ret_val_unbox_d_186;
+        auto fmadd_d_183_arg4 = ret_val_get_rm_187;
+        x86::Gp ret_val_fmadd_d_183 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_fmadd_d_183,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox64_182;
+        auto NaNBox64_182_arg0 = ret_val_fmadd_d_183;
+        x86::Gp ret_val_NaNBox64_182 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_182, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(jh.cc, bor, gen_ext(jh.cc, gen_operation(jh.cc, shl, gen_operation(cc, bnot, gen_slice(jh.cc, load_reg_from_mem(jh, traits::F0 + rs2), 63, 63-63+1)), 63), 64, false), gen_slice(jh.cc, load_reg_from_mem(jh, traits::F0 + rs1), 0, 62-0+1)));
+              ret_val_NaNBox64_182);
+        setArg(call_unbox_d_184, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_184, 1, unbox_d_184_arg1);
+        setRet(call_unbox_d_184, 0, ret_val_unbox_d_184);
+        setArg(call_unbox_d_185, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_185, 1, unbox_d_185_arg1);
+        setRet(call_unbox_d_185, 0, ret_val_unbox_d_185);
+        setArg(call_unbox_d_186, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_186, 1, unbox_d_186_arg1);
+        setRet(call_unbox_d_186, 0, ret_val_unbox_d_186);
+        setArg(call_get_rm_187, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_187, 1, rm);
+        setRet(call_get_rm_187, 0, ret_val_get_rm_187);
+        setArg(call_fmadd_d_183, 0, fmadd_d_183_arg0);
+        setArg(call_fmadd_d_183, 1, fmadd_d_183_arg1);
+        setArg(call_fmadd_d_183, 2, fmadd_d_183_arg2);
+        setArg(call_fmadd_d_183, 3, 3);
+        setArg(call_fmadd_d_183, 4, fmadd_d_183_arg4);
+        setRet(call_fmadd_d_183, 0, ret_val_fmadd_d_183);
+        setArg(call_NaNBox64_182, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_182, 1, NaNBox64_182_arg0);
+        setRet(call_NaNBox64_182, 0, ret_val_NaNBox64_182);
+        InvokeNode* call_fget_flags_188;
+        x86::Gp ret_val_fget_flags_188 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_188,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_188;
+        setRet(call_fget_flags_188, 0, ret_val_fget_flags_188);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 140);
@@ -8509,18 +8586,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 141: FSGNJX_D */
-    continuation_e __fsgnjx_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 141: FCVT__W__D */
+    continuation_e __fcvt__w__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.w.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8531,7 +8608,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FSGNJX_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FCVT__W__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 141);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8539,12 +8616,47 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_operation(cc, bxor, load_reg_from_mem(jh, traits::F0 + rs1), (gen_operation(cc, band, load_reg_from_mem(jh, traits::F0 + rs2), ((uint64_t)1<<63))
-              ))
-              );
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_unbox_d_190;
+            auto unbox_d_190_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_190 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_190,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_get_rm_191;
+            x86::Gp ret_val_get_rm_191 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_191, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_f64toi32_189;
+            auto f64toi32_189_arg0 = ret_val_unbox_d_190;
+            auto f64toi32_189_arg1 = ret_val_get_rm_191;
+            x86::Gp ret_val_f64toi32_189 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_f64toi32_189,  &f64toi32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_f64toi32_189, 32, false), 32, true);
+            setArg(call_unbox_d_190, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_190, 1, unbox_d_190_arg1);
+            setRet(call_unbox_d_190, 0, ret_val_unbox_d_190);
+            setArg(call_get_rm_191, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_191, 1, rm);
+            setRet(call_get_rm_191, 0, ret_val_get_rm_191);
+            setArg(call_f64toi32_189, 0, f64toi32_189_arg0);
+            setArg(call_f64toi32_189, 1, f64toi32_189_arg1);
+            setRet(call_f64toi32_189, 0, ret_val_f64toi32_189);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, true));
+            }
+            InvokeNode* call_fget_flags_192;
+            x86::Gp ret_val_fget_flags_192 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_192,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_192;
+            setRet(call_fget_flags_192, 0, ret_val_fget_flags_192);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 141);
@@ -8552,18 +8664,18 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 142: FMIN_D */
-    continuation_e __fmin_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 142: FCVT__WU__D */
+    continuation_e __fcvt__wu__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmin_d"),
-                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.wu.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -8574,7 +8686,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMIN_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FCVT__WU__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 142);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8582,31 +8694,47 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        InvokeNode* call_fsel_d_358;
-        jh.cc.comment("//call_fsel_d");
-        auto fsel_d_358_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fsel_d_358_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_fsel_d_358 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fsel_d_358, &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fsel_d_358);
-        setArg(call_fsel_d_358, 0, fsel_d_358_arg0);
-        setArg(call_fsel_d_358, 1, fsel_d_358_arg1);
-        setArg(call_fsel_d_358, 2, 0);
-        setRet(call_fsel_d_358, 0, ret_val_fsel_d_358);
-        InvokeNode* call_fget_flags_359;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_359 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_359, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_359;
-        setRet(call_fget_flags_359, 0, ret_val_fget_flags_359);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_unbox_d_194;
+            auto unbox_d_194_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_194 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_194,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_get_rm_195;
+            x86::Gp ret_val_get_rm_195 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_195, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_f64toui32_193;
+            auto f64toui32_193_arg0 = ret_val_unbox_d_194;
+            auto f64toui32_193_arg1 = ret_val_get_rm_195;
+            x86::Gp ret_val_f64toui32_193 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_f64toui32_193,  &f64toui32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            auto res = gen_ext(cc, 
+                gen_ext(cc, 
+                    ret_val_f64toui32_193, 32, false), 32, true);
+            setArg(call_unbox_d_194, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_194, 1, unbox_d_194_arg1);
+            setRet(call_unbox_d_194, 0, ret_val_unbox_d_194);
+            setArg(call_get_rm_195, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_195, 1, rm);
+            setRet(call_get_rm_195, 0, ret_val_get_rm_195);
+            setArg(call_f64toui32_193, 0, f64toui32_193_arg0);
+            setArg(call_f64toui32_193, 1, f64toui32_193_arg1);
+            setRet(call_f64toui32_193, 0, ret_val_f64toui32_193);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, true));
+            }
+            InvokeNode* call_fget_flags_196;
+            x86::Gp ret_val_fget_flags_196 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_196,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_196;
+            setRet(call_fget_flags_196, 0, ret_val_fget_flags_196);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 142);
@@ -8614,8 +8742,296 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 143: FMAX_D */
-    continuation_e __fmax_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 143: FCVT__D__W */
+    continuation_e __fcvt__d__w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.w"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__D__W_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 143);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_get_rm_199;
+            x86::Gp ret_val_get_rm_199 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_199, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_i32tof64_198;
+            auto i32tof64_198_arg0 = gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
+            auto i32tof64_198_arg1 = ret_val_get_rm_199;
+            x86::Gp ret_val_i32tof64_198 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_i32tof64_198,  &i32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            InvokeNode* call_NaNBox64_197;
+            auto NaNBox64_197_arg0 = ret_val_i32tof64_198;
+            x86::Gp ret_val_NaNBox64_197 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox64_197, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+            mov(cc, get_ptr_for(jh, traits::F0+ rd),
+                  ret_val_NaNBox64_197);
+            setArg(call_get_rm_199, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_199, 1, rm);
+            setRet(call_get_rm_199, 0, ret_val_get_rm_199);
+            setArg(call_i32tof64_198, 0, i32tof64_198_arg0);
+            setArg(call_i32tof64_198, 1, i32tof64_198_arg1);
+            setRet(call_i32tof64_198, 0, ret_val_i32tof64_198);
+            setArg(call_NaNBox64_197, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox64_197, 1, NaNBox64_197_arg0);
+            setRet(call_NaNBox64_197, 0, ret_val_NaNBox64_197);
+            InvokeNode* call_fget_flags_200;
+            x86::Gp ret_val_fget_flags_200 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_200,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_200;
+            setRet(call_fget_flags_200, 0, ret_val_fget_flags_200);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 143);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 144: FCVT__D__WU */
+    continuation_e __fcvt__d__wu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.wu"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__D__WU_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 144);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rs1>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_get_rm_203;
+            x86::Gp ret_val_get_rm_203 = get_reg_Gp(cc, 8, false);
+            cc.invoke(&call_get_rm_203, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+            InvokeNode* call_ui32tof64_202;
+            auto ui32tof64_202_arg0 = gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
+            auto ui32tof64_202_arg1 = ret_val_get_rm_203;
+            x86::Gp ret_val_ui32tof64_202 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_ui32tof64_202,  &ui32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            InvokeNode* call_NaNBox64_201;
+            auto NaNBox64_201_arg0 = ret_val_ui32tof64_202;
+            x86::Gp ret_val_NaNBox64_201 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_NaNBox64_201, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+            mov(cc, get_ptr_for(jh, traits::F0+ rd),
+                  ret_val_NaNBox64_201);
+            setArg(call_get_rm_203, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_get_rm_203, 1, rm);
+            setRet(call_get_rm_203, 0, ret_val_get_rm_203);
+            setArg(call_ui32tof64_202, 0, ui32tof64_202_arg0);
+            setArg(call_ui32tof64_202, 1, ui32tof64_202_arg1);
+            setRet(call_ui32tof64_202, 0, ret_val_ui32tof64_202);
+            setArg(call_NaNBox64_201, 0, reinterpret_cast<uintptr_t>(this));
+            setArg(call_NaNBox64_201, 1, NaNBox64_201_arg0);
+            setRet(call_NaNBox64_201, 0, ret_val_NaNBox64_201);
+            InvokeNode* call_fget_flags_204;
+            x86::Gp ret_val_fget_flags_204 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_204,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_204;
+            setRet(call_fget_flags_204, 0, ret_val_fget_flags_204);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 144);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 145: FCVT__S__D */
+    continuation_e __fcvt__s__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.s.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__S__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 145);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_207;
+        auto unbox_d_207_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_207 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_207,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_208;
+        x86::Gp ret_val_get_rm_208 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_208, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_f64tof32_206;
+        auto f64tof32_206_arg0 = ret_val_unbox_d_207;
+        auto f64tof32_206_arg1 = ret_val_get_rm_208;
+        x86::Gp ret_val_f64tof32_206 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_f64tof32_206,  &f64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+        InvokeNode* call_NaNBox32_205;
+        auto NaNBox32_205_arg0 = ret_val_f64tof32_206;
+        x86::Gp ret_val_NaNBox32_205 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox32_205, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox32_205);
+        setArg(call_unbox_d_207, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_207, 1, unbox_d_207_arg1);
+        setRet(call_unbox_d_207, 0, ret_val_unbox_d_207);
+        setArg(call_get_rm_208, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_208, 1, rm);
+        setRet(call_get_rm_208, 0, ret_val_get_rm_208);
+        setArg(call_f64tof32_206, 0, f64tof32_206_arg0);
+        setArg(call_f64tof32_206, 1, f64tof32_206_arg1);
+        setRet(call_f64tof32_206, 0, ret_val_f64tof32_206);
+        setArg(call_NaNBox32_205, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox32_205, 1, NaNBox32_205_arg0);
+        setRet(call_NaNBox32_205, 0, ret_val_NaNBox32_205);
+        InvokeNode* call_fget_flags_209;
+        x86::Gp ret_val_fget_flags_209 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_fget_flags_209,  &fget_flags, FuncSignature::build<uint32_t>());
+        auto flags = ret_val_fget_flags_209;
+        setRet(call_fget_flags_209, 0, ret_val_fget_flags_209);
+        mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 145);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 146: FCVT__D__S */
+    continuation_e __fcvt__d__s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rm = ((bit_sub<12,3>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rm}", fmt::arg("mnemonic", "fcvt.d.s"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rm", rm));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FCVT__D__S_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 146);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_s_212;
+        auto unbox_s_212_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_s_212 = get_reg_Gp(cc, 32, false);
+        cc.invoke(&call_unbox_s_212,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        InvokeNode* call_get_rm_213;
+        x86::Gp ret_val_get_rm_213 = get_reg_Gp(cc, 8, false);
+        cc.invoke(&call_get_rm_213, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
+        InvokeNode* call_f32tof64_211;
+        auto f32tof64_211_arg0 = ret_val_unbox_s_212;
+        auto f32tof64_211_arg1 = ret_val_get_rm_213;
+        x86::Gp ret_val_f32tof64_211 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_f32tof64_211,  &f32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+        InvokeNode* call_NaNBox64_210;
+        auto NaNBox64_210_arg0 = ret_val_f32tof64_211;
+        x86::Gp ret_val_NaNBox64_210 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_210, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_210);
+        setArg(call_unbox_s_212, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_s_212, 1, unbox_s_212_arg1);
+        setRet(call_unbox_s_212, 0, ret_val_unbox_s_212);
+        setArg(call_get_rm_213, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_get_rm_213, 1, rm);
+        setRet(call_get_rm_213, 0, ret_val_get_rm_213);
+        setArg(call_f32tof64_211, 0, f32tof64_211_arg0);
+        setArg(call_f32tof64_211, 1, f32tof64_211_arg1);
+        setRet(call_f32tof64_211, 0, ret_val_f32tof64_211);
+        setArg(call_NaNBox64_210, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_210, 1, NaNBox64_210_arg0);
+        setRet(call_NaNBox64_210, 0, ret_val_NaNBox64_210);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 146);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 147: FSGNJ__D */
+    continuation_e __fsgnj__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -8624,7 +9040,7 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fmax_d"),
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnj.d"),
                 fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -8636,255 +9052,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FMAX_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 143);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fsel_d_360;
-        jh.cc.comment("//call_fsel_d");
-        auto fsel_d_360_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fsel_d_360_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-        x86::Gp ret_val_fsel_d_360 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fsel_d_360, &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fsel_d_360);
-        setArg(call_fsel_d_360, 0, fsel_d_360_arg0);
-        setArg(call_fsel_d_360, 1, fsel_d_360_arg1);
-        setArg(call_fsel_d_360, 2, 1);
-        setRet(call_fsel_d_360, 0, ret_val_fsel_d_360);
-        InvokeNode* call_fget_flags_361;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_361 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_361, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_361;
-        setRet(call_fget_flags_361, 0, ret_val_fget_flags_361);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 143);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 144: FCVT_S_D */
-    continuation_e __fcvt_s_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_s_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_S_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 144);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fconv_d2f_362;
-        jh.cc.comment("//call_fconv_d2f");
-        auto fconv_d2f_362_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-        auto fconv_d2f_362_arg1 = get_rm(jh, rm);
-        x86::Gp ret_val_fconv_d2f_362 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fconv_d2f_362, &fconv_d2f, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
-        auto res = ret_val_fconv_d2f_362;
-        setArg(call_fconv_d2f_362, 0, fconv_d2f_362_arg0);
-        setArg(call_fconv_d2f_362, 1, fconv_d2f_362_arg1);
-        setRet(call_fconv_d2f_362, 0, ret_val_fconv_d2f_362);
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              gen_ext(cc, 
-                  (gen_operation(cc, add, res, ((int64_t)- 1<<32))
-                  ), 64, true));
-        InvokeNode* call_fget_flags_363;
-        jh.cc.comment("//call_fget_flags");
-        x86::Gp ret_val_fget_flags_363 = get_reg_Gp(jh.cc, 32, true);
-        jh.cc.invoke(&call_fget_flags_363, &fget_flags, FuncSignature::build<uint32_t>());
-        auto flags = ret_val_fget_flags_363;
-        setRet(call_fget_flags_363, 0, ret_val_fget_flags_363);
-        mov(cc, get_ptr_for(jh, traits::FCSR),
-              gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-              ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-              ))
-              );
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 144);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 145: FCVT_D_S */
-    continuation_e __fcvt_d_s(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_s"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_D_S_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 145);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        InvokeNode* call_fconv_f2d_364;
-        jh.cc.comment("//call_fconv_f2d");
-        auto fconv_f2d_364_arg0 = gen_ext(cc, 
-            load_reg_from_mem(jh, traits::F0 + rs1), 32, false);
-        auto fconv_f2d_364_arg1 = get_rm(jh, rm);
-        x86::Gp ret_val_fconv_f2d_364 = get_reg_Gp(jh.cc, 64, true);
-        jh.cc.invoke(&call_fconv_f2d_364, &fconv_f2d, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
-        mov(cc, get_ptr_for(jh, traits::F0+ rd),
-              ret_val_fconv_f2d_364);
-        setArg(call_fconv_f2d_364, 0, fconv_f2d_364_arg0);
-        setArg(call_fconv_f2d_364, 1, fconv_f2d_364_arg1);
-        setRet(call_fconv_f2d_364, 0, ret_val_fconv_f2d_364);
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 145);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 146: FEQ_D */
-    continuation_e __feq_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FEQ_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 146);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcmp_d_365;
-            jh.cc.comment("//call_fcmp_d");
-            auto fcmp_d_365_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            auto fcmp_d_365_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_fcmp_d_365 = get_reg_Gp(jh.cc, 64, true);
-            jh.cc.invoke(&call_fcmp_d_365, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
-            auto res = ret_val_fcmp_d_365;
-            setArg(call_fcmp_d_365, 0, fcmp_d_365_arg0);
-            setArg(call_fcmp_d_365, 1, fcmp_d_365_arg1);
-            setArg(call_fcmp_d_365, 2, 0);
-            setRet(call_fcmp_d_365, 0, ret_val_fcmp_d_365);
-            if(rd!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          res, 32, false));
-            }
-            InvokeNode* call_fget_flags_366;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_366 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_366, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_366;
-            setRet(call_fget_flags_366, 0, ret_val_fget_flags_366);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 146);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 147: FLT_D */
-    continuation_e __flt_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        uint8_t rs2 = ((bit_sub<20,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt_d"),
-                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FLT_D_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FSGNJ__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 147);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -8892,40 +9060,30 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcmp_d_367;
-            jh.cc.comment("//call_fcmp_d");
-            auto fcmp_d_367_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            auto fcmp_d_367_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_fcmp_d_367 = get_reg_Gp(jh.cc, 64, true);
-            jh.cc.invoke(&call_fcmp_d_367, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
-            auto res = ret_val_fcmp_d_367;
-            setArg(call_fcmp_d_367, 0, fcmp_d_367_arg0);
-            setArg(call_fcmp_d_367, 1, fcmp_d_367_arg1);
-            setArg(call_fcmp_d_367, 2, 2);
-            setRet(call_fcmp_d_367, 0, ret_val_fcmp_d_367);
-            if(rd!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          res, 32, false));
-            }
-            InvokeNode* call_fget_flags_368;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_368 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_368, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_368;
-            setRet(call_fget_flags_368, 0, ret_val_fget_flags_368);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
+        InvokeNode* call_unbox_d_215;
+        auto unbox_d_215_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_215 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_215,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_216;
+        auto unbox_d_216_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_216 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_216,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox64_214;
+        auto NaNBox64_214_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_d_215, 63, 63-63+1), 64, false), 63), gen_ext(cc, gen_slice(cc, ret_val_unbox_d_216, 0, 62-0+1), 64, false));
+        x86::Gp ret_val_NaNBox64_214 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_214, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_214);
+        setArg(call_unbox_d_215, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_215, 1, unbox_d_215_arg1);
+        setRet(call_unbox_d_215, 0, ret_val_unbox_d_215);
+        setArg(call_unbox_d_216, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_216, 1, unbox_d_216_arg1);
+        setRet(call_unbox_d_216, 0, ret_val_unbox_d_216);
+        setArg(call_NaNBox64_214, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_214, 1, NaNBox64_214_arg0);
+        setRet(call_NaNBox64_214, 0, ret_val_NaNBox64_214);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 147);
@@ -8933,8 +9091,8 @@ private:
     	return returnValue;        
     }
     
-    /* instruction 148: FLE_D */
-    continuation_e __fle_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 148: FSGNJN__D */
+    continuation_e __fsgnjn__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -8943,7 +9101,129 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle_d"),
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjn.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSGNJN__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 148);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_218;
+        auto unbox_d_218_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_218 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_218,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_219;
+        auto unbox_d_219_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_219 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_219,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox64_217;
+        auto NaNBox64_217_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_d_218, 63, 63-63+1)), 64, false), 63), gen_ext(cc, gen_slice(cc, ret_val_unbox_d_219, 0, 62-0+1), 64, false));
+        x86::Gp ret_val_NaNBox64_217 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_217, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_217);
+        setArg(call_unbox_d_218, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_218, 1, unbox_d_218_arg1);
+        setRet(call_unbox_d_218, 0, ret_val_unbox_d_218);
+        setArg(call_unbox_d_219, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_219, 1, unbox_d_219_arg1);
+        setRet(call_unbox_d_219, 0, ret_val_unbox_d_219);
+        setArg(call_NaNBox64_217, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_217, 1, NaNBox64_217_arg0);
+        setRet(call_NaNBox64_217, 0, ret_val_NaNBox64_217);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 148);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 149: FSGNJX__D */
+    continuation_e __fsgnjx__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fsgnjx.d"),
+                fmt::arg("rd", fname(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FSGNJX__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 149);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        InvokeNode* call_unbox_d_221;
+        auto unbox_d_221_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+        x86::Gp ret_val_unbox_d_221 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_221,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_unbox_d_222;
+        auto unbox_d_222_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+        x86::Gp ret_val_unbox_d_222 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_unbox_d_222,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        InvokeNode* call_NaNBox64_220;
+        auto NaNBox64_220_arg0 = gen_operation(cc, bxor, (gen_operation(cc, band, ret_val_unbox_d_221, ((uint64_t)1<<63))), ret_val_unbox_d_222);
+        x86::Gp ret_val_NaNBox64_220 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_220, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_220);
+        setArg(call_unbox_d_221, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_221, 1, unbox_d_221_arg1);
+        setRet(call_unbox_d_221, 0, ret_val_unbox_d_221);
+        setArg(call_unbox_d_222, 0, static_cast<uint32_t>(traits::FLEN));
+        setArg(call_unbox_d_222, 1, unbox_d_222_arg1);
+        setRet(call_unbox_d_222, 0, ret_val_unbox_d_222);
+        setArg(call_NaNBox64_220, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_220, 1, NaNBox64_220_arg0);
+        setRet(call_NaNBox64_220, 0, ret_val_NaNBox64_220);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 149);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 150: FEQ__D */
+    continuation_e __feq__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "feq.d"),
                 fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -8955,57 +9235,220 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FLE_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 148);
+        cc.comment(fmt::format("FEQ__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 150);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_fcmp_d_369;
-            jh.cc.comment("//call_fcmp_d");
-            auto fcmp_d_369_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            auto fcmp_d_369_arg1 = load_reg_from_mem(jh, traits::F0 + rs2);
-            x86::Gp ret_val_fcmp_d_369 = get_reg_Gp(jh.cc, 64, true);
-            jh.cc.invoke(&call_fcmp_d_369, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
-            auto res = ret_val_fcmp_d_369;
-            setArg(call_fcmp_d_369, 0, fcmp_d_369_arg0);
-            setArg(call_fcmp_d_369, 1, fcmp_d_369_arg1);
-            setArg(call_fcmp_d_369, 2, 1);
-            setRet(call_fcmp_d_369, 0, ret_val_fcmp_d_369);
+        else {
+            InvokeNode* call_unbox_d_224;
+            auto unbox_d_224_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_224 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_224,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_d_225;
+            auto unbox_d_225_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_d_225 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_225,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_d_223;
+            auto fcmp_d_223_arg0 = ret_val_unbox_d_224;
+            auto fcmp_d_223_arg1 = ret_val_unbox_d_225;
+            x86::Gp ret_val_fcmp_d_223 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_fcmp_d_223,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            auto res = ret_val_fcmp_d_223;
+            setArg(call_unbox_d_224, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_224, 1, unbox_d_224_arg1);
+            setRet(call_unbox_d_224, 0, ret_val_unbox_d_224);
+            setArg(call_unbox_d_225, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_225, 1, unbox_d_225_arg1);
+            setRet(call_unbox_d_225, 0, ret_val_unbox_d_225);
+            setArg(call_fcmp_d_223, 0, fcmp_d_223_arg0);
+            setArg(call_fcmp_d_223, 1, fcmp_d_223_arg1);
+            setArg(call_fcmp_d_223, 2, 0);
+            setRet(call_fcmp_d_223, 0, ret_val_fcmp_d_223);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
                           res, 32, false));
             }
-            InvokeNode* call_fget_flags_370;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_370 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_370, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_370;
-            setRet(call_fget_flags_370, 0, ret_val_fget_flags_370);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
+            InvokeNode* call_fget_flags_226;
+            x86::Gp ret_val_fget_flags_226 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_226,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_226;
+            setRet(call_fget_flags_226, 0, ret_val_fget_flags_226);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
         }
         auto returnValue = CONT;
         
-        gen_sync(jh, POST_SYNC, 148);
+        gen_sync(jh, POST_SYNC, 150);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
     
-    /* instruction 149: FCLASS_D */
-    continuation_e __fclass_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+    /* instruction 151: FLT__D */
+    continuation_e __flt__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "flt.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FLT__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 151);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_unbox_d_228;
+            auto unbox_d_228_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_228 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_228,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_d_229;
+            auto unbox_d_229_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_d_229 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_229,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_d_227;
+            auto fcmp_d_227_arg0 = ret_val_unbox_d_228;
+            auto fcmp_d_227_arg1 = ret_val_unbox_d_229;
+            x86::Gp ret_val_fcmp_d_227 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_fcmp_d_227,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            auto res = ret_val_fcmp_d_227;
+            setArg(call_unbox_d_228, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_228, 1, unbox_d_228_arg1);
+            setRet(call_unbox_d_228, 0, ret_val_unbox_d_228);
+            setArg(call_unbox_d_229, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_229, 1, unbox_d_229_arg1);
+            setRet(call_unbox_d_229, 0, ret_val_unbox_d_229);
+            setArg(call_fcmp_d_227, 0, fcmp_d_227_arg0);
+            setArg(call_fcmp_d_227, 1, fcmp_d_227_arg1);
+            setArg(call_fcmp_d_227, 2, 2);
+            setRet(call_fcmp_d_227, 0, ret_val_fcmp_d_227);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, false));
+            }
+            InvokeNode* call_fget_flags_230;
+            x86::Gp ret_val_fget_flags_230 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_230,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_230;
+            setRet(call_fget_flags_230, 0, ret_val_fget_flags_230);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 151);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 152: FLE__D */
+    continuation_e __fle__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rd = ((bit_sub<7,5>(instr)));
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t rs2 = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rd}, {rs1}, {rs2}", fmt::arg("mnemonic", "fle.d"),
+                fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)), fmt::arg("rs2", fname(rs2)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("FLE__D_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 152);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        }
+        else {
+            InvokeNode* call_unbox_d_232;
+            auto unbox_d_232_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_232 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_232,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_unbox_d_233;
+            auto unbox_d_233_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
+            x86::Gp ret_val_unbox_d_233 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_233,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_fcmp_d_231;
+            auto fcmp_d_231_arg0 = ret_val_unbox_d_232;
+            auto fcmp_d_231_arg1 = ret_val_unbox_d_233;
+            x86::Gp ret_val_fcmp_d_231 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_fcmp_d_231,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            auto res = ret_val_fcmp_d_231;
+            setArg(call_unbox_d_232, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_232, 1, unbox_d_232_arg1);
+            setRet(call_unbox_d_232, 0, ret_val_unbox_d_232);
+            setArg(call_unbox_d_233, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_233, 1, unbox_d_233_arg1);
+            setRet(call_unbox_d_233, 0, ret_val_unbox_d_233);
+            setArg(call_fcmp_d_231, 0, fcmp_d_231_arg0);
+            setArg(call_fcmp_d_231, 1, fcmp_d_231_arg1);
+            setArg(call_fcmp_d_231, 2, 1);
+            setRet(call_fcmp_d_231, 0, ret_val_fcmp_d_231);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, false));
+            }
+            InvokeNode* call_fget_flags_234;
+            x86::Gp ret_val_fget_flags_234 = get_reg_Gp(cc, 32, false);
+            cc.invoke(&call_fget_flags_234,  &fget_flags, FuncSignature::build<uint32_t>());
+            auto flags = ret_val_fget_flags_234;
+            setRet(call_fget_flags_234, 0, ret_val_fget_flags_234);
+            mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
+        }
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 152);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 153: FCLASS__D */
+    continuation_e __fclass__d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
         uint8_t rd = ((bit_sub<7,5>(instr)));
         uint8_t rs1 = ((bit_sub<15,5>(instr)));
@@ -9013,7 +9456,7 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass_d"),
+                "{mnemonic:10} {rd}, {rs1}", fmt::arg("mnemonic", "fclass.d"),
                 fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -9025,266 +9468,7 @@ private:
 
         }
         x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCLASS_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 149);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            if(rd!=0){
-                InvokeNode* call_fclass_d_371;
-                jh.cc.comment("//call_fclass_d");
-                auto fclass_d_371_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-                x86::Gp ret_val_fclass_d_371 = get_reg_Gp(jh.cc, 64, true);
-                jh.cc.invoke(&call_fclass_d_371, &fclass_d, FuncSignature::build<uint64_t, uint64_t>());
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          ret_val_fclass_d_371, 32, false));
-                setArg(call_fclass_d_371, 0, fclass_d_371_arg0);
-                setRet(call_fclass_d_371, 0, ret_val_fclass_d_371);
-            }
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 149);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 150: FCVT_W_D */
-    continuation_e __fcvt_w_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_w_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_W_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 150);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcvt_64_32_372;
-            jh.cc.comment("//call_fcvt_64_32");
-            auto fcvt_64_32_372_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            auto fcvt_64_32_372_arg2 = get_rm(jh, rm);
-            x86::Gp ret_val_fcvt_64_32_372 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_64_32_372, &fcvt_64_32, FuncSignature::build<uint32_t, uint64_t, uint32_t, uint8_t>());
-            auto res = gen_ext(cc, 
-                gen_ext(cc, 
-                    ret_val_fcvt_64_32_372, 32, false), 32, true);
-            setArg(call_fcvt_64_32_372, 0, fcvt_64_32_372_arg0);
-            setArg(call_fcvt_64_32_372, 1, 0);
-            setArg(call_fcvt_64_32_372, 2, fcvt_64_32_372_arg2);
-            setRet(call_fcvt_64_32_372, 0, ret_val_fcvt_64_32_372);
-            if(rd!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          res, 32, true));
-            }
-            InvokeNode* call_fget_flags_373;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_373 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_373, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_373;
-            setRet(call_fget_flags_373, 0, ret_val_fget_flags_373);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 150);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 151: FCVT_WU_D */
-    continuation_e __fcvt_wu_d(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_wu_d"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", name(rd)), fmt::arg("rs1", fname(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_WU_D_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 151);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rd>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcvt_64_32_374;
-            jh.cc.comment("//call_fcvt_64_32");
-            auto fcvt_64_32_374_arg0 = load_reg_from_mem(jh, traits::F0 + rs1);
-            auto fcvt_64_32_374_arg2 = get_rm(jh, rm);
-            x86::Gp ret_val_fcvt_64_32_374 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fcvt_64_32_374, &fcvt_64_32, FuncSignature::build<uint32_t, uint64_t, uint32_t, uint8_t>());
-            auto res = gen_ext(cc, 
-                gen_ext(cc, 
-                    ret_val_fcvt_64_32_374, 32, false), 32, true);
-            setArg(call_fcvt_64_32_374, 0, fcvt_64_32_374_arg0);
-            setArg(call_fcvt_64_32_374, 1, 1);
-            setArg(call_fcvt_64_32_374, 2, fcvt_64_32_374_arg2);
-            setRet(call_fcvt_64_32_374, 0, ret_val_fcvt_64_32_374);
-            if(rd!=0){
-                mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          res, 32, true));
-            }
-            InvokeNode* call_fget_flags_375;
-            jh.cc.comment("//call_fget_flags");
-            x86::Gp ret_val_fget_flags_375 = get_reg_Gp(jh.cc, 32, true);
-            jh.cc.invoke(&call_fget_flags_375, &fget_flags, FuncSignature::build<uint32_t>());
-            auto flags = ret_val_fget_flags_375;
-            setRet(call_fget_flags_375, 0, ret_val_fget_flags_375);
-            mov(cc, get_ptr_for(jh, traits::FCSR),
-                  gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK))
-                  ))
-                  );
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 151);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 152: FCVT_D_W */
-    continuation_e __fcvt_d_w(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_w"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_D_W_{:#x}:",pc.val).c_str());
-        gen_sync(jh, PRE_SYNC, 152);
-        mov(cc, jh.pc, pc.val);
-        gen_set_tval(jh, instr);
-        pc = pc+4;
-        mov(cc, jh.next_pc, pc.val);
-
-        gen_instr_prologue(jh);
-        cc.comment("//behavior:");
-        /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
-        }
-        else{
-            InvokeNode* call_fcvt_32_64_376;
-            jh.cc.comment("//call_fcvt_32_64");
-            auto fcvt_32_64_376_arg0 = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false);
-            auto fcvt_32_64_376_arg2 = get_rm(jh, rm);
-            x86::Gp ret_val_fcvt_32_64_376 = get_reg_Gp(jh.cc, 64, true);
-            jh.cc.invoke(&call_fcvt_32_64_376, &fcvt_32_64, FuncSignature::build<uint64_t, uint32_t, uint32_t, uint8_t>());
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  ret_val_fcvt_32_64_376);
-            setArg(call_fcvt_32_64_376, 0, fcvt_32_64_376_arg0);
-            setArg(call_fcvt_32_64_376, 1, 2);
-            setArg(call_fcvt_32_64_376, 2, fcvt_32_64_376_arg2);
-            setRet(call_fcvt_32_64_376, 0, ret_val_fcvt_32_64_376);
-        }
-        auto returnValue = CONT;
-        
-        gen_sync(jh, POST_SYNC, 152);
-        gen_instr_epilogue(jh);
-    	return returnValue;        
-    }
-    
-    /* instruction 153: FCVT_D_WU */
-    continuation_e __fcvt_d_wu(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
-        uint64_t PC = pc.val;
-        uint8_t rd = ((bit_sub<7,5>(instr)));
-        uint8_t rm = ((bit_sub<12,3>(instr)));
-        uint8_t rs1 = ((bit_sub<15,5>(instr)));
-        if(this->disass_enabled){
-            /* generate disass */
-            
-            auto mnemonic = fmt::format(
-                "{mnemonic:10} {rm}, {rd}, {rs1}", fmt::arg("mnemonic", "fcvt_d_wu"),
-                fmt::arg("rm", name(rm)), fmt::arg("rd", fname(rd)), fmt::arg("rs1", name(rs1)));
-            InvokeNode* call_print_disass;
-            char* mnemonic_ptr = strdup(mnemonic.c_str());
-            jh.disass_collection.push_back(mnemonic_ptr);
-            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
-            call_print_disass->setArg(0, jh.arch_if_ptr);
-            call_print_disass->setArg(1, pc.val);
-            call_print_disass->setArg(2, mnemonic_ptr);
-
-        }
-        x86::Compiler& cc = jh.cc;
-        cc.comment(fmt::format("FCVT_D_WU_{:#x}:",pc.val).c_str());
+        cc.comment(fmt::format("FCLASS__D_{:#x}:",pc.val).c_str());
         gen_sync(jh, PRE_SYNC, 153);
         mov(cc, jh.pc, pc.val);
         gen_set_tval(jh, instr);
@@ -9292,25 +9476,30 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
-        if(rs1>=static_cast<uint32_t>(traits::RFS)){
-            gen_raise(jh, 0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        if(rd>=static_cast<uint32_t>(traits::RFS)){
+            gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            InvokeNode* call_fcvt_32_64_377;
-            jh.cc.comment("//call_fcvt_32_64");
-            auto fcvt_32_64_377_arg0 = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false);
-            auto fcvt_32_64_377_arg2 = get_rm(jh, rm);
-            x86::Gp ret_val_fcvt_32_64_377 = get_reg_Gp(jh.cc, 64, true);
-            jh.cc.invoke(&call_fcvt_32_64_377, &fcvt_32_64, FuncSignature::build<uint64_t, uint32_t, uint32_t, uint8_t>());
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  ret_val_fcvt_32_64_377);
-            setArg(call_fcvt_32_64_377, 0, fcvt_32_64_377_arg0);
-            setArg(call_fcvt_32_64_377, 1, 3);
-            setArg(call_fcvt_32_64_377, 2, fcvt_32_64_377_arg2);
-            setRet(call_fcvt_32_64_377, 0, ret_val_fcvt_32_64_377);
+        else {
+            InvokeNode* call_unbox_d_236;
+            auto unbox_d_236_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
+            x86::Gp ret_val_unbox_d_236 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_unbox_d_236,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            InvokeNode* call_fclass_d_235;
+            auto fclass_d_235_arg0 = ret_val_unbox_d_236;
+            x86::Gp ret_val_fclass_d_235 = get_reg_Gp(cc, 64, false);
+            cc.invoke(&call_fclass_d_235,  &fclass_d, FuncSignature::build<uint64_t, uint64_t>());
+            auto res = ret_val_fclass_d_235;
+            setArg(call_unbox_d_236, 0, static_cast<uint32_t>(traits::FLEN));
+            setArg(call_unbox_d_236, 1, unbox_d_236_arg1);
+            setRet(call_unbox_d_236, 0, ret_val_unbox_d_236);
+            setArg(call_fclass_d_235, 0, fclass_d_235_arg0);
+            setRet(call_fclass_d_235, 0, ret_val_fclass_d_235);
+            if(rd!=0){
+                mov(cc, get_ptr_for(jh, traits::X0+ rd),
+                      gen_ext(cc, 
+                          res, 32, false));
+            }
         }
         auto returnValue = CONT;
         
@@ -9349,22 +9538,20 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         auto res = gen_ext(cc, 
             gen_read_mem(jh, traits::MEM, offs, 8), 64, false);
-        if(static_cast<uint32_t>(traits::FLEN)==64){
-            mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
-                  res);
-        }
-        else{
-            mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
-                  gen_operation(cc, bor, res, ((uint8_t)(- 1<<64)))
-                  );
-        }
+        InvokeNode* call_NaNBox64_237;
+        auto NaNBox64_237_arg0 = res;
+        x86::Gp ret_val_NaNBox64_237 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_237, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd+8),
+              ret_val_NaNBox64_237);
+        setArg(call_NaNBox64_237, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_237, 1, NaNBox64_237_arg0);
+        setRet(call_NaNBox64_237, 0, ret_val_NaNBox64_237);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 154);
@@ -9402,13 +9589,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::F0 + rs2+8), 64, false), 8);
+            load_reg_from_mem_Gp(jh, traits::F0 + rs2+8), 64, false), 8);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 155);
@@ -9445,22 +9630,20 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
         auto res = gen_ext(cc, 
             gen_read_mem(jh, traits::MEM, offs, 8), 64, false);
-        if(static_cast<uint32_t>(traits::FLEN)==64){
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  res);
-        }
-        else{
-            mov(cc, get_ptr_for(jh, traits::F0+ rd),
-                  gen_operation(cc, bor, res, ((uint8_t)(- 1<<64)))
-                  );
-        }
+        InvokeNode* call_NaNBox64_238;
+        auto NaNBox64_238_arg0 = res;
+        x86::Gp ret_val_NaNBox64_238 = get_reg_Gp(cc, 64, false);
+        cc.invoke(&call_NaNBox64_238, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
+        mov(cc, get_ptr_for(jh, traits::F0+ rd),
+              ret_val_NaNBox64_238);
+        setArg(call_NaNBox64_238, 0, reinterpret_cast<uintptr_t>(this));
+        setArg(call_NaNBox64_238, 1, NaNBox64_238_arg0);
+        setRet(call_NaNBox64_238, 0, ret_val_NaNBox64_238);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 156);
@@ -9497,13 +9680,11 @@ private:
         mov(cc, jh.next_pc, pc.val);
 
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::F0 + rs2), 64, false), 8);
+            load_reg_from_mem_Gp(jh, traits::F0 + rs2), 64, false), 8);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 157);
@@ -9533,7 +9714,6 @@ private:
         pc = pc + ((instr & 3) == 3 ? 4 : 2);
         mov(cc, jh.next_pc, pc.val);
         gen_instr_prologue(jh);
-        cc.comment("//behavior:");
         gen_raise(jh, 0, 2);
         gen_sync(jh, POST_SYNC, instr_descr.size());
         gen_instr_epilogue(jh);
@@ -9557,19 +9737,16 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
     }()) {}
 
 template <typename ARCH>
-continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, jit_holder& jh) {
+continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, jit_holder& jh) {
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
     phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    if(this->core.has_mmu())
-        paddr = this->core.virt2phys(pc);
     auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok)
         return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)
         return JUMP_TO_SELF;
-    ++inst_cnt;
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
@@ -9582,11 +9759,10 @@ template <typename ARCH>
 void vm_impl<ARCH>::gen_instr_prologue(jit_holder& jh) {
     auto& cc = jh.cc;
 
-    cc.comment("//gen_instr_prologue");
-
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     mov(cc, get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
+    cc.comment("//Instruction prologue end");
 
 }
 template <typename ARCH>
@@ -9599,6 +9775,9 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     cmp(cc, current_trap_state, 0);
     cc.jne(jh.trap_entry);
     cc.inc(get_ptr_for(jh, traits::ICOUNT));
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
+    cc.comment("//Instruction epilogue end");
+
 }
 template <typename ARCH>
 void vm_impl<ARCH>::gen_block_prologue(jit_holder& jh){
@@ -9622,7 +9801,6 @@ void vm_impl<ARCH>::gen_block_epilogue(jit_holder& jh){
     x86::Gp current_pc = get_reg_for_Gp(cc, traits::PC);
     mov(cc, current_pc, get_ptr_for(jh, traits::PC));
 
-    cc.comment("//enter trap call;");
     InvokeNode* call_enter_trap;
     cc.invoke(&call_enter_trap, &enter_trap, FuncSignature::build<uint64_t, void*, uint64_t, uint64_t, uint64_t>());
     call_enter_trap->setArg(0, jh.arch_if_ptr);
@@ -9640,7 +9818,6 @@ void vm_impl<ARCH>::gen_block_epilogue(jit_holder& jh){
 template <typename ARCH>
 inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause) {
     auto& cc = jh.cc;
-    cc.comment("//gen_raise");
     auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
     mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
