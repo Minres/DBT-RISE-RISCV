@@ -19,7 +19,7 @@
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "contrib/cmake/conan_provider.cmake",
-                "WITH_ASMJIT": false
+                "WITH_ASMJIT": OFF
             }
         },
         {
