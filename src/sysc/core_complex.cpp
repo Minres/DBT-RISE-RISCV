@@ -79,7 +79,7 @@ using namespace scv_tr;
 #endif
 
 namespace sysc {
-namespace riscv_vp {
+namespace riscv {
 using namespace std;
 using namespace iss;
 using namespace logging;
@@ -286,10 +286,10 @@ template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elaboration() {
-    SCCDEBUG(SCMOD) << "instantiating iss::arch::tgf with " << GET_PROP_VALUE(backend) << " backend";
+    auto& type = GET_PROP_VALUE(core_type);
+    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
-    auto& type = GET_PROP_VALUE(core_type);
     cpu->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
     if(type == "?")
         return;
@@ -564,5 +564,5 @@ template class core_complex<scc::LT>;
 template class core_complex<32>;
 template class core_complex<64>;
 
-} /* namespace riscv_vp */
+} // namespace riscv
 } /* namespace sysc */

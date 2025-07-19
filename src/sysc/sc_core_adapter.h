@@ -49,7 +49,7 @@ public:
     using this_class = sc_core_adapter<PLAT>;
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
     using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
-    sc_core_adapter(sysc::riscv_vp::core_complex_if* owner)
+    sc_core_adapter(sysc::riscv::core_complex_if* owner)
     : owner(owner) {
         this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
         if(sizeof(reg_t) == 4)
@@ -89,9 +89,8 @@ public:
             std::stringstream s;
             s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
               << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCDEBUG(owner->hier_name()) << "disass: "
-                                         << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc << "\t\t"
-                                         << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
+            SCCDEBUG(owner->hier_name()) << "disass: " << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc
+                                         << "\t\t" << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
         }
     };
 
@@ -123,14 +122,14 @@ public:
                 if(payload_addr != 0x1) {
                     SCCERR(owner->hier_name()) << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr
                                                << "), stopping simulation";
-                        } else {
-                            SCCINFO(owner->hier_name())
+                } else {
+                    SCCINFO(owner->hier_name())
                         << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr << "), stopping simulation";
-                        }
-                        this->reg.trap_state = std::numeric_limits<uint32_t>::max();
+                }
+                this->reg.trap_state = std::numeric_limits<uint32_t>::max();
                 this->interrupt_sim = payload_addr;
                 return iss::Ok;
-                    }
+            }
             if(device == 0 && command == 0) {
                 std::array<uint64_t, 8> loaded_payload;
                 auto res = owner->read_mem(payload_addr, 8 * sizeof(uint64_t), reinterpret_cast<uint8_t*>(loaded_payload.data()), false)
@@ -138,7 +137,7 @@ public:
                                : iss::Err;
                 if(res == iss::Err) {
                     SCCERR(owner->hier_name()) << "Syscall read went wrong";
-                return iss::Ok;
+                    return iss::Ok;
                 }
                 uint64_t syscall_num = loaded_payload.at(0);
                 if(syscall_num == 64) // SYS_WRITE
@@ -159,15 +158,15 @@ public:
     }
 
     iss::status read_time(unsigned addr, reg_t& val) {
-            uint64_t time_val = owner->mtime_i.get_interface() ? owner->mtime_i.read() : 0;
-            if(addr == iss::arch::time) {
-                val = static_cast<reg_t>(time_val);
-            } else if(addr == iss::arch::timeh) {
-                if(sizeof(reg_t) != 4)
-                    return iss::Err;
-                val = static_cast<reg_t>(time_val >> 32);
-            }
-            return iss::Ok;
+        uint64_t time_val = owner->mtime_i.get_interface() ? owner->mtime_i.read() : 0;
+        if(addr == iss::arch::time) {
+            val = static_cast<reg_t>(time_val);
+        } else if(addr == iss::arch::timeh) {
+            if(sizeof(reg_t) != 4)
+                return iss::Err;
+            val = static_cast<reg_t>(time_val >> 32);
+        }
+        return iss::Ok;
     }
 
     void wait_until(uint64_t flags) override {
@@ -206,7 +205,7 @@ public:
     }
 
 private:
-    sysc::riscv_vp::core_complex_if* const owner{nullptr};
+    sysc::riscv::core_complex_if* const owner{nullptr};
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};
