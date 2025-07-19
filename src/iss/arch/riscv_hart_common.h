@@ -443,7 +443,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                     if(name != "") {
                         this->symbol_table[name] = value;
 #ifndef NDEBUG
-                        CPPLOG(DEBUG) << "Found Symbol " << name;
+                        CPPLOG(TRACE) << "Found Symbol " << name;
 #endif
                     }
                 }
