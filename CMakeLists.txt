@@ -103,35 +103,36 @@ if(WITH_ASMJIT)
     )
 endif()
 
-# library files
-FILE(GLOB GEN_ISS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/iss/arch/*.cpp)
-FILE(GLOB GEN_VM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/vm/interp/vm_*.cpp)
-FILE(GLOB GEN_YAML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/contrib/instr/*.yaml)
-list(APPEND LIB_SOURCES ${GEN_ISS_SOURCES} ${GEN_VM_SOURCES})
+if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+    # custom core files
+    FILE(GLOB GEN_ISS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/iss/arch/*.cpp)
+    FILE(GLOB GEN_VM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/interp/vm_*.cpp)
+    FILE(GLOB GEN_YAML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/contrib/instr/*.yaml)
+    list(APPEND LIB_SOURCES ${GEN_ISS_SOURCES} ${GEN_VM_SOURCES})
 
-foreach(FILEPATH ${GEN_ISS_SOURCES})
-    get_filename_component(CORE ${FILEPATH} NAME_WE)
-    string(TOUPPER ${CORE} CORE)
-    list(APPEND LIB_DEFINES CORE_${CORE})
-endforeach()
+    foreach(FILEPATH ${GEN_ISS_SOURCES})
+        get_filename_component(CORE ${FILEPATH} NAME_WE)
+        string(TOUPPER ${CORE} CORE)
+        list(APPEND LIB_DEFINES CORE_${CORE})
+    endforeach()
 
-message(STATUS "Core defines are ${LIB_DEFINES}")
+    message(STATUS "Core defines are ${LIB_DEFINES}")
 
-if(WITH_LLVM)
-    FILE(GLOB LLVM_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/vm/llvm/vm_*.cpp)
-    list(APPEND LIB_SOURCES ${LLVM_GEN_SOURCES})
+    if(WITH_LLVM)
+        FILE(GLOB LLVM_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/llvm/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${LLVM_GEN_SOURCES})
+    endif()
+
+    if(WITH_TCC)
+        FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/tcc/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
+    endif()
+
+    if(WITH_ASMJIT)
+        FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/asmjit/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
+    endif()
 endif()
-
-if(WITH_TCC)
-    FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/vm/tcc/vm_*.cpp)
-    list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
-endif()
-
-if(WITH_ASMJIT)
-    FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/vm/asmjit/vm_*.cpp)
-    list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
-endif()
-
 # Define the library
 add_library(${PROJECT_NAME} SHARED ${LIB_SOURCES})
 if(USE_SC_SIGNAL4IRQ)
@@ -144,7 +145,9 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC src)
-target_include_directories(${PROJECT_NAME} PUBLIC src-gen)
+if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+    target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/../dbt-rise-custom/src)
+endif()
 
 target_force_link_libraries(${PROJECT_NAME} PRIVATE dbt-rise-core)
 
@@ -256,8 +259,10 @@ if(TARGET scc-sysc)
         src/sysc/core_complex.cpp
         src/sysc/register_cores.cpp
     )
-    FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/sysc/register_*.cpp)
-    list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})
+    if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+        FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)
+        list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})
+    endif()
     add_library(${PROJECT_NAME} ${LIB_SOURCES})
     target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_SYSTEMC)
     target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv scc-sysc)
