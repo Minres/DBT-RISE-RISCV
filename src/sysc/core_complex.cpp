@@ -213,13 +213,13 @@ core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     trc = new core_trace();
-    ibus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
+    ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
             fetch_lut.removeEntry(lut_entry);
         }
     });
-    dbus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
+    dbus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
             read_lut.removeEntry(lut_entry);
