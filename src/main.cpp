@@ -42,6 +42,7 @@
 #include <util/ities.h>
 #include <vector>
 
+#include "util/logging.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #ifdef WITH_LLVM
@@ -71,21 +72,22 @@ int main(int argc, char* argv[]) {
         ("logfile,l", po::value<std::string>(), "Sets default log file.")
         ("disass,d", po::value<std::string>()->implicit_value(""), "Enables disassembly")
         ("gdb-port,g", po::value<unsigned>()->default_value(0), "enable gdb server and specify port to use")
-        ("instructions,i", po::value<uint64_t>()->default_value(std::numeric_limits<uint64_t>::max()), "max. number of instructions to simulate")
+        ("ilimit,i", po::value<uint64_t>()->default_value(std::numeric_limits<uint64_t>::max()), "max. number of instructions to simulate")
+        ("flimit", po::value<uint64_t>()->default_value(std::numeric_limits<uint64_t>::max()), "max. number of fetches to simulate")
         ("reset,r", po::value<std::string>(), "reset address")
         ("dump-ir", "dump the intermediate representation")
         ("elf,f", po::value<std::vector<std::string>>(), "ELF file(s) to load")
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
         ("backend", po::value<std::string>()->default_value("interp"), "the ISS backend to use, options are: interp, llvm, tcc, asmjit")
-        ("isa", po::value<std::string>()->default_value("rv32imac"), "core or isa name to use for simulation, use '?' to get list");
+        ("isa", po::value<std::string>()->default_value("tgc5c"), "core or isa name to use for simulation, use '?' to get list");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
         po::store(parsed, clim); // can throw
         // --help option
         if(clim.count("help")) {
-            std::cout << "DBT-RISE-RISCV simulator for RISC-V cores" << std::endl << desc << std::endl;
+            std::cout << "DBT-RISE-TGC simulator for TGC RISC-V cores" << std::endl << desc << std::endl;
             return 0;
         }
         po::notify(clim); // throws on error, so do after help in case
@@ -129,10 +131,18 @@ int main(int argc, char* argv[]) {
             std::sort(std::begin(list), std::end(list));
             std::cout << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
             return 0;
+        } else if(isa_opt.find('|') != std::string::npos) {
+            std::tie(cpu, vm) =
+                f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+        } else {
+            auto base_isa = isa_opt.substr(0, 5);
+            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
+                isa_opt += "|mu_p_clic_pmp|" + clim["backend"].as<std::string>();
+            } else {
+                isa_opt += "|m_p|" + clim["backend"].as<std::string>();
+            }
+            std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         }
-        if(isa_opt.find('|') == std::string::npos)
-            isa_opt += "|m_p";
-        std::tie(cpu, vm) = f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         if(!cpu) {
             auto list = f.get_names();
             std::sort(std::begin(list), std::end(list));
@@ -199,21 +209,36 @@ int main(int argc, char* argv[]) {
         if(clim.count("elf"))
             for(std::string input : clim["elf"].as<std::vector<std::string>>()) {
                 auto start_addr = vm->get_arch()->load_file(input);
-                if(start_addr.second) // FIXME: this always evaluates to true as load file always returns <sth, true>
+                if(start_addr.second)
                     start_address = start_addr.first;
+                else {
+                    LOG(ERR) << "Error occured while loading file " << input << std::endl;
+                    return 1;
+                }
             }
         for(std::string input : args) {
             auto start_addr = vm->get_arch()->load_file(input); // treat remaining arguments as elf files
-            if(start_addr.second) // FIXME: this always evaluates to true as load file always returns <sth, true>
+            if(start_addr.second)
                 start_address = start_addr.first;
+            else {
+                LOG(ERR) << "Error occured while loading file " << input << std::endl;
+                return 1;
+            }
         }
         if(clim.count("reset")) {
             auto str = clim["reset"].as<std::string>();
             start_address = str.find("0x") == 0 ? std::stoull(str.substr(2), nullptr, 16) : std::stoull(str, nullptr, 10);
         }
         vm->reset(start_address);
-        auto cycles = clim["instructions"].as<uint64_t>();
-        res = vm->start(cycles, dump);
+        auto limit = clim["ilimit"].as<uint64_t>();
+        auto cond = iss::finish_cond_e::JUMP_TO_SELF;
+        if(clim.count("flimit")) {
+            cond = cond | iss::finish_cond_e::FCOUNT_LIMIT;
+            limit = clim["flimit"].as<uint64_t>();
+        } else {
+            cond = cond | iss::finish_cond_e::ICOUNT_LIMIT;
+        }
+        res = vm->start(limit, dump, cond);
 
         auto instr_if = vm->get_arch()->get_instrumentation_if();
         // this assumes a single input file
@@ -230,12 +255,13 @@ int main(int argc, char* argv[]) {
             std::string filename = fmt::format("{}.signature", isa_opt);
             std::replace(std::begin(filename), std::end(filename), '|', '_');
             // default riscof requires this filename
-            filename = "DUT-riscv-sim.signature";
+            filename = "DUT-tgc.signature";
             file.open(filename, std::ios::out);
             if(!file.is_open()) {
                 LOG(ERR) << "Error opening file " << filename << std::endl;
                 return 1;
             }
+            LOGGER(DEFAULT)::reporting_level() = logging::ERR;
             for(auto addr = start_addr; addr < end_addr; addr += data.size()) {
                 vm->get_arch()->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0 /*MEM*/, addr, data.size(),
                                      data.data()); // FIXME: get space from iss::arch::traits<ARCH>::mem_type_e::MEM

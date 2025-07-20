@@ -37,8 +37,6 @@
 #include <iss/debugger/target_adapter_if.h>
 #include <iss/iss.h>
 #include <iss/vm_types.h>
-#include <tlm_core/tlm_2/tlm_2_interfaces/tlm_fw_bw_ifs.h>
-#include <tlm_core/tlm_2/tlm_generic_payload/tlm_phase.h>
 #include "iss_factory.h"
 #include "tlm/scc/tlm_signal_gp.h"
 #ifndef WIN32
@@ -48,19 +46,18 @@
 #include <scc/report.h>
 #include <util/ities.h>
 #include <iostream>
-#include <sstream>
 #include <array>
-#include <numeric>
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
+#include <util/ities.h>
 
 // clang-format on
 
 #define STR(X) #X
 #define CREATE_CORE(CN)                                                                                                                    \
-        if(type == STR(CN)) {                                                                                                              \
-            std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                   \
-        } else
+    if(type == STR(CN)) {                                                                                                                  \
+        std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
+    } else
 
 #ifdef HAS_SCV
 #include <scv.h>
@@ -82,7 +79,7 @@ using namespace scv_tr;
 #endif
 
 namespace sysc {
-namespace riscv_vp {
+namespace riscv {
 using namespace std;
 using namespace iss;
 using namespace logging;
@@ -131,7 +128,7 @@ public:
     : owner(owner) {}
 
     void reset(uint64_t addr) { vm->reset(addr); }
-    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump, finish_cond_e::NONE); }
+    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump); }
     inline std::pair<uint64_t, bool> load_file(std::string const& name) {
         iss::arch_if* cc = cpu->get_arch_if();
         return cc->load_file(name);
@@ -146,9 +143,10 @@ public:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
         auto& f = sysc::iss_factory::instance();
         if(type.size() == 0 || type == "?") {
-            std::cout << "Available cores: " << util::join(f.get_names(), ", ") << std::endl;
+            auto names = f.get_names();
+            std::sort(names.begin(), names.end());
+            SCCINFO(owner->hier_name()) << "Available cores: \n    " << util::join(names, ",\n    ") << std::endl;
             sc_core::sc_stop();
-            exit(0);
         } else if(type.find('|') != std::string::npos) {
             std::tie(cpu, vm) = f.create(type + "|" + backend);
         } else {
@@ -160,10 +158,10 @@ public:
             }
         }
         if(!cpu) {
-            if(type!="?")
+            if(type != "?")
                 SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
         } else if(!vm) {
-            if(type!="?")
+            if(type != "?")
                 SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
         } else {
             auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
@@ -179,10 +177,10 @@ public:
                 tgt_adapter = srv->get_target();
             if(tgt_adapter)
                 tgt_adapter->add_custom_command({"sysc",
-                [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
-                    return cmd_sysc(argc, argv, of, df, tgt_adapter);
-                },
-                "SystemC sub-commands: break <time>, print_time"});
+                                                 [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
+                                                     return cmd_sysc(argc, argv, of, df, tgt_adapter);
+                                                 },
+                                                 "SystemC sub-commands: break <time>, print_time"});
         }
     }
 
@@ -251,7 +249,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     });
     for(auto i = 0U; i < local_irq_i.size(); ++i)
         local_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-            cpu->local_irq(16+i, gp.get_value());
+            cpu->local_irq(16 + i, gp.get_value());
             return tlm::TLM_COMPLETED;
         });
 #else
@@ -288,10 +286,13 @@ template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elaboration() {
-    SCCDEBUG(SCMOD) << "instantiating iss::arch::tgf with " << GET_PROP_VALUE(backend) << " backend";
+    auto& type = GET_PROP_VALUE(core_type);
+    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
     cpu = new core_wrapper(this);
-    cpu->create_cpu(GET_PROP_VALUE(core_type), GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    cpu->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    if(type == "?")
+        return;
 #ifndef CWR_SYSTEMC
     if(!local_irq_num.is_default_value()) {
         auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu->cpu.get());
@@ -299,7 +300,10 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     }
 #endif
     sc_assert(cpu->vm != nullptr);
-    cpu->vm->setDisassEnabled(GET_PROP_VALUE(enable_disass) || trc->m_db != nullptr);
+    auto disass = GET_PROP_VALUE(enable_disass);
+    if(disass && trc->m_db)
+        SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
+    cpu->vm->setDisassEnabled(disass || trc->m_db != nullptr);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -337,17 +341,20 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulation() {
     // quantum_keeper.reset();
     if(GET_PROP_VALUE(elf_file).size() > 0) {
-        istringstream is(GET_PROP_VALUE(elf_file));
-        string s;
-        while(getline(is, s, ',')) {
-            std::pair<uint64_t, bool> start_addr = cpu->load_file(s);
+        auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
+        for(auto& s : file_names) {
+            std::pair<uint64_t, bool> load_result = cpu->load_file(s);
+            if(!std::get<1>(load_result)) {
+                SCCWARN(SCMOD) << "Could not load FW file " << s;
+            } else {
 #ifndef CWR_SYSTEMC
-            if(reset_address.is_default_value() && start_addr.second == true)
-                reset_address.set_value(start_addr.first);
+                if(reset_address.is_default_value())
+                    reset_address.set_value(load_result.first);
 #else
-            if(start_addr.second == true)
-                reset_address = start_addr.first;
+                if(start_addr.second == true)
+                    reset_address = start_addr.first;
 #endif
+            }
         }
     }
     if(trc->m_db != nullptr && trc->stream_handle == nullptr) {
@@ -421,7 +428,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
         quantum_keeper.reset();
         cpu->set_interrupt_execution(false);
         cpu->start(dump_ir);
-    } while(cpu->get_interrupt_execution());
+    } while(!cpu->get_interrupt_execution());
     sc_stop();
 }
 
@@ -453,7 +460,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
             gp.set_extension(preExt);
         }
         auto pre_delay = delay;
-        dbus->b_transport(gp, delay);
+        sckt->b_transport(gp, delay);
         if(pre_delay > delay) {
             quantum_keeper.reset();
         } else {
@@ -464,9 +471,9 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
                 dbus_inc += incr;
         }
         SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr << ") : 0x"
-                << (length == 4   ? *(uint32_t*)data
-                        : length == 2 ? *(uint16_t*)data
-                                : (unsigned)*data);
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -511,9 +518,9 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
         SCCTRACE() << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
-                << (length == 4   ? *(uint32_t*)data
-                        : length == 2 ? *(uint16_t*)data
-                                : (unsigned)*data);
+                   << (length == 4   ? *(uint32_t*)data
+                       : length == 2 ? *(uint16_t*)data
+                                     : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }
@@ -524,7 +531,7 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
             if(dbus->get_direct_mem_ptr(gp, dmi_data)) {
                 if(dmi_data.is_write_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
                     write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
-                            dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
+                                       dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
         return true;
@@ -557,5 +564,5 @@ template class core_complex<scc::LT>;
 template class core_complex<32>;
 template class core_complex<64>;
 
-} /* namespace riscv_vp */
+} // namespace riscv
 } /* namespace sysc */

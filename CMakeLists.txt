@@ -19,8 +19,8 @@ if(NOT TARGET dbt-rise-core)
 	    dbt_rise_core_git
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
-	    #GIT_SHALLOW    OFF
-	    GIT_TAG         99cf682
+	    GIT_TAG         4d1bf6
+	    GIT_SHALLOW     ON
 	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
 	)
 	FetchContent_GetProperties(dbt_rise_core_git)
@@ -54,20 +54,35 @@ set(LIB_SOURCES
     src/iss/arch/rv32gc.cpp
 	src/iss/arch/rv64i.cpp
     src/iss/arch/rv64gc.cpp
+    src/iss/arch/tgc5c.cpp
+    src/iss/mem/memory_if.cpp
+    src/vm/interp/vm_tgc5c.cpp
     src/vm/interp/vm_rv32i.cpp
     src/vm/interp/vm_rv32imac.cpp
     src/vm/interp/vm_rv32gc.cpp
     src/vm/interp/vm_rv64i.cpp
-	src/vm/interp/vm_rv64gc.cpp
+    src/vm/interp/vm_rv64gc.cpp
     src/vm/fp_functions.cpp
+    src/vm/vector_functions.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
-    src/iss/plugin/cycle_estimate.cpp
-    src/iss/plugin/instruction_count.cpp
 )
+if(TARGET yaml-cpp::yaml-cpp)
+    list(APPEND LIB_SOURCES
+        src/iss/plugin/cycle_estimate.cpp
+        src/iss/plugin/instruction_count.cpp
+    )
+endif()
+
+if(WITH_TCC)
+    list(APPEND LIB_SOURCES
+        src/vm/tcc/vm_tgc5c.cpp
+    )
+endif()
 
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
+        src/vm/llvm/vm_tgc5c.cpp
         src/vm/llvm/vm_rv32i.cpp
         src/vm/llvm/vm_rv32imac.cpp
         src/vm/llvm/vm_rv32gc.cpp
@@ -79,6 +94,7 @@ endif()
 
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
+        src/vm/asmjit/vm_tgc5c.cpp
         src/vm/asmjit/vm_rv32i.cpp
         src/vm/asmjit/vm_rv32imac.cpp
         src/vm/asmjit/vm_rv32gc.cpp
@@ -87,6 +103,36 @@ if(WITH_ASMJIT)
     )
 endif()
 
+if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+    # custom core files
+    FILE(GLOB GEN_ISS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/iss/arch/*.cpp)
+    FILE(GLOB GEN_VM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/interp/vm_*.cpp)
+    FILE(GLOB GEN_YAML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/contrib/instr/*.yaml)
+    list(APPEND LIB_SOURCES ${GEN_ISS_SOURCES} ${GEN_VM_SOURCES})
+
+    foreach(FILEPATH ${GEN_ISS_SOURCES})
+        get_filename_component(CORE ${FILEPATH} NAME_WE)
+        string(TOUPPER ${CORE} CORE)
+        list(APPEND LIB_DEFINES CORE_${CORE})
+    endforeach()
+
+    message(STATUS "Core defines are ${LIB_DEFINES}")
+
+    if(WITH_LLVM)
+        FILE(GLOB LLVM_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/llvm/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${LLVM_GEN_SOURCES})
+    endif()
+
+    if(WITH_TCC)
+        FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/tcc/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
+    endif()
+
+    if(WITH_ASMJIT)
+        FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/asmjit/vm_*.cpp)
+        list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
+    endif()
+endif()
 # Define the library
 add_library(${PROJECT_NAME} SHARED ${LIB_SOURCES})
 if(USE_SC_SIGNAL4IRQ)
@@ -99,6 +145,9 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC src)
+if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+    target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/../dbt-rise-custom/src)
+endif()
 
 target_force_link_libraries(${PROJECT_NAME} PRIVATE dbt-rise-core)
 
@@ -111,16 +160,11 @@ if(NOT(DBT_CORE_DEFS STREQUAL DBT_CORE_DEFS-NOTFOUND))
     target_compile_definitions(${PROJECT_NAME} INTERFACE ${DBT_CORE_DEFS})
 endif()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC elfio::elfio softfloat scc-util  yaml-cpp::yaml-cpp Boost::coroutine)
+target_link_libraries(${PROJECT_NAME} PUBLIC elfio::elfio softfloat scc-util Boost::coroutine)
 
-if(WITH_LLVM)
-    find_package(LLVM)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC ${LLVM_DEFINITIONS})
-    target_include_directories(${PROJECT_NAME} PUBLIC ${LLVM_INCLUDE_DIRS})
-
-    if(BUILD_SHARED_LIBS)
-        target_link_libraries(${PROJECT_NAME} PUBLIC ${LLVM_LIBRARIES})
-    endif()
+if(TARGET yaml-cpp::yaml-cpp)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_PLUGINS)
+    target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp::yaml-cpp)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -171,6 +215,10 @@ else()
 endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS})
 
+if(Tcmalloc_FOUND)
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${Tcmalloc_LIBRARIES})
+endif(Tcmalloc_FOUND)
+
 install(TARGETS riscv-sim
     EXPORT ${PROJECT_NAME}Targets # for downstream dependencies
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} # static lib
@@ -211,8 +259,10 @@ if(TARGET scc-sysc)
         src/sysc/core_complex.cpp
         src/sysc/register_cores.cpp
     )
-    FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src-gen/sysc/register_*.cpp)
-    list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})
+    if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
+        FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)
+        list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})
+    endif()
     add_library(${PROJECT_NAME} ${LIB_SOURCES})
     target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_SYSTEMC)
     target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv scc-sysc)
@@ -236,3 +286,9 @@ if(TARGET scc-sysc)
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} # headers
     )
 endif()
+
+project(elfio-test)
+find_package(Boost COMPONENTS program_options thread REQUIRED)
+
+add_executable(${PROJECT_NAME} src/elfio.cpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC elfio::elfio)

@@ -10,33 +10,40 @@
     },
     "configurePresets": [
         {
-            "name": "Debug",
+            "name": "Base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
-                "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES":"cmake-conan/conan_provider.cmake",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "contrib/cmake/conan_provider.cmake",
                 "WITH_TCC": "OFF"
+            }
+        },
+        {
+            "name": "Debug",
+            "inherits": "Base",
+            "displayName": "Debug build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
             "name": "RelWithDebInfo",
+            "inherits": "Base",
+            "displayName": "RelWithDebInfo build",
             "cacheVariables": {
-                "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES":"cmake-conan/conan_provider.cmake",
-                "WITH_TCC": "OFF"
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
         },
         {
             "name": "Release",
+            "inherits": "Base",
+            "displayName": "Release build",
             "cacheVariables": {
-                "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES":"cmake-conan/conan_provider.cmake",
-                "WITH_TCC": "OFF"
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ]

@@ -39,7 +39,6 @@
 #include <iss/iss.h>
 
 #include <array>
-#include <memory>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif

@@ -30,6 +30,9 @@
  *
  *******************************************************************************/
 <%
+def floating_point = registers.find {it.name=='FCSR'}
+def vector = registers.find {it.name=='vtype'}
+def aes = functions.find { it.contains('aes') }
 def nativeTypeSize(int size){
     if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
 }
@@ -41,7 +44,16 @@ def nativeTypeSize(int size){
 #include <iss/debugger/server.h>
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
+<%
+if(floating_point != null) {%>
 #include <vm/fp_functions.h>
+<%}
+if(vector != null) {%>
+#include <vm/vector_functions.h>
+<%}
+if(aes != null) {%>
+#include <vm/aes_sbox.h>
+<%}%>
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
@@ -102,9 +114,47 @@ protected:
 
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
 <%
-def fcsr = registers.find {it.name=='FCSR'}
-if(fcsr != null) {%>
+if(floating_point != null) {%>
     inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}     
+<%}
+if(vector != null) {%>
+    inline const char* vname(size_t index) { return index < 32 ? name(index + traits::V0) : "illegal"; }
+    inline const char* sew_name(size_t bits) {
+        switch(bits) {
+        case 0b000:
+            return "e8";
+        case 0b001:
+            return "e16";
+        case 0b010:
+            return "e32";
+        case 0b011:
+            return "e64";
+        default:
+            return "illegal";
+        }
+    }
+    inline const char* lmul_name(size_t bits) {
+        switch(bits) {
+        case 0b101:
+            return "mf8";
+        case 0b110:
+            return "mf4";
+        case 0b111:
+            return "mf2";
+        case 0b000:
+            return "m1";
+        case 0b001:
+            return "m2";
+        case 0b010:
+            return "m4";
+        case 0b011:
+            return "m8";
+        default:
+            return "illegal";
+        }
+    }
+    inline const char* ma_name(bool ma) { return ma ? "ma" : "mu"; }
+    inline const char* ta_name(bool ta) { return ta ? "ta" : "tu"; }
 <%}%>
 
     virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
@@ -127,7 +177,806 @@ if(fcsr != null) {%>
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
+<%if(vector != null) {
+    def xlen = constants.find { it.name == 'XLEN' }?.value ?: 0
+    def vlen = constants.find { it.name == 'VLEN' }?.value ?: 0 %>
+    inline void lower(){
+        this->core.reg.trap_state = 0;
+    }
+    uint64_t vlseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
+        switch(width_val){
+            case 0b000:
+                return softvector::vector_load_store<${vlen}, uint8_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b101:
+                return softvector::vector_load_store<${vlen}, uint16_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b110:
+                return softvector::vector_load_store<${vlen}, uint32_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b111:
+                return softvector::vector_load_store<${vlen}, uint64_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            default:
+                throw new std::runtime_error("Unsupported width bit value");
+        }
+    }
+    uint64_t vsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
+        switch(width_val){
+            case 0b000:
+                return softvector::vector_load_store<${vlen}, uint8_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b101:
+                return softvector::vector_load_store<${vlen}, uint16_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b110:
+                return softvector::vector_load_store<${vlen}, uint32_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            case 0b111:
+                return softvector::vector_load_store<${vlen}, uint64_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size);
+            default:
+                throw new std::runtime_error("Unsupported width bit value");
+        }
+    }
+    uint64_t vlsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
+        switch(width_val){
+            case 0b000:
+                return softvector::vector_load_store<${vlen}, uint8_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b101:
+                return softvector::vector_load_store<${vlen}, uint16_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b110:
+                return softvector::vector_load_store<${vlen}, uint32_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b111:
+                return softvector::vector_load_store<${vlen}, uint64_t>(this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            default:
+                throw new std::runtime_error("Unsupported width bit value");
+        }    
+    }
+    uint64_t vssseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
+        switch(width_val){
+            case 0b000:
+                return softvector::vector_load_store<${vlen}, uint8_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b101:
+                return softvector::vector_load_store<${vlen}, uint16_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b110:
+                return softvector::vector_load_store<${vlen}, uint32_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            case 0b111:
+                return softvector::vector_load_store<${vlen}, uint64_t>(this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vd, rs1_val, segment_size, stride, true);
+            default:
+                throw new std::runtime_error("Unsupported width bit value");
+        }    
+    }
 
+    using indexed_load_store_t = std::function<uint64_t(void*, std::function<bool(void*, uint64_t, uint64_t, uint8_t*)>, uint8_t*, uint64_t, uint64_t, softvector::vtype_t, bool, uint8_t, uint64_t, uint8_t, uint8_t)>;
+    template <typename T1, typename T2> indexed_load_store_t getFunction() {
+        return [this](void* core, std::function<uint64_t(void*, uint64_t, uint64_t, uint8_t*)> load_store_fn, uint8_t* V, uint64_t vl,
+                      uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1, uint8_t vs2, uint8_t segment_size) {
+            return softvector::vector_load_store_index<${xlen}, ${vlen}, T1, T2>(core, load_store_fn, V, vl, vstart, vtype, vm, vd, rs1, vs2, segment_size);
+        };
+    }
+
+    const std::array<std::array<indexed_load_store_t, 4>, 4> functionTable = {{
+        {getFunction<uint8_t, uint8_t>(), getFunction<uint8_t, uint16_t>(), getFunction<uint8_t, uint32_t>(), getFunction<uint8_t, uint64_t>()},
+        {getFunction<uint16_t, uint8_t>(), getFunction<uint16_t, uint16_t>(), getFunction<uint16_t, uint32_t>(), getFunction<uint16_t, uint64_t>()},
+        {getFunction<uint32_t, uint8_t>(), getFunction<uint32_t, uint16_t>(), getFunction<uint32_t, uint32_t>(), getFunction<uint32_t, uint64_t>()},
+        {getFunction<uint64_t, uint8_t>(), getFunction<uint64_t, uint16_t>(), getFunction<uint64_t, uint32_t>(), getFunction<uint64_t, uint64_t>()}
+    }};
+    const size_t map_index_size[9] = { 0, 0, 1, 0, 2, 0, 0, 0, 3 }; // translate number of bytes to index in functionTable
+    uint64_t vlxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
+        return functionTable[map_index_size[index_byte_size]][data_byte_size](this->get_arch(), softvector::softvec_read, V, vl, vstart, vtype, vm, vd, rs1_val, vs2, segment_size);
+    }
+    uint64_t vsxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vs3, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
+        return functionTable[map_index_size[index_byte_size]][data_byte_size](this->get_arch(), softvector::softvec_write, V, vl, vstart, vtype, vm, vs3, rs1_val, vs2, segment_size);
+    }
+    void vector_vector_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_vector_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_imm_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_op<${vlen}, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_op<${vlen}, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_op<${vlen}, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_op<${vlen}, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_op<${vlen}, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_op<${vlen}, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_ww(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_op<${vlen}, uint16_t, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_op<${vlen}, uint32_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_op<${vlen}, uint64_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_ww(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_op<${vlen}, uint16_t, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_op<${vlen}, uint32_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_op<${vlen}, uint64_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_extend(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t target_sew_pow, uint8_t frac_pow){
+        switch(target_sew_pow){
+            case 4: // uint16_t target
+                if(frac_pow != 1) throw new std::runtime_error("Unsupported frac_pow");
+                return softvector::vector_unary_op<${vlen}, uint16_t, uint8_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+            case 5: // uint32_t target
+                switch(frac_pow){
+                    case 1:
+                        return softvector::vector_unary_op<${vlen}, uint32_t, uint16_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+                    case 2:
+                        return softvector::vector_unary_op<${vlen}, uint32_t, uint8_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+                    default: 
+                        throw new std::runtime_error("Unsupported frac_pow");
+                }
+            case 6: // uint64_t target
+                switch(frac_pow){
+                    case 1:
+                        return softvector::vector_unary_op<${vlen}, uint64_t, uint32_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+                    case 2:
+                        return softvector::vector_unary_op<${vlen}, uint64_t, uint16_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+                    case 3:
+                        return softvector::vector_unary_op<${vlen}, uint64_t, uint8_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+                    default: 
+                        throw new std::runtime_error("Unsupported frac_pow");
+                }
+            default: 
+                throw new std::runtime_error("Unsupported target_sew_pow");
+        }
+    }
+    void vector_vector_carry(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val, int8_t carry){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_carry<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, vs1, carry);
+            case 0b001:
+                return softvector::vector_vector_carry<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, vs1, carry);
+            case 0b010:
+                return softvector::vector_vector_carry<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, vs1, carry);
+            case 0b011:
+                return softvector::vector_vector_carry<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, vs1, carry);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }    }
+    void vector_imm_carry(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val, int8_t carry){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_carry<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, imm, carry);
+            case 0b001:
+                return softvector::vector_imm_carry<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, imm, carry);
+            case 0b010:
+                return softvector::vector_imm_carry<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, imm, carry);
+            case 0b011:
+                return softvector::vector_imm_carry<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vd, vs2, imm, carry);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void carry_vector_vector_op(uint8_t* V, unsigned funct6, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, unsigned vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::carry_vector_vector_op<${vlen}, uint8_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::carry_vector_vector_op<${vlen}, uint16_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::carry_vector_vector_op<${vlen}, uint32_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::carry_vector_vector_op<${vlen}, uint64_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void carry_vector_imm_op(uint8_t* V, unsigned funct6, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::carry_vector_imm_op<${vlen}, uint8_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::carry_vector_imm_op<${vlen}, uint16_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::carry_vector_imm_op<${vlen}, uint32_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::carry_vector_imm_op<${vlen}, uint64_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void mask_vector_vector_op(uint8_t* V, unsigned funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, unsigned vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::mask_vector_vector_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::mask_vector_vector_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::mask_vector_vector_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::mask_vector_vector_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void mask_vector_imm_op(uint8_t* V, unsigned funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::mask_vector_imm_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::mask_vector_imm_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::mask_vector_imm_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::mask_vector_imm_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_vw(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_op<${vlen}, uint8_t, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_op<${vlen}, uint16_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_op<${vlen}, uint32_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_vw(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_op<${vlen}, uint8_t,  uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_op<${vlen}, uint16_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_op<${vlen}, uint32_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_merge(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_merge<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_merge<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_merge<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_vector_merge<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_merge(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_merge<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_merge<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_merge<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_imm_merge<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    bool sat_vector_vector_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint64_t vxrm, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::sat_vector_vector_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::sat_vector_vector_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::sat_vector_vector_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::sat_vector_vector_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    bool sat_vector_imm_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint64_t vxrm, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::sat_vector_imm_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::sat_vector_imm_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::sat_vector_imm_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::sat_vector_imm_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    bool sat_vector_vector_vw(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint64_t vxrm, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::sat_vector_vector_op<${vlen}, uint8_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::sat_vector_vector_op<${vlen}, uint16_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::sat_vector_vector_op<${vlen}, uint32_t, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, vs1);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    bool sat_vector_imm_vw(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint64_t vxrm, bool vm, uint8_t vd, uint8_t vs2, int64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::sat_vector_imm_op<${vlen}, uint8_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::sat_vector_imm_op<${vlen}, uint16_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::sat_vector_imm_op<${vlen}, uint32_t, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vxrm, vm, vd, vs2, imm);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_red_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_red_op<${vlen}, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_red_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_red_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_red_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_red_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_red_op<${vlen}, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_red_op<${vlen}, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_red_op<${vlen}, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void mask_mask_op(uint8_t* V, unsigned funct6, unsigned funct3, uint64_t vl, uint64_t vstart, unsigned vd, unsigned vs2, unsigned vs1){
+        return softvector::mask_mask_op<${vlen}>(V, funct6, funct3, vl, vstart, vd, vs2, vs1);
+    }
+    uint64_t vcpop(uint8_t* V, uint64_t vl, uint64_t vstart, bool vm, unsigned vs2){
+        return softvector::vcpop<${vlen}>(V, vl, vstart, vm, vs2);
+    }
+    int64_t vfirst(uint8_t* V, uint64_t vl, uint64_t vstart, bool vm, unsigned vs2){
+        return softvector::vfirst<${vlen}>(V, vl, vstart, vm, vs2);
+    }
+    void mask_set_op(uint8_t* V, unsigned enc, uint64_t vl, uint64_t vstart, bool vm, unsigned vd, unsigned vs2){
+        return softvector::mask_set_op<${vlen}>(V, enc, vl, vstart, vm, vd, vs2);
+    }
+    void viota(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::viota<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2);
+            case 0b001:
+                return softvector::viota<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2);
+            case 0b010:
+                return softvector::viota<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2);
+            case 0b011:
+                return softvector::viota<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vid(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vid<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd);
+            case 0b001:
+                return softvector::vid<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd);
+            case 0b010:
+                return softvector::vid<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd);
+            case 0b011:
+                return softvector::vid<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void scalar_to_vector(uint8_t* V, softvector::vtype_t vtype, unsigned vd, uint64_t val, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                softvector::scalar_move<${vlen}, uint8_t>(V, vtype, vd, val, true);
+                break;
+            case 0b001:
+                softvector::scalar_move<${vlen}, uint16_t>(V, vtype, vd, val, true);
+                break;
+            case 0b010:
+                softvector::scalar_move<${vlen}, uint32_t>(V, vtype, vd, val, true);
+                break;
+            case 0b011:
+                softvector::scalar_move<${vlen}, uint64_t>(V, vtype, vd, val, true);
+                break;
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    uint64_t scalar_from_vector(uint8_t* V, softvector::vtype_t vtype, unsigned vd, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::scalar_move<${vlen}, uint8_t>(V, vtype, vd, 0, false);
+            case 0b001:
+                return softvector::scalar_move<${vlen}, uint16_t>(V, vtype, vd, 0, false);
+            case 0b010:
+                return softvector::scalar_move<${vlen}, uint32_t>(V, vtype, vd, 0, false);
+            case 0b011:
+                return softvector::scalar_move<${vlen}, uint64_t>(V, vtype, vd, 0, false);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_slideup(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_slideup<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_slideup<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_slideup<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_slideup<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_slidedown(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_slidedown<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_slidedown<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_slidedown<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_slidedown<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_slide1up(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_slide1up<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_slide1up<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_slide1up<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_slide1up<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_slide1down(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_slide1down<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_slide1down<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_slide1down<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_slide1down<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_gather(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_gather<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_gather<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_gather<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_vector_gather<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_vector_gatherei16(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_vector_gather<${vlen}, uint8_t, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_vector_gather<${vlen}, uint16_t, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_vector_gather<${vlen}, uint32_t, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_vector_gather<${vlen}, uint64_t, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_imm_gather(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_imm_gather<${vlen}, uint8_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b001:
+                return softvector::vector_imm_gather<${vlen}, uint16_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b010:
+                return softvector::vector_imm_gather<${vlen}, uint32_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            case 0b011:
+                return softvector::vector_imm_gather<${vlen}, uint64_t>(V, vl, vstart, vtype, vm, vd, vs2, imm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_compress(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_compress<${vlen}, uint8_t>(V, vl, vstart, vtype, vd, vs2, vs1);
+            case 0b001:
+                return softvector::vector_compress<${vlen}, uint16_t>(V, vl, vstart, vtype, vd, vs2, vs1);
+            case 0b010:
+                return softvector::vector_compress<${vlen}, uint32_t>(V, vl, vstart, vtype, vd, vs2, vs1);
+            case 0b011:
+                return softvector::vector_compress<${vlen}, uint64_t>(V, vl, vstart, vtype, vd, vs2, vs1);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_whole_move(uint8_t* V, uint8_t vd, uint8_t vs2, uint8_t count){
+        return softvector::vector_whole_move<${vlen}>(V, vd, vs2, count);
+    }
+    uint64_t fp_scalar_from_vector(uint8_t* V, softvector::vtype_t vtype, unsigned vd, uint8_t sew_val){
+        return scalar_from_vector(V, vtype, vd, sew_val);
+    }
+    void fp_vector_slide1up(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        return vector_slide1up(V, vl, vstart, vtype, vm, vd, vs2, imm, sew_val);
+    }
+    void fp_vector_slide1down(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, unsigned vd, unsigned vs2, uint64_t imm, uint8_t sew_val) {
+        return vector_slide1down(V, vl, vstart, vtype, vm, vd, vs2, imm, sew_val);
+    }
+    void fp_vector_red_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_red_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::fp_vector_red_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011:
+                return softvector::fp_vector_red_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_red_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::fp_vector_red_op<${vlen}, uint16_t, uint8_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b001:
+                return softvector::fp_vector_red_op<${vlen}, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::fp_vector_red_op<${vlen}, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011: // would require 128 bits vs2 value
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_vector_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_vector_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::fp_vector_vector_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011:
+                return softvector::fp_vector_vector_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_imm_op(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_imm_op<${vlen}, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b010:
+                return softvector::fp_vector_imm_op<${vlen}, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b011:
+                return softvector::fp_vector_imm_op<${vlen}, uint64_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_vector_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_vector_op<${vlen}, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::fp_vector_vector_op<${vlen}, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_imm_wv(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_imm_op<${vlen}, uint32_t, uint16_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b010:
+                return softvector::fp_vector_imm_op<${vlen}, uint64_t, uint32_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_vector_ww(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_vector_op<${vlen}, uint32_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::fp_vector_vector_op<${vlen}, uint64_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_imm_ww(uint8_t* V, uint8_t funct6, uint8_t funct3, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_imm_op<${vlen}, uint32_t, uint32_t, uint16_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b010:
+                return softvector::fp_vector_imm_op<${vlen}, uint64_t, uint64_t, uint32_t>(V, funct6, funct3, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_unary_op(uint8_t* V, uint8_t encoding_space, uint8_t unary_op, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::fp_vector_unary_op<${vlen}, uint16_t>(V, encoding_space, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b010:
+                return softvector::fp_vector_unary_op<${vlen}, uint32_t>(V, encoding_space, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b011:
+                return softvector::fp_vector_unary_op<${vlen}, uint64_t>(V, encoding_space, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void mask_fp_vector_vector_op(uint8_t* V, uint8_t funct6, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t vs1, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::mask_fp_vector_vector_op<${vlen}, uint16_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b010:
+                return softvector::mask_fp_vector_vector_op<${vlen}, uint32_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            case 0b011:
+                return softvector::mask_fp_vector_vector_op<${vlen}, uint64_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, vs1, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void mask_fp_vector_imm_op(uint8_t* V, uint8_t funct6, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                throw new std::runtime_error("Unsupported sew bit value");
+            case 0b001:
+                return softvector::mask_fp_vector_imm_op<${vlen}, uint16_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b010:
+                return softvector::mask_fp_vector_imm_op<${vlen}, uint32_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            case 0b011:
+                return softvector::mask_fp_vector_imm_op<${vlen}, uint64_t>(V, funct6, vl, vstart, vtype, vm, vd, vs2, imm, rm);
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_imm_merge(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint64_t imm, uint8_t sew_val){
+        vector_imm_merge(V, vl, vstart, vtype, vm, vd, vs2, imm, sew_val);
+    }
+    void fp_vector_unary_w(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::fp_vector_unary_w<${vlen}, uint16_t, uint8_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b001:
+                return softvector::fp_vector_unary_w<${vlen}, uint32_t, uint16_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b010:
+                return softvector::fp_vector_unary_w<${vlen}, uint64_t, uint32_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b011: // would widen to 128 bits
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void fp_vector_unary_n(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t rm, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::fp_vector_unary_n<${vlen}, uint8_t, uint16_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b001:
+                return softvector::fp_vector_unary_n<${vlen}, uint16_t, uint32_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b010:
+                return softvector::fp_vector_unary_n<${vlen}, uint32_t, uint64_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2, rm);
+            case 0b011: // would require 128 bit value to narrow
+            default:
+                throw new std::runtime_error("Unsupported sew bit value");
+        }
+    }
+    void vector_unary_op(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint8_t vs2, uint8_t sew_val){
+        switch(sew_val){
+            case 0b000:
+                return softvector::vector_unary_op<${vlen}, uint8_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+            case 0b001:
+                return softvector::vector_unary_op<${vlen}, uint16_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+            case 0b010:
+                return softvector::vector_unary_op<${vlen}, uint32_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+            case 0b011:
+                return softvector::vector_unary_op<${vlen}, uint64_t>(V, unary_op, vl, vstart, vtype, vm, vd, vs2);
+            default: 
+                throw new std::runtime_error("Unsupported sew_val");
+        }
+    }
+<%}%>
     uint64_t fetch_count{0};
     uint64_t tval{0};
 
@@ -175,22 +1024,8 @@ private:
     decoder instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
-        if(this->core.has_mmu()) {
-            auto phys_pc = this->core.virt2phys(pc);
-//            if ((pc.val & upper_bits) != ((pc.val + 2) & upper_bits)) { // we may cross a page boundary
-//                if (this->core.read(phys_pc, 2, data) != iss::Ok) return iss::Err;
-//                if ((data[0] & 0x3) == 0x3) // this is a 32bit instruction
-//                    if (this->core.read(this->core.v2p(pc + 2), 2, data + 2) != iss::Ok)
-//                        return iss::Err;
-//            } else {
-                if (this->core.read(phys_pc, 4, data) != iss::Ok)
+        if (this->core.read(iss::address_type::PHYSICAL, pc.access, pc.space, pc.val, 4, data) != iss::Ok)
                     return iss::Err;
-//            }
-        } else {
-            if (this->core.read(phys_addr_t(pc.access, pc.space, pc.val), 4, data) != iss::Ok)
-                return iss::Err;
-
-        }
         return iss::Ok;
     }
 };
@@ -199,9 +1034,6 @@ template <typename CODE_WORD> void debug_fn(CODE_WORD insn) {
     volatile CODE_WORD x = insn;
     insn = 2 * x;
 }
-
-template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
-
 // according to
 // https://stackoverflow.com/questions/8871204/count-number-of-1s-in-binary-representation
 #ifdef __GCC__
@@ -288,8 +1120,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // used registers<%instr.usedVariables.each{ k,v->
                     if(v.isArray) {%>
                     auto* ${k} = reinterpret_cast<uint${nativeTypeSize(v.type.size)}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::${k}0]);<% }else{ %> 
-                    auto* ${k} = reinterpret_cast<uint${nativeTypeSize(v.type.size)}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::${k}]);
-                    <%}}%>// calculate next pc value
+                    auto* ${k} = reinterpret_cast<uint${nativeTypeSize(v.type.size)}_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::${k}]);<%}}%>
+                    // calculate next pc value
                     *NEXT_PC = *PC + ${instr.length/8};
                     // execute instruction<%instr.behavior.eachLine{%>
                     ${it}<%}%>

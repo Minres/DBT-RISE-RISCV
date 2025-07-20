@@ -30,11 +30,21 @@
  *
  *******************************************************************************/
 <%
-def nativeTypeSize(int size){
-    if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
+def nativeSize(int size){
+    if(size<=8) return 8;
+    if(size<=16) return 16;
+    if(size<=32) return 32;
+    if(size<=64) return 64;
+    if(size<=128) return 128;
+    if(size<=256) return 256;
+    if(size<=512) return 512;
+    if(size<=1024) return 1024;
+    if(size<=2048) return 2048;
+    if(size<=4096) return 4096;
+    throw new IllegalArgumentException("Unsupported size in nativeSize in CORENAME.h.gtl");
 }
 def getRegisterSizes(){
-    def regs = registers.collect{nativeTypeSize(it.size)}
+    def regs = registers.collect{nativeSize(it.size)}
     regs+=[32,32, 64, 64, 64, 32, 32] // append TRAP_STATE, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
     return regs
 }
@@ -47,13 +57,7 @@ def getRegisterOffsets(){
     }
     return offsets
 }
-def byteSize(int size){
-    if(size<=8) return 8;
-    if(size<=16) return 16;
-    if(size<=32) return 32;
-    if(size<=64) return 64;
-    return 128;
-}
+
 def getCString(def val){
     return val.toString()+'ULL'
 }
@@ -84,6 +88,8 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
     enum constants {${constants.collect{c -> c.name+"="+getCString(c.value)}.join(', ')}};
 
     constexpr static unsigned FP_REGS_SIZE = ${constants.find {it.name=='FLEN'}?.value?:0};
+    constexpr static unsigned V_REGS_SIZE = ${constants.find {it.name=='VLEN'}?.value?:0};
+
 
     enum reg_e {
         ${registers.collect{it.name}.join(', ')}, NUM_REGS, TRAP_STATE=NUM_REGS, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
@@ -131,8 +137,6 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
 
     uint8_t* get_regs_base_ptr() override;
 
-    inline uint64_t get_icount() { return reg.icount; }
-
     inline bool should_stop() { return interrupt_sim; }
 
     inline uint64_t stop_code() { return interrupt_sim; }
@@ -141,13 +145,13 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
-    inline uint32_t get_last_branch() { return reg.last_branch; }
-
 
 #pragma pack(push, 1)
     struct ${coreDef.name}_regs {<%
-        registers.each { reg -> if(reg.size>0) {%> 
-        uint${byteSize(reg.size)}_t ${reg.name} = 0;<%
+        registers.each { reg -> if(reg.size>64) {%>
+        uint8_t ${reg.name}[${reg.size/8}] = {0};<%
+        }else if(reg.size>0) {%>
+        uint${nativeSize(reg.size)}_t ${reg.name} = 0;<%
         }}%>
         uint32_t trap_state = 0, pending_trap = 0;
         uint64_t icount = 0;
@@ -168,6 +172,31 @@ if(fcsr != null) {%>
 <%} else { %>
     uint32_t get_fcsr(){return 0;}
     void set_fcsr(uint32_t val){}
+<%}
+def vstart = registers.find {it.name=='vstart'}
+def vl = registers.find {it.name=='vl'}
+def vtype = registers.find {it.name=='vtype'}
+def vxsat = registers.find {it.name=='vxsat'}
+def vxrm = registers.find {it.name=='vxrm'}
+
+if(vtype != null) {%>
+    uint${vstart.size}_t get_vstart(){return reg.vstart;}
+    void set_vstart(uint${vstart.size}_t val){reg.vstart = val;}
+    uint${vl.size}_t get_vl(){return reg.vl;}
+    uint${vtype.size}_t get_vtype(){return reg.vtype;}
+    uint${vxsat.size}_t get_vxsat(){return reg.vxsat;}
+    void set_vxsat(uint${vxsat.size}_t val){reg.vxsat = val;}
+    uint${vxrm.size}_t get_vxrm(){return reg.vxrm;}
+    void set_vxrm(uint${vxrm.size}_t val){reg.vxrm = val;}
+<%} else { %>
+    uint32_t get_vstart(){return 0;}
+    void set_vstart(uint32_t val){}
+    uint32_t get_vl(){return 0;}
+    uint32_t get_vtype(){return 0;}
+    uint32_t get_vxsat(){return 0;}
+    void set_vxsat(uint32_t val){}
+    uint32_t get_vxrm(){return 0;}
+    void set_vxrm(uint32_t val){}
 <%}%>
 };
 

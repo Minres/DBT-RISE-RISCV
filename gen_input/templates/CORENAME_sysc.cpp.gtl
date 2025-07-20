@@ -45,17 +45,17 @@ namespace interp {
 using namespace sysc;
 volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|interp", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         }),
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|interp", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") {%>,
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p_clic_pmp|interp", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_PMP | iss::arch::FEAT_EXT_N | iss::arch::FEAT_CLIC)>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
@@ -66,17 +66,17 @@ namespace llvm {
 using namespace sysc;
 volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|llvm", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         }),
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|llvm", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") {%>,
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p_clic_pmp|llvm", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::tgfs::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_PMP | iss::arch::FEAT_EXT_N | iss::arch::FEAT_CLIC)>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
@@ -88,17 +88,17 @@ namespace tcc {
 using namespace sysc;
 volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|tcc", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         }),
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|tcc", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") {%>,
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p_clic_pmp|tcc", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_PMP | iss::arch::FEAT_EXT_N | iss::arch::FEAT_CLIC)>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
@@ -110,17 +110,17 @@ namespace asmjit {
 using namespace sysc;
 volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         }),
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") {%>,
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p_clic_pmp|asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
-            auto* cc = reinterpret_cast<sysc::tgfs::core_complex*>(data);
+            auto* cc = reinterpret_cast<sysc::riscv_vp::core_complex_if*>(data);
             auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_PMP | iss::arch::FEAT_EXT_N | iss::arch::FEAT_CLIC)>>(cc);
             return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>

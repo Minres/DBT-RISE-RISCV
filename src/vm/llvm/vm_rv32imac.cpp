@@ -31,12 +31,14 @@
  *******************************************************************************/
 // clang-format off
 #include <iss/arch/rv32imac.h>
+// vm_base needs to be included before gdb_session as termios.h (via boost and gdb_server) has a define which clashes with a variable
+// name in ConstantRange.h
+#include <iss/llvm/vm_base.h>
+#include <iss/iss.h>
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/server.h>
-#include <iss/iss.h>
-#include <iss/llvm/vm_base.h>
-#include <util/logging.h>
 #include <iss/instruction_decoder.h>
+#include <util/logging.h>
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -97,7 +99,7 @@ protected:
         return super::gen_cond_assign(cond, this->gen_ext(trueVal, size), this->gen_ext(falseVal, size));
     }
 
-    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, unsigned int &, BasicBlock *) override;
+    std::tuple<continuation_e, BasicBlock *> gen_single_inst_behavior(virt_addr_t &, BasicBlock *) override;
 
     void gen_leave_behavior(BasicBlock *leave_blk) override;
     void gen_raise_trap(uint16_t trap_id, uint16_t cause);
@@ -375,7 +377,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -421,7 +423,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -468,7 +470,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto new_pc =(uint32_t)(PC+(int32_t)sext<21>(imm));
@@ -525,7 +527,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto addr_mask =(uint32_t)- 2;
@@ -606,7 +608,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -671,7 +673,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -736,7 +738,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -805,7 +807,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -874,7 +876,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -939,7 +941,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -1003,7 +1005,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1061,7 +1063,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1119,7 +1121,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1177,7 +1179,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1233,7 +1235,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto load_address =this->gen_ext(
@@ -1289,7 +1291,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1342,7 +1344,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1395,7 +1397,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto store_address =this->gen_ext(
@@ -1448,7 +1450,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1500,7 +1502,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1554,7 +1556,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1607,7 +1609,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1657,7 +1659,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1707,7 +1709,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1757,7 +1759,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1807,7 +1809,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1857,7 +1859,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1909,7 +1911,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -1961,7 +1963,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2013,7 +2015,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2066,7 +2068,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2121,7 +2123,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2174,7 +2176,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2224,7 +2226,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2277,7 +2279,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2333,7 +2335,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2383,7 +2385,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -2575,10 +2577,10 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> wait_253_args{
+        std::vector<Value*> wait_57_args{
             this->gen_ext(this->gen_const(8,1), 32)
         };
-        this->builder.CreateCall(this->mod->getFunction("wait"), wait_253_args);
+        this->builder.CreateCall(this->mod->getFunction("wait"), wait_57_args);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -2617,7 +2619,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrs1 =this->gen_reg_load(traits::X0+ rs1);
@@ -2673,7 +2675,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2730,7 +2732,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2787,7 +2789,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2838,7 +2840,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2894,7 +2896,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto xrd =this->gen_read_mem(traits::CSR, csr, 4);
@@ -2990,7 +2992,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3045,7 +3047,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3103,7 +3105,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3160,7 +3162,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto res =this->builder.CreateMul(
@@ -3216,7 +3218,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto dividend =this->gen_ext(
@@ -3320,7 +3322,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3393,7 +3395,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3501,7 +3503,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             {
@@ -3575,7 +3577,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0){ auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3631,7 +3633,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3703,7 +3705,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3763,7 +3765,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3829,7 +3831,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3893,7 +3895,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -3957,7 +3959,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4021,7 +4023,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4091,7 +4093,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4161,7 +4163,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4230,7 +4232,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_reg_load(traits::X0+ rs1);
@@ -4306,7 +4308,7 @@ private:
             get_reg_ptr(rd+8 + traits::X0), false);
         }
         else{
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -4443,7 +4445,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rs1!=0) {
@@ -4570,7 +4572,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -4616,7 +4618,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(imm==0||rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         if(rd!=0) {
             this->builder.CreateStore(
@@ -4669,7 +4671,7 @@ private:
             get_reg_ptr(2 + traits::X0), false);
         }
         else{
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -4705,7 +4707,7 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5204,7 +5206,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rs1!=0) {
@@ -5253,7 +5255,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5307,7 +5309,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -5434,7 +5436,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             if(rd!=0) {
@@ -5485,7 +5487,7 @@ private:
         /*generate behavior*/
         this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
         if(rs1>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto addr_mask =(uint32_t)- 2;
@@ -5571,7 +5573,7 @@ private:
         this->gen_instr_prologue();
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)) {
-            this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+            this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
             auto offs =this->gen_ext(
@@ -5619,7 +5621,7 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->gen_raise_trap(0, static_cast<int32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
+        this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5682,21 +5684,20 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 
 template <typename ARCH>
 std::tuple<continuation_e, BasicBlock *>
-vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, unsigned int &inst_cnt, BasicBlock *this_block) {
+vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block) {
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
     // const typename traits::addr_t upper_bits = ~traits::PGMASK;
     phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    if(this->core.has_mmu())
-        paddr = this->core.virt2phys(pc);
     auto res = this->core.read(paddr, 4, data);
     if (res != iss::Ok) 
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
-    if (instr == 0x0000006f || (instr&0xffff)==0xa001)
+    if (instr == 0x0000006f || (instr&0xffff)==0xa001){
+        this->builder.CreateBr(this->leave_blk);
         return std::make_tuple(JUMP_TO_SELF, nullptr);
-    ++inst_cnt;
+        }
     uint32_t inst_index = instr_decoder.decode_instr(instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
@@ -5778,6 +5779,10 @@ void vm_impl<ARCH>::gen_instr_epilogue(BasicBlock *bb) {
     auto* icount_val = this->builder.CreateAdd(
         this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::ICOUNT), get_reg_ptr(arch::traits<ARCH>::ICOUNT)), this->gen_const(64U, 1));
     this->builder.CreateStore(icount_val, get_reg_ptr(arch::traits<ARCH>::ICOUNT), false);
+    //increment cyclecount
+    auto* cycle_val = this->builder.CreateAdd(
+        this->builder.CreateLoad(this->get_typeptr(arch::traits<ARCH>::CYCLE), get_reg_ptr(arch::traits<ARCH>::CYCLE)), this->gen_const(64U, 1));
+    this->builder.CreateStore(cycle_val, get_reg_ptr(arch::traits<ARCH>::CYCLE), false);
 }
 
 } // namespace rv32imac

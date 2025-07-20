@@ -68,7 +68,7 @@ public:
     bool operator!=(const tlm_dmi_ext& o) const { return !operator==(o); }
 };
 
-namespace riscv_vp {
+namespace riscv {
 #ifdef USE_TLM_SIGNAL
 using irq_signal_t = tlm::scc::tlm_signal_bool_opt_in;
 #else
@@ -246,7 +246,7 @@ private:
     void init();
     std::vector<iss::vm_plugin*> plugin_list;
 };
-} // namespace riscv_vp
+} // namespace riscv
 } /* namespace sysc */
 
 #endif /* _SYSC_CORE_COMPLEX_H_ */
