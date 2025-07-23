@@ -422,7 +422,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                     auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
                                            pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
+                        CPPLOG(ERR) << "problem writing " << fsize << " bytes to 0x" << std::hex << pseg->get_physical_address();
                 }
             }
             const auto sym_sec = reader.sections[".symtab"];
