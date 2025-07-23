@@ -366,13 +366,13 @@ template <> struct traits<tgc5c> {
         offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::NEXT_PC),
         offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::PRIV),
         offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::DPC),
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::trap_state) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::pending_trap) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::icount) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::cycle) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::instret) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::instruction) * 8,
-        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::last_branch) * 8,
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::trap_state),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::pending_trap),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::icount),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::cycle),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::instret),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::instruction),
+        offsetof(tgc5c::TGC5C_regs, tgc5c::TGC5C_regs::last_branch),
     }};
 
     static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
