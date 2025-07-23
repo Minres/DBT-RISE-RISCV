@@ -48,9 +48,9 @@
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
+#include <fmt/format.h>
 #include <iss/mem/memory_with_htif.h>
 #include <iss/mem/mmu.h>
-#include <fmt/format.h>
 #include <type_traits>
 #include <unordered_map>
 
@@ -63,9 +63,7 @@ public:
     using core = BASE;
     using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_msu_vp<BASE>;
-    using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
-    using addr_t = typename core::addr_t;
 
     static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
         if(sizeof(reg_t) == 4) {
@@ -145,8 +143,8 @@ public:
     void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
 
 protected:
-    using mem_read_f = iss::status(phys_addr_t addr, unsigned, uint8_t* const);
-    using mem_write_f = iss::status(phys_addr_t addr, unsigned, uint8_t const* const);
+    using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
+    using mem_write_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t const* const);
 
     hart_state<reg_t> state;
 
@@ -614,9 +612,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
-                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
-                             << " to " << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
+                             << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;

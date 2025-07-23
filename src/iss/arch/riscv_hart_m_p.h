@@ -60,9 +60,7 @@ public:
     using core = BASE;
     using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_m_p<BASE, FEAT, LOGCAT>;
-    using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
-    using addr_t = typename core::addr_t;
 
     static constexpr reg_t get_mstatus_mask() {
         if(sizeof(reg_t) == 4)
@@ -129,8 +127,8 @@ public:
     void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
 
 protected:
-    using mem_read_f = iss::status(phys_addr_t addr, unsigned, uint8_t* const);
-    using mem_write_f = iss::status(phys_addr_t addr, unsigned, uint8_t const* const);
+    using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
+    using mem_write_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t const* const);
 
     hart_state<reg_t> state;
 
@@ -525,8 +523,8 @@ uint64_t riscv_hart_m_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
-                             << " at address " << buffer.data() << " occurred";
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                             << buffer.data() << " occurred";
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;

@@ -291,9 +291,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     using core = BASE;
     using this_class = riscv_hart_common<BASE, LOGCAT>;
-    using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
-    using addr_t = typename core::addr_t;
 
     using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
     using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
