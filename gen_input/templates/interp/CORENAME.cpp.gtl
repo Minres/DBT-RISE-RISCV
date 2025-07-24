@@ -1128,8 +1128,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")<%}%>
                 default: {
+                    if(this->disass_enabled){
+                        std::string mnemonic = "Illegal Instruction";
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
                     *NEXT_PC = *PC + ((instr & 3) == 3 ? 4 : 2);
-                    raise(0,  2);
+                    raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                 }
                 }
             }catch(memory_access_exception& e){}
