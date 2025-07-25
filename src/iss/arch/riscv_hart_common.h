@@ -512,28 +512,42 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
     iss::status read_csr(unsigned addr, reg_t& val) {
-        if(addr >= csr.size())
+        if(addr >= csr.size()) {
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto req_priv_lvl = (addr >> 8) & 0x3;
-        if(this->reg.PRIV < req_priv_lvl) // not having required privileges
+        if(this->reg.PRIV < req_priv_lvl) { // not having required privileges
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto it = csr_rd_cb.find(addr);
-        if(it == csr_rd_cb.end() || !it->second) // non existent register
+        if(it == csr_rd_cb.end() || !it->second) { // non existent register
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         return it->second(addr, val);
     }
 
     iss::status write_csr(unsigned addr, reg_t val) {
-        if(addr >= csr.size())
+        if(addr >= csr.size()) {
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto req_priv_lvl = (addr >> 8) & 0x3;
-        if(this->reg.PRIV < req_priv_lvl) // not having required privileges
+        if(this->reg.PRIV < req_priv_lvl) { // not having required privileges
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
-        if((addr & 0xc00) == 0xc00) // writing to read-only region
+        }
+        if((addr & 0xc00) == 0xc00) { // writing to read-only region
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto it = csr_wr_cb.find(addr);
-        if(it == csr_wr_cb.end() || !it->second) // non existent register
+        if(it == csr_wr_cb.end() || !it->second) { // non existent register
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         return it->second(addr, val);
     }
 
