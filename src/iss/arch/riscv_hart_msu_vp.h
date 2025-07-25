@@ -157,7 +157,9 @@ protected:
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
     iss::status write_ideleg(unsigned addr, reg_t val);
-    iss::status write_edeleg(unsigned addr, reg_t val);
+    iss::status write_edeleg(unsigned addr, uint32_t val);
+    iss::status write_edeleg(unsigned addr, uint64_t val);
+    iss::status write_edelegh(unsigned addr, uint32_t val);
 
     void check_interrupt();
     mem::mmu<reg_t> mmu;
@@ -170,8 +172,8 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
 , mmu(base::get_priv_if())
 , default_mem(base::get_priv_if()) {
     // common regs
-    const std::array<unsigned, 17> rwaddrs{{mepc, mtvec, mscratch, mtval, mscratch, sepc, stvec, sscratch, scause, stval, sscratch, uepc,
-                                            utvec, uscratch, ucause, utval, uscratch}};
+    const std::array<unsigned, 16> rwaddrs{
+        {mepc, mtvec, mscratch, mcause, mtval, sepc, stvec, sscratch, scause, stval, sscratch, uepc, utvec, uscratch, ucause, utval}};
     for(auto addr : rwaddrs) {
         this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_plain);
@@ -207,6 +209,14 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr_wr_cb[mvendorid] = MK_CSR_WR_CB(write_null);
     this->csr_wr_cb[marchid] = MK_CSR_WR_CB(write_null);
     this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
+    this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
+    this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
+    this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
+    this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
+    if(traits<BASE>::XLEN == 32) {
+        this->csr_rd_cb[medelegh] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[medelegh] = MK_CSR_WR_CB(write_edelegh);
+    }
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     if(FEAT & FEAT_DEBUG) {
@@ -449,6 +459,40 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t&
     return iss::Ok;
 }
 
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_ideleg(unsigned addr, reg_t val) {
+    // only U and S mode interrupts can be delegated
+    auto mask = 0b0011'0011'0011;
+    this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, uint32_t val) {
+    // bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved), bit 16-17 (reserved), bit 20-23 (reserved)
+    uint32_t mask = 0b1111'1111'0000'1100'1011'0011'1111'0111;
+    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, uint64_t val) {
+    // bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved), bit 16-17 (reserved), bit 20-23 (reserved)
+    uint32_t mask_lower = 0b1111'1111'0000'1100'1011'0011'1111'0111;
+    // bit 32-47(reserved)
+    uint64_t mask = ((uint64_t)0b1111'1111'1111'1111'0000'0000'0000'0000 << 32) | mask_lower;
+    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edelegh(unsigned addr, uint32_t val) {
+    // bit 32-47(reserved)
+    auto mask = 0b1111'1111'1111'1111'0000'0000'0000'0000;
+    this->csr[medelegh] = (this->csr[medelegh] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
 template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
     BASE::reset(address);
     state.mstatus = hart_state<reg_t>::mstatus_reset_val;
@@ -495,7 +539,10 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
     // calculate effective privilege level
     unsigned new_priv = PRIV_M;
     if(trap_id == 0) { // exception
-        if(this->reg.PRIV != PRIV_M && ((this->csr[medeleg] >> cause) & 0x1) != 0)
+        uint64_t medeleg = this->csr[medeleg];
+        if(traits<BASE>::XLEN == 32)
+            medeleg |= (static_cast<uint64_t>(this->csr[medeleg]) << 32);
+        if(this->reg.PRIV != PRIV_M && ((medeleg >> cause) & 0x1) != 0)
             new_priv = (this->csr[sedeleg] >> cause) & 0x1 ? PRIV_U : PRIV_S;
         // store ret addr in xepc register
         this->csr[uepc | (new_priv << 8)] = static_cast<reg_t>(addr); // store actual address instruction of exception
@@ -612,9 +659,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                             << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
+                             << " to " << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
