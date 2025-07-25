@@ -173,8 +173,6 @@ protected:
     iss::status write_dscratch(unsigned addr, reg_t val);
     iss::status read_dpc(unsigned addr, reg_t& val);
     iss::status write_dpc(unsigned addr, reg_t val);
-    iss::status write_ideleg(unsigned addr, reg_t val);
-    iss::status write_edeleg(unsigned addr, reg_t val);
 
     void check_interrupt();
     mem::memory_with_htif<reg_t> default_mem;
@@ -216,10 +214,6 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
     this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
 
     if(FEAT & FEAT_EXT_N) {
-        this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
-        this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
-        this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
-        this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
         this->csr_rd_cb[uie] = MK_CSR_RD_CB(read_ie);
         this->csr_wr_cb[uie] = MK_CSR_WR_CB(write_ie);
         this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
@@ -427,8 +421,6 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mie] & mask;
-    if(this->reg.PRIV != 3)
-        val &= this->csr[mideleg];
     return iss::Ok;
 }
 
@@ -444,22 +436,6 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
     auto mask = get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mip] & mask;
-    if(this->reg.PRIV != 3)
-        val &= this->csr[mideleg];
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ideleg(unsigned addr, reg_t val) {
-    auto mask = 0b000100010001; // only U mode supported
-    this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, reg_t val) {
-    auto mask = 0b1011001111110111; // bit 14/10 (reserved), bit 11 (Env call), and 3 (break) are hardwired to 0
-    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
@@ -470,7 +446,6 @@ template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_har
 
 template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::check_interrupt() {
     // TODO: Implement CLIC functionality
-    auto ideleg = this->csr[mideleg];
     // Multiple simultaneous interrupts and traps at the same privilege level are
     // handled in the following decreasing priority order:
     // external interrupts, software interrupts, timer interrupts, then finally
@@ -479,7 +454,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<
 
     bool mstatus_mie = state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
-    auto enabled_interrupts = m_enabled ? ena_irq & ~ideleg : 0;
+    auto enabled_interrupts = m_enabled ? ena_irq : 0;
 
     if(enabled_interrupts != 0) {
         int res = 0;
@@ -504,8 +479,6 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
     // calculate effective privilege level
     unsigned new_priv = PRIV_M;
     if(trap_id == 0) { // exception
-        if(this->reg.PRIV != PRIV_M && ((this->csr[medeleg] >> cause) & 0x1) != 0)
-            new_priv = PRIV_U;
         // store ret addr in xepc register
         this->csr[uepc | (new_priv << 8)] = static_cast<reg_t>(addr); // store actual address instruction of exception
         /*
@@ -565,8 +538,6 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
         }
         this->fault_data = 0;
     } else {
-        if(this->reg.PRIV != PRIV_M && ((this->csr[mideleg] >> cause) & 0x1) != 0)
-            new_priv = PRIV_U;
         this->csr[uepc | (new_priv << 8)] = this->reg.NEXT_PC; // store next address if interrupt
         this->reg.pending_trap = 0;
     }
@@ -616,9 +587,9 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                             << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
+                             << " to " << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
