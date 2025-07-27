@@ -241,7 +241,16 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::read(const address_type type, co
             return this->read_csr(addr, *reinterpret_cast<reg_t* const>(data));
         } break;
         case traits<BASE>::FENCE: {
-            return iss::Ok;
+            switch(addr) {
+            case traits<BASE>::fence:
+            case traits<BASE>::fencei:
+                break;
+            case traits<BASE>::fencevma: {
+                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
+            }
+            default:
+                return iss::Ok;
+            }
         } break;
         case traits<BASE>::RES: {
             auto it = atomic_reservation.find(addr);
@@ -324,8 +333,18 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::write(const address_type type, c
                 return iss::Err;
             return this->write_csr(addr, *reinterpret_cast<const reg_t*>(data));
         } break;
-        case traits<BASE>::FENCE:
-            break;
+        case traits<BASE>::FENCE: {
+            switch(addr) {
+            case traits<BASE>::fence:
+            case traits<BASE>::fencei:
+                break;
+            case traits<BASE>::fencevma: {
+                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
+            }
+            default:
+                return iss::Ok;
+            }
+        }
         case traits<BASE>::RES: {
             atomic_reservation[addr] = data[0];
         } break;

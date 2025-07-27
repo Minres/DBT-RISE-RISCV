@@ -288,7 +288,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
         } break;
         case traits<BASE>::FENCE: {
             switch(addr) {
-            case 2: {
+            case traits<BASE>::fencevma: {
                 auto tvm = state.mstatus.TVM;
                 if(this->reg.PRIV == PRIV_S & tvm != 0) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
