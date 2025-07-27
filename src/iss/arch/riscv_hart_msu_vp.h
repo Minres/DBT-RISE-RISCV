@@ -52,6 +52,7 @@
 #include <fmt/format.h>
 #include <iss/mem/memory_with_htif.h>
 #include <iss/mem/mmu.h>
+#include <optional>
 #include <type_traits>
 #include <unordered_map>
 
@@ -257,7 +258,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
                 this->fault_data = addr;
                 if(is_debug(access))
                     throw trap_access(0, addr);
-                this->reg.trap_state = (1UL << 31); // issue trap 0
+                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_FETCH << 16;
                 return iss::Err;
             }
             try {
@@ -287,16 +288,26 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
         } break;
         case traits<BASE>::FENCE: {
             switch(addr) {
-            case 2:   // SFENCE:VMA lower
-            case 3: { // SFENCE:VMA upper
+            case 2: {
                 auto tvm = state.mstatus.TVM;
                 if(this->reg.PRIV == PRIV_S & tvm != 0) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
                     this->fault_data = this->reg.PC;
                     return iss::Err;
                 }
+                uint8_t asid_reg = *data;
+                uint8_t vaddr_reg = *(data + 1);
+                std::optional<reg_t> vaddr =
+                    vaddr_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(vaddr_reg)))
+                              : std::nullopt;
+                std::optional<reg_t> asid =
+                    asid_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(asid_reg)))
+                             : std::nullopt;
+                mmu.flush_tlb(vaddr, asid_reg);
                 return iss::Ok;
             }
+            default:
+                return iss::Ok;
             }
         } break;
         case traits<BASE>::RES: {
