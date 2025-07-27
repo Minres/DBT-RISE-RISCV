@@ -35,6 +35,7 @@
 #ifndef _RISCV_HART_M_P_H
 #define _RISCV_HART_M_P_H
 
+#include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
 #include "riscv_hart_common.h"
@@ -216,13 +217,13 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::read(const address_type type, co
             }
             try {
                 if(!is_debug(access) && (addr & (alignment - 1))) {
-                    this->reg.trap_state = (1UL << 31) | 4 << 16;
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_LOAD << 16;
                     this->fault_data = addr;
                     return iss::Err;
                 }
                 auto res = this->memory.rd_mem(access, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
-                    this->reg.trap_state = (1UL << 31) | (5 << 16); // issue trap 5 (load access fault
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
                     this->fault_data = addr;
                 }
                 return res;
@@ -302,13 +303,13 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::write(const address_type type, c
             try {
                 auto alignment = std::min<unsigned>(length, sizeof(reg_t));
                 if(length > 1 && (addr & (alignment - 1)) && !is_debug(access)) {
-                    this->reg.trap_state = (1UL << 31) | 6 << 16;
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_STORE << 16;
                     this->fault_data = addr;
                     return iss::Err;
                 }
                 auto res = this->memory.wr_mem(access, addr, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
-                    this->reg.trap_state = (1UL << 31) | (7UL << 16); // issue trap 7 (Store/AMO access fault)
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
                     this->fault_data = addr;
                 }
                 return res;
@@ -523,8 +524,8 @@ uint64_t riscv_hart_m_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred";
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred";
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;

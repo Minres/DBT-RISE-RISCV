@@ -35,6 +35,7 @@
 #ifndef _RISCV_HART_MU_P_H
 #define _RISCV_HART_MU_P_H
 
+#include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
 #include "riscv_hart_common.h"
@@ -266,13 +267,13 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
             }
             try {
                 if(!is_debug(access) && (addr & (alignment - 1))) {
-                    this->reg.trap_state = (1UL << 31) | 4 << 16;
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_LOAD << 16;
                     this->fault_data = addr;
                     return iss::Err;
                 }
                 auto res = this->memory.rd_mem(access, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
-                    this->reg.trap_state = (1UL << 31) | (5 << 16); // issue trap 5 (load access fault
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
                     this->fault_data = addr;
                 }
                 return res;
@@ -352,13 +353,13 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, 
             try {
                 auto alignment = std::min<unsigned>(length, sizeof(reg_t));
                 if(length > 1 && (addr & (alignment - 1)) && !is_debug(access)) {
-                    this->reg.trap_state = (1UL << 31) | 6 << 16;
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_STORE << 16;
                     this->fault_data = addr;
                     return iss::Err;
                 }
                 auto res = this->memory.wr_mem(access, addr, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
-                    this->reg.trap_state = (1UL << 31) | (7UL << 16); // issue trap 7 (Store/AMO access fault)
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
                     this->fault_data = addr;
                 }
                 return res;
@@ -600,7 +601,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = (flags & 0x3) ? 3 : 0;
     if(inst_priv > cur_priv) {
-        this->reg.trap_state = 0x80ULL << 24 | (2 << 16); // illegal instruction
+        this->reg.trap_state = 0x80ULL << 24 | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
         this->reg.NEXT_PC = std::numeric_limits<uint32_t>::max();
     } else {
         auto status = state.mstatus;
@@ -633,7 +634,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<
     auto status = state.mstatus;
     auto tw = status.TW;
     if(this->reg.PRIV == PRIV_S && tw != 0) {
-        this->reg.trap_state = (1 << 31) | (2 << 16);
+        this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
         this->fault_data = this->reg.PC;
     }
 }
