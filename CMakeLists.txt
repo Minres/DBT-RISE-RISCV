@@ -12,6 +12,7 @@ include(GNUInstallDirs)
 include(flink)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
