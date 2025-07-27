@@ -209,8 +209,8 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr_wr_cb[mvendorid] = MK_CSR_WR_CB(write_null);
     this->csr_wr_cb[marchid] = MK_CSR_WR_CB(write_null);
     this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
-    this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
-    this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
+    this->csr_rd_cb[arch::riscv_csr::medeleg] = MK_CSR_RD_CB(read_plain);
+    this->csr_wr_cb[arch::riscv_csr::medeleg] = MK_CSR_WR_CB(write_edeleg);
     this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
     this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
     if(traits<BASE>::XLEN == 32) {
@@ -471,7 +471,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, uint32_t val) {
     // bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved), bit 16-17 (reserved), bit 20-23 (reserved)
     uint32_t mask = 0b1111'1111'0000'1100'1011'0011'1111'0111;
-    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
+    this->csr[arch::riscv_csr::medeleg] = (this->csr[arch::riscv_csr::medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
@@ -481,7 +481,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, u
     uint32_t mask_lower = 0b1111'1111'0000'1100'1011'0011'1111'0111;
     // bit 32-47(reserved)
     uint64_t mask = ((uint64_t)0b1111'1111'1111'1111'0000'0000'0000'0000 << 32) | mask_lower;
-    this->csr[medeleg] = (this->csr[medeleg] & ~mask) | (val & mask);
+    this->csr[arch::riscv_csr::medeleg] = (this->csr[arch::riscv_csr::medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
@@ -539,9 +539,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
     // calculate effective privilege level
     unsigned new_priv = PRIV_M;
     if(trap_id == 0) { // exception
-        uint64_t medeleg = this->csr[medeleg];
+        uint64_t medeleg = this->csr[arch::riscv_csr::medeleg];
         if(traits<BASE>::XLEN == 32)
-            medeleg |= (static_cast<uint64_t>(this->csr[medeleg]) << 32);
+            medeleg |= (static_cast<uint64_t>(this->csr[arch::riscv_csr::medeleg]) << 32);
         if(this->reg.PRIV != PRIV_M && ((medeleg >> cause) & 0x1) != 0)
             new_priv = (this->csr[sedeleg] >> cause) & 0x1 ? PRIV_U : PRIV_S;
         // store ret addr in xepc register
