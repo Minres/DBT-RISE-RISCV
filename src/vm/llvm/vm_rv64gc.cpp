@@ -193,7 +193,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 198> instr_descr = {{
+    const std::array<instruction_descriptor, 200> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -591,6 +591,10 @@ private:
         {16, 0b0010000000000010, 0b1110000000000011, &this_class::__c__fldsp},
         /* instruction C__FSDSP, encoding '0b1010000000000010' */
         {16, 0b1010000000000010, 0b1110000000000011, &this_class::__c__fsdsp},
+        /* instruction SFENCE__VMA, encoding '0b00010010000000000000000001110011' */
+        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence__vma},
+        /* instruction SRET, encoding '0b00010000001000000000000001110011' */
+        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
     }};
 
     //needs to be declared after instr_descr
@@ -12205,6 +12209,80 @@ private:
     	return returnValue;        
     }
     
+    /* instruction 198: SFENCE__VMA */
+    std::tuple<continuation_e, BasicBlock*> __sfence__vma(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t asid = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {asid}", fmt::arg("mnemonic", "sfence.vma"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("asid", name(asid)));
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("SFENCE__VMA_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,198);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        this->gen_write_mem(traits::FENCE,
+        static_cast<uint32_t>(traits::fencevma),
+        this->gen_const(16,((uint8_t)rs1<<8)|(uint8_t)asid));
+        bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
+        auto returnValue = std::make_tuple(CONT,bb);
+        
+        this->gen_sync(POST_SYNC, 198);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
+    /* instruction 199: SRET */
+    std::tuple<continuation_e, BasicBlock*> __sret(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate console output when executing the command */
+            //No disass specified, using instruction name
+            std::string mnemonic = "sret";
+            std::vector<Value*> args {
+                this->core_ptr,
+                this->gen_const(64, pc.val),
+                this->builder.CreateGlobalStringPtr(mnemonic),
+            };
+            this->builder.CreateCall(this->mod->getFunction("print_disass"), args);
+        }
+        bb->setName(fmt::format("SRET_0x{:X}",pc.val));
+        this->gen_sync(PRE_SYNC,199);
+        
+        this->gen_set_pc(pc, traits::PC);
+        this->set_tval(instr);
+        pc=pc+ 4;
+        this->gen_set_pc(pc, traits::NEXT_PC);
+        
+        this->gen_instr_prologue();
+        /*generate behavior*/
+        this->builder.CreateStore(this->gen_const(32U, static_cast<int>(NO_JUMP)), get_reg_ptr(traits::LAST_BRANCH), false);
+        this->gen_leave_trap(1);
+        bb = this->leave_blk;
+        auto returnValue = std::make_tuple(TRAP,nullptr);
+        
+        this->gen_sync(POST_SYNC, 199);
+        this->gen_instr_epilogue(bb);
+        this->builder.CreateBr(bb);
+    	return returnValue;        
+    }
+    
     /****************************************************************************
      * end opcode definitions
      ****************************************************************************/
@@ -12372,10 +12450,22 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
-volatile std::array<bool, 2> dummy = {
+
+volatile std::array<bool, 3> dummy = {
+        core_factory::instance().register_creator("rv64gc|msu_vp|llvm", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
+		    auto vm = new llvm::rv64gc::vm_impl<arch::rv64gc>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv64gc>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        }),
         core_factory::instance().register_creator("rv64gc|m_p|llvm", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv64gc>();
 		    auto vm = new llvm::rv64gc::vm_impl<arch::rv64gc>(*cpu, false);
