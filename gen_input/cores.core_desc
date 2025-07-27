@@ -29,7 +29,7 @@ Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
     }
 }
 
-Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd {
+Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd, RVSMode {
     architectural_state {
         XLEN=32;
         FLEN=64;
@@ -51,7 +51,7 @@ Core RV64I provides RVI, Zicsr, Zifencei {
     }
 }
 
-Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd {
+Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd, RVSMode {
     architectural_state {
         XLEN=64;
         FLEN=64;

@@ -1176,7 +1176,7 @@ std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreD
 #include <iss/factory.h>
 namespace iss {
 namespace {
-<% if(${coreDef.name.toLowerCase().contains("gc)} ) {%>
+<% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
 volatile std::array<bool, 3> dummy = {
         core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|msu_vp|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::${coreDef.name.toLowerCase()}>();

@@ -2728,8 +2728,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")
                 default: {
+                    if(this->disass_enabled){
+                        std::string mnemonic = "Illegal / Unknown Instruction";
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
                     *NEXT_PC = *PC + ((instr & 3) == 3 ? 4 : 2);
-                    raise(0,  2);
+                    raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                 }
                 }
             }catch(memory_access_exception& e){}
@@ -2768,11 +2772,12 @@ std::unique_ptr<vm_if> create<arch::tgc5c>(arch::tgc5c *core, unsigned short por
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
-volatile std::array<bool, 2> dummy = {
+volatile std::array<bool, 3> dummy = {
         core_factory::instance().register_creator("tgc5c|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::tgc5c>();
 		    auto vm = new interp::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
@@ -2785,6 +2790,16 @@ volatile std::array<bool, 2> dummy = {
         }),
         core_factory::instance().register_creator("tgc5c|mu_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::tgc5c>();
+		    auto vm = new interp::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::tgc5c>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        }),
+        core_factory::instance().register_creator("tgc5c|msu_vp|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::tgc5c>();
 		    auto vm = new interp::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){
