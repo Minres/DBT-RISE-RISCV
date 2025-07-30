@@ -96,7 +96,7 @@ public:
 
     template <typename T_ = reg_t, std::enable_if_t<std::is_same<T_, uint32_t>::value>* = nullptr>
     void write_mstatus(T_ val, unsigned priv_lvl) {
-        reg_t old_val = mstatus;
+        reg_t old_val = this->state.mstatus;
         auto mask = get_mstatus_mask(priv_lvl);
         auto new_val = (old_val & ~mask) | (val & mask);
         this->state.mstatus = new_val;
@@ -104,7 +104,7 @@ public:
 
     template <typename T_ = reg_t, std::enable_if_t<std::is_same<T_, uint64_t>::value>* = nullptr>
     void write_mstatus(T_ val, unsigned priv_lvl) {
-        reg_t old_val = mstatus;
+        reg_t old_val = this->state.mstatus;
         auto mask = get_mstatus_mask(priv_lvl);
         auto new_val = (old_val & ~mask) | (val & mask);
         if((new_val & this->state.mstatus.SXL.Mask) == 0) {
@@ -148,8 +148,6 @@ protected:
     using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
     using mem_write_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t const* const);
 
-    hart_state<reg_t> state;
-
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
 
     iss::status read_status(unsigned addr, reg_t& val);
@@ -170,8 +168,7 @@ protected:
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
-: state()
-, mmu(base::get_priv_if())
+: mmu(base::get_priv_if())
 , default_mem(base::get_priv_if()) {
     // common regs
     const std::array<unsigned, 16> rwaddrs{
@@ -289,7 +286,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
         case traits<BASE>::FENCE: {
             switch(addr) {
             case traits<BASE>::fencevma: {
-                auto tvm = state.mstatus.TVM;
+                auto tvm = this->state.mstatus.TVM;
                 if(this->reg.PRIV == PRIV_S & tvm != 0) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
                     this->fault_data = this->reg.PC;
@@ -395,7 +392,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
             switch(addr) {
             case 2:
             case 3: {
-                auto tvm = state.mstatus.TVM;
+                auto tvm = this->state.mstatus.TVM;
                 if(this->reg.PRIV == PRIV_S & tvm != 0) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
                     this->fault_data = this->reg.PC;
@@ -424,7 +421,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
     auto req_priv_lvl = (addr >> 8) & 0x3;
-    val = state.mstatus & get_mstatus_mask(req_priv_lvl);
+    val = this->state.mstatus & get_mstatus_mask(req_priv_lvl);
     return iss::Ok;
 }
 
@@ -507,11 +504,11 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edelegh(unsigned addr, 
 
 template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
     BASE::reset(address);
-    state.mstatus = hart_state<reg_t>::mstatus_reset_val;
+    this->state.mstatus = hart_state<reg_t>::mstatus_reset_val;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::check_interrupt() {
-    auto status = state.mstatus;
+    auto status = this->state.mstatus;
     auto ip = this->csr[mip];
     auto ie = this->csr[mie];
     auto ideleg = this->csr[mideleg];
@@ -521,12 +518,12 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_v
     // any synchronous traps.
     auto ena_irq = ip & ie;
 
-    bool mie = state.mstatus.MIE;
+    bool mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || (this->reg.PRIV == PRIV_M && mie);
     auto enabled_interrupts = m_enabled ? ena_irq & ~ideleg : 0;
 
     if(enabled_interrupts == 0) {
-        auto sie = state.mstatus.SIE;
+        auto sie = this->state.mstatus.SIE;
         auto s_enabled = this->reg.PRIV < PRIV_S || (this->reg.PRIV == PRIV_S && sie);
         enabled_interrupts = s_enabled ? ena_irq & ideleg : 0;
     }
@@ -631,18 +628,18 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
     // store the actual privilege level in yPP and store interrupt enable flags
     switch(new_priv) {
     case PRIV_M:
-        state.mstatus.MPP = this->reg.PRIV;
-        state.mstatus.MPIE = state.mstatus.MIE;
-        state.mstatus.MIE = false;
+        this->state.mstatus.MPP = this->reg.PRIV;
+        this->state.mstatus.MPIE = this->state.mstatus.MIE;
+        this->state.mstatus.MIE = false;
         break;
     case PRIV_S:
-        state.mstatus.SPP = this->reg.PRIV;
-        state.mstatus.SPIE = state.mstatus.SIE;
-        state.mstatus.SIE = false;
+        this->state.mstatus.SPP = this->reg.PRIV;
+        this->state.mstatus.SPIE = this->state.mstatus.SIE;
+        this->state.mstatus.SIE = false;
         break;
     case PRIV_U:
-        state.mstatus.UPIE = state.mstatus.UIE;
-        state.mstatus.UIE = false;
+        this->state.mstatus.UPIE = this->state.mstatus.UIE;
+        this->state.mstatus.UIE = false;
         break;
     default:
         break;
@@ -674,7 +671,7 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
                              << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
                              << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
                              << " to " << this->lvl[new_priv];
-    // reset trap state
+    // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
     return this->reg.NEXT_PC;
@@ -684,31 +681,31 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = flags & 0x3;
 
-    auto tsr = state.mstatus.TSR;
+    auto tsr = this->state.mstatus.TSR;
     if(cur_priv == PRIV_S && inst_priv == PRIV_S && tsr != 0) {
-        this->reg.trap_state = 0x80ULL << 24 | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16); // illegal instruction
+        this->reg.trap_state = 0x80ULL << 24 | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
         this->reg.NEXT_PC = std::numeric_limits<uint32_t>::max();
     } else {
-        auto status = state.mstatus;
+        auto status = this->state.mstatus;
         // pop the relevant lower-privilege interrupt enable and privilege mode stack
         // clear respective yIE
         switch(inst_priv) {
         case PRIV_M:
-            this->reg.PRIV = state.mstatus.MPP;
-            state.mstatus.MPP = 0; // clear mpp to U mode
-            state.mstatus.MIE = state.mstatus.MPIE;
-            state.mstatus.MPIE = 1;
+            this->reg.PRIV = this->state.mstatus.MPP;
+            this->state.mstatus.MPP = 0; // clear mpp to U mode
+            this->state.mstatus.MIE = this->state.mstatus.MPIE;
+            this->state.mstatus.MPIE = 1;
             break;
         case PRIV_S:
-            this->reg.PRIV = state.mstatus.SPP;
-            state.mstatus.SPP = 0; // clear spp to U mode
-            state.mstatus.SIE = state.mstatus.SPIE;
-            state.mstatus.SPIE = 1;
+            this->reg.PRIV = this->state.mstatus.SPP;
+            this->state.mstatus.SPP = 0; // clear spp to U mode
+            this->state.mstatus.SIE = this->state.mstatus.SPIE;
+            this->state.mstatus.SPIE = 1;
             break;
         case PRIV_U:
             this->reg.PRIV = 0;
-            state.mstatus.UIE = state.mstatus.UPIE;
-            state.mstatus.UPIE = 1;
+            this->state.mstatus.UIE = this->state.mstatus.UPIE;
+            this->state.mstatus.UPIE = 1;
             break;
         }
         // sets the pc to the value stored in the x epc register.
@@ -722,7 +719,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::wait_until(uint64_t flags) {
-    auto status = state.mstatus;
+    auto status = this->state.mstatus;
     auto tw = status.TW;
     if(this->reg.PRIV < PRIV_M && tw != 0) {
         this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16);
