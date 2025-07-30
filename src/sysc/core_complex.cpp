@@ -38,7 +38,7 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
-#include "tlm/scc/tlm_signal_gp.h"
+#include "tlm/scc/quantum_keeper.h"
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
@@ -122,8 +122,7 @@ int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func 
 using cpu_ptr = std::unique_ptr<iss::arch_if>;
 using vm_ptr = std::unique_ptr<iss::vm_if>;
 
-class core_wrapper {
-public:
+struct core_wrapper {
     core_wrapper(core_complex_if* owner)
     : owner(owner) {}
 
@@ -200,9 +199,11 @@ struct core_trace {
     scv_tr_handle tr_handle;
 };
 
+template <typename T> struct is_mt : std::is_same<T, tlm::scc::quantumkeeper_mt> {};
+
 #ifndef CWR_SYSTEMC
-template <unsigned int BUSWIDTH>
-core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
+template <unsigned int BUSWIDTH, typename QKT>
+core_complex<BUSWIDTH, QKT>::core_complex(sc_module_name const& name)
 : sc_module(name)
 , fetch_lut(tlm_dmi_ext())
 , read_lut(tlm_dmi_ext())
@@ -211,7 +212,7 @@ core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 }
 #endif
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::init() {
     trc = new core_trace();
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
@@ -230,8 +231,11 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
         }
     });
 
-    SC_HAS_PROCESS(core_complex<BUSWIDTH>); // NOLINT
-    SC_THREAD(run);
+    SC_HAS_PROCESS(this_class); // NOLINT
+    if(is_mt<QKT>::value)
+        SC_THREAD(run_mt);
+    else
+        SC_THREAD(run_st);
     SC_METHOD(rst_cb);
     sensitive << rst_i;
 #ifdef USE_TLM_SIGNAL
@@ -276,16 +280,16 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 #endif
 }
 
-template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
+template <unsigned int BUSWIDTH, typename QKT> core_complex<BUSWIDTH, QKT>::~core_complex() {
     delete cpu;
     delete trc;
     for(auto* p : plugin_list)
         delete p;
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::trace(sc_trace_file* trf) const {}
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elaboration() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::before_end_of_elaboration() {
     auto& type = GET_PROP_VALUE(core_type);
     SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
@@ -338,7 +342,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     }
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulation() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::start_of_simulation() {
     // quantum_keeper.reset();
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
@@ -364,7 +368,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH, typename QKT> bool core_complex<BUSWIDTH, QKT>::disass_output(uint64_t pc, const std::string instr_str) {
     if(trc->m_db == nullptr)
         return false;
     if(trc->tr_handle.is_active())
@@ -378,34 +382,33 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint
     return true;
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::forward() {
 #ifndef CWR_SYSTEMC
     set_clock_period(clk_i.read());
 #else
     set_clock_period(curr_clk.read());
-
 #endif
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
         cpu->set_interrupt_execution(true);
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::rst_cb() {
     if(rst_i.read())
         cpu->set_interrupt_execution(true);
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
             cpu->local_irq(16 + i, local_irq_i[i].read());
@@ -414,7 +417,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
 }
 #endif
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::run_st() {
     wait(SC_ZERO_TIME); // separate from elaboration phase
     do {
         wait(SC_ZERO_TIME);
@@ -432,7 +435,26 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     sc_stop();
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
+template <unsigned int BUSWIDTH, typename QKT> void core_complex<BUSWIDTH, QKT>::run_mt() {
+    wait(SC_ZERO_TIME); // separate from elaboration phase
+    do {
+        wait(SC_ZERO_TIME);
+        if(rst_i.read()) {
+            cpu->reset(GET_PROP_VALUE(reset_address));
+            wait(rst_i.negedge_event());
+        }
+        while(curr_clk.read() == SC_ZERO_TIME) {
+            wait(curr_clk.value_changed_event());
+        }
+        quantum_keeper.reset();
+        cpu->set_interrupt_execution(false);
+        cpu->start(dump_ir);
+    } while(!cpu->get_interrupt_execution());
+    sc_stop();
+}
+
+template <unsigned int BUSWIDTH, typename QKT>
+bool core_complex<BUSWIDTH, QKT>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
@@ -490,7 +512,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QKT>
+bool core_complex<BUSWIDTH, QKT>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = write_lut.getEntry(addr);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr - lut_entry.get_start_address();
@@ -538,7 +561,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QKT>
+bool core_complex<BUSWIDTH, QKT>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
     gp.set_address(addr);
@@ -548,7 +572,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem_dbg(uint6
     return dbus->transport_dbg(gp) == length;
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QKT>
+bool core_complex<BUSWIDTH, QKT>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;

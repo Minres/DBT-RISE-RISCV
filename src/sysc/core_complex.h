@@ -49,8 +49,8 @@
 #endif
 #endif
 #include <memory>
+#include <tlm/scc/quantum_keeper.h>
 #include <tlm>
-#include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
 
 namespace iss {
@@ -100,7 +100,10 @@ struct core_complex_if {
     scc::sc_in_opt<uint64_t> mtime_i{"mtime_i"};
 };
 
-template <unsigned int BUSWIDTH = scc::LT> class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
+template <unsigned int BUSWIDTH = scc::LT, typename QKT = tlm::scc::quantumkeeper>
+class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
+    using this_class = core_complex<BUSWIDTH, QKT>;
+
 public:
     tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> ibus{"ibus"};
 
@@ -194,13 +197,10 @@ public:
         return mem_incr > 1 ? mem_incr : 1;
     }
 
+    template <typename T> void check_and_sync(T qk, sc_core::sc_time t) { qk.check_and_sync(t); }
     void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
-        quantum_keeper.inc(core_inc);
-        if(quantum_keeper.need_sync()) {
-            wait(quantum_keeper.get_local_time());
-            quantum_keeper.reset();
-        }
+        check_and_sync(quantum_keeper, core_inc);
         last_sync_cycle = cycle;
     }
 
@@ -224,7 +224,8 @@ protected:
     void before_end_of_elaboration() override;
     void start_of_simulation() override;
     void forward();
-    void run();
+    void run_st();
+    void run_mt();
     void rst_cb();
 #ifndef USE_TLM_SIGNAL
     void sw_irq_cb();
@@ -234,7 +235,7 @@ protected:
 #endif
     uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
-    tlm_utils::tlm_quantumkeeper quantum_keeper;
+    QKT quantum_keeper;
     std::vector<uint8_t> write_buf;
     core_wrapper* cpu{nullptr};
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
