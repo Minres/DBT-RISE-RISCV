@@ -35,7 +35,8 @@
 #ifndef _SYSC_SC_CORE_ADAPTER_H_
 #define _SYSC_SC_CORE_ADAPTER_H_
 
-#include "sc_core_adapter_if.h"
+#include "core_complex.h"
+#include "core_facade.h"
 #include <iostream>
 #include <iss/iss.h>
 #include <iss/mem/memory_if.h>
@@ -44,7 +45,7 @@
 #include <util/ities.h>
 
 namespace sysc {
-template <typename PLAT> class sc_core_adapter : public PLAT, public sc_core_adapter_if {
+template <typename PLAT> class sc_core_adapter : public PLAT, public core_facade {
 public:
     using this_class = sc_core_adapter<PLAT>;
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
@@ -55,21 +56,31 @@ public:
         if(sizeof(reg_t) == 4)
             this->csr_rd_cb[iss::arch::timeh] = MK_CSR_RD_CB(read_time);
         this->memories.replace_last(*this);
+        this->get_arch_if = util::delegate<iss::arch_if*()>::from<this_class, &this_class::_get_arch_if>(this);
+        this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid>(this);
+        this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num>(this);
+        this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode>(this);
+        this->get_state = util::delegate<uint64_t()>::from<this_class, &this_class::_get_state>(this);
+        this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution>(this);
+        this->set_interrupt_execution = util::delegate<void(bool)>::from<this_class, &this_class::_set_interrupt_execution>(this);
+        this->local_irq = util::delegate<void(short, bool)>::from<this_class, &this_class::_local_irq>(this);
     }
 
-    iss::arch_if* get_arch_if() override { return this; }
+    virtual ~sc_core_adapter() {}
 
-    void set_mhartid(unsigned id) override { PLAT::set_mhartid(id); }
+    iss::arch_if* _get_arch_if() { return this; }
 
-    void set_irq_num(unsigned num) override { PLAT::set_irq_num(num); }
+    void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
 
-    uint32_t get_mode() override { return this->reg.PRIV; }
+    void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
 
-    void set_interrupt_execution(bool v) override { this->interrupt_sim = v ? 1 : 0; }
+    uint32_t _get_mode() { return this->reg.PRIV; }
 
-    bool get_interrupt_execution() override { return this->interrupt_sim; }
+    void _set_interrupt_execution(bool v) { this->interrupt_sim = v ? 1 : 0; }
 
-    uint64_t get_state() override { return this->state.mstatus.backing.val; }
+    bool _get_interrupt_execution() { return this->interrupt_sim; }
+
+    uint64_t _get_state() { return this->state.mstatus.backing.val; }
 
     void notify_phase(iss::arch_if::exec_phase p) override {
         if(p == iss::arch_if::ISTART && !first) {
@@ -177,7 +188,7 @@ public:
         }
     }
 
-    void local_irq(short id, bool value) override {
+    void _local_irq(short id, bool value) {
         reg_t mask = 0;
         switch(id) {
         case 3: // SW
