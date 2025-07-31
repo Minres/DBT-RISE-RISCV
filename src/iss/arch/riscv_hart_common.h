@@ -226,10 +226,20 @@ enum {
     ISA_U = 1 << 20
 };
 
+class trap_instruction_access_fault : public trap_access {
+public:
+    trap_instruction_access_fault(uint64_t badaddr)
+    : trap_access(1 << 16, badaddr) {}
+};
 class trap_load_access_fault : public trap_access {
 public:
     trap_load_access_fault(uint64_t badaddr)
     : trap_access(5 << 16, badaddr) {}
+};
+class trap_store_access_fault : public trap_access {
+public:
+    trap_store_access_fault(uint64_t badaddr)
+    : trap_access(7 << 16, badaddr) {}
 };
 class trap_instruction_page_fault : public trap_access {
 public:
