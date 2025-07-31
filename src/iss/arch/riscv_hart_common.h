@@ -135,6 +135,7 @@ enum riscv_csr {
     mtvec = 0x305,
     mcounteren = 0x306,
     mtvt = 0x307, // CLIC
+    mstatush = 0x310,
     medelegh = 0x312,
     // Machine Trap Handling
     mscratch = 0x340,
