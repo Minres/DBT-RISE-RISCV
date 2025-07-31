@@ -45,7 +45,11 @@ namespace arch {
 template <class T, class Enable = void> struct status {};
 // specialization 32bit
 template <typename T> struct status<T, typename std::enable_if<std::is_same<T, uint32_t>::value>::type> {
-    static inline unsigned SD(T v) { return bit_sub<63, 1>(v); }
+    static inline unsigned SD(T v) { return bit_sub<63, 1>(v); };
+    // Machine mode big endian
+    static inline unsigned MBE(T v) { return bit_sub<37, 1>(v); };
+    // Supervisor mode big endian
+    static inline unsigned SBE(T v) { return bit_sub<36, 1>(v); };
     // value of XLEN for S-mode
     static inline unsigned SXL(T v) { return bit_sub<34, 2>(v); };
     // value of XLEN for U-mode
@@ -90,6 +94,10 @@ public:
     // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR
     // XS==11)))
     static inline unsigned SD(T v) { return bit_sub<63, 1>(v); };
+    // Machine mode big endian
+    static inline unsigned MBE(T v) { return bit_sub<37, 1>(v); };
+    // Supervisor mode big endian
+    static inline unsigned SBE(T v) { return bit_sub<36, 1>(v); };
     // value of XLEN for S-mode
     static inline unsigned SXL(T v) { return bit_sub<34, 2>(v); };
     // value of XLEN for U-mode
@@ -185,6 +193,10 @@ public:
     // SD bit is read-only and is set when either the FS or XS bits encode a Dirty state (i.e., SD=((FS==11) OR
     // XS==11)))
     BF_FIELD(SD, 63, 1);
+    // Machine mode big endian
+    BF_FIELD(MBE, 37, 1);
+    // Supervisor mode big endian
+    BF_FIELD(SBE, 36, 1);
     // value of XLEN for S-mode
     BF_FIELD(SXL, 34, 2);
     // value of XLEN for U-mode
