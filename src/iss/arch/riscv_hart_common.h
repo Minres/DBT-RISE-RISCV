@@ -854,18 +854,6 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 protected:
     hart_state<reg_t> state;
 
-    static constexpr reg_t get_mstatus_mask_t(unsigned priv_lvl = PRIV_M) {
-        if(sizeof(reg_t) == 4) {
-            return priv_lvl == PRIV_U ? 0x80000011UL :   // 0b1...0 0001 0001
-                       priv_lvl == PRIV_S ? 0x800de133UL // 0b0...0 0001 1000 1001 1001;
-                                          : 0x807ff9ddUL;
-        } else {
-            return priv_lvl == PRIV_U ? 0x011ULL : // 0b1...0 0001 0001
-                       priv_lvl == PRIV_S ? 0x000de133ULL
-                                          : 0x007ff9ddULL;
-        }
-    }
-
     mem::memory_if memory;
     struct riscv_instrumentation_if : public iss::instrumentation_if {
 
