@@ -152,6 +152,8 @@ protected:
 
     iss::status read_status(unsigned addr, reg_t& val);
     iss::status write_status(unsigned addr, reg_t val);
+    iss::status read_statush(unsigned addr, reg_t& val);
+    iss::status write_statush(unsigned addr, reg_t val);
     iss::status write_cause(unsigned addr, reg_t val);
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
@@ -213,6 +215,8 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
     this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
     if(traits<BASE>::XLEN == 32) {
+        this->csr_rd_cb[mstatush] = MK_CSR_RD_CB(read_statush);
+        this->csr_wr_cb[mstatush] = MK_CSR_WR_CB(write_statush);
         this->csr_rd_cb[medelegh] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[medelegh] = MK_CSR_WR_CB(write_edelegh);
     }
@@ -430,6 +434,17 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_status(unsigned addr, r
     auto req_priv_lvl = (addr >> 8) & 0x3;
     write_mstatus(val, req_priv_lvl);
     check_interrupt();
+    return iss::Ok;
+}
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_statush(unsigned addr, reg_t& val) {
+    val = this->csr[mstatush] & 0b11'1111'1000;
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT, typename LOGCAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_statush(unsigned addr, reg_t val) {
+    this->csr[mstatush] = val & 0b11'1111'1000;
     return iss::Ok;
 }
 
