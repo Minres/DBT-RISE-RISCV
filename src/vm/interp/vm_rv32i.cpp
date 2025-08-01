@@ -285,7 +285,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
             process_spawn_blocks();
             if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
+            *PC = super::core.enter_trap(trap_state, pc.val, instr);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
@@ -1786,6 +1786,7 @@ std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short por
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
