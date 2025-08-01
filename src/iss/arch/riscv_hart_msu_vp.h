@@ -76,9 +76,9 @@ public:
             case PRIV_U:
                 return 0x80000000UL; // 0b1000 0000 0000 0000 0000 0000 0001 0001
             case PRIV_S:
-                return 0x800de122UL; // 0b1000 0000 0000 1101 1110 0001 0011 0011
+                return 0x800de762UL; // 0b1000 0000 0000 1101 1110 0001 0011 0011
             default:
-                return 0x807ff9aaUL; // 0b1000 0000 0111 1111 1111 1001 1011 1011
+                return 0x801fffeaUL; // 0b1000 0000 0111 1111 1111 1001 1011 1011
             }
 #endif
         } else if(sizeof(reg_t) == 8) {
@@ -86,9 +86,25 @@ public:
             case PRIV_U:
                 return 0x8000000f00000000ULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
             case PRIV_S:
-                return 0x8000000f000de122ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0001 0011 0011
+                return 0x80000003000de762ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0111 0110 0010
             default:
-                return 0x8000000f007ff9aaULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
+                return 0x80000030001fffeaULL; // 0b1...0 0000 0000 0000 0001 1111 1111 1111 1110 1010
+            }
+        } else
+            assert(false && "Unsupported XLEN value");
+    }
+    static constexpr reg_t get_mstatus_rd_mask(unsigned priv_lvl) {
+        if(sizeof(reg_t) == 4) {
+            return get_mstatus_mask(priv_lvl);
+        } else if(sizeof(reg_t) == 8) {
+            auto wr_mask = get_mstatus_mask(priv_lvl);
+            switch(priv_lvl) {
+            case PRIV_U:
+                return wr_mask;
+            case PRIV_S:
+                return wr_mask |= 0x300000000;
+            default:
+                return wr_mask |= 0xf00000000;
             }
         } else
             assert(false && "Unsupported XLEN value");
@@ -425,7 +441,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
     auto req_priv_lvl = (addr >> 8) & 0x3;
-    val = this->state.mstatus & get_mstatus_mask(req_priv_lvl);
+    val = this->state.mstatus & get_mstatus_rd_mask(req_priv_lvl);
     return iss::Ok;
 }
 
@@ -520,6 +536,8 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edelegh(unsigned addr, 
 template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
     BASE::reset(address);
     this->state.mstatus = hart_state<reg_t>::mstatus_reset_val;
+    if(sizeof(reg_t) == 8) // Set UXLEN and SXLEN to 64
+        this->state.mstatus |= static_cast<reg_t>(0xa00000000ULL);
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::check_interrupt() {
