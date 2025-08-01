@@ -509,13 +509,15 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
          * faulting effective address.
          */
         switch(cause) {
-        case 0:
-            this->csr[utval | (new_priv << 8)] = static_cast<reg_t>(addr);
+        case traits<BASE>::RV_CAUSE_MISALIGNED_FETCH:
+            this->csr[utval | (new_priv << 8)] = static_cast<reg_t>(tval);
             break;
-        case 2:
-            this->csr[utval | (new_priv << 8)] = (!this->has_compressed() || (tval & 0x3) == 3) ? tval : tval & 0xffff;
+        case traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION:
+#ifdef MTVAL_ILLEGAL_INFORMATIVE
+            this->csr[utval | (new_priv << 8)] = (!this->has_compressed() || (instr & 0x3) == 3) ? instr : instr & 0xffff;
+#endif
             break;
-        case 3:
+        case traits<BASE>::RV_CAUSE_BREAKPOINT:
             if((FEAT & FEAT_DEBUG) && (this->csr[dcsr] & 0x8000)) {
                 this->reg.DPC = addr;
                 this->csr[dcsr] = (this->csr[dcsr] & ~0x1c3) | (1 << 6) | PRIV_M; // FIXME: cause should not be 4 (stepi)
@@ -548,9 +550,11 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
                 }
             }
             break;
-        case 4:
-        case 6:
-        case 7:
+        case traits<BASE>::RV_CAUSE_FETCH_ACCESS:
+        case traits<BASE>::RV_CAUSE_MISALIGNED_LOAD:
+        case traits<BASE>::RV_CAUSE_LOAD_ACCESS:
+        case traits<BASE>::RV_CAUSE_MISALIGNED_STORE:
+        case traits<BASE>::RV_CAUSE_STORE_ACCESS:
             this->csr[utval | (new_priv << 8)] = this->fault_data;
             break;
         default:
