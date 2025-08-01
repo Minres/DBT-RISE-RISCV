@@ -292,15 +292,6 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
                     this->fault_data = this->reg.PC;
                     return iss::Err;
                 }
-                uint8_t asid_reg = *data;
-                uint8_t vaddr_reg = *(data + 1);
-                std::optional<reg_t> vaddr =
-                    vaddr_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(vaddr_reg)))
-                              : std::nullopt;
-                std::optional<reg_t> asid =
-                    asid_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(asid_reg)))
-                             : std::nullopt;
-                mmu.flush_tlb(vaddr, asid_reg);
                 return iss::Ok;
             }
             default:
@@ -398,6 +389,15 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
                     this->fault_data = this->reg.PC;
                     return iss::Err;
                 }
+                uint8_t asid_reg = *data;
+                uint8_t vaddr_reg = *(data + 1);
+                std::optional<reg_t> vaddr =
+                    vaddr_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(vaddr_reg)))
+                              : std::nullopt;
+                std::optional<reg_t> asid =
+                    asid_reg ? std::make_optional(*(this->get_regs_base_ptr() + traits<BASE>::reg_byte_offsets.at(asid_reg)))
+                             : std::nullopt;
+                mmu.flush_tlb(vaddr, asid_reg);
                 return iss::Ok;
             }
             }
