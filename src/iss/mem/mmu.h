@@ -33,8 +33,10 @@
  ******************************************************************************/
 
 #include "iss/arch/riscv_hart_common.h"
+#include "iss/arch_if.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
+#include "util/ities.h"
 #include <cstdint>
 #include <optional>
 #include <type_traits>
@@ -69,7 +71,6 @@ struct vm_info {
 template <typename WORD_TYPE> struct mmu : public memory_elem {
     using this_class = mmu<WORD_TYPE>;
     using reg_t = WORD_TYPE;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
 
     constexpr static reg_t PGSIZE = 1 << PGSHIFT;
     constexpr static reg_t PGMASK = PGSIZE - 1;
@@ -95,17 +96,19 @@ template <typename WORD_TYPE> struct mmu : public memory_elem {
     }
 
 private:
-    uint32_t effective_priv() {
+    uint32_t effective_priv(iss::access_type type) {
         auto priv = hart_if.PRIV;
-        if(priv == arch::PRIV_M && hart_if.state.mstatus.MPRV)
+        if(priv == arch::PRIV_M && (type & iss::access_type::FUNC) != iss::access_type::FETCH && hart_if.state.mstatus.MPRV)
             priv = hart_if.state.mstatus.MPP;
         return priv;
     }
 
-    bool needs_translation() { return (effective_priv() == arch::PRIV_U || effective_priv() == arch::PRIV_S) && vm_setting.levels; }
+    bool needs_translation(iss::access_type type) {
+        return (effective_priv(type) == arch::PRIV_U || effective_priv(type) == arch::PRIV_S) && vm_setting.levels;
+    }
 
     iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation())) { // we may cross a page boundary
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
             auto res = down_stream_mem.rd_mem(access, virt2phys(access, addr), len1, data);
@@ -113,11 +116,11 @@ private:
                 res = down_stream_mem.rd_mem(access, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.rd_mem(access, needs_translation() ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.rd_mem(access, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
     }
 
     iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation())) { // we may cross a page boundary
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
             auto res = down_stream_mem.wr_mem(access, virt2phys(access, addr), len1, data);
@@ -125,7 +128,7 @@ private:
                 res = down_stream_mem.wr_mem(access, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.wr_mem(access, needs_translation() ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.wr_mem(access, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
     }
 
     iss::status read_plain(unsigned addr, reg_t& val) {
@@ -194,6 +197,18 @@ private:
             abort();
         }
     }
+    void throw_page_fault(iss::access_type type, uint64_t bad_addr) {
+        switch(type) {
+        case access_type::FETCH:
+            throw arch::trap_instruction_page_fault(bad_addr);
+        case access_type::READ:
+            throw arch::trap_load_page_fault(bad_addr);
+        case access_type::WRITE:
+            throw arch::trap_store_page_fault(bad_addr);
+        default:
+            abort();
+        }
+    }
 
 protected:
     reg_t satp;
@@ -205,70 +220,100 @@ protected:
 
 template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_type access, uint64_t addr) {
     const auto type = access & iss::access_type::FUNC;
+    reg_t pte{0};
     if(auto it = tlb.find(addr >> PGSHIFT); it != tlb.end()) {
-        const reg_t pte = it->second;
-        const reg_t ad = PTE_A | (type == iss::access_type::WRITE) * PTE_D;
-
-        if((pte & ad) == ad)
-            return {(pte & (~PGMASK)) | (addr & PGMASK)};
-        else
-            tlb.erase(it); // throw an exception
+        pte = it->second;
     } else {
-        const bool s_mode = effective_priv() == arch::PRIV_S;
-        const bool sum = hart_if.state.mstatus.SUM;
-        const bool mxr = hart_if.state.mstatus.MXR;
         reg_t base = vm_setting.ptbase;
+        const int va_bits = vm_setting.idxbits * vm_setting.levels + PGSHIFT;
+        const reg_t mask = (reg_t(1) << (sizeof(reg_t) * 8 - (va_bits - 1))) - 1;
+        const reg_t masked_msbs = (addr >> (va_bits - 1)) & mask;
+        if(masked_msbs != 0 && masked_msbs != mask) {
+            CPPLOG(ERR) << "Page fault because of invalid unused address bits";
+            throw_page_fault(type, addr);
+        }
         for(int i = vm_setting.levels - 1; i >= 0; i--) {
             const int ptshift = i * vm_setting.idxbits;
             const reg_t idx = (addr >> (PGSHIFT + ptshift)) & ((1 << vm_setting.idxbits) - 1);
-
-            // check that physical address of PTE is legal
-            reg_t pte = 0;
             const iss::status res =
                 down_stream_mem.rd_mem(iss::access_type::READ, base + idx * vm_setting.ptesize, vm_setting.ptesize, (uint8_t*)&pte);
-            if(res != iss::status::Ok)
-                throw arch::trap_load_access_fault(addr);
-            const reg_t ppn = pte >> PTE_PPN_SHIFT;
-
-            if(PTE_TABLE(pte)) { // next level of page table
-                base = ppn << PGSHIFT;
-            } else if((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
-                break;
-            } else if(!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
-                break;
-            } else if(type == (type == iss::access_type::FETCH  ? !(pte & PTE_X)
-                               : type == iss::access_type::READ ? !(pte & PTE_R) && !(mxr && (pte & PTE_X))
-                                                                : !((pte & PTE_R) && (pte & PTE_W)))) {
-                break;
-            } else if((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
-                break;
-            } else {
-                const reg_t ad = PTE_A | ((type == iss::access_type::WRITE) * PTE_D);
-
-                if((pte & ad) != ad)
-                    break;
-                // for superpage mappings, make a fake leaf PTE for the TLB's benefit.
-                const reg_t vpn = addr >> PGSHIFT;
-                const reg_t value = (ppn | (vpn & ((reg_t(1) << ptshift) - 1))) << PGSHIFT;
-                const reg_t offset = addr & PGMASK;
-                tlb[vpn] = value | (pte & 0xff);
-                return value | offset;
+            if(res != iss::status::Ok) {
+                CPPLOG(ERR) << "Access fault when trying to read next pte";
+                switch(type) {
+                case iss::access_type::READ:
+                    throw arch::trap_load_access_fault(addr);
+                case iss::access_type::WRITE:
+                    throw arch::trap_store_access_fault(addr);
+                case iss::access_type::FETCH:
+                    throw arch::trap_instruction_access_fault(addr);
+                default:
+                    abort();
+                };
             }
+            if(bit_sub<63, 1>(static_cast<uint64_t>(pte))) {
+                CPPLOG(ERR) << "Page fault because of set 'N' bit without Svnapot extension present";
+                throw_page_fault(type, addr);
+            }
+            if(bit_sub<61, 2>(static_cast<uint64_t>(pte))) {
+                CPPLOG(ERR) << "Page fault because of set 'PBMT' bit(s) without Svpbmt extension present";
+                throw_page_fault(type, addr);
+            }
+            if(bit_sub<54, 7>(static_cast<uint64_t>(pte))) {
+                CPPLOG(ERR) << "Page fault because of set 'reserved' bits";
+                throw_page_fault(type, addr);
+            }
+
+            if(!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
+                CPPLOG(ERR) << "Page fault because of invalid page";
+                throw_page_fault(type, addr);
+            }
+            const reg_t ppn = pte >> PTE_PPN_SHIFT;
+            if(!(pte & PTE_R || pte & PTE_X)) {
+                base = ppn << PGSHIFT;
+                continue;
+            }
+            if((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
+                CPPLOG(ERR) << "Page fault because of page misalignment";
+                throw_page_fault(type, addr);
+            }
+            const reg_t vpn = addr >> PGSHIFT;
+            const reg_t value = (ppn | (vpn & ((reg_t(1) << ptshift) - 1))) << PGSHIFT;
+            const reg_t offset = addr & PGMASK;
+            const reg_t pte_entry = value | (pte & 0xff);
+            tlb[vpn] = pte_entry;
+            pte = pte_entry;
+            break;
         }
     }
-    switch(type) {
-    case access_type::FETCH:
-        hart_if.raise_trap(12, 0, addr);
-        throw arch::trap_instruction_page_fault(addr);
-    case access_type::READ:
-        hart_if.raise_trap(13, 0, addr);
-        throw arch::trap_load_page_fault(addr);
-    case access_type::WRITE:
-        hart_if.raise_trap(15, 0, addr);
-        throw arch::trap_store_page_fault(addr);
-    default:
-        abort();
+    const bool s_mode = effective_priv(type) == arch::PRIV_S;
+    const bool sum = hart_if.state.mstatus.SUM;
+    const bool mxr = hart_if.state.mstatus.MXR;
+    if((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
+        CPPLOG(ERR) << "Page fault because of SUM bit";
+        throw_page_fault(type, addr);
     }
+    if(type == iss::access_type::FETCH   ? !(pte & PTE_X)
+       : type == iss::access_type::WRITE ? !(pte & PTE_W)
+                                         : !((pte & PTE_R) || (mxr && (pte & PTE_X)))) {
+        CPPLOG(ERR) << "Page fault because of Invalid request";
+        throw_page_fault(type, addr);
+    }
+    if(!(pte & PTE_A) || (type == iss::access_type::WRITE && !(pte & PTE_D))) {
+        // non-Svade
+        // Perform the following steps atomically:
+        //  ■ Compare pte to the value of the PTE at address a+va.vpn[i]×PTESIZE.
+        //  ■ If the values match, set pte.a to 1 and, if the original memory access is a store, also set pte.d to 1.
+        //  ■ If the comparison fails, return to step 2.
+        // pte |= PTE_A;
+        // if(type == iss::access_type::WRITE)
+        //    pte |= PTE_D;
+
+        // Svade behavior
+        CPPLOG(ERR) << "Page fault because of unset A or D bit";
+        throw_page_fault(type, addr);
+    }
+
+    return (pte & (~PGMASK)) | (addr & PGMASK);
 }
 } // namespace mem
 } // namespace iss
