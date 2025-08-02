@@ -292,7 +292,6 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
             }
             const reg_t vpn = addr >> PGSHIFT;
             const reg_t value = (ppn | (vpn & ((reg_t(1) << ptshift) - 1))) << PGSHIFT;
-            const reg_t offset = addr & PGMASK;
             const reg_t pte_entry = value | (pte & 0xff);
             tlb[vpn] = pte_entry;
             pte = pte_entry;
