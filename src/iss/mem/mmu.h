@@ -276,6 +276,20 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 CPPLOG(ERR) << "Page fault because of page misalignment";
                 throw_page_fault(type, addr);
             }
+            if(!(pte & PTE_A) || (type == iss::access_type::WRITE && !(pte & PTE_D))) {
+                // non-Svade
+                // Perform the following steps atomically:
+                //  ■ Compare pte to the value of the PTE at address a+va.vpn[i]×PTESIZE.
+                //  ■ If the values match, set pte.a to 1 and, if the original memory access is a store, also set pte.d to 1.
+                //  ■ If the comparison fails, return to step 2.
+                // pte |= PTE_A;
+                // if(type == iss::access_type::WRITE)
+                //    pte |= PTE_D;
+
+                // Svade behavior
+                CPPLOG(ERR) << "Page fault because of unset A or D bit";
+                throw_page_fault(type, addr);
+            }
             const reg_t vpn = addr >> PGSHIFT;
             const reg_t value = (ppn | (vpn & ((reg_t(1) << ptshift) - 1))) << PGSHIFT;
             const reg_t offset = addr & PGMASK;
@@ -287,29 +301,15 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
     }
     const bool s_mode = effective_priv(type) == arch::PRIV_S;
     const bool sum = hart_if.state.mstatus.SUM;
-    const bool mxr = hart_if.state.mstatus.MXR;
     if((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
         CPPLOG(ERR) << "Page fault because of SUM bit";
         throw_page_fault(type, addr);
     }
+    const bool mxr = hart_if.state.mstatus.MXR;
     if(type == iss::access_type::FETCH   ? !(pte & PTE_X)
        : type == iss::access_type::WRITE ? !(pte & PTE_W)
                                          : !((pte & PTE_R) || (mxr && (pte & PTE_X)))) {
         CPPLOG(ERR) << "Page fault because of Invalid request";
-        throw_page_fault(type, addr);
-    }
-    if(!(pte & PTE_A) || (type == iss::access_type::WRITE && !(pte & PTE_D))) {
-        // non-Svade
-        // Perform the following steps atomically:
-        //  ■ Compare pte to the value of the PTE at address a+va.vpn[i]×PTESIZE.
-        //  ■ If the values match, set pte.a to 1 and, if the original memory access is a store, also set pte.d to 1.
-        //  ■ If the comparison fails, return to step 2.
-        // pte |= PTE_A;
-        // if(type == iss::access_type::WRITE)
-        //    pte |= PTE_D;
-
-        // Svade behavior
-        CPPLOG(ERR) << "Page fault because of unset A or D bit";
         throw_page_fault(type, addr);
     }
 
