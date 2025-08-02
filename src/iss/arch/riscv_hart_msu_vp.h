@@ -638,7 +638,6 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
                 }
             }
             break;
-        case traits<BASE>::RV_CAUSE_MISALIGNED_FETCH:
         case traits<BASE>::RV_CAUSE_FETCH_ACCESS:
         case traits<BASE>::RV_CAUSE_MISALIGNED_LOAD:
         case traits<BASE>::RV_CAUSE_LOAD_ACCESS:
