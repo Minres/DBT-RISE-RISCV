@@ -229,7 +229,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
         const reg_t mask = (reg_t(1) << (sizeof(reg_t) * 8 - (va_bits - 1))) - 1;
         const reg_t masked_msbs = (addr >> (va_bits - 1)) & mask;
         if(masked_msbs != 0 && masked_msbs != mask) {
-            CPPLOG(ERR) << "Page fault because of invalid unused address bits";
+            CPPLOG(DEBUG) << "Page fault because of invalid unused address bits";
             throw_page_fault(type, addr);
         }
         for(int i = vm_setting.levels - 1; i >= 0; i--) {
@@ -238,7 +238,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
             const iss::status res =
                 down_stream_mem.rd_mem(iss::access_type::READ, base + idx * vm_setting.ptesize, vm_setting.ptesize, (uint8_t*)&pte);
             if(res != iss::status::Ok) {
-                CPPLOG(ERR) << "Access fault when trying to read next pte";
+                CPPLOG(DEBUG) << "Access fault when trying to read next pte";
                 switch(type) {
                 case iss::access_type::READ:
                     throw arch::trap_load_access_fault(addr);
@@ -251,20 +251,20 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 };
             }
             if(bit_sub<63, 1>(static_cast<uint64_t>(pte))) {
-                CPPLOG(ERR) << "Page fault because of set 'N' bit without Svnapot extension present";
+                CPPLOG(DEBUG) << "Page fault because of set 'N' bit without Svnapot extension present";
                 throw_page_fault(type, addr);
             }
             if(bit_sub<61, 2>(static_cast<uint64_t>(pte))) {
-                CPPLOG(ERR) << "Page fault because of set 'PBMT' bit(s) without Svpbmt extension present";
+                CPPLOG(DEBUG) << "Page fault because of set 'PBMT' bit(s) without Svpbmt extension present";
                 throw_page_fault(type, addr);
             }
             if(bit_sub<54, 7>(static_cast<uint64_t>(pte))) {
-                CPPLOG(ERR) << "Page fault because of set 'reserved' bits";
+                CPPLOG(DEBUG) << "Page fault because of set 'reserved' bits";
                 throw_page_fault(type, addr);
             }
 
             if(!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
-                CPPLOG(ERR) << "Page fault because of invalid page";
+                CPPLOG(DEBUG) << "Page fault because of invalid page";
                 throw_page_fault(type, addr);
             }
             const reg_t ppn = pte >> PTE_PPN_SHIFT;
@@ -273,7 +273,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 continue;
             }
             if((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
-                CPPLOG(ERR) << "Page fault because of page misalignment";
+                CPPLOG(DEBUG) << "Page fault because of page misalignment";
                 throw_page_fault(type, addr);
             }
             if(!(pte & PTE_A) || (type == iss::access_type::WRITE && !(pte & PTE_D))) {
@@ -287,7 +287,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 //    pte |= PTE_D;
 
                 // Svade behavior
-                CPPLOG(ERR) << "Page fault because of unset A or D bit";
+                CPPLOG(DEBUG) << "Page fault because of unset A or D bit";
                 throw_page_fault(type, addr);
             }
             const reg_t vpn = addr >> PGSHIFT;
@@ -302,14 +302,14 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
     const bool s_mode = effective_priv(type) == arch::PRIV_S;
     const bool sum = hart_if.state.mstatus.SUM;
     if((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
-        CPPLOG(ERR) << "Page fault because of SUM bit";
+        CPPLOG(DEBUG) << "Page fault because of SUM bit";
         throw_page_fault(type, addr);
     }
     const bool mxr = hart_if.state.mstatus.MXR;
     if(type == iss::access_type::FETCH   ? !(pte & PTE_X)
        : type == iss::access_type::WRITE ? !(pte & PTE_W)
                                          : !((pte & PTE_R) || (mxr && (pte & PTE_X)))) {
-        CPPLOG(ERR) << "Page fault because of Invalid request";
+        CPPLOG(DEBUG) << "Page fault because of Invalid request";
         throw_page_fault(type, addr);
     }
 
