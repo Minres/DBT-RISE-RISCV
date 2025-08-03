@@ -147,7 +147,7 @@ struct core_wrapper {
             SCCINFO(owner->hier_name()) << "Available cores: \n    " << util::join(names, ",\n    ") << std::endl;
             sc_core::sc_stop();
         } else if(type.find('|') != std::string::npos) {
-            std::tie(cpu, vm) = f.create(type + "|" + backend);
+            std::tie(cpu, vm) = f.create(type + "|" + backend, gdb_port, owner);
         } else {
             auto base_isa = type.substr(0, 5);
             if(base_isa == "tgc5d" || base_isa == "tgc5e") {
