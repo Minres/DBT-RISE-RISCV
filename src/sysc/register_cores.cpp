@@ -90,7 +90,7 @@ volatile std::array<bool, 14> riscv_init = {
     iss_factory::instance().register_creator("rv32gc|msu_vp|interp",
                                              [](unsigned gdb_port, void* data) -> iss_factory::base_t {
                                                  auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
-                                                 auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::rv32gc>>(cc);
+                                                 auto* cpu = new sc_core_adapter<arch::riscv_hart_msu_vp<arch::rv32gc>>(cc);
                                                  return {sysc::sc_cpu_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64i|m_p|interp",
