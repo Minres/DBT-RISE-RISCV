@@ -67,6 +67,34 @@ namespace iss {
 namespace arch {
 
 enum features_e { FEAT_NONE, FEAT_EXT_N = 1, FEAT_DEBUG = 2 };
+enum extension_encoding {
+    A = 1UL << 0,
+    B = 1UL << 1,
+    C = 1UL << 2,
+    D = 1UL << 3,
+    E = 1UL << 4,
+    F = 1UL << 5,
+    G = 1UL << 6, // Reserved
+    H = 1UL << 7,
+    I = 1UL << 8,
+    J = 1UL << 9,  // Reserved
+    K = 1UL << 10, // Reserved
+    L = 1UL << 11, // Reserved
+    M = 1UL << 12,
+    N = 1UL << 13, // Reserved
+    O = 1UL << 14, // Reserved
+    P = 1UL << 15, // Reserved
+    Q = 1UL << 16,
+    R = 1UL << 17, // Reserved
+    S = 1UL << 18,
+    T = 1UL << 19, // Reserved
+    U = 1UL << 20,
+    V = 1UL << 21,
+    W = 1UL << 22, // Reserved
+    X = 1UL << 23,
+    Y = 1UL << 24, // Reserved
+    Z = 1UL << 25, // Reserved
+};
 
 enum riscv_csr {
     /* user-level CSR */
