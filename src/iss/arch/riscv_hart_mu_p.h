@@ -240,6 +240,7 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     this->memories.root(*this);
     this->memories.append(default_mem);
+    this->csr[misa] |= extension_encoding::U;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>

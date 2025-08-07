@@ -253,6 +253,7 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->set_next(mmu.get_mem_if());
     this->memories.root(mmu);
     this->memories.append(default_mem);
+    this->csr[misa] |= (extension_encoding::S | extension_encoding::U);
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
