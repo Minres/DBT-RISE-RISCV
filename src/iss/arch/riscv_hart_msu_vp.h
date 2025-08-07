@@ -230,6 +230,8 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr_wr_cb[arch::riscv_csr::medeleg] = MK_CSR_WR_CB(write_edeleg);
     this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
     this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
+    this->csr_rd_cb[scounteren] = MK_CSR_RD_CB(read_null);
+    this->csr_wr_cb[scounteren] = MK_CSR_WR_CB(write_null);
     if(traits<BASE>::XLEN == 32) {
         this->csr_rd_cb[mstatush] = MK_CSR_RD_CB(read_statush);
         this->csr_wr_cb[mstatush] = MK_CSR_WR_CB(write_statush);
