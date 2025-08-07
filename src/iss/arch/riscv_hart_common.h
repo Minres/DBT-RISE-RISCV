@@ -39,6 +39,7 @@
 #include "util/delegate.h"
 #include <array>
 #include <cstdint>
+#include <elfio/elf_types.hpp>
 #include <elfio/elfio.hpp>
 #include <fmt/format.h>
 #include <iss/arch/traits.h>
@@ -421,8 +422,10 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                 CPPLOG(ERR) << "ISA missmatch, selected XLEN does not match supplied file ";
                 return false;
             }
-            if(reader.get_type() != ELFIO::ET_EXEC)
+            if(reader.get_type() != ELFIO::ET_EXEC && reader.get_type() != ELFIO::ET_DYN) {
+                CPPLOG(ERR) << "Input is neither an executable nor a pie executable (dyn)";
                 return false;
+            }
             if(reader.get_machine() != ELFIO::EM_RISCV)
                 return false;
             entry_address = reader.get_entry();
