@@ -238,7 +238,10 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::read(const address_type type, co
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
-            return this->read_csr(addr, *reinterpret_cast<reg_t* const>(data));
+            auto res = this->read_csr(addr, *reinterpret_cast<reg_t* const>(data));
+            if(res != iss::Ok && !is_debug(access))
+                this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
+            return res;
         } break;
         case traits<BASE>::FENCE: {
             switch(addr) {
@@ -331,7 +334,10 @@ iss::status riscv_hart_m_p<BASE, FEAT, LOGCAT>::write(const address_type type, c
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
-            return this->write_csr(addr, *reinterpret_cast<const reg_t*>(data));
+            auto res = this->write_csr(addr, *reinterpret_cast<const reg_t*>(data));
+            if(res != iss::Ok && !is_debug(access))
+                this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
+            return res;
         } break;
         case traits<BASE>::FENCE: {
             switch(addr) {
@@ -548,8 +554,8 @@ uint64_t riscv_hart_m_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
-                             << " at address " << buffer.data() << " occurred";
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                             << buffer.data() << " occurred";
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
