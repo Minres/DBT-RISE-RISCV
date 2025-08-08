@@ -566,7 +566,6 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         }
         auto it = csr_rd_cb.find(addr);
         if(it == csr_rd_cb.end() || !it->second) { // non existent register
-            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
         }
         return it->second(addr, val);
