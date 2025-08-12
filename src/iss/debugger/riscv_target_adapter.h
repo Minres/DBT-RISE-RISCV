@@ -378,7 +378,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
         {"uint64", "longs", 64, 'l'},
         {"uint32", "words", 32, 'w'},
         {"uint16", "shorts", 16, 's'},
-        // { "ieee_half", 16, 'h', 'f' },
+        //{"ieee_half", "half", 16, 'h'},
         {"uint8", "bytes", 8, 'b'},
     }};
 
