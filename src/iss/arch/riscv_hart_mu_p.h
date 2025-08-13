@@ -183,7 +183,6 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
 : state()
 , default_mem(base::get_priv_if()) {
-    this->csr[misa] = traits<BASE>::MISA_VAL | (1 << ('U' - 'A'));
     const std::array<unsigned, 8> rwaddrs{{
         mepc,
         mtvec,

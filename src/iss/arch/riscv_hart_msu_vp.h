@@ -188,7 +188,6 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
 : mmu(base::get_priv_if())
 , default_mem(base::get_priv_if()) {
-    this->csr[misa] = traits<BASE>::MISA_VAL | (1 << ('U' - 'A')) | (1 << ('S' - 'A'));
     // common regs
     const std::array<unsigned, 16> rwaddrs{
         {mepc, mtvec, mscratch, mcause, mtval, sepc, stvec, sscratch, scause, stval, sscratch, uepc, utvec, uscratch, ucause, utval}};
