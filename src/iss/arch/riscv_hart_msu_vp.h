@@ -209,11 +209,11 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr_rd_cb[stvec] = MK_CSR_RD_CB(read_tvec);
     this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[sip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[sip] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[sip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
     this->csr_rd_cb[sie] = MK_CSR_RD_CB(read_ie);
@@ -573,7 +573,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_v
         int res = 0;
         while((enabled_interrupts & 1) == 0)
             enabled_interrupts >>= 1, res++;
-        this->reg.pending_trap = res << 16 | 1; // 0x80 << 24 | (cause << 16) | trap_id
+        this->reg.pending_trap = 0x80ULL << 24 | res << 16 | 1; // 0x80 << 24 | (cause << 16) | trap_id
     }
 }
 
@@ -581,7 +581,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
-    if(flags == std::numeric_limits<uint64_t>::max())
+    if(flags == std::numeric_limits<uint32_t>::max())
         flags = this->reg.trap_state;
     auto trap_id = bit_sub<0, 16>(flags);
     auto cause = bit_sub<16, 15>(flags);
@@ -718,9 +718,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                             << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
+                             << " to " << this->lvl[new_priv];
     // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
