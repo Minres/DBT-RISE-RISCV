@@ -204,7 +204,7 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
     this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
     this->csr_wr_cb[mepc] = MK_CSR_WR_CB(write_epc);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_null);
+    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
     this->csr_rd_cb[mcounteren] = MK_CSR_RD_CB(read_null);
@@ -618,9 +618,9 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                             << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
+                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
+                             << " to " << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
