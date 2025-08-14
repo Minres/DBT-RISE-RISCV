@@ -388,7 +388,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
         if(iss::arch::traits<ARCH>::XLEN == 32)
             oss << "<architecture>riscv:rv32</architecture>\n";
         else if(iss::arch::traits<ARCH>::XLEN == 64)
-            oss << "  <architectureriscv:rv64</architecture>\n";
+            oss << "  <architecture>riscv:rv64</architecture>\n";
         oss << "  <feature name=\"org.gnu.gdb.riscv.cpu\">\n";
         auto reg_base_num = iss::arch::traits<ARCH>::X0;
         for(auto i = 0U; i < iss::arch::traits<ARCH>::RFS; ++i) {
