@@ -45,6 +45,7 @@
 #include <cstdint>
 #include <elfio/elf_types.hpp>
 #include <elfio/elfio.hpp>
+#include <limits>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -125,16 +126,6 @@ public:
         this->state.mstatus = new_val;
     }
 
-    constexpr reg_t get_irq_mask(size_t mode) {
-        std::array<const reg_t, 4> m = {{
-            0b000100010001, // U mode
-            0b001100110011, // S mode
-            0,
-            0b100110011001 // M mode
-        }};
-        return m[mode];
-    }
-
     riscv_hart_mu_p();
 
     virtual ~riscv_hart_mu_p() = default;
@@ -163,17 +154,9 @@ protected:
 
     iss::status read_status(unsigned addr, reg_t& val);
     iss::status write_status(unsigned addr, reg_t val);
-    iss::status read_cause(unsigned addr, reg_t& val);
-    iss::status write_cause(unsigned addr, reg_t val);
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
-    iss::status write_xtvt(unsigned addr, reg_t val);
-    iss::status write_dcsr(unsigned addr, reg_t val);
-    iss::status read_debug(unsigned addr, reg_t& val);
-    iss::status write_dscratch(unsigned addr, reg_t val);
-    iss::status read_dpc(unsigned addr, reg_t& val);
-    iss::status write_dpc(unsigned addr, reg_t val);
 
     void check_interrupt();
     mem::memory_with_htif<reg_t> default_mem;
@@ -183,59 +166,37 @@ template <typename BASE, features_e FEAT, typename LOGCAT>
 riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
 : state()
 , default_mem(base::get_priv_if()) {
-    const std::array<unsigned, 8> rwaddrs{{
-        mepc,
-        mtvec,
-        mscratch,
-        mtval,
-        uepc,
-        utvec,
-        uscratch,
-        utval,
-    }};
-    for(auto addr : rwaddrs) {
-        this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_plain);
-        this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_plain);
-    }
     this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
     this->csr_wr_cb[mstatus] = MK_CSR_WR_CB(write_status);
-    this->csr_rd_cb[mcause] = MK_CSR_RD_CB(read_cause);
-    this->csr_wr_cb[mcause] = MK_CSR_WR_CB(write_cause);
-    this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
-    this->csr_wr_cb[mepc] = MK_CSR_WR_CB(write_epc);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
     this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
     this->csr_rd_cb[mcounteren] = MK_CSR_RD_CB(read_null);
     this->csr_wr_cb[mcounteren] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[misa] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[mvendorid] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[marchid] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
 
     if(FEAT & FEAT_EXT_N) {
         this->csr_rd_cb[uie] = MK_CSR_RD_CB(read_ie);
         this->csr_wr_cb[uie] = MK_CSR_WR_CB(write_ie);
         this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
         this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_null);
+        this->csr_rd_cb[uepc] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[uepc] = MK_CSR_WR_CB(write_epc);
         this->csr_rd_cb[ustatus] = MK_CSR_RD_CB(read_status);
         this->csr_wr_cb[ustatus] = MK_CSR_WR_CB(write_status);
         this->csr_rd_cb[ucause] = MK_CSR_RD_CB(read_cause);
         this->csr_wr_cb[ucause] = MK_CSR_WR_CB(write_cause);
+        this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_plain);
         this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
+        this->csr_rd_cb[uscratch] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[uscratch] = MK_CSR_WR_CB(write_plain);
+        this->csr_rd_cb[utval] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[utval] = MK_CSR_WR_CB(write_plain);
+        this->csr[misa] |= extension_encoding::N;
     }
-    if(FEAT & FEAT_DEBUG) {
-        this->csr_wr_cb[dscratch0] = MK_CSR_WR_CB(write_dscratch);
-        this->csr_rd_cb[dscratch0] = MK_CSR_RD_CB(read_debug);
-        this->csr_wr_cb[dscratch1] = MK_CSR_WR_CB(write_dscratch);
-        this->csr_rd_cb[dscratch1] = MK_CSR_RD_CB(read_debug);
-        this->csr_wr_cb[dpc] = MK_CSR_WR_CB(write_dpc);
-        this->csr_rd_cb[dpc] = MK_CSR_RD_CB(read_dpc);
-        this->csr_wr_cb[dcsr] = MK_CSR_WR_CB(write_dcsr);
-        this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
-    }
+    if(FEAT & FEAT_DEBUG)
+        this->add_debug_csrs();
+
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     this->memories.root(*this);
@@ -432,28 +393,15 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_status(unsigned addr, reg
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_cause(unsigned addr, reg_t& val) {
-    val = this->csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (this->mcause_max_irq - 1));
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_cause(unsigned addr, reg_t val) {
-    auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (this->mcause_max_irq - 1));
-    this->csr[addr] = (val & mask) | (this->csr[addr] & ~mask);
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
-    auto mask = get_irq_mask((addr >> 8) & 0x3);
+    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mie] & mask;
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
-    auto mask = get_irq_mask((addr >> 8) & 0x3);
+    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -461,7 +409,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t v
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
-    auto mask = get_irq_mask((addr >> 8) & 0x3);
+    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mip] & mask;
     return iss::Ok;
 }
@@ -618,9 +566,9 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
-                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
-                             << " to " << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
+                             << this->lvl[new_priv];
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
