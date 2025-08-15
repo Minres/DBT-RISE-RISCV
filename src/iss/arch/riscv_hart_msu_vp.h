@@ -132,16 +132,6 @@ public:
         this->state.mstatus = new_val;
     }
 
-    constexpr reg_t get_irq_mask(size_t mode) {
-        std::array<const reg_t, 4> m = {{
-            0b000100010001, // U mode
-            0b001100110011, // S mode
-            0,
-            0b101110111011 // M mode
-        }};
-        return m[mode];
-    }
-
     riscv_hart_msu_vp();
 
     virtual ~riscv_hart_msu_vp() = default;
@@ -170,7 +160,6 @@ protected:
     iss::status write_status(unsigned addr, reg_t val);
     iss::status read_statush(unsigned addr, reg_t& val);
     iss::status write_statush(unsigned addr, reg_t val);
-    iss::status write_cause(unsigned addr, reg_t val);
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
@@ -198,34 +187,33 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     // special handling & overrides
     this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
     this->csr_wr_cb[mstatus] = MK_CSR_WR_CB(write_status);
-    this->csr_wr_cb[mcause] = MK_CSR_WR_CB(write_cause);
     this->csr_rd_cb[sstatus] = MK_CSR_RD_CB(read_status);
     this->csr_wr_cb[sstatus] = MK_CSR_WR_CB(write_status);
+    this->csr_rd_cb[scause] = MK_CSR_RD_CB(read_cause);
     this->csr_wr_cb[scause] = MK_CSR_WR_CB(write_cause);
-    this->csr_rd_cb[ustatus] = MK_CSR_RD_CB(read_status);
-    this->csr_wr_cb[ustatus] = MK_CSR_WR_CB(write_status);
-    this->csr_wr_cb[ucause] = MK_CSR_WR_CB(write_cause);
-    this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
     this->csr_rd_cb[stvec] = MK_CSR_RD_CB(read_tvec);
-    this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
+    this->csr_wr_cb[stvec] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
     this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[sip] = MK_CSR_RD_CB(read_ip);
     this->csr_wr_cb[sip] = MK_CSR_WR_CB(write_plain);
-    this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_plain);
     this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
     this->csr_rd_cb[sie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[sie] = MK_CSR_WR_CB(write_ie);
-    this->csr_rd_cb[uie] = MK_CSR_RD_CB(read_ie);
-    this->csr_wr_cb[uie] = MK_CSR_WR_CB(write_ie);
+    if(FEAT & FEAT_EXT_N) {
+        this->csr_rd_cb[ustatus] = MK_CSR_RD_CB(read_status);
+        this->csr_wr_cb[ustatus] = MK_CSR_WR_CB(write_status);
+        this->csr_wr_cb[ucause] = MK_CSR_WR_CB(write_cause);
+        this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
+        this->csr_rd_cb[uip] = MK_CSR_RD_CB(read_ip);
+        this->csr_wr_cb[uip] = MK_CSR_WR_CB(write_plain);
+        this->csr_rd_cb[uie] = MK_CSR_RD_CB(read_ie);
+        this->csr_wr_cb[uie] = MK_CSR_WR_CB(write_ie);
+        this->csr[misa] |= extension_encoding::N;
+    }
     this->csr_rd_cb[mcounteren] = MK_CSR_RD_CB(read_null);
     this->csr_wr_cb[mcounteren] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[misa] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[mvendorid] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[marchid] = MK_CSR_WR_CB(write_null);
-    this->csr_wr_cb[mimpid] = MK_CSR_WR_CB(write_null);
     this->csr_rd_cb[arch::riscv_csr::medeleg] = MK_CSR_RD_CB(read_plain);
     this->csr_wr_cb[arch::riscv_csr::medeleg] = MK_CSR_WR_CB(write_edeleg);
     this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
@@ -238,18 +226,9 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
         this->csr_rd_cb[medelegh] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[medelegh] = MK_CSR_WR_CB(write_edelegh);
     }
-    this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
-    this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
-    if(FEAT & FEAT_DEBUG) {
-        this->csr_wr_cb[dscratch0] = MK_CSR_WR_CB(write_dscratch);
-        this->csr_rd_cb[dscratch0] = MK_CSR_RD_CB(read_debug);
-        this->csr_wr_cb[dscratch1] = MK_CSR_WR_CB(write_dscratch);
-        this->csr_rd_cb[dscratch1] = MK_CSR_RD_CB(read_debug);
-        this->csr_wr_cb[dpc] = MK_CSR_WR_CB(write_dpc);
-        this->csr_rd_cb[dpc] = MK_CSR_RD_CB(read_dpc);
-        this->csr_wr_cb[dcsr] = MK_CSR_WR_CB(write_dcsr);
-        this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
-    }
+    if(FEAT & FEAT_DEBUG)
+        this->add_debug_csrs();
+
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     this->set_next(mmu.get_mem_if());
@@ -474,12 +453,6 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_statush(unsigned addr, 
 }
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_cause(unsigned addr, reg_t val) {
-    this->csr[addr] = val & ((1UL << (traits<BASE>::XLEN - 1)) | 0xf); // TODO: make exception code size configurable
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
     val = this->csr[mie];
     if(addr < mie)
@@ -491,8 +464,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t&
 
 template <typename BASE, features_e FEAT, typename LOGCAT>
 iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
-    auto req_priv_lvl = (addr >> 8) & 0x3;
-    auto mask = get_irq_mask(req_priv_lvl);
+    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -718,9 +690,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
         NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")"
-                             << " at address " << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV]
-                             << " to " << this->lvl[new_priv];
+                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
+                             << this->lvl[new_priv];
     // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;

@@ -348,6 +348,16 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         csr[mvendorid] = 0x669;
         csr[marchid] = traits<BASE>::MARCHID_VAL;
         csr[mimpid] = 1;
+        csr[mtvt] = 0;
+        const std::array<unsigned, 5> rwaddrs{{mepc, mtvec, mscratch, mtval, mip}};
+        for(auto addr : rwaddrs) {
+            this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_plain);
+            this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_plain);
+        }
+        this->csr_rd_cb[mcause] = MK_CSR_RD_CB(read_cause);
+        this->csr_wr_cb[mcause] = MK_CSR_WR_CB(write_cause);
+        this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
+        this->csr_wr_cb[mepc] = MK_CSR_WR_CB(write_epc);
 
         if(traits<BASE>::FLEN > 0) {
             csr_rd_cb[fcsr] = MK_CSR_RD_CB(read_fcsr);
@@ -554,6 +564,27 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     const reg_t& get_mhartid() const { return mhartid_reg; }
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
+    void add_debug_csrs() {
+        this->csr_wr_cb[dscratch0] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch0] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dscratch1] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch1] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dpc] = MK_CSR_WR_CB(write_dpc);
+        this->csr_rd_cb[dpc] = MK_CSR_RD_CB(read_dpc);
+        this->csr_wr_cb[dcsr] = MK_CSR_WR_CB(write_dcsr);
+        this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
+    }
+
+    constexpr reg_t get_irq_mask(size_t mode) {
+        std::array<const reg_t, 4> m = {{
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b000100010001, // U mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b001100110011, // S mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0,              // H mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b101110111011  // M mode
+        }};
+        return m[mode];
+    }
+
     iss::status read_csr(unsigned addr, reg_t& val) {
         if(addr >= csr.size()) {
             this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
@@ -666,6 +697,17 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                 return iss::Err;
             val = static_cast<reg_t>(time_val >> 32);
         }
+        return iss::Ok;
+    }
+
+    iss::status read_cause(unsigned addr, reg_t& val) {
+        val = this->csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
+        return iss::Ok;
+    }
+
+    iss::status write_cause(unsigned addr, reg_t val) {
+        auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
+        this->csr[addr] = (val & mask) | (this->csr[addr] & ~mask);
         return iss::Ok;
     }
 
@@ -879,7 +921,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     void set_next(mem::memory_if mem_if) override { memory = mem_if; };
 
-    void set_irq_num(unsigned i) { mcause_max_irq = 1 << util::ilog2(i); }
+    void set_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
 protected:
     hart_state<reg_t> state;
