@@ -41,6 +41,7 @@
 #include "iss_factory.h"
 #include "tlm/scc/quantum_keeper.h"
 #include <tlm/scc/tlm_signal_gp.h>
+#include <tlm/scc/quantum_keeper.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
