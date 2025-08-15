@@ -197,10 +197,9 @@ public:
         return mem_incr > 1 ? mem_incr : 1;
     }
 
-    template <typename T> void check_and_sync(T qk, sc_core::sc_time t) { qk.check_and_sync(t); }
     void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
-        check_and_sync(quantum_keeper, core_inc);
+        quantum_keeper.check_and_sync(core_inc);
         last_sync_cycle = cycle;
     }
 
@@ -237,7 +236,7 @@ protected:
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
     QKT quantum_keeper;
     std::vector<uint8_t> write_buf;
-    core_wrapper* cpu{nullptr};
+    core_wrapper* core{nullptr};
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
     uint64_t ibus_inc{0}, dbus_inc{0};
     core_trace* trc{nullptr};

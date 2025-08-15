@@ -33,7 +33,7 @@
 #ifndef _ISS_FACTORY_H_
 #define _ISS_FACTORY_H_
 
-#include "sc_core_adapter_if.h"
+#include "core_facade.h"
 #include <algorithm>
 #include <functional>
 #include <iss/iss.h>
@@ -44,12 +44,12 @@
 
 namespace sysc {
 
-using sc_cpu_ptr = std::unique_ptr<sc_core_adapter_if>;
+using core_ptr = std::unique_ptr<core_facade>;
 using vm_ptr = std::unique_ptr<iss::vm_if>;
 
 class iss_factory {
 public:
-    using base_t = std::tuple<sc_cpu_ptr, vm_ptr>;
+    using base_t = std::tuple<core_ptr, vm_ptr>;
     using create_fn = std::function<base_t(unsigned, void*)>;
     using registry_t = std::unordered_map<std::string, create_fn>;
 
