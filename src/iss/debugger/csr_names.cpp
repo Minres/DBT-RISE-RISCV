@@ -39,12 +39,12 @@
 namespace iss {
 namespace debugger {
 const std::array<char const* const, 4096> csr_names = {
-    "unknown",        // 0
+    "ustatus",        // 0
     "fflags",         // 1
     "frm",            // 2
     "fcsr",           // 3
-    "unknown",        // 4
-    "unknown",        // 5
+    "uie",            // 4
+    "utvec",          // 5
     "unknown",        // 6
     "utvt",           // 7
     "vstart",         // 8
@@ -103,14 +103,14 @@ const std::array<char const* const, 4096> csr_names = {
     "unknown",        // 61
     "unknown",        // 62
     "unknown",        // 63
-    "unknown",        // 64
-    "unknown",        // 65
-    "unknown",        // 66
-    "unknown",        // 67
-    "unknown",        // 68
+    "uscratch",       // 64
+    "uepc",           // 65
+    "ucause",         // 66
+    "utval",          // 67
+    "uip",            // 68
     "unxti",          // 69
     "uintstatus",     // 70
-    "unknown",        // 71
+    "uintthresh",     // 71
     "uscratchcsw",    // 72
     "uscratchcswl",   // 73
     "unknown",        // 74
@@ -3288,7 +3288,7 @@ const std::array<char const* const, 4096> csr_names = {
     "unknown",        // 3246
     "unknown",        // 3247
     "unknown",        // 3248
-    "unknown",        // 3249
+    "uintstatus",     // 3249 MRW Current interrupt levels (CLIC) - addr subject to change
     "unknown",        // 3250
     "unknown",        // 3251
     "unknown",        // 3252
