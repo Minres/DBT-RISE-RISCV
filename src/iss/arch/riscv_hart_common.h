@@ -643,10 +643,12 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     iss::status read_cycle(unsigned addr, reg_t& val) {
         auto cycle_val = this->reg.cycle + cycle_offset;
-        if(addr == mcycle) {
+        if(addr == mcycle || addr == cycle) {
             val = static_cast<reg_t>(cycle_val);
-        } else if(addr == mcycleh) {
+        } else if(addr == mcycleh || addr == cycleh) {
             val = static_cast<reg_t>(cycle_val >> 32);
+        } else {
+            return iss::Err;
         }
         return iss::Ok;
     }
