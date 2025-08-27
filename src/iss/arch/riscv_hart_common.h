@@ -39,6 +39,7 @@
 #include "util/delegate.h"
 #include <array>
 #include <cstdint>
+#include <elfio/elf_types.hpp>
 #include <elfio/elfio.hpp>
 #include <fmt/format.h>
 #include <iss/arch/traits.h>
@@ -66,6 +67,34 @@ namespace iss {
 namespace arch {
 
 enum features_e { FEAT_NONE, FEAT_EXT_N = 1, FEAT_DEBUG = 2 };
+enum extension_encoding {
+    A = 1UL << 0,
+    B = 1UL << 1,
+    C = 1UL << 2,
+    D = 1UL << 3,
+    E = 1UL << 4,
+    F = 1UL << 5,
+    G = 1UL << 6, // Reserved
+    H = 1UL << 7,
+    I = 1UL << 8,
+    J = 1UL << 9,  // Reserved
+    K = 1UL << 10, // Reserved
+    L = 1UL << 11, // Reserved
+    M = 1UL << 12,
+    N = 1UL << 13, // Reserved
+    O = 1UL << 14, // Reserved
+    P = 1UL << 15, // Reserved
+    Q = 1UL << 16,
+    R = 1UL << 17, // Reserved
+    S = 1UL << 18,
+    T = 1UL << 19, // Reserved
+    U = 1UL << 20,
+    V = 1UL << 21,
+    W = 1UL << 22, // Reserved
+    X = 1UL << 23,
+    Y = 1UL << 24, // Reserved
+    Z = 1UL << 25, // Reserved
+};
 
 enum riscv_csr {
     /* user-level CSR */
@@ -135,6 +164,8 @@ enum riscv_csr {
     mtvec = 0x305,
     mcounteren = 0x306,
     mtvt = 0x307, // CLIC
+    mstatush = 0x310,
+    medelegh = 0x312,
     // Machine Trap Handling
     mscratch = 0x340,
     mepc = 0x341,
@@ -225,10 +256,20 @@ enum {
     ISA_U = 1 << 20
 };
 
+class trap_instruction_access_fault : public trap_access {
+public:
+    trap_instruction_access_fault(uint64_t badaddr)
+    : trap_access(1 << 16, badaddr) {}
+};
 class trap_load_access_fault : public trap_access {
 public:
     trap_load_access_fault(uint64_t badaddr)
     : trap_access(5 << 16, badaddr) {}
+};
+class trap_store_access_fault : public trap_access {
+public:
+    trap_store_access_fault(uint64_t badaddr)
+    : trap_access(7 << 16, badaddr) {}
 };
 class trap_instruction_page_fault : public trap_access {
 public:
@@ -291,9 +332,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     using core = BASE;
     using this_class = riscv_hart_common<BASE, LOGCAT>;
-    using phys_addr_t = typename core::phys_addr_t;
     using reg_t = typename core::reg_t;
-    using addr_t = typename core::addr_t;
 
     using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
     using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
@@ -309,6 +348,16 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         csr[mvendorid] = 0x669;
         csr[marchid] = traits<BASE>::MARCHID_VAL;
         csr[mimpid] = 1;
+        csr[mtvt] = 0;
+        const std::array<unsigned, 5> rwaddrs{{mepc, mtvec, mscratch, mtval, mip}};
+        for(auto addr : rwaddrs) {
+            this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_plain);
+            this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_plain);
+        }
+        this->csr_rd_cb[mcause] = MK_CSR_RD_CB(read_cause);
+        this->csr_wr_cb[mcause] = MK_CSR_WR_CB(write_cause);
+        this->csr_rd_cb[mtvec] = MK_CSR_RD_CB(read_tvec);
+        this->csr_wr_cb[mepc] = MK_CSR_WR_CB(write_epc);
 
         if(traits<BASE>::FLEN > 0) {
             csr_rd_cb[fcsr] = MK_CSR_RD_CB(read_fcsr);
@@ -411,8 +460,10 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                 CPPLOG(ERR) << "ISA missmatch, selected XLEN does not match supplied file ";
                 return false;
             }
-            if(reader.get_type() != ELFIO::ET_EXEC)
+            if(reader.get_type() != ELFIO::ET_EXEC && reader.get_type() != ELFIO::ET_DYN) {
+                CPPLOG(ERR) << "Input is neither an executable nor a pie executable (dyn)";
                 return false;
+            }
             if(reader.get_machine() != ELFIO::EM_RISCV)
                 return false;
             entry_address = reader.get_entry();
@@ -424,7 +475,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                     auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
                                            pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << "bytes to 0x" << std::hex << pseg->get_physical_address();
+                        CPPLOG(ERR) << "problem writing " << fsize << " bytes to 0x" << std::hex << pseg->get_physical_address();
                 }
             }
             const auto sym_sec = reader.sections[".symtab"];
@@ -513,29 +564,63 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     const reg_t& get_mhartid() const { return mhartid_reg; }
     void set_mhartid(reg_t mhartid) { mhartid_reg = mhartid; };
 
+    void add_debug_csrs() {
+        this->csr_wr_cb[dscratch0] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch0] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dscratch1] = MK_CSR_WR_CB(write_dscratch);
+        this->csr_rd_cb[dscratch1] = MK_CSR_RD_CB(read_debug);
+        this->csr_wr_cb[dpc] = MK_CSR_WR_CB(write_dpc);
+        this->csr_rd_cb[dpc] = MK_CSR_RD_CB(read_dpc);
+        this->csr_wr_cb[dcsr] = MK_CSR_WR_CB(write_dcsr);
+        this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
+    }
+
+    constexpr reg_t get_irq_mask(size_t mode) {
+        std::array<const reg_t, 4> m = {{
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b000100010001, // U mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b001100110011, // S mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0,              // H mode
+            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b101110111011  // M mode
+        }};
+        return m[mode];
+    }
+
     iss::status read_csr(unsigned addr, reg_t& val) {
-        if(addr >= csr.size())
+        if(addr >= csr.size()) {
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto req_priv_lvl = (addr >> 8) & 0x3;
-        if(this->reg.PRIV < req_priv_lvl) // not having required privileges
+        if(this->reg.PRIV < req_priv_lvl) { // not having required privileges
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto it = csr_rd_cb.find(addr);
-        if(it == csr_rd_cb.end() || !it->second) // non existent register
+        if(it == csr_rd_cb.end() || !it->second) { // non existent register
             return iss::Err;
+        }
         return it->second(addr, val);
     }
 
     iss::status write_csr(unsigned addr, reg_t val) {
-        if(addr >= csr.size())
+        if(addr >= csr.size()) {
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto req_priv_lvl = (addr >> 8) & 0x3;
-        if(this->reg.PRIV < req_priv_lvl) // not having required privileges
+        if(this->reg.PRIV < req_priv_lvl) { // not having required privileges
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
-        if((addr & 0xc00) == 0xc00) // writing to read-only region
+        }
+        if((addr & 0xc00) == 0xc00) { // writing to read-only region
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         auto it = csr_wr_cb.find(addr);
-        if(it == csr_wr_cb.end() || !it->second) // non existent register
+        if(it == csr_wr_cb.end() || !it->second) { // non existent register
+            this->reg.trap_state = (1U << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
             return iss::Err;
+        }
         return it->second(addr, val);
     }
 
@@ -558,10 +643,12 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     iss::status read_cycle(unsigned addr, reg_t& val) {
         auto cycle_val = this->reg.cycle + cycle_offset;
-        if(addr == mcycle) {
+        if(addr == mcycle || addr == cycle) {
             val = static_cast<reg_t>(cycle_val);
-        } else if(addr == mcycleh) {
+        } else if(addr == mcycleh || addr == cycleh) {
             val = static_cast<reg_t>(cycle_val >> 32);
+        } else {
+            return iss::Err;
         }
         return iss::Ok;
     }
@@ -612,6 +699,17 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                 return iss::Err;
             val = static_cast<reg_t>(time_val >> 32);
         }
+        return iss::Ok;
+    }
+
+    iss::status read_cause(unsigned addr, reg_t& val) {
+        val = this->csr[addr] & ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
+        return iss::Ok;
+    }
+
+    iss::status write_cause(unsigned addr, reg_t val) {
+        auto mask = ((1UL << (traits<BASE>::XLEN - 1)) | (mcause_max_irq - 1));
+        this->csr[addr] = (val & mask) | (this->csr[addr] & ~mask);
         return iss::Ok;
     }
 
@@ -825,22 +923,10 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     void set_next(mem::memory_if mem_if) override { memory = mem_if; };
 
-    void set_irq_num(unsigned i) { mcause_max_irq = 1 << util::ilog2(i); }
+    void set_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
 protected:
     hart_state<reg_t> state;
-
-    static constexpr reg_t get_mstatus_mask_t(unsigned priv_lvl = PRIV_M) {
-        if(sizeof(reg_t) == 4) {
-            return priv_lvl == PRIV_U ? 0x80000011UL :   // 0b1...0 0001 0001
-                       priv_lvl == PRIV_S ? 0x800de133UL // 0b0...0 0001 1000 1001 1001;
-                                          : 0x807ff9ddUL;
-        } else {
-            return priv_lvl == PRIV_U ? 0x011ULL : // 0b1...0 0001 0001
-                       priv_lvl == PRIV_S ? 0x000de133ULL
-                                          : 0x007ff9ddULL;
-        }
-    }
 
     mem::memory_if memory;
     struct riscv_instrumentation_if : public iss::instrumentation_if {

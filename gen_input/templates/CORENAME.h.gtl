@@ -43,21 +43,6 @@ def nativeSize(int size){
     if(size<=4096) return 4096;
     throw new IllegalArgumentException("Unsupported size in nativeSize in CORENAME.h.gtl");
 }
-def getRegisterSizes(){
-    def regs = registers.collect{nativeSize(it.size)}
-    regs+=[32,32, 64, 64, 64, 32, 32] // append TRAP_STATE, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
-    return regs
-}
-def getRegisterOffsets(){
-    def offset = 0
-    def offsets = []
-    getRegisterSizes().each { size ->
-        offsets<<offset
-        offset+=size/8
-    }
-    return offsets
-}
-
 def getCString(def val){
     return val.toString()+'ULL'
 }
@@ -73,62 +58,13 @@ def getCString(def val){
 namespace iss {
 namespace arch {
 
-struct ${coreDef.name.toLowerCase()};
-
-template <> struct traits<${coreDef.name.toLowerCase()}> {
-
-    constexpr static char const* const core_type = "${coreDef.name}";
-    
-    static constexpr std::array<const char*, ${registers.size()}> reg_names{
-        {"${registers.collect{it.name.toLowerCase()}.join('", "')}"}};
- 
-    static constexpr std::array<const char*, ${registers.size()}> reg_aliases{
-        {"${registers.collect{it.alias.toLowerCase()}.join('", "')}"}};
-
-    enum constants {${constants.collect{c -> c.name+"="+getCString(c.value)}.join(', ')}};
-
-    constexpr static unsigned FP_REGS_SIZE = ${constants.find {it.name=='FLEN'}?.value?:0};
-    constexpr static unsigned V_REGS_SIZE = ${constants.find {it.name=='VLEN'}?.value?:0};
-
-
-    enum reg_e {
-        ${registers.collect{it.name}.join(', ')}, NUM_REGS, TRAP_STATE=NUM_REGS, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
-    };
+struct ${coreDef.name.toLowerCase()}: public arch_if {
 
     using reg_t = uint${addrDataWidth}_t;
 
-    using addr_t = uint${addrDataWidth}_t;
+    using virt_addr_t = iss::virt_addr_t;
 
-    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
-
-    using virt_addr_t = iss::typed_addr_t<iss::address_type::VIRTUAL>;
-
-    using phys_addr_t = iss::typed_addr_t<iss::address_type::PHYSICAL>;
-
-    static constexpr std::array<const uint32_t, ${getRegisterSizes().size()}> reg_bit_widths{
-        {${getRegisterSizes().join(',')}}};
-
-    static constexpr std::array<const uint32_t, ${getRegisterOffsets().size()}> reg_byte_offsets{
-        {${getRegisterOffsets().join(',')}}};
-
-    static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
-
-    enum sreg_flag_e { FLAGS };
-
-    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = MEM };
-    
-    enum class opcode_e {<%instructions.eachWithIndex{instr, index -> %>
-        ${instr.instruction.name} = ${index},<%}%>
-        MAX_OPCODE
-    };
-};
-
-struct ${coreDef.name.toLowerCase()}: public arch_if {
-
-    using virt_addr_t = typename traits<${coreDef.name.toLowerCase()}>::virt_addr_t;
-    using phys_addr_t = typename traits<${coreDef.name.toLowerCase()}>::phys_addr_t;
-    using reg_t =  typename traits<${coreDef.name.toLowerCase()}>::reg_t;
-    using addr_t = typename traits<${coreDef.name.toLowerCase()}>::addr_t;
+    using phys_addr_t = iss::phys_addr_t;
 
     ${coreDef.name.toLowerCase()}();
     ~${coreDef.name.toLowerCase()}();
@@ -200,6 +136,73 @@ if(vtype != null) {%>
 <%}%>
 };
 
+struct ${coreDef.name.toLowerCase()};
+
+template <> struct traits<${coreDef.name.toLowerCase()}> {
+
+    constexpr static char const* const core_type = "${coreDef.name}";
+    
+    static constexpr std::array<const char*, ${registers.size()}> reg_names{
+        {"${registers.collect{it.name.toLowerCase()}.join('", "')}"}};
+ 
+    static constexpr std::array<const char*, ${registers.size()}> reg_aliases{
+        {"${registers.collect{it.alias.toLowerCase()}.join('", "')}"}};
+
+    enum constants {
+        ${constants.collect{c -> c.name+"="+getCString(c.value)}.collate(4).collect { it.join(', ') }.join(',\n        ')}
+    };
+
+    constexpr static unsigned FP_REGS_SIZE = ${constants.find {it.name=='FLEN'}?.value?:0};
+    constexpr static unsigned V_REGS_SIZE = ${constants.find {it.name=='VLEN'}?.value?:0};
+
+
+    enum reg_e {
+        ${registers.collect{it.name}.join(', ')}, NUM_REGS, TRAP_STATE=NUM_REGS, PENDING_TRAP, ICOUNT, CYCLE, INSTRET, INSTRUCTION, LAST_BRANCH
+    };
+
+    using reg_t = uint${addrDataWidth}_t;
+
+    using addr_t = uint${addrDataWidth}_t;
+
+    using code_word_t = uint${addrDataWidth}_t; //TODO: check removal
+
+    using virt_addr_t = iss::virt_addr_t;
+
+    using phys_addr_t = iss::phys_addr_t;
+
+    static constexpr std::array<const uint32_t, ${registers.size() + 7}> reg_bit_widths{{
+        ${registers.collect{'sizeof('+coreDef.name.toLowerCase()+'::'+coreDef.name+'_regs::'+it.name+') * 8'}.join(',\n        ')},
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::trap_state) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::pending_trap) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::icount) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::cycle) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::instret) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::instruction) * 8,
+        sizeof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs::last_branch) * 8,
+    }};
+
+    static constexpr std::array<const uint32_t, ${registers.size() + 7}> reg_byte_offsets{{
+        ${registers.collect{'offsetof('+coreDef.name.toLowerCase()+'::'+coreDef.name+'_regs, '+coreDef.name.toLowerCase()+'::'+coreDef.name+'_regs::'+it.name+')'}.join(',\n        ')},
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::trap_state),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::pending_trap),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::icount),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::cycle),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::instret),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::instruction),
+        offsetof(${coreDef.name.toLowerCase()}::${coreDef.name}_regs, ${coreDef.name.toLowerCase()}::${coreDef.name}_regs::last_branch),
+    }};
+
+    static const uint64_t addr_mask = (reg_t(1) << (XLEN - 1)) | ((reg_t(1) << (XLEN - 1)) - 1);
+
+    enum sreg_flag_e { FLAGS };
+
+    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = MEM };
+    
+    enum class opcode_e {<%instructions.eachWithIndex{instr, index -> %>
+        ${instr.instruction.name} = ${index},<%}%>
+        MAX_OPCODE
+    };
+};
 }
 }            
 #endif /* _${coreDef.name.toUpperCase()}_H_ */

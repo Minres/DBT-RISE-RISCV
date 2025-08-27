@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2017-2024 MINRES Technologies GmbH
+ * Copyright (C) 2024 MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -354,13 +354,14 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)((int32_t)imm));
@@ -400,13 +401,14 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)(PC+(int32_t)imm));
@@ -446,20 +448,21 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto new_pc = (uint32_t)(PC+(int32_t)sext<21>(imm));
             if(new_pc%static_cast<uint32_t>(traits::INSTR_ALIGNMENT)){
                 gen_set_tval(jh, new_pc);
                 gen_raise(jh, 0, 0);
             }
-            else{
+            else {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
                           (uint32_t)(PC+4));
@@ -504,23 +507,22 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto addr_mask = (uint32_t)- 2;
             auto new_pc = gen_ext(cc, 
-                (gen_operation(cc, band, (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), addr_mask)
-                ), 32, true);
+                (gen_operation(cc, band, (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), addr_mask)), 32, true);
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, urem, new_pc, static_cast<uint32_t>(traits::INSTR_ALIGNMENT))
-            ,0);
+            auto cond =  gen_operation(cc, urem, new_pc, static_cast<uint32_t>(traits::INSTR_ALIGNMENT));
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
@@ -576,18 +578,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -595,7 +598,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -639,18 +642,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -658,7 +662,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -702,20 +706,21 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, lt, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ,0);
+            auto cond =  gen_operation(cc, lt, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -723,7 +728,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -767,20 +772,21 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, gte, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false))
-            ,0);
+            auto cond =  gen_operation(cc, gte, gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false), gen_ext(cc, 
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -788,7 +794,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -832,18 +838,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ltu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, ltu, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -851,7 +858,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -895,18 +902,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, gteu, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ,0);
+            auto cond =  gen_operation(cc, gteu, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
+            cmp(cc, cond, 0);
             cc.je(label_merge);
             {
                 auto new_pc = (uint32_t)(PC+(int16_t)sext<13>(imm));
@@ -914,7 +922,7 @@ private:
                     gen_set_tval(jh, new_pc);
                     gen_raise(jh, 0, 0);
                 }
-                else{
+                else {
                     auto PC_val_v = new_pc;
                     mov(cc, jh.next_pc, PC_val_v);
                     mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -958,16 +966,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 1), 8, false);
             if(rd!=0){
@@ -1011,16 +1019,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 2), 16, false);
             if(rd!=0){
@@ -1064,16 +1072,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_ext(cc, 
                 gen_read_mem(jh, traits::MEM, load_address, 4), 32, false);
             if(rd!=0){
@@ -1117,16 +1125,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_read_mem(jh, traits::MEM, load_address, 1);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -1169,16 +1177,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto load_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             auto res = gen_read_mem(jh, traits::MEM, load_address, 2);
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -1221,18 +1229,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 8, false), 1);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 8, false), 1);
         }
         auto returnValue = CONT;
         
@@ -1269,18 +1277,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 16, false), 2);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 16, false), 2);
         }
         auto returnValue = CONT;
         
@@ -1317,18 +1325,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto store_address = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                ), 32, true);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true);
             gen_write_mem(jh, traits::MEM, store_address, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), 4);
         }
         auto returnValue = CONT;
         
@@ -1365,18 +1373,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))
-                          ), 32, true));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int16_t)sext<12>(imm))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -1414,19 +1422,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 auto label_then1 = cc.newLabel();
                 auto label_merge1 = cc.newLabel();
-                auto tmp_reg1 = get_reg(cc, 8, false);
-                cmp(cc, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs1), 32, true), (int16_t)sext<12>(imm));
+                auto tmp_reg1 = get_reg_Gp(cc, 8, false);
+                cmp(cc, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), (int16_t)sext<12>(imm));
                 cc.jl(label_then1);
                 mov(cc, tmp_reg1,0);
                 cc.jmp(label_merge1);
@@ -1474,18 +1482,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 auto label_then2 = cc.newLabel();
                 auto label_merge2 = cc.newLabel();
-                auto tmp_reg2 = get_reg(cc, 8, false);
-                cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)));
+                auto tmp_reg2 = get_reg_Gp(cc, 8, false);
+                cmp(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)));
                 cc.jb(label_then2);
                 mov(cc, tmp_reg2,0);
                 cc.jmp(label_merge2);
@@ -1533,17 +1542,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1581,17 +1590,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1629,17 +1638,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm)))
-                      );
+                      gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (uint32_t)((int16_t)sext<12>(imm))));
             }
         }
         auto returnValue = CONT;
@@ -1677,17 +1686,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), shamt)
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), shamt));
             }
         }
         auto returnValue = CONT;
@@ -1725,17 +1734,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1), shamt)
-                      );
+                      gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1), shamt));
             }
         }
         auto returnValue = CONT;
@@ -1773,19 +1782,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_ext(cc, 
-                          (gen_operation(cc, sar, gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1), 32, true), shamt)
-                          ), 32, false));
+                      gen_ext(cc, (gen_operation(cc, sar, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), shamt)), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -1823,18 +1830,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, false));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -1872,18 +1879,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sub, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, true));
+                          (gen_operation(cc, sub, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -1921,18 +1928,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                      ))
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1)))));
             }
         }
         auto returnValue = CONT;
@@ -1970,20 +1976,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 auto label_then3 = cc.newLabel();
                 auto label_merge3 = cc.newLabel();
-                auto tmp_reg3 = get_reg(cc, 8, false);
-                cmp(cc, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs2), 32, true));
+                auto tmp_reg3 = get_reg_Gp(cc, 8, false);
+                cmp(cc, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
                 cc.jl(label_then3);
                 mov(cc, tmp_reg3,0);
                 cc.jmp(label_merge3);
@@ -2031,18 +2036,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 auto label_then4 = cc.newLabel();
                 auto label_merge4 = cc.newLabel();
-                auto tmp_reg4 = get_reg(cc, 8, false);
-                cmp(cc, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2));
+                auto tmp_reg4 = get_reg_Gp(cc, 8, false);
+                cmp(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
                 cc.jb(label_then4);
                 mov(cc, tmp_reg4,0);
                 cc.jmp(label_merge4);
@@ -2090,17 +2096,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2138,18 +2144,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                      ))
-                      );
+                      gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1)))));
             }
         }
         auto returnValue = CONT;
@@ -2187,20 +2192,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1), 32, true), (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))
-                          ))
-                          ), 32, true));
+                          (gen_operation(cc, sar, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs2), (static_cast<uint32_t>(traits::XLEN)-1))))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -2238,17 +2241,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2286,17 +2289,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                      );
+                      gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
             }
         }
         auto returnValue = CONT;
@@ -2336,6 +2339,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2371,10 +2375,11 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, 11);
         auto returnValue = TRAP;
         
@@ -2407,10 +2412,11 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_raise(jh, 0, 3);
         auto returnValue = TRAP;
         
@@ -2443,10 +2449,11 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         gen_leave(jh, 3);
         auto returnValue = TRAP;
         
@@ -2479,11 +2486,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         InvokeNode* call_wait_5;
-        jh.cc.invoke(&call_wait_5,  &wait, FuncSignature::build<void, uint32_t>());
+        cc.invoke(&call_wait_5,  &wait, FuncSignature::build<void, uint32_t>());
         setArg(call_wait_5, 0, 1);
         auto returnValue = CONT;
         
@@ -2520,21 +2528,22 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+        else {
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rd!=0){
                 auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
                 gen_write_mem(jh, traits::CSR, csr, xrs1, 4);
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       xrd);
             }
-            else{
+            else {
                 gen_write_mem(jh, traits::CSR, csr, xrs1, 4);
             }
         }
@@ -2573,18 +2582,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rs1!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, xrs1)
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, xrs1), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2626,18 +2635,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
-            auto xrs1 = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto xrs1 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             if(rs1!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, gen_operation(cc, bnot, xrs1))
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, gen_operation(cc, bnot, xrs1)), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2679,13 +2688,14 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             gen_write_mem(jh, traits::CSR, csr, (uint32_t)zimm, 4);
             if(rd!=0){
@@ -2728,17 +2738,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             if(zimm!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, (uint32_t)zimm)
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, bor, xrd, (uint32_t)zimm), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2780,17 +2790,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto xrd = gen_read_mem(jh, traits::CSR, csr, 4);
             if(zimm!=0){
-                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, ~ ((uint32_t)zimm))
-                , 4);
+                gen_write_mem(jh, traits::CSR, csr, gen_operation(cc, band, xrd, ~ ((uint32_t)zimm)), 4);
             }
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
@@ -2832,6 +2842,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2871,17 +2882,15 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, smul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-            ;
+        else {
+            auto res = gen_operation(cc, smul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
@@ -2923,22 +2932,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, smul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-            ;
+        else {
+            auto res = gen_operation(cc, smul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, true));
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -2976,21 +2982,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, sumul, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true), load_reg_from_mem(jh, traits::X0 + rs2))
-            ;
+        else {
+            auto res = gen_operation(cc, sumul, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, true));
+                          (gen_operation(cc, sar, res, static_cast<uint32_t>(traits::XLEN))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -3028,20 +3032,19 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto res = gen_operation(cc, umul, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-            ;
+        else {
+            auto res = gen_operation(cc, umul, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, shr, res, static_cast<uint32_t>(traits::XLEN))
-                          ), 32, false));
+                          (gen_operation(cc, shr, res, static_cast<uint32_t>(traits::XLEN))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -3079,32 +3082,29 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
-            auto dividend = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs1), 32, true);
-            auto divisor = gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, true);
+        else {
+            auto dividend = gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true);
+            auto divisor = gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true);
             if(rd!=0){
                 {
                 auto label_merge = cc.newLabel();
-                cmp(cc, gen_operation(cc, ne, divisor, 0)
-                ,0);
+                auto cond =  gen_operation(cc, ne, divisor, 0);
+                cmp(cc, cond, 0);
                 auto label_else = cc.newLabel();
                 cc.je(label_else);
                 {
                     auto MMIN = ((uint32_t)1)<<(static_cast<uint32_t>(traits::XLEN)-1);
                     {
                     auto label_merge = cc.newLabel();
-                    cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
-                    , gen_operation(cc, eq, divisor, - 1)
-                    )
-                    ,0);
+                    auto cond =  gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), MMIN), gen_operation(cc, eq, divisor, - 1));
+                    cmp(cc, cond, 0);
                     auto label_else = cc.newLabel();
                     cc.je(label_else);
                     {
@@ -3116,8 +3116,7 @@ private:
                         {
                             mov(cc, get_ptr_for(jh, traits::X0+ rd),
                                   gen_ext(cc, 
-                                      (gen_operation(cc, sdiv, dividend, divisor)
-                                      ), 32, true));
+                                      (gen_operation(cc, sdiv, dividend, divisor)), 32, true));
                         }
                     cc.bind(label_merge);
                     }
@@ -3167,24 +3166,24 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                          gen_operation(cc, udiv, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          );
+                          gen_operation(cc, udiv, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
                 }
             }
             cc.jmp(label_merge);
@@ -3233,28 +3232,27 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 auto MMIN = (uint32_t)1<<(static_cast<uint32_t>(traits::XLEN)-1);
                 {
                 auto label_merge = cc.newLabel();
-                cmp(cc, gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1), MMIN)
-                , gen_operation(cc, eq, gen_ext(cc, 
-                    load_reg_from_mem(jh, traits::X0 + rs2), 32, false), - 1)
-                )
-                ,0);
+                auto cond =  gen_operation(cc, land, gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1), MMIN), gen_operation(cc, eq, gen_ext(cc, 
+                    load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), - 1));
+                cmp(cc, cond, 0);
                 auto label_else = cc.newLabel();
                 cc.je(label_else);
                 {
@@ -3269,11 +3267,7 @@ private:
                     {
                         if(rd!=0){
                             mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                                  gen_ext(cc, 
-                                      (gen_operation(cc, srem, gen_ext(cc, 
-                                          load_reg_from_mem(jh, traits::X0 + rs1), 32, true), gen_ext(cc, 
-                                          load_reg_from_mem(jh, traits::X0 + rs2), 32, true))
-                                      ), 32, false));
+                                  gen_ext(cc, (gen_operation(cc, srem, gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, true), gen_ext(cc, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, true))), 32, false));
                         }
                     }
                 cc.bind(label_merge);
@@ -3284,7 +3278,7 @@ private:
                 {
                     if(rd!=0){
                         mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                              load_reg_from_mem(jh, traits::X0 + rs1));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1));
                     }
                 }
             cc.bind(label_merge);
@@ -3325,24 +3319,24 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rs1>=static_cast<uint32_t>(traits::RFS)||rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             {
             auto label_merge = cc.newLabel();
-            cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs2), 0)
-            ,0);
+            auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs2), 0);
+            cmp(cc, cond, 0);
             auto label_else = cc.newLabel();
             cc.je(label_else);
             {
                 if(rd!=0){
                     mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                          gen_operation(cc, urem, load_reg_from_mem(jh, traits::X0 + rs1), load_reg_from_mem(jh, traits::X0 + rs2))
-                          );
+                          gen_operation(cc, urem, load_reg_from_mem_Gp(jh, traits::X0 + rs1), load_reg_from_mem_Gp(jh, traits::X0 + rs2)));
                 }
             }
             cc.jmp(label_merge);
@@ -3350,7 +3344,7 @@ private:
                 {
                     if(rd!=0){
                         mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                              load_reg_from_mem(jh, traits::X0 + rs1));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1));
                     }
                 }
             cc.bind(label_merge);
@@ -3390,16 +3384,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(imm){
             mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
                   gen_ext(cc, 
-                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), imm)
-                      ), 32, false));
+                      (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), imm)), 32, false));
         }
-        else{
+        else {
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         auto returnValue = CONT;
@@ -3437,12 +3431,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
               gen_ext(cc, 
                   gen_ext(cc, 
@@ -3482,14 +3476,14 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         auto offs = gen_ext(cc, 
-            (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1+8), uimm)
-            ), 32, false);
+            (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), uimm)), 32, false);
         gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-            load_reg_from_mem(jh, traits::X0 + rs2+8), 32, false), 4);
+            load_reg_from_mem_Gp(jh, traits::X0 + rs2+8), 32, false), 4);
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 59);
@@ -3524,18 +3518,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rs1!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rs1), (int8_t)sext<6>(imm))
-                          ), 32, true));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rs1), (int8_t)sext<6>(imm))), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -3570,6 +3564,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3606,10 +3601,11 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         mov(cc, get_ptr_for(jh, traits::X0+ 1),
               (uint32_t)(PC+2));
         auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
@@ -3649,13 +3645,14 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       (uint32_t)((int8_t)sext<6>(imm)));
@@ -3695,6 +3692,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3738,16 +3736,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(nzimm){
             mov(cc, get_ptr_for(jh, traits::X0+ 2),
                   gen_ext(cc, 
-                      (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), (int16_t)sext<10>(nzimm))
-                      ), 32, true));
+                      (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), (int16_t)sext<10>(nzimm))), 32, true));
         }
-        else{
+        else {
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         auto returnValue = CONT;
@@ -3782,6 +3780,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3820,12 +3819,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
-              gen_operation(cc, shr, load_reg_from_mem(jh, traits::X0 + rs1+8), shamt)
-              );
+              gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), shamt));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 67);
@@ -3860,6 +3859,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3867,16 +3867,14 @@ private:
             mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
                   gen_ext(cc, 
                       (gen_operation(cc, sar, (gen_ext(cc, 
-                          load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), shamt)
-                      ), 32, true));
+                          load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 32, false)), shamt)), 32, true));
         }
-        else{
+        else {
             if(static_cast<uint32_t>(traits::XLEN)==128){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
                       gen_ext(cc, 
                           (gen_operation(cc, sar, (gen_ext(cc, 
-                              load_reg_from_mem(jh, traits::X0 + rs1+8), 32, false)), 64)
-                          ), 32, true));
+                              load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 32, false)), 64)), 32, true));
             }
         }
         auto returnValue = CONT;
@@ -3913,13 +3911,13 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
               gen_ext(cc, 
-                  (gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1+8), (int8_t)sext<6>(imm))
-                  ), 32, true));
+                  (gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), (int8_t)sext<6>(imm))), 32, true));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 69);
@@ -3954,13 +3952,13 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
               gen_ext(cc, 
-                  (gen_operation(cc, sub, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-                  ), 32, true));
+                  (gen_operation(cc, sub, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8))), 32, true));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 70);
@@ -3995,12 +3993,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, bxor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, bxor, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 71);
@@ -4035,12 +4033,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, bor, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, bor, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 72);
@@ -4075,12 +4073,12 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         mov(cc, get_ptr_for(jh, traits::X0+ rd+8),
-              gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rd+8), load_reg_from_mem(jh, traits::X0 + rs2+8))
-              );
+              gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rd+8), load_reg_from_mem_Gp(jh, traits::X0 + rs2+8)));
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 73);
@@ -4114,10 +4112,11 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         auto PC_val_v = (uint32_t)(PC+(int16_t)sext<12>(imm));
         mov(cc, jh.next_pc, PC_val_v);
         mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(KNOWN_JUMP));
@@ -4155,14 +4154,15 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         {
         auto label_merge = cc.newLabel();
-        cmp(cc, gen_operation(cc, eq, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
-        ,0);
+        auto cond =  gen_operation(cc, eq, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 0);
+        cmp(cc, cond, 0);
         cc.je(label_merge);
         {
             auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
@@ -4205,14 +4205,15 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         {
         auto label_merge = cc.newLabel();
-        cmp(cc, gen_operation(cc, ne, load_reg_from_mem(jh, traits::X0 + rs1+8), 0)
-        ,0);
+        auto cond =  gen_operation(cc, ne, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), 0);
+        cmp(cc, cond, 0);
         cc.je(label_merge);
         {
             auto PC_val_v = (uint32_t)(PC+(int16_t)sext<9>(imm));
@@ -4255,17 +4256,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rs1!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1),
-                      gen_operation(cc, shl, load_reg_from_mem(jh, traits::X0 + rs1), nzuimm)
-                      );
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), nzuimm));
             }
         }
         auto returnValue = CONT;
@@ -4302,16 +4303,16 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)||rd==0){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-                ), 32, false);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
             mov(cc, get_ptr_for(jh, traits::X0+ rd),
                   gen_ext(cc, 
                       gen_ext(cc, 
@@ -4351,16 +4352,17 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
-                      load_reg_from_mem(jh, traits::X0 + rs2));
+                      load_reg_from_mem_Gp(jh, traits::X0 + rs2));
             }
         }
         auto returnValue = CONT;
@@ -4396,18 +4398,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs1&&rs1<static_cast<uint32_t>(traits::RFS)){
             auto addr_mask = (uint32_t)- 2;
-            auto PC_val_v = gen_operation(cc, band, load_reg_from_mem(jh, traits::X0 + rs1%static_cast<uint32_t>(traits::RFS)), addr_mask)
-            ;
+            auto PC_val_v = gen_operation(cc, band, load_reg_from_mem_Gp(jh, traits::X0 + rs1%static_cast<uint32_t>(traits::RFS)), addr_mask);
             mov(cc, jh.next_pc, PC_val_v);
             mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
         }
-        else{
+        else {
             gen_raise(jh, 0, 2);
         }
         auto returnValue = BRANCH;
@@ -4441,6 +4443,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4479,18 +4482,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rd>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             if(rd!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rd),
                       gen_ext(cc, 
-                          (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + rd), load_reg_from_mem(jh, traits::X0 + rs2))
-                          ), 32, false));
+                          (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + rd), load_reg_from_mem_Gp(jh, traits::X0 + rs2))), 32, false));
             }
         }
         auto returnValue = CONT;
@@ -4526,20 +4529,20 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(jh.cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
         if(rs1>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto addr_mask = (uint32_t)- 2;
-            auto new_pc = load_reg_from_mem(jh, traits::X0 + rs1);
+            auto new_pc = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             mov(cc, get_ptr_for(jh, traits::X0+ 1),
                   (uint32_t)(PC+2));
-            auto PC_val_v = gen_operation(cc, band, new_pc, addr_mask)
-            ;
+            auto PC_val_v = gen_operation(cc, band, new_pc, addr_mask);
             mov(cc, jh.next_pc, PC_val_v);
             mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(UNKNOWN_JUMP));
         }
@@ -4574,6 +4577,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4612,18 +4616,18 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
         if(rs2>=static_cast<uint32_t>(traits::RFS)){
             gen_raise(jh, 0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
-        else{
+        else {
             auto offs = gen_ext(cc, 
-                (gen_operation(cc, add, load_reg_from_mem(jh, traits::X0 + 2), uimm)
-                ), 32, false);
+                (gen_operation(cc, add, load_reg_from_mem_Gp(jh, traits::X0 + 2), uimm)), 32, false);
             gen_write_mem(jh, traits::MEM, offs, gen_ext(cc, 
-                load_reg_from_mem(jh, traits::X0 + rs2), 32, false), 4);
+                load_reg_from_mem_Gp(jh, traits::X0 + rs2), 32, false), 4);
         }
         auto returnValue = CONT;
         
@@ -4656,6 +4660,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4745,12 +4750,13 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//Instruction epilogue begin");
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     cmp(cc, current_trap_state, 0);
     cc.jne(jh.trap_entry);
     cc.inc(get_ptr_for(jh, traits::ICOUNT));
-    cc.inc(get_ptr_for(jh, traits::CYCLE));
+    cc.inc(get_ptr_for(jh, traits::INSTRET));
     cc.comment("//Instruction epilogue end");
 
 }
@@ -4764,7 +4770,7 @@ void vm_impl<ARCH>::gen_block_prologue(jit_holder& jh){
 template <typename ARCH>
 void vm_impl<ARCH>::gen_block_epilogue(jit_holder& jh){
     x86::Compiler& cc = jh.cc;
-    cc.comment("//block epilogue begin");
+    cc.comment("//gen_block_epilogue");
     cc.ret(jh.next_pc);
 
     cc.bind(jh.trap_entry);
@@ -4828,9 +4834,11 @@ std::unique_ptr<vm_if> create<arch::tgc5c>(arch::tgc5c *core, unsigned short por
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
+
 volatile std::array<bool, 2> dummy = {
         core_factory::instance().register_creator("tgc5c|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::tgc5c>();

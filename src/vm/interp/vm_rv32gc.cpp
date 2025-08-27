@@ -153,7 +153,7 @@ protected:
             return (uint64_t)val;
         }
         else {
-            uint64_t box = ~ ((uint64_t)0);
+            uint64_t box = ~((uint64_t)0);
             return (uint64_t)(((uint128_t)box<<32)|val);
         }
     }
@@ -172,7 +172,7 @@ protected:
             return (uint64_t)val;
         }
         else {
-            uint64_t box = ~ ((uint64_t)0);
+            uint64_t box = ~((uint64_t)0);
             return (uint64_t)(((uint128_t)box<<64)|val);
         }
     }
@@ -189,7 +189,7 @@ private:
         typename arch::traits<ARCH>::opcode_e op;
     };
 
-    const std::array<instruction_descriptor, 158> instr_descr = {{
+    const std::array<instruction_descriptor, 160> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::AUIPC},
@@ -349,6 +349,8 @@ private:
         {16, 0b1010000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSD},
         {16, 0b0010000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLDSP},
         {16, 0b1010000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSDSP},
+        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, arch::traits<ARCH>::opcode_e::SFENCE__VMA},
+        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, arch::traits<ARCH>::opcode_e::SRET},
     }};
 
     //needs to be declared after instr_descr
@@ -427,7 +429,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
             process_spawn_blocks();
             if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
+            *PC = super::core.enter_trap(trap_state, pc.val, instr);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
@@ -1748,7 +1750,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t xrd = res_8;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
-                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ xrs1);
+                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~xrs1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
@@ -1851,7 +1853,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_11;
                                         if(zimm != 0) {
-                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ ((uint32_t)zimm));
+                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~((uint32_t)zimm));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
@@ -3315,7 +3317,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3340,7 +3342,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fsub_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3365,7 +3367,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fmul_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3390,7 +3392,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fdiv_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3414,7 +3416,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fsel_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 0));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3438,7 +3440,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fsel_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), 1));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3462,7 +3464,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fsqrt_s(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3488,7 +3490,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 0, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3514,7 +3516,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 1, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3540,7 +3542,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 2, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3566,7 +3568,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(fmadd_s(unbox_s(traits::FLEN, *(F+rs1)), unbox_s(traits::FLEN, *(F+rs2)), unbox_s(traits::FLEN, *(F+rs3)), 3, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3598,7 +3600,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3631,7 +3633,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3661,7 +3663,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         *(F+rd) = NaNBox32(i32tof32((uint32_t)*(X+rs1), get_rm(rm)));
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3691,7 +3693,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         *(F+rd) = NaNBox32(ui32tof32((uint32_t)*(X+rs1), get_rm(rm)));
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3734,7 +3736,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox32(((uint32_t)~ bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2)))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox32(((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& (1ULL << 0)<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -3841,7 +3843,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3874,7 +3876,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -3907,7 +3909,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4119,7 +4121,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4144,7 +4146,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fsub_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4169,7 +4171,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fmul_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4194,7 +4196,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fdiv_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4218,7 +4220,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fsel_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 0));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4242,7 +4244,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fsel_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), 1));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4266,7 +4268,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fsqrt_d(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4292,7 +4294,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 0, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4319,7 +4321,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         uint64_t res = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 1, get_rm(rm)));
                         *(F+rd) = res;
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4345,7 +4347,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 2, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4371,7 +4373,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox64(fmadd_d(unbox_d(traits::FLEN, *(F+rs1)), unbox_d(traits::FLEN, *(F+rs2)), unbox_d(traits::FLEN, *(F+rs3)), 3, get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4403,7 +4405,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4436,7 +4438,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4466,7 +4468,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         *(F+rd) = NaNBox64(i32tof64((uint32_t)*(X+rs1), get_rm(rm)));
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4496,7 +4498,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         *(F+rd) = NaNBox64(ui32tof64((uint32_t)*(X+rs1), get_rm(rm)));
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4521,7 +4523,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         *(F+rd) = NaNBox32(f64tof32(unbox_d(traits::FLEN, *(F+rs1)), get_rm(rm)));
                         uint32_t flags = fget_flags();
-                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4584,7 +4586,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox64(((uint64_t)~ bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2)))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox64(((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& (1ULL << 0)<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4637,7 +4639,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4670,7 +4672,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4703,7 +4705,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             *(X+rd) = (uint32_t)res;
                                         }
                                         uint32_t flags = fget_flags();
-                                        *FCSR = (*FCSR & ~ traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
+                                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                                     }
                                 }
                     break;
@@ -4835,9 +4837,49 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     break;
                 }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::SFENCE__VMA: {
+                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
+                    uint8_t asid = ((bit_sub<20,5>(instr)));
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} {rs1}, {asid}", fmt::arg("mnemonic", "sfence.vma"),
+                            fmt::arg("rs1", name(rs1)), fmt::arg("asid", name(asid)));
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    super::template write_mem<uint32_t>(traits::FENCE, traits::fencevma, ((uint16_t)(uint8_t)rs1<<8)|(uint8_t)asid);
+                                    if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
+                                }
+                    break;
+                }// @suppress("No break at end of case")
+                case arch::traits<ARCH>::opcode_e::SRET: {
+                    if(this->disass_enabled){
+                        /* generate console output when executing the command */
+                        //No disass specified, using instruction name
+                        std::string mnemonic = "sret";
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
+                    // used registers
+                    // calculate next pc value
+                    *NEXT_PC = *PC + 4;
+                    // execute instruction
+                    {
+                                    leave(1);
+                                }
+                    break;
+                }// @suppress("No break at end of case")
                 default: {
+                    if(this->disass_enabled){
+                        std::string mnemonic = "Illegal Instruction";
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
                     *NEXT_PC = *PC + ((instr & 3) == 3 ? 4 : 2);
-                    raise(0,  2);
+                    raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                 }
                 }
             }catch(memory_access_exception& e){}
@@ -4877,10 +4919,22 @@ std::unique_ptr<vm_if> create<arch::rv32gc>(arch::rv32gc *core, unsigned short p
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
-volatile std::array<bool, 2> dummy = {
+
+volatile std::array<bool, 3> dummy = {
+        core_factory::instance().register_creator("rv32gc|msu_vp|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
+		    auto vm = new interp::rv32gc::vm_impl<arch::rv32gc>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32gc>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        }),
         core_factory::instance().register_creator("rv32gc|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32gc>();
 		    auto vm = new interp::rv32gc::vm_impl<arch::rv32gc>(*cpu, false);

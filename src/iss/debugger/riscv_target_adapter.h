@@ -49,7 +49,8 @@ namespace iss {
 namespace debugger {
 
 char const* const get_csr_name(unsigned);
-constexpr auto csr_offset = 100U;
+constexpr auto vec_offset = 128U;
+constexpr auto csr_offset = 256U;
 
 using namespace iss::arch;
 using namespace iss::debugger;
@@ -203,18 +204,6 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::read_registers(std::
             }
         }
     }
-    if(iss::arch::traits<ARCH>::FLEN > 0) {
-        auto fstart_reg = get_f0_offset<ARCH>();
-        for(size_t i = 0; i < 32; ++i) {
-            auto reg_no = fstart_reg + i;
-            auto reg_width = arch::traits<ARCH>::reg_bit_widths[reg_no] / 8;
-            unsigned offset = traits<ARCH>::reg_byte_offsets[reg_no];
-            for(size_t j = 0; j < reg_width; ++j) {
-                data.push_back(*(reg_base + offset + j));
-                avail.push_back(0xff);
-            }
-        }
-    }
     return Ok;
 }
 
@@ -234,21 +223,12 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_registers(cons
         }
         iter += reg_width;
     }
-    if(iss::arch::traits<ARCH>::FLEN > 0) {
-        auto fstart_reg = get_f0_offset<ARCH>();
-        auto reg_width = arch::traits<ARCH>::FLEN / 8;
-        for(size_t i = 0; i < 32 && iter < iter_end; ++i) {
-            unsigned offset = traits<ARCH>::reg_byte_offsets[fstart_reg + i];
-            std::copy(iter, iter + reg_width, reg_base + offset);
-            iter += reg_width;
-        }
-    }
     return Ok;
 }
 
 template <typename ARCH>
 status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
-    if(reg_no < csr_offset) {
+    if(reg_no < vec_offset) {
         // auto reg_size = arch::traits<ARCH>::reg_bit_width(static_cast<typename
         // arch::traits<ARCH>::reg_e>(reg_no))/8;
         auto* reg_base = core->get_regs_base_ptr();
@@ -258,6 +238,8 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
         auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(reg_base + offset, reg_base + offset + reg_width, data.begin());
         std::fill(avail.begin(), avail.end(), 0xff);
+    } else if(reg_no < csr_offset) {
+        // TODO: implement vector register reading
     } else {
         typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, reg_no - csr_offset);
         data.resize(sizeof(typename traits<ARCH>::reg_t));
@@ -270,11 +252,13 @@ status riscv_target_adapter<ARCH>::read_single_register(unsigned int reg_no, std
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_single_register(unsigned int reg_no, const std::vector<uint8_t>& data) {
-    if(reg_no < csr_offset) {
+    if(reg_no < vec_offset) {
         auto* reg_base = core->get_regs_base_ptr();
         auto reg_width = arch::traits<ARCH>::reg_bit_widths[static_cast<typename arch::traits<ARCH>::reg_e>(reg_no)] / 8;
         auto offset = traits<ARCH>::reg_byte_offsets[reg_no];
         std::copy(data.begin(), data.begin() + reg_width, reg_base + offset);
+    } else if(reg_no < csr_offset) {
+        // TODO: implement vector register writing
     } else {
         typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_WRITE, traits<ARCH>::CSR, reg_no - csr_offset);
         core->write(a, data.size(), data.data());
@@ -381,14 +365,30 @@ status riscv_target_adapter<ARCH>::resume_from_addr(bool step, int sig, uint64_t
     return resume_from_current(step, sig, thread, stop_callback);
 }
 
+struct lane_types {
+    const char* gdb_type;
+    const char* id;
+    int size;
+    const char suffix;
+};
+
 template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std::string& out_buf) {
+    static constexpr std::array<lane_types, 5> vector_lanes = {{
+        {"uint128", "quads", 128, 'q'},
+        {"uint64", "longs", 64, 'l'},
+        {"uint32", "words", 32, 'w'},
+        {"uint16", "shorts", 16, 's'},
+        // { "ieee_half", 16, 'h', 'f' },
+        {"uint8", "bytes", 8, 'b'},
+    }};
+
     if(!csr_xml.size()) {
         std::ostringstream oss;
         oss << "<?xml version=\"1.0\"?><!DOCTYPE feature SYSTEM \"gdb-target.dtd\"><target version=\"1.0\">\n";
         if(iss::arch::traits<ARCH>::XLEN == 32)
             oss << "<architecture>riscv:rv32</architecture>\n";
         else if(iss::arch::traits<ARCH>::XLEN == 64)
-            oss << "  <architectureriscv:rv64</architecture>\n";
+            oss << "  <architecture>riscv:rv64</architecture>\n";
         oss << "  <feature name=\"org.gnu.gdb.riscv.cpu\">\n";
         auto reg_base_num = iss::arch::traits<ARCH>::X0;
         for(auto i = 0U; i < iss::arch::traits<ARCH>::RFS; ++i) {
@@ -401,20 +401,37 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
         if(iss::arch::traits<ARCH>::FLEN > 0) {
             oss << "  <feature name=\"org.gnu.gdb.riscv.fpu\">\n";
             auto reg_base_num = get_f0_offset<ARCH>();
-            auto type = iss::arch::traits<ARCH>::FLEN == 32 ? "ieee_single" : "riscv_double";
+            auto type = iss::arch::traits<ARCH>::FLEN == 32 ? "ieee_single" : "ieee_double";
             for(auto i = 0U; i < 32; ++i) {
                 oss << "    <reg name=\"f" << i << "\" bitsize=\"" << iss::arch::traits<ARCH>::reg_bit_widths[reg_base_num + i]
                     << "\" type=\"" << type << "\" regnum=\"" << i + 33 << "\"/>\n";
             }
-            oss << "    <reg name=\"fcsr\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"103\" type int/>\n";
-            oss << "    <reg name=\"fflags\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"101\" type int/>\n";
-            oss << "    <reg name=\"frm\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN << "\" regnum=\"102\" type int/>\n";
+            oss << "  </feature>\n";
+        }
+        std::vector<uint8_t> data;
+        data.resize(sizeof(typename traits<ARCH>::reg_t));
+        typed_addr_t<iss::address_type::PHYSICAL> vlen_addr(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, 0xC22);
+        auto res = core->read(vlen_addr, data.size(), data.data());
+        if(res == iss::Ok) {
+            auto bitsize = data[0] * 8L;
+            oss << "  <feature name=\"org.gnu.gdb.riscv.vector\">\n";
+            for(auto& lane : vector_lanes) {
+                int count = bitsize / lane.size;
+                oss << "    <vector id=\"" << lane.id << "\" type=\"" << lane.gdb_type << "\" count=\"" << count << "\"/>";
+            }
+            oss << "    <union id=\"riscv_vector\">";
+            for(auto& lane : vector_lanes) {
+                oss << "      <field name=\"" << lane.suffix << "\" type=\"" << lane.id << "\"/>";
+            }
+            oss << "    </union>";
+            for(auto i = 0U; i < 32; ++i) {
+                oss << "    <reg name=\"v" << i << "\" bitsize=\"" << bitsize << "\"  type=\"riscv_vector\" regnum=\"" << (i + vec_offset)
+                    << "\" group=\"vector\"/>\n";
+            }
             oss << "  </feature>\n";
         }
         oss << "  <feature name=\"org.gnu.gdb.riscv.csr\">\n";
-        std::vector<uint8_t> data;
         std::vector<uint8_t> avail;
-        data.resize(sizeof(typename traits<ARCH>::reg_t));
         avail.resize(sizeof(typename traits<ARCH>::reg_t));
         for(auto i = 0U; i < 4096; ++i) {
             typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, traits<ARCH>::CSR, i);

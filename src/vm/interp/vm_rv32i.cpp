@@ -285,7 +285,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
             process_spawn_blocks();
             if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
-            pc.val = super::core.enter_trap(arch::traits<ARCH>::RV_CAUSE_FETCH_ACCESS<<16, pc.val, 0);
+            *PC = super::core.enter_trap(trap_state, pc.val, instr);
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
@@ -1606,7 +1606,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t xrd = res_8;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
-                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ xrs1);
+                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~xrs1);
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
@@ -1709,7 +1709,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_11;
                                         if(zimm != 0) {
-                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~ ((uint32_t)zimm));
+                                            super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~((uint32_t)zimm));
                                             if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
@@ -1741,8 +1741,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")
                 default: {
+                    if(this->disass_enabled){
+                        std::string mnemonic = "Illegal Instruction";
+                        this->core.disass_output(pc.val, mnemonic);
+                    }
                     *NEXT_PC = *PC + ((instr & 3) == 3 ? 4 : 2);
-                    raise(0,  2);
+                    raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                 }
                 }
             }catch(memory_access_exception& e){}
@@ -1782,9 +1786,11 @@ std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short por
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
+
 volatile std::array<bool, 2> dummy = {
         core_factory::instance().register_creator("rv32i|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32i>();

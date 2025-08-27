@@ -31,6 +31,7 @@
  *******************************************************************************/
 
 // clang-format off
+#include "core_complex.h"
 #include <iss/debugger/gdb_session.h>
 #include <iss/debugger/encoderdecoder.h>
 #include <iss/debugger/server.h>
@@ -38,14 +39,13 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
-#include "tlm/scc/tlm_signal_gp.h"
+#include <tlm/scc/tlm_signal_gp.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
-#include "sc_core_adapter_if.h"
+#include "core_facade.h"
 #include <scc/report.h>
 #include <util/ities.h>
-#include <iostream>
 #include <array>
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
@@ -130,15 +130,9 @@ public:
     void reset(uint64_t addr) { vm->reset(addr); }
     inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump); }
     inline std::pair<uint64_t, bool> load_file(std::string const& name) {
-        iss::arch_if* cc = cpu->get_arch_if();
+        iss::arch_if* cc = core->get_arch_if();
         return cc->load_file(name);
     };
-
-    std::function<unsigned(void)> get_mode;
-    std::function<uint64_t(void)> get_state;
-    std::function<bool(void)> get_interrupt_execution;
-    std::function<void(bool)> set_interrupt_execution;
-    std::function<void(short, bool)> local_irq;
 
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
         auto& f = sysc::iss_factory::instance();
@@ -148,30 +142,23 @@ public:
             SCCINFO(owner->hier_name()) << "Available cores: \n    " << util::join(names, ",\n    ") << std::endl;
             sc_core::sc_stop();
         } else if(type.find('|') != std::string::npos) {
-            std::tie(cpu, vm) = f.create(type + "|" + backend);
+            std::tie(core, vm) = f.create(type + "|" + backend, gdb_port, owner);
         } else {
             auto base_isa = type.substr(0, 5);
             if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                std::tie(cpu, vm) = f.create(type + "|mu_p_clic_pmp|" + backend, gdb_port, owner);
+                std::tie(core, vm) = f.create(type + "|mu_p_clic_pmp|" + backend, gdb_port, owner);
             } else {
-                std::tie(cpu, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
+                std::tie(core, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
             }
         }
-        if(!cpu) {
+        if(!core) {
             if(type != "?")
                 SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
         } else if(!vm) {
             if(type != "?")
                 SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
         } else {
-            auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu.get());
-            sc_cpu_if->set_mhartid(hart_id);
-            get_mode = [sc_cpu_if]() { return sc_cpu_if->get_mode(); };
-            get_state = [sc_cpu_if]() { return sc_cpu_if->get_state(); };
-            get_interrupt_execution = [sc_cpu_if]() { return sc_cpu_if->get_interrupt_execution(); };
-            set_interrupt_execution = [sc_cpu_if](bool b) { return sc_cpu_if->set_interrupt_execution(b); };
-            local_irq = [sc_cpu_if](short s, bool b) { return sc_cpu_if->local_irq(s, b); };
-
+            core->set_hartid(hart_id);
             auto* srv = debugger::server<debugger::gdb_session>::get();
             if(srv)
                 tgt_adapter = srv->get_target();
@@ -186,7 +173,7 @@ public:
 
     core_complex_if* const owner;
     vm_ptr vm{nullptr};
-    sc_cpu_ptr cpu{nullptr};
+    core_ptr core{nullptr};
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
 };
 
@@ -213,13 +200,13 @@ core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     trc = new core_trace();
-    ibus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
+    ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
             fetch_lut.removeEntry(lut_entry);
         }
     });
-    dbus.register_invalidate_direct_mem_ptr([=](uint64_t start, uint64_t end) -> void {
+    dbus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = read_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
             read_lut.removeEntry(lut_entry);
@@ -277,7 +264,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 }
 
 template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
-    delete cpu;
+    delete core;
     delete trc;
     for(auto* p : plugin_list)
         delete p;
@@ -289,21 +276,21 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     auto& type = GET_PROP_VALUE(core_type);
     SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
-    cpu = new core_wrapper(this);
-    cpu->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    core = new core_wrapper(this);
+    core->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
     if(type == "?")
         return;
 #ifndef CWR_SYSTEMC
     if(!local_irq_num.is_default_value()) {
-        auto* sc_cpu_if = reinterpret_cast<sc_core_adapter_if*>(cpu->cpu.get());
-        sc_cpu_if->set_irq_num(16 + local_irq_num);
+        auto* sc_cpu_if = reinterpret_cast<core_facade*>(core->core.get());
+        sc_cpu_if->set_irq_count(16 + local_irq_num);
     }
 #endif
-    sc_assert(cpu->vm != nullptr);
+    sc_assert(core->vm != nullptr);
     auto disass = GET_PROP_VALUE(enable_disass);
     if(disass && trc->m_db)
         SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
-    cpu->vm->setDisassEnabled(disass || trc->m_db != nullptr);
+    core->vm->setDisassEnabled(disass || trc->m_db != nullptr);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -316,11 +303,11 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
             }
             if(plugin_name == "ic") {
                 auto* plugin = new iss::plugin::instruction_count(filename);
-                cpu->vm->register_plugin(*plugin);
+                core->vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else if(plugin_name == "ce") {
                 auto* plugin = new iss::plugin::cycle_estimate(filename);
-                cpu->vm->register_plugin(*plugin);
+                core->vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else {
 #ifndef WIN32
@@ -328,7 +315,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
                 iss::plugin::loader l(plugin_name, {{"initPlugin"}});
                 auto* plugin = l.call_function<iss::vm_plugin*>("initPlugin", a.size(), a.data());
                 if(plugin) {
-                    cpu->vm->register_plugin(*plugin);
+                    core->vm->register_plugin(*plugin);
                     plugin_list.push_back(plugin);
                 } else
 #endif
@@ -343,7 +330,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
-            std::pair<uint64_t, bool> load_result = cpu->load_file(s);
+            std::pair<uint64_t, bool> load_result = core->load_file(s);
             if(!std::get<1>(load_result)) {
                 SCCWARN(SCMOD) << "Could not load FW file " << s;
             } else {
@@ -372,8 +359,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint
     trc->tr_handle = trc->instr_tr_handle->begin_transaction();
     trc->tr_handle.record_attribute("PC", pc);
     trc->tr_handle.record_attribute("INSTR", instr_str);
-    trc->tr_handle.record_attribute("MODE", lvl[cpu->get_mode()]);
-    trc->tr_handle.record_attribute("MSTATUS", cpu->get_state());
+    trc->tr_handle.record_attribute("MODE", lvl[core->core->get_mode()]);
+    trc->tr_handle.record_attribute("MSTATUS", core->core->get_state());
     trc->tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
     return true;
 }
@@ -390,25 +377,25 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
-        cpu->set_interrupt_execution(true);
+        core->core->set_interrupt_execution(true);
 }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
     if(rst_i.read())
-        cpu->set_interrupt_execution(true);
+        core->core->set_interrupt_execution(true);
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { cpu->local_irq(3, sw_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core->core->local_irq(3, sw_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { cpu->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core->core->local_irq(7, timer_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { cpu->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core->core->local_irq(11, ext_irq_i.read()); }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
-            cpu->local_irq(16 + i, local_irq_i[i].read());
+            core->core->local_irq(16 + i, local_irq_i[i].read());
         }
     }
 }
@@ -419,16 +406,16 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     do {
         wait(SC_ZERO_TIME);
         if(rst_i.read()) {
-            cpu->reset(GET_PROP_VALUE(reset_address));
+            core->reset(GET_PROP_VALUE(reset_address));
             wait(rst_i.negedge_event());
         }
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
         }
         quantum_keeper.reset();
-        cpu->set_interrupt_execution(false);
-        cpu->start(dump_ir);
-    } while(!cpu->get_interrupt_execution());
+        core->core->set_interrupt_execution(false);
+        core->start(dump_ir);
+    } while(!core->core->get_interrupt_execution());
     sc_stop();
 }
 

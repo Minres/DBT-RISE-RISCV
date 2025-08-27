@@ -35,9 +35,10 @@
 #ifndef _MEMORY_WITH_HTIF_
 #define _MEMORY_WITH_HTIF_
 
-#include "memory_if.h"
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/vm_types.h"
+#include "memory_if.h"
+#include <cstdlib>
 #include <util/logging.h>
 #include <util/sparse_array.h>
 
@@ -63,15 +64,39 @@ template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
 
 private:
     iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        for(auto offs = 0U; offs < length; ++offs) {
-            *(data + offs) = mem[(addr + offs) % mem.size()];
+        // for(auto offs = 0U; offs < length; ++offs) {
+        //     *(data + offs) = mem[(addr + offs) % mem.size()];
+        // }
+        if(mem.is_allocated(addr)) {
+            const auto& p = mem(addr / mem.page_size);
+            auto offs = addr & mem.page_addr_mask;
+            if((offs + length) > mem.page_size) {
+                auto first_part = mem.page_size - offs;
+                std::copy(p.data() + offs, p.data() + offs + first_part, data);
+                const auto& p2 = mem((addr / mem.page_size) + 1);
+                std::copy(p2.data(), p2.data() + length - first_part, data + first_part);
+            } else {
+                std::copy(p.data() + offs, p.data() + offs + length, data);
+            }
+        } else {
+            // no allocated page so return randomized data
+            for(size_t i = 0; i < length; i++)
+                data[i] = std::rand() % 256;
         }
         return iss::Ok;
     }
 
     iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        mem_type::page_type& p = mem(addr / mem.page_size);
-        std::copy(data, data + length, p.data() + (addr & mem.page_addr_mask));
+        auto& p = mem(addr / mem.page_size);
+        auto offs = addr & mem.page_addr_mask;
+        if((offs + length) > mem.page_size) {
+            auto first_part = mem.page_size - offs;
+            std::copy(data, data + first_part, p.data() + offs);
+            auto& p2 = mem((addr / mem.page_size) + 1);
+            std::copy(data + first_part, data + length, p2.data());
+        } else {
+            std::copy(data, data + length, p.data() + offs);
+        }
         // this->tohost handling in case of riscv-test
         // according to https://github.com/riscv-software-src/riscv-isa-sim/issues/364#issuecomment-607657754:
         if(access && iss::access_type::FUNC && addr == hart_if.tohost) {

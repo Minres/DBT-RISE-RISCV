@@ -145,7 +145,7 @@ protected:
             return (uint64_t)val;
         }
         else {
-            uint64_t box = ~ ((uint64_t)0);
+            uint64_t box = ~((uint64_t)0);
             return (uint64_t)(((uint128_t)box<<32)|val);
         }
     }
@@ -168,7 +168,7 @@ protected:
             return (uint64_t)val;
         }
         else {
-            uint64_t box = ~ ((uint64_t)0);
+            uint64_t box = ~((uint64_t)0);
             return (uint64_t)(((uint128_t)box<<64)|val);
         }
     }
@@ -183,7 +183,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 158> instr_descr = {{
+    const std::array<instruction_descriptor, 160> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -501,6 +501,10 @@ private:
         {16, 0b0010000000000010, 0b1110000000000011, &this_class::__c__fldsp},
         /* instruction C__FSDSP, encoding '0b1010000000000010' */
         {16, 0b1010000000000010, 0b1110000000000011, &this_class::__c__fsdsp},
+        /* instruction SFENCE__VMA, encoding '0b00010010000000000000000001110011' */
+        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, &this_class::__sfence__vma},
+        /* instruction SRET, encoding '0b00010000001000000000000001110011' */
+        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, &this_class::__sret},
     }};
 
     //needs to be declared after instr_descr
@@ -534,6 +538,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -580,6 +585,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -626,6 +632,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -684,6 +691,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -754,6 +762,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -817,6 +826,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -880,6 +890,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -945,6 +956,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1010,6 +1022,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1073,6 +1086,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1136,6 +1150,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1188,6 +1203,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1240,6 +1256,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1292,6 +1309,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1343,6 +1361,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1394,6 +1413,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1441,6 +1461,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1488,6 +1509,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1535,6 +1557,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1583,6 +1606,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1642,6 +1666,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1701,6 +1726,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1748,6 +1774,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1795,6 +1822,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1842,6 +1870,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1889,6 +1918,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1936,6 +1966,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -1983,6 +2014,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2031,6 +2063,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2079,6 +2112,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2126,6 +2160,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2185,6 +2220,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2244,6 +2280,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2291,6 +2328,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2338,6 +2376,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2386,6 +2425,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2433,6 +2473,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2482,6 +2523,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2517,6 +2559,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2553,6 +2596,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2589,6 +2633,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2625,6 +2670,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2666,6 +2712,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2719,6 +2766,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2771,6 +2819,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2823,6 +2872,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2872,6 +2922,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2923,6 +2974,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -2974,6 +3026,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3013,6 +3066,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3062,6 +3116,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3111,6 +3166,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3160,6 +3216,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3209,6 +3266,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3292,6 +3350,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3357,6 +3416,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3443,6 +3503,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3509,6 +3570,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3562,6 +3624,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3636,6 +3699,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3691,6 +3755,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3748,6 +3813,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3803,6 +3869,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3858,6 +3925,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3913,6 +3981,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -3981,6 +4050,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4049,6 +4119,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4116,6 +4187,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4180,6 +4252,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4226,6 +4299,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4270,6 +4344,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4311,6 +4386,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4356,6 +4432,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4392,6 +4469,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4435,6 +4513,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4481,6 +4560,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4524,6 +4604,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4567,6 +4648,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4605,6 +4687,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4644,6 +4727,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4695,6 +4779,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4735,6 +4820,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4775,6 +4861,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4814,6 +4901,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4853,6 +4941,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4891,6 +4980,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4932,6 +5022,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -4982,6 +5073,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5032,6 +5124,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5078,6 +5171,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5126,6 +5220,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5171,6 +5266,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5215,6 +5311,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5253,6 +5350,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5299,6 +5397,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5346,6 +5445,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5384,6 +5484,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5427,6 +5528,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5466,6 +5568,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5520,6 +5623,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5568,6 +5672,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5652,6 +5757,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5736,6 +5842,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5820,6 +5927,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5903,6 +6011,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -5979,6 +6088,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6055,6 +6165,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6131,6 +6242,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6226,6 +6338,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6321,6 +6434,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6416,6 +6530,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6509,6 +6624,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6587,6 +6703,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6665,6 +6782,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6738,6 +6856,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6811,6 +6930,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6872,6 +6992,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6933,6 +7054,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -6993,6 +7115,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7042,6 +7165,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7095,6 +7219,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7172,6 +7297,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7249,6 +7375,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7325,6 +7452,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7386,6 +7514,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7437,6 +7566,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7478,6 +7608,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7528,6 +7659,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7570,6 +7702,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7624,6 +7757,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7672,6 +7806,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7756,6 +7891,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7840,6 +7976,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -7924,6 +8061,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8007,6 +8145,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8083,6 +8222,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8159,6 +8299,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8235,6 +8376,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8330,6 +8472,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8426,6 +8569,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8521,6 +8665,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8614,6 +8759,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8692,6 +8838,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8770,6 +8917,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8843,6 +8991,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8916,6 +9065,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -8990,6 +9140,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9058,6 +9209,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9119,6 +9271,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9180,6 +9333,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9241,6 +9395,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9319,6 +9474,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9397,6 +9553,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9474,6 +9631,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+4;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9536,6 +9694,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9587,6 +9746,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9628,6 +9788,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9678,6 +9839,7 @@ private:
         gen_set_tval(jh, instr);
         pc = pc+2;
         mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
 
         gen_instr_prologue(jh);
         /*generate behavior*/
@@ -9688,6 +9850,82 @@ private:
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 157);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 158: SFENCE__VMA */
+    continuation_e __sfence__vma(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        uint8_t rs1 = ((bit_sub<15,5>(instr)));
+        uint8_t asid = ((bit_sub<20,5>(instr)));
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            auto mnemonic = fmt::format(
+                "{mnemonic:10} {rs1}, {asid}", fmt::arg("mnemonic", "sfence.vma"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("asid", name(asid)));
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("SFENCE__VMA_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 158);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        gen_write_mem(jh, traits::FENCE, static_cast<uint32_t>(traits::fencevma), ((uint8_t)rs1<<8)|(uint8_t)asid, 4);
+        auto returnValue = CONT;
+        
+        gen_sync(jh, POST_SYNC, 158);
+        gen_instr_epilogue(jh);
+    	return returnValue;        
+    }
+    
+    /* instruction 159: SRET */
+    continuation_e __sret(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
+        uint64_t PC = pc.val;
+        if(this->disass_enabled){
+            /* generate disass */
+            
+            //No disass specified, using instruction name
+            std::string mnemonic = "sret";
+            InvokeNode* call_print_disass;
+            char* mnemonic_ptr = strdup(mnemonic.c_str());
+            jh.disass_collection.push_back(mnemonic_ptr);
+            jh.cc.invoke(&call_print_disass, &print_disass, FuncSignature::build<void, void *, uint64_t, char *>());
+            call_print_disass->setArg(0, jh.arch_if_ptr);
+            call_print_disass->setArg(1, pc.val);
+            call_print_disass->setArg(2, mnemonic_ptr);
+
+        }
+        x86::Compiler& cc = jh.cc;
+        cc.comment(fmt::format("SRET_{:#x}:",pc.val).c_str());
+        gen_sync(jh, PRE_SYNC, 159);
+        mov(cc, jh.pc, pc.val);
+        gen_set_tval(jh, instr);
+        pc = pc+4;
+        mov(cc, jh.next_pc, pc.val);
+        cc.mov(get_ptr_for(jh, traits::INSTRUCTION), instr);
+
+        gen_instr_prologue(jh);
+        /*generate behavior*/
+        mov(cc, get_ptr_for(jh, traits::LAST_BRANCH), static_cast<int>(NO_JUMP));
+        gen_leave(jh, 1);
+        auto returnValue = TRAP;
+        
+        gen_sync(jh, POST_SYNC, 159);
         gen_instr_epilogue(jh);
     	return returnValue;        
     }
@@ -9769,13 +10007,14 @@ template <typename ARCH>
 void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
-    cc.comment("//gen_instr_epilogue");
+    cc.comment("//Instruction epilogue begin");
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     cmp(cc, current_trap_state, 0);
     cc.jne(jh.trap_entry);
     cc.inc(get_ptr_for(jh, traits::ICOUNT));
-    cc.inc(get_ptr_for(jh, traits::CYCLE));
+    cc.inc(get_ptr_for(jh, traits::INSTRET));
     cc.comment("//Instruction epilogue end");
 
 }
@@ -9853,10 +10092,22 @@ std::unique_ptr<vm_if> create<arch::rv32gc>(arch::rv32gc *core, unsigned short p
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
-volatile std::array<bool, 2> dummy = {
+
+volatile std::array<bool, 3> dummy = {
+        core_factory::instance().register_creator("rv32gc|msu_vp|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv32gc>();
+		    auto vm = new asmjit::rv32gc::vm_impl<arch::rv32gc>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv32gc>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        }),
         core_factory::instance().register_creator("rv32gc|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32gc>();
 		    auto vm = new asmjit::rv32gc::vm_impl<arch::rv32gc>(*cpu, false);

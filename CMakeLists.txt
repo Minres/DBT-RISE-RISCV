@@ -12,6 +12,7 @@ include(GNUInstallDirs)
 include(flink)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
@@ -19,8 +20,8 @@ if(NOT TARGET dbt-rise-core)
 	    dbt_rise_core_git
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
-	    GIT_TAG         4d1bf6
-	    GIT_SHALLOW     ON
+	    GIT_TAG         718f877
+	    GIT_SHALLOW     OFF
 	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
 	)
 	FetchContent_GetProperties(dbt_rise_core_git)
