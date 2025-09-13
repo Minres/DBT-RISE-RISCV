@@ -157,6 +157,7 @@ private:
             hart_if.raise_trap(0, 2, hart_if.PC);
             return iss::Err;
         }
+        CPPLOG(INFO) << "mmu: writing satp with 0x" << std::hex << val;
         satp = val;
         update_vm_info();
         return iss::Ok;
@@ -224,12 +225,13 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
     if(auto it = tlb.find(addr >> PGSHIFT); it != tlb.end()) {
         pte = it->second;
     } else {
+        update_vm_info();
         reg_t base = vm_setting.ptbase;
         const int va_bits = vm_setting.idxbits * vm_setting.levels + PGSHIFT;
         const reg_t mask = (reg_t(1) << (sizeof(reg_t) * 8 - (va_bits - 1))) - 1;
         const reg_t masked_msbs = (addr >> (va_bits - 1)) & mask;
         if(masked_msbs != 0 && masked_msbs != mask) {
-            CPPLOG(DEBUG) << "Page fault because of invalid unused address bits";
+            CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": invalid unused address bits";
             throw_page_fault(type, addr);
         }
         for(int i = vm_setting.levels - 1; i >= 0; i--) {
@@ -251,20 +253,20 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 };
             }
             if(bit_sub<63, 1>(static_cast<uint64_t>(pte))) {
-                CPPLOG(DEBUG) << "Page fault because of set 'N' bit without Svnapot extension present";
+                CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": set 'N' bit without Svnapot extension present";
                 throw_page_fault(type, addr);
             }
             if(bit_sub<61, 2>(static_cast<uint64_t>(pte))) {
-                CPPLOG(DEBUG) << "Page fault because of set 'PBMT' bit(s) without Svpbmt extension present";
+                CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": set 'PBMT' bit(s) without Svpbmt extension present";
                 throw_page_fault(type, addr);
             }
             if(bit_sub<54, 7>(static_cast<uint64_t>(pte))) {
-                CPPLOG(DEBUG) << "Page fault because of set 'reserved' bits";
+                CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": set 'reserved' bits";
                 throw_page_fault(type, addr);
             }
 
             if(!(pte & PTE_V) || (!(pte & PTE_R) && (pte & PTE_W))) {
-                CPPLOG(DEBUG) << "Page fault because of invalid page";
+                CPPLOG(INFO) << "Page fault for address 0x" << std::hex << addr << ": invalid page, PTE=0x" << std::hex << pte;
                 throw_page_fault(type, addr);
             }
             const reg_t ppn = pte >> PTE_PPN_SHIFT;
@@ -273,7 +275,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 continue;
             }
             if((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
-                CPPLOG(DEBUG) << "Page fault because of page misalignment";
+                CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": page misalignment";
                 throw_page_fault(type, addr);
             }
             if(!(pte & PTE_A) || (type == iss::access_type::WRITE && !(pte & PTE_D))) {
@@ -287,7 +289,7 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
                 //    pte |= PTE_D;
 
                 // Svade behavior
-                CPPLOG(DEBUG) << "Page fault because of unset A or D bit";
+                CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": unset A or D bit";
                 throw_page_fault(type, addr);
             }
             const reg_t vpn = addr >> PGSHIFT;
@@ -301,14 +303,14 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
     const bool s_mode = effective_priv(type) == arch::PRIV_S;
     const bool sum = hart_if.state.mstatus.SUM;
     if((pte & PTE_U) ? s_mode && (type == iss::access_type::FETCH || !sum) : !s_mode) {
-        CPPLOG(DEBUG) << "Page fault because of SUM bit";
+        CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": SUM bit";
         throw_page_fault(type, addr);
     }
     const bool mxr = hart_if.state.mstatus.MXR;
     if(type == iss::access_type::FETCH   ? !(pte & PTE_X)
        : type == iss::access_type::WRITE ? !(pte & PTE_W)
                                          : !((pte & PTE_R) || (mxr && (pte & PTE_X)))) {
-        CPPLOG(DEBUG) << "Page fault because of Invalid request";
+        CPPLOG(DEBUG) << "Page fault for address 0x" << std::hex << addr << ": Invalid request";
         throw_page_fault(type, addr);
     }
 
