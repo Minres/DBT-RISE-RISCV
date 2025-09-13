@@ -508,9 +508,9 @@ uint64_t riscv_hart_m_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t
     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
-        NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred";
+        NSCLOG(DEBUG, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
+                              << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                              << buffer.data() << " occurred";
     // reset trap state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;

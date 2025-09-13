@@ -689,10 +689,10 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
     if((flags & 0xffffffff) != 0xffffffff)
-        NSCLOG(INFO, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                             << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                             << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                             << this->lvl[new_priv];
+        NSCLOG(DEBUG, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
+                              << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
+                              << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
+                              << this->lvl[new_priv];
     // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
@@ -732,8 +732,8 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
         }
         // sets the pc to the value stored in the x epc register.
         this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
-        NSCLOG(INFO, LOGCAT) << "Executing xRET , changing privilege level from " << this->lvl[cur_priv] << " to "
-                             << this->lvl[this->reg.PRIV];
+        NSCLOG(DEBUG, LOGCAT) << "Executing xRET , changing privilege level from " << this->lvl[cur_priv] << " to "
+                              << this->lvl[this->reg.PRIV];
         check_interrupt();
     }
     this->reg.trap_state = this->reg.pending_trap;

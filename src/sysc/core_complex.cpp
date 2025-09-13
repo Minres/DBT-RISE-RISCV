@@ -161,7 +161,7 @@ public:
             core->set_hartid(hart_id);
             auto* srv = debugger::server<debugger::gdb_session>::get();
             if(srv)
-                tgt_adapter = srv->get_target();
+                tgt_adapter = srv->get_target(0); // FIXME: add core_id
             if(tgt_adapter)
                 tgt_adapter->add_custom_command({"sysc",
                                                  [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
