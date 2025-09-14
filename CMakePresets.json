@@ -13,6 +13,7 @@
             "name": "Base",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
+            "hidden": true,
             "cacheVariables": {
                 "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
                 "CMAKE_CXX_STANDARD": "17",
