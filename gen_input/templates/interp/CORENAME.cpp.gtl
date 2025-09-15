@@ -30,9 +30,9 @@
  *
  *******************************************************************************/
 <%
-def floating_point = registers.find {it.name=='FCSR'}
-def vector = registers.find {it.name=='vtype'}
-def aes = functions.find { it.contains('aes') }
+def floating_point = registers.find {it.name=='FCSR'} != null
+def vector = registers.find {it.name=='vtype'} != null
+def aes = functions.find { it.contains('aes') } != null
 def nativeTypeSize(int size){
     if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
 }
@@ -45,13 +45,13 @@ def nativeTypeSize(int size){
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
 <%
-if(floating_point != null) {%>
+if(floating_point) {%>
 #include <vm/fp_functions.h>
 <%}
-if(vector != null) {%>
+if(vector) {%>
 #include <vm/vector_functions.h>
 <%}
-if(aes != null) {%>
+if(aes) {%>
 #include <vm/aes_sbox.h>
 <%}%>
 #include <util/logging.h>
@@ -114,10 +114,10 @@ protected:
 
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
 <%
-if(floating_point != null) {%>
+if(floating_point) {%>
     inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}     
 <%}
-if(vector != null) {%>
+if(vector) {%>
     inline const char* vname(size_t index) { return index < 32 ? name(index + traits::V0) : "illegal"; }
     inline const char* sew_name(size_t bits) {
         switch(bits) {
@@ -177,7 +177,7 @@ if(vector != null) {%>
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
-<%if(vector != null) {
+<%if(vector) {
     def xlen = constants.find { it.name == 'XLEN' }?.value ?: 0
     def vlen = constants.find { it.name == 'VLEN' }?.value ?: 0 %>
     inline void lower(){
@@ -1179,7 +1179,7 @@ namespace iss {
 namespace {
 <% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
 volatile std::array<bool, 3> dummy = {
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|msu_vp|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_msu:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -1190,7 +1190,7 @@ volatile std::array<bool, 3> dummy = {
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),<% } else { %>
 volatile std::array<bool, 2> dummy = {<%}%>
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_m:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -1200,7 +1200,7 @@ volatile std::array<bool, 2> dummy = {<%}%>
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_mu:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);

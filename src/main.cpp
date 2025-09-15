@@ -127,19 +127,28 @@ int main(int argc, char* argv[]) {
         semihosting_cb_t<uint32_t> semihosting_cb = [&cb](iss::arch_if* i, uint32_t* a0, uint32_t* a1) { cb(i, a0, a1); };
         std::string isa_opt(clim["isa"].as<std::string>());
         if(isa_opt.size() == 0 || isa_opt == "?") {
-            auto list = f.get_names();
-            std::sort(std::begin(list), std::end(list));
-            std::cout << "Available implementations (core|platform|backend):\n  - " << util::join(list, "\n  - ") << std::endl;
+            std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
+            for(auto& e: f.get_names()) {
+                auto p = e.find(':');
+                assert(p!=std::string::npos);
+                core_by_backend[e.substr(p+1)].push_back(e.substr(0, p));
+            }
+            std::cout << "Available implementations\n";
+            std::cout << "=========================\n";
+            for(auto& e:core_by_backend) {
+                std::sort(std::begin(e.second), std::end(e.second));
+                std::cout<<"  backend "<<e.first<<":\n  - "<< util::join(e.second, "\n  - ") << std::endl;
+            }
             return 0;
-        } else if(isa_opt.find('|') != std::string::npos) {
+        } else if(isa_opt.find(':') == std::string::npos) {
             std::tie(cpu, vm) =
-                f.create(isa_opt + "|" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
+                f.create(isa_opt + ":" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         } else {
             auto base_isa = isa_opt.substr(0, 5);
             if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                isa_opt += "|mu_p_clic_pmp|" + clim["backend"].as<std::string>();
+                isa_opt += "_clic_pmp:" + clim["backend"].as<std::string>();
             } else {
-                isa_opt += "|m_p|" + clim["backend"].as<std::string>();
+                isa_opt += ":" + clim["backend"].as<std::string>();
             }
             std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         }

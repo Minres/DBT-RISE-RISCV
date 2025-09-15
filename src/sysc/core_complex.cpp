@@ -39,6 +39,7 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
+#include <sstream>
 #include <tlm/scc/tlm_signal_gp.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
@@ -137,18 +138,29 @@ public:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
         auto& f = sysc::iss_factory::instance();
         if(type.size() == 0 || type == "?") {
-            auto names = f.get_names();
-            std::sort(names.begin(), names.end());
-            SCCINFO(owner->hier_name()) << "Available cores: \n    " << util::join(names, ",\n    ") << std::endl;
+                        std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
+            for(auto& e: f.get_names()) {
+                auto p = e.find(':');
+                assert(p!=std::string::npos);
+                core_by_backend[e.substr(p+1)].push_back(e.substr(0, p));
+            }
+            std::ostringstream os;
+            os << "Available implementations\n";
+            os << "=========================\n";
+            for(auto& e:core_by_backend) {
+                std::sort(std::begin(e.second), std::end(e.second));
+                os<<"  backend "<<e.first<<":\n  - "<< util::join(e.second, "\n  - ") ;
+            }
+            SCCINFO(owner->hier_name()) << "\n"<<os.str();
             sc_core::sc_stop();
-        } else if(type.find('|') != std::string::npos) {
-            std::tie(core, vm) = f.create(type + "|" + backend, gdb_port, owner);
+        } else if(type.find(':') == std::string::npos) {
+            std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, owner);
         } else {
             auto base_isa = type.substr(0, 5);
             if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                std::tie(core, vm) = f.create(type + "|mu_p_clic_pmp|" + backend, gdb_port, owner);
+                std::tie(core, vm) = f.create(type + "_clic_pmp:" + backend, gdb_port, owner);
             } else {
-                std::tie(core, vm) = f.create(type + "|m_p|" + backend, gdb_port, owner);
+                std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, owner);
             }
         }
         if(!core) {
