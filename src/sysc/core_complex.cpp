@@ -149,7 +149,8 @@ public:
             os << "=========================\n";
             for(auto& e:core_by_backend) {
                 std::sort(std::begin(e.second), std::end(e.second));
-                os<<"  backend "<<e.first<<":\n  - "<< util::join(e.second, "\n  - ") ;
+                if(os.str().size()) os<<"\n";
+                os<<"  backend "<<e.first<<":\n  - "<< util::join(e.second, "\n  - ");
             }
             SCCINFO(owner->hier_name()) << "\n"<<os.str();
             sc_core::sc_stop();
