@@ -189,7 +189,7 @@ private:
         typename arch::traits<ARCH>::opcode_e op;
     };
 
-    const std::array<instruction_descriptor, 200> instr_descr = {{
+    const std::array<instruction_descriptor, 198> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::AUIPC},
@@ -389,8 +389,6 @@ private:
         {16, 0b1010000000000000, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSD},
         {16, 0b0010000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FLDSP},
         {16, 0b1010000000000010, 0b1110000000000011, arch::traits<ARCH>::opcode_e::C__FSDSP},
-        {32, 0b00010010000000000000000001110011, 0b11111110000000000111111111111111, arch::traits<ARCH>::opcode_e::SFENCE__VMA},
-        {32, 0b00010000001000000000000001110011, 0b11111111111111111111111111111111, arch::traits<ARCH>::opcode_e::SRET},
     }};
 
     //needs to be declared after instr_descr
@@ -6180,42 +6178,6 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     break;
                 }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::SFENCE__VMA: {
-                    uint8_t rs1 = ((bit_sub<15,5>(instr)));
-                    uint8_t asid = ((bit_sub<20,5>(instr)));
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs1}, {asid}", fmt::arg("mnemonic", "sfence.vma"),
-                            fmt::arg("rs1", name(rs1)), fmt::arg("asid", name(asid)));
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    super::template write_mem<uint64_t>(traits::FENCE, traits::fencevma, ((uint16_t)(uint8_t)rs1<<8)|(uint8_t)asid);
-                                    if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
-                                }
-                    break;
-                }// @suppress("No break at end of case")
-                case arch::traits<ARCH>::opcode_e::SRET: {
-                    if(this->disass_enabled){
-                        /* generate console output when executing the command */
-                        //No disass specified, using instruction name
-                        std::string mnemonic = "sret";
-                        this->core.disass_output(pc.val, mnemonic);
-                    }
-                    // used registers
-                    // calculate next pc value
-                    *NEXT_PC = *PC + 4;
-                    // execute instruction
-                    {
-                                    leave(1);
-                                }
-                    break;
-                }// @suppress("No break at end of case")
                 default: {
                     if(this->disass_enabled){
                         std::string mnemonic = "Illegal Instruction";
@@ -6267,18 +6229,8 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 namespace iss {
 namespace {
 
-volatile std::array<bool, 3> dummy = {
-        core_factory::instance().register_creator("rv64gc|msu_vp|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
-            auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::rv64gc>();
-		    auto vm = new interp::rv64gc::vm_impl<arch::rv64gc>(*cpu, false);
-		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
-            if(init_data){
-                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv64gc>::reg_t>*>(init_data);
-                cpu->set_semihosting_callback(*cb);
-            }
-            return {cpu_ptr{cpu}, vm_ptr{vm}};
-        }),
-        core_factory::instance().register_creator("rv64gc|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+volatile std::array<bool, 2> dummy = {
+        core_factory::instance().register_creator("rv64gc_m:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv64gc>();
 		    auto vm = new interp::rv64gc::vm_impl<arch::rv64gc>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -6288,7 +6240,7 @@ volatile std::array<bool, 3> dummy = {
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("rv64gc|mu_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("rv64gc_mu:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv64gc>();
 		    auto vm = new interp::rv64gc::vm_impl<arch::rv64gc>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);

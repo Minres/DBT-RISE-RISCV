@@ -368,7 +368,7 @@ namespace iss {
 namespace {
 <% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
 volatile std::array<bool, 3> dummy = {
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|msu_vp|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_msu:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_msu_vp<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new asmjit::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -379,7 +379,7 @@ volatile std::array<bool, 3> dummy = {
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),<% } else { %>
 volatile std::array<bool, 2> dummy = {<%}%>
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_m:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new asmjit::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -389,7 +389,7 @@ volatile std::array<bool, 2> dummy = {<%}%>
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}|mu_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_mu:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new asmjit::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);

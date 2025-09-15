@@ -1792,7 +1792,7 @@ namespace iss {
 namespace {
 
 volatile std::array<bool, 2> dummy = {
-        core_factory::instance().register_creator("rv32i|m_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("rv32i_m:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32i>();
 		    auto vm = new interp::rv32i::vm_impl<arch::rv32i>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -1802,7 +1802,7 @@ volatile std::array<bool, 2> dummy = {
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("rv32i|mu_p|interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("rv32i_mu:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv32i>();
 		    auto vm = new interp::rv32i::vm_impl<arch::rv32i>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);

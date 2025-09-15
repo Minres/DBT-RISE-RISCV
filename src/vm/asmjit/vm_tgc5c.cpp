@@ -4840,7 +4840,7 @@ namespace iss {
 namespace {
 
 volatile std::array<bool, 2> dummy = {
-        core_factory::instance().register_creator("tgc5c|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("tgc5c_m:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::tgc5c>();
 		    auto vm = new asmjit::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -4850,7 +4850,7 @@ volatile std::array<bool, 2> dummy = {
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("tgc5c|mu_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("tgc5c_mu:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::tgc5c>();
 		    auto vm = new asmjit::tgc5c::vm_impl<arch::tgc5c>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);

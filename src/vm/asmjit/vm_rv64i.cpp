@@ -3601,7 +3601,7 @@ namespace iss {
 namespace {
 
 volatile std::array<bool, 2> dummy = {
-        core_factory::instance().register_creator("rv64i|m_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("rv64i_m:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv64i>();
 		    auto vm = new asmjit::rv64i::vm_impl<arch::rv64i>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
@@ -3611,7 +3611,7 @@ volatile std::array<bool, 2> dummy = {
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
         }),
-        core_factory::instance().register_creator("rv64i|mu_p|asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+        core_factory::instance().register_creator("rv64i_mu:asmjit", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::rv64i>();
 		    auto vm = new asmjit::rv64i::vm_impl<arch::rv64i>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
