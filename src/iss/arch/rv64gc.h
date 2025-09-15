@@ -679,6 +679,8 @@ template <> struct traits<rv64gc> {
         C__FSD = 195,
         C__FLDSP = 196,
         C__FSDSP = 197,
+        SFENCE__VMA = 198,
+        SRET = 199,
         MAX_OPCODE
     };
 };

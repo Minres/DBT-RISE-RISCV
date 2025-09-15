@@ -6,8 +6,6 @@ import "ISA/Zc.core_desc"
 import "ISA/RVF.core_desc"
 import "ISA/RVD.core_desc"
 import "ISA/RVV/RVV.core_desc"
-import "ISA/Zvk.core_desc"
-
 
 Core RV32I provides RVI, Zicsr, Zifencei {
     architectural_state {
