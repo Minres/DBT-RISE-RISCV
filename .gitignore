@@ -36,3 +36,5 @@
 /.direnv/
 /.envrc.*
 build
+contrib/instr/*_fast.yaml
+contrib/instr/*_slow.yaml
