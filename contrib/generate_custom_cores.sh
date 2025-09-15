@@ -35,7 +35,7 @@ done
 
 [[ -d $ROOT_DIR/build/TGC-GEN ]] || (cd build; git clone --recursive -b develop https://git.minres.com/TGFS/TGC-GEN.git )
 
-Generate standard cores
+# Generate standard cores
 for core in RV32I RV32IMAC RV32GC RV64I RV64GC; do
 	for backend in ${BACKENDS}; do 
 		${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -c $core -b ${backend} ${TMPL_DIR}/../../gen_input/cores.core_desc
