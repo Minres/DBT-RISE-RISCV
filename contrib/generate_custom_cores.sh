@@ -55,8 +55,7 @@ for core in RV32I RV32IMAC RV32GC RV64I RV64GC; do
 	#python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_slow.yaml -s slow
 done
 for core in RV32GCV RV64GCV; do
-	echo ${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -s -c $core -b interp ${TMPL_DIR}/../../gen_input/cores.core_desc
-	${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -s -c $core -b interp ${TMPL_DIR}/../../gen_input/cores.core_desc
+	${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -c $core -b interp ${TMPL_DIR}/../../gen_input/cores.core_desc
 	#python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_fast.yaml -s fast
 	#python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_slow.yaml -s slow
 done
@@ -64,7 +63,6 @@ done
 # Generate for TGC5C
 core=TGC5C
 for backend in ${BACKENDS}; do 
-	echo ${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -c $core -b ${backend} ${CORE_DSL_DIR}/${core}.core_desc
 	${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -c $core -b ${backend} ${CORE_DSL_DIR}/${core}.core_desc
 done
 unset core
@@ -92,10 +90,10 @@ if [ $EXT_LIST -gt 0 ]; then
 	if [ $EXT_LIST -gt 1 ]; then
 		for core in TGC5Xe TGC5Xi TGC5Xec TGC5Xic TGC5Xem TGC5Xim TGC5Xemc TGC5Ximc; do
 			for backend in ${BACKENDS}; do 
-				${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -c $core -b ${backend} ${CORE_DSL_DIR}/TGC5.core_desc
+				${SCRIPTDIR}/generate_iss.sh -o ${OUTPUT_ROOT} -t ${TMPL_DIR} -m src -s -c $core -b ${backend} ${CORE_DSL_DIR}/TGC5.core_desc
 			done
-			python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_fast.yaml -s fast
-			python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_slow.yaml -s slow
+			#python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_fast.yaml -s fast
+			#python3 ${SCRIPTDIR}/update_cycle_yaml.py -i ${OUTPUT_ROOT}/contrib/instr/${core}_instr.yaml -o ${OUTPUT_ROOT}/contrib/instr/${core}_slow.yaml -s slow
 		done
 	fi
 fi

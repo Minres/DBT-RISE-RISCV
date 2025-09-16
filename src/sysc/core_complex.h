@@ -127,7 +127,7 @@ public:
 
     cci::cci_param<uint64_t> reset_address{"reset_address", 0ULL};
 
-    cci::cci_param<std::string> core_type{"core_type", "rv32imac"};
+    cci::cci_param<std::string> core_type{"core_type", "rv32imac_m"};
 
     cci::cci_param<std::string> backend{"backend", "interp"};
 
