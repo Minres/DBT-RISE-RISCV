@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         ("mem,m", po::value<std::string>(), "the memory input file")
         ("plugin,p", po::value<std::vector<std::string>>(), "plugin to activate")
         ("backend", po::value<std::string>()->default_value("interp"), "the ISS backend to use, options are: interp, llvm, tcc, asmjit")
-        ("isa", po::value<std::string>()->default_value("tgc5c"), "core or isa name to use for simulation, use '?' to get list");
+        ("isa", po::value<std::string>()->default_value("rv32imac_m"), "core or isa name to use for simulation, use '?' to get list");
     // clang-format on
     auto parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     try {
