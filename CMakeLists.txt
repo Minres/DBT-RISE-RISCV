@@ -53,16 +53,20 @@ set(LIB_SOURCES
     src/iss/arch/rv32imc.cpp
     src/iss/arch/rv32imac.cpp
     src/iss/arch/rv32gc.cpp
+    src/iss/arch/rv32gcv.cpp
 	src/iss/arch/rv64i.cpp
     src/iss/arch/rv64gc.cpp
+    src/iss/arch/rv64gcv.cpp
     src/iss/arch/tgc5c.cpp
     src/iss/mem/memory_if.cpp
     src/vm/interp/vm_tgc5c.cpp
     src/vm/interp/vm_rv32i.cpp
     src/vm/interp/vm_rv32imac.cpp
     src/vm/interp/vm_rv32gc.cpp
+    src/vm/interp/vm_rv32gcv.cpp
     src/vm/interp/vm_rv64i.cpp
     src/vm/interp/vm_rv64gc.cpp
+    src/vm/interp/vm_rv64gcv.cpp
     src/vm/fp_functions.cpp
     src/vm/vector_functions.cpp
     src/iss/debugger/csr_names.cpp
@@ -260,6 +264,13 @@ if(TARGET scc-sysc)
         src/sysc/core_complex.cpp
         src/sysc/register_cores.cpp
     )
+    if(WITH_ASMJIT)
+        list(APPEND LIB_SOURCES
+            src/sysc/register_rv32gcv.cpp
+            src/sysc/register_rv64gcv.cpp
+        )
+    endif()
+
     if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
         FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)
         list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})

@@ -704,7 +704,6 @@ RVF:
     index: 98
     encoding: 0b00000000000000000010000000000111
     mask: 0b00000000000000000111000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
@@ -715,194 +714,171 @@ RVF:
     size:   32
     branch:   false
     delay:   1
-  FMADD__S:
-    index: 100
-    encoding: 0b00000000000000000000000001000011
-    mask: 0b00000110000000000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FMSUB__S:
-    index: 101
-    encoding: 0b00000000000000000000000001000111
-    mask: 0b00000110000000000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FNMADD__S:
-    index: 102
-    encoding: 0b00000000000000000000000001001111
-    mask: 0b00000110000000000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FNMSUB__S:
-    index: 103
-    encoding: 0b00000000000000000000000001001011
-    mask: 0b00000110000000000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
   FADD__S:
-    index: 104
+    index: 100
     encoding: 0b00000000000000000000000001010011
     mask: 0b11111110000000000000000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FSUB__S:
-    index: 105
+    index: 101
     encoding: 0b00001000000000000000000001010011
     mask: 0b11111110000000000000000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FMUL__S:
-    index: 106
+    index: 102
     encoding: 0b00010000000000000000000001010011
     mask: 0b11111110000000000000000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FDIV__S:
-    index: 107
+    index: 103
     encoding: 0b00011000000000000000000001010011
     mask: 0b11111110000000000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FSQRT__S:
-    index: 108
-    encoding: 0b01011000000000000000000001010011
-    mask: 0b11111111111100000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJ__S:
-    index: 109
-    encoding: 0b00100000000000000000000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJN__S:
-    index: 110
-    encoding: 0b00100000000000000001000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJX__S:
-    index: 111
-    encoding: 0b00100000000000000010000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FMIN__S:
-    index: 112
+    index: 104
     encoding: 0b00101000000000000000000001010011
     mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FMAX__S:
-    index: 113
+    index: 105
     encoding: 0b00101000000000000001000001010011
     mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FSQRT__S:
+    index: 106
+    encoding: 0b01011000000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMADD__S:
+    index: 107
+    encoding: 0b00000000000000000000000001000011
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMSUB__S:
+    index: 108
+    encoding: 0b00000000000000000000000001000111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMADD__S:
+    index: 109
+    encoding: 0b00000000000000000000000001001111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMSUB__S:
+    index: 110
+    encoding: 0b00000000000000000000000001001011
+    mask: 0b00000110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
   FCVT__W__S:
-    index: 114
+    index: 111
     encoding: 0b11000000000000000000000001010011
     mask: 0b11111111111100000000000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FCVT__WU__S:
-    index: 115
+    index: 112
     encoding: 0b11000000000100000000000001010011
     mask: 0b11111111111100000000000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FEQ__S:
-    index: 116
-    encoding: 0b10100000000000000010000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FLT__S:
-    index: 117
-    encoding: 0b10100000000000000001000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FLE__S:
-    index: 118
-    encoding: 0b10100000000000000000000001010011
-    mask: 0b11111110000000000111000001111111
-    attributes: [[name:enable, value:1]]
-    size:   32
-    branch:   false
-    delay:   1
-  FCLASS__S:
-    index: 119
-    encoding: 0b11100000000000000001000001010011
-    mask: 0b11111111111100000111000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FCVT__S__W:
-    index: 120
+    index: 113
     encoding: 0b11010000000000000000000001010011
     mask: 0b11111111111100000000000001111111
-    attributes: [[name:enable, value:1]]
     size:   32
     branch:   false
     delay:   1
   FCVT__S__WU:
-    index: 121
+    index: 114
     encoding: 0b11010000000100000000000001010011
     mask: 0b11111111111100000000000001111111
-    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJ__S:
+    index: 115
+    encoding: 0b00100000000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJN__S:
+    index: 116
+    encoding: 0b00100000000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJX__S:
+    index: 117
+    encoding: 0b00100000000000000010000001010011
+    mask: 0b11111110000000000111000001111111
     size:   32
     branch:   false
     delay:   1
   FMV__X__W:
-    index: 122
+    index: 118
     encoding: 0b11100000000000000000000001010011
     mask: 0b11111111111100000111000001111111
     size:   32
     branch:   false
     delay:   1
   FMV__W__X:
-    index: 123
+    index: 119
     encoding: 0b11110000000000000000000001010011
     mask: 0b11111111111100000111000001111111
-    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FEQ__S:
+    index: 120
+    encoding: 0b10100000000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLT__S:
+    index: 121
+    encoding: 0b10100000000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLE__S:
+    index: 122
+    encoding: 0b10100000000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCLASS__S:
+    index: 123
+    encoding: 0b11100000000000000001000001010011
+    mask: 0b11111111111100000111000001111111
     size:   32
     branch:   false
     delay:   1
@@ -954,171 +930,171 @@ RVD:
     size:   32
     branch:   false
     delay:   1
-  FMADD_D:
+  FADD__D:
     index: 130
-    encoding: 0b00000010000000000000000001000011
-    mask: 0b00000110000000000000000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FMSUB_D:
-    index: 131
-    encoding: 0b00000010000000000000000001000111
-    mask: 0b00000110000000000000000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FNMADD_D:
-    index: 132
-    encoding: 0b00000010000000000000000001001111
-    mask: 0b00000110000000000000000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FNMSUB_D:
-    index: 133
-    encoding: 0b00000010000000000000000001001011
-    mask: 0b00000110000000000000000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FADD_D:
-    index: 134
     encoding: 0b00000010000000000000000001010011
     mask: 0b11111110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FSUB_D:
-    index: 135
+  FSUB__D:
+    index: 131
     encoding: 0b00001010000000000000000001010011
     mask: 0b11111110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FMUL_D:
-    index: 136
+  FMUL__D:
+    index: 132
     encoding: 0b00010010000000000000000001010011
     mask: 0b11111110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FDIV_D:
-    index: 137
+  FDIV__D:
+    index: 133
     encoding: 0b00011010000000000000000001010011
     mask: 0b11111110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FSQRT_D:
-    index: 138
-    encoding: 0b01011010000000000000000001010011
-    mask: 0b11111111111100000000000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJ_D:
-    index: 139
-    encoding: 0b00100010000000000000000001010011
-    mask: 0b11111110000000000111000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJN_D:
-    index: 140
-    encoding: 0b00100010000000000001000001010011
-    mask: 0b11111110000000000111000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FSGNJX_D:
-    index: 141
-    encoding: 0b00100010000000000010000001010011
-    mask: 0b11111110000000000111000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FMIN_D:
-    index: 142
+  FMIN__D:
+    index: 134
     encoding: 0b00101010000000000000000001010011
     mask: 0b11111110000000000111000001111111
     size:   32
     branch:   false
     delay:   1
-  FMAX_D:
-    index: 143
+  FMAX__D:
+    index: 135
     encoding: 0b00101010000000000001000001010011
     mask: 0b11111110000000000111000001111111
     size:   32
     branch:   false
     delay:   1
-  FCVT_S_D:
-    index: 144
-    encoding: 0b01000000000100000000000001010011
+  FSQRT__D:
+    index: 136
+    encoding: 0b01011010000000000000000001010011
     mask: 0b11111111111100000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FCVT_D_S:
-    index: 145
-    encoding: 0b01000010000000000000000001010011
-    mask: 0b11111111111100000000000001111111
+  FMADD__D:
+    index: 137
+    encoding: 0b00000010000000000000000001000011
+    mask: 0b00000110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FEQ_D:
-    index: 146
-    encoding: 0b10100010000000000010000001010011
-    mask: 0b11111110000000000111000001111111
+  FMSUB__D:
+    index: 138
+    encoding: 0b00000010000000000000000001000111
+    mask: 0b00000110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FLT_D:
-    index: 147
-    encoding: 0b10100010000000000001000001010011
-    mask: 0b11111110000000000111000001111111
+  FNMADD__D:
+    index: 139
+    encoding: 0b00000010000000000000000001001111
+    mask: 0b00000110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FLE_D:
-    index: 148
-    encoding: 0b10100010000000000000000001010011
-    mask: 0b11111110000000000111000001111111
+  FNMSUB__D:
+    index: 140
+    encoding: 0b00000010000000000000000001001011
+    mask: 0b00000110000000000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FCLASS_D:
-    index: 149
-    encoding: 0b11100010000000000001000001010011
-    mask: 0b11111111111100000111000001111111
-    size:   32
-    branch:   false
-    delay:   1
-  FCVT_W_D:
-    index: 150
+  FCVT__W__D:
+    index: 141
     encoding: 0b11000010000000000000000001010011
     mask: 0b11111111111100000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FCVT_WU_D:
-    index: 151
+  FCVT__WU__D:
+    index: 142
     encoding: 0b11000010000100000000000001010011
     mask: 0b11111111111100000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FCVT_D_W:
-    index: 152
+  FCVT__D__W:
+    index: 143
     encoding: 0b11010010000000000000000001010011
     mask: 0b11111111111100000000000001111111
     size:   32
     branch:   false
     delay:   1
-  FCVT_D_WU:
-    index: 153
+  FCVT__D__WU:
+    index: 144
     encoding: 0b11010010000100000000000001010011
     mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__D:
+    index: 145
+    encoding: 0b01000000000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__S:
+    index: 146
+    encoding: 0b01000010000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJ__D:
+    index: 147
+    encoding: 0b00100010000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJN__D:
+    index: 148
+    encoding: 0b00100010000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJX__D:
+    index: 149
+    encoding: 0b00100010000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FEQ__D:
+    index: 150
+    encoding: 0b10100010000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLT__D:
+    index: 151
+    encoding: 0b10100010000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLE__D:
+    index: 152
+    encoding: 0b10100010000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCLASS__D:
+    index: 153
+    encoding: 0b11100010000000000001000001010011
+    mask: 0b11111111111100000111000001111111
     size:   32
     branch:   false
     delay:   1
@@ -1149,6 +1125,22 @@ Zcd:
     encoding: 0b1010000000000010
     mask: 0b1110000000000011
     size:   16
+    branch:   false
+    delay:   1
+RVSMode: 
+  SFENCE__VMA:
+    index: 158
+    encoding: 0b00010010000000000000000001110011
+    mask: 0b11111110000000000111111111111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRET:
+    index: 159
+    encoding: 0b00010000001000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
     branch:   false
     delay:   1
 
