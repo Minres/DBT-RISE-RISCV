@@ -1,0 +1,5867 @@
+
+RVI: 
+  LUI:
+    index: 0
+    encoding: 0b00000000000000000000000000110111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AUIPC:
+    index: 1
+    encoding: 0b00000000000000000000000000010111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  JAL:
+    index: 2
+    encoding: 0b00000000000000000000000001101111
+    mask: 0b00000000000000000000000001111111
+    size:   32
+    branch:   true
+    delay:   1
+  JALR:
+    index: 3
+    encoding: 0b00000000000000000000000001100111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BEQ:
+    index: 4
+    encoding: 0b00000000000000000000000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BNE:
+    index: 5
+    encoding: 0b00000000000000000001000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BLT:
+    index: 6
+    encoding: 0b00000000000000000100000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BGE:
+    index: 7
+    encoding: 0b00000000000000000101000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BLTU:
+    index: 8
+    encoding: 0b00000000000000000110000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  BGEU:
+    index: 9
+    encoding: 0b00000000000000000111000001100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   true
+    delay:   [1,1]
+  LB:
+    index: 10
+    encoding: 0b00000000000000000000000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LH:
+    index: 11
+    encoding: 0b00000000000000000001000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LW:
+    index: 12
+    encoding: 0b00000000000000000010000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LBU:
+    index: 13
+    encoding: 0b00000000000000000100000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LHU:
+    index: 14
+    encoding: 0b00000000000000000101000000000011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SB:
+    index: 15
+    encoding: 0b00000000000000000000000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SH:
+    index: 16
+    encoding: 0b00000000000000000001000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SW:
+    index: 17
+    encoding: 0b00000000000000000010000000100011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ADDI:
+    index: 18
+    encoding: 0b00000000000000000000000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTI:
+    index: 19
+    encoding: 0b00000000000000000010000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTIU:
+    index: 20
+    encoding: 0b00000000000000000011000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  XORI:
+    index: 21
+    encoding: 0b00000000000000000100000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ORI:
+    index: 22
+    encoding: 0b00000000000000000110000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ANDI:
+    index: 23
+    encoding: 0b00000000000000000111000000010011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLLI:
+    index: 24
+    encoding: 0b00000000000000000001000000010011
+    mask: 0b11111100000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRLI:
+    index: 25
+    encoding: 0b00000000000000000101000000010011
+    mask: 0b11111100000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRAI:
+    index: 26
+    encoding: 0b01000000000000000101000000010011
+    mask: 0b11111100000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  ADD:
+    index: 27
+    encoding: 0b00000000000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SUB:
+    index: 28
+    encoding: 0b01000000000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLL:
+    index: 29
+    encoding: 0b00000000000000000001000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLT:
+    index: 30
+    encoding: 0b00000000000000000010000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SLTU:
+    index: 31
+    encoding: 0b00000000000000000011000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  XOR:
+    index: 32
+    encoding: 0b00000000000000000100000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRL:
+    index: 33
+    encoding: 0b00000000000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRA:
+    index: 34
+    encoding: 0b01000000000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  OR:
+    index: 35
+    encoding: 0b00000000000000000110000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AND:
+    index: 36
+    encoding: 0b00000000000000000111000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FENCE:
+    index: 37
+    encoding: 0b00000000000000000000000000001111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  ECALL:
+    index: 38
+    encoding: 0b00000000000000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  EBREAK:
+    index: 39
+    encoding: 0b00000000000100000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  MRET:
+    index: 40
+    encoding: 0b00110000001000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+  WFI:
+    index: 41
+    encoding: 0b00010000010100000000000001110011
+    mask: 0b11111111111111111111111111111111
+    size:   32
+    branch:   false
+    delay:   1
+  LWU:
+    index: 42
+    encoding: 0b00000000000000000110000000000011
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  LD:
+    index: 43
+    encoding: 0b00000000000000000011000000000011
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SD:
+    index: 44
+    encoding: 0b00000000000000000011000000100011
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  ADDIW:
+    index: 45
+    encoding: 0b00000000000000000000000000011011
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SLLIW:
+    index: 46
+    encoding: 0b00000000000000000001000000011011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRLIW:
+    index: 47
+    encoding: 0b00000000000000000101000000011011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRAIW:
+    index: 48
+    encoding: 0b01000000000000000101000000011011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  ADDW:
+    index: 49
+    encoding: 0b00000000000000000000000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SUBW:
+    index: 50
+    encoding: 0b01000000000000000000000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SLLW:
+    index: 51
+    encoding: 0b00000000000000000001000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRLW:
+    index: 52
+    encoding: 0b00000000000000000101000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SRAW:
+    index: 53
+    encoding: 0b01000000000000000101000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+Zicsr: 
+  CSRRW:
+    index: 54
+    encoding: 0b00000000000000000001000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRS:
+    index: 55
+    encoding: 0b00000000000000000010000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRC:
+    index: 56
+    encoding: 0b00000000000000000011000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRWI:
+    index: 57
+    encoding: 0b00000000000000000101000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRSI:
+    index: 58
+    encoding: 0b00000000000000000110000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  CSRRCI:
+    index: 59
+    encoding: 0b00000000000000000111000001110011
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+Zifencei: 
+  FENCE_I:
+    index: 60
+    encoding: 0b00000000000000000001000000001111
+    mask: 0b00000000000000000111000001111111
+    attributes: [[name:flush]]
+    size:   32
+    branch:   false
+    delay:   1
+RVM: 
+  MUL:
+    index: 61
+    encoding: 0b00000010000000000000000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULH:
+    index: 62
+    encoding: 0b00000010000000000001000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULHSU:
+    index: 63
+    encoding: 0b00000010000000000010000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULHU:
+    index: 64
+    encoding: 0b00000010000000000011000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  DIV:
+    index: 65
+    encoding: 0b00000010000000000100000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  DIVU:
+    index: 66
+    encoding: 0b00000010000000000101000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  REM:
+    index: 67
+    encoding: 0b00000010000000000110000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  REMU:
+    index: 68
+    encoding: 0b00000010000000000111000000110011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  MULW:
+    index: 69
+    encoding: 0b00000010000000000000000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  DIVW:
+    index: 70
+    encoding: 0b00000010000000000100000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  DIVUW:
+    index: 71
+    encoding: 0b00000010000000000101000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  REMW:
+    index: 72
+    encoding: 0b00000010000000000110000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  REMUW:
+    index: 73
+    encoding: 0b00000010000000000111000000111011
+    mask: 0b11111110000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+RVA: 
+  LRW:
+    index: 74
+    encoding: 0b00010000000000000010000000101111
+    mask: 0b11111001111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  SCW:
+    index: 75
+    encoding: 0b00011000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOSWAPW:
+    index: 76
+    encoding: 0b00001000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOADDW:
+    index: 77
+    encoding: 0b00000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOXORW:
+    index: 78
+    encoding: 0b00100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOANDW:
+    index: 79
+    encoding: 0b01100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOORW:
+    index: 80
+    encoding: 0b01000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMINW:
+    index: 81
+    encoding: 0b10000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXW:
+    index: 82
+    encoding: 0b10100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMINUW:
+    index: 83
+    encoding: 0b11000000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXUW:
+    index: 84
+    encoding: 0b11100000000000000010000000101111
+    mask: 0b11111000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  LRD:
+    index: 85
+    encoding: 0b00010000000000000011000000101111
+    mask: 0b11111001111100000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  SCD:
+    index: 86
+    encoding: 0b00011000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOSWAPD:
+    index: 87
+    encoding: 0b00001000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOADDD:
+    index: 88
+    encoding: 0b00000000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOXORD:
+    index: 89
+    encoding: 0b00100000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOANDD:
+    index: 90
+    encoding: 0b01100000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOORD:
+    index: 91
+    encoding: 0b01000000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMIND:
+    index: 92
+    encoding: 0b10000000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXD:
+    index: 93
+    encoding: 0b10100000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMINUD:
+    index: 94
+    encoding: 0b11000000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  AMOMAXUD:
+    index: 95
+    encoding: 0b11100000000000000011000000101111
+    mask: 0b11111000000000000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+Zca: 
+  C__ADDI4SPN:
+    index: 96
+    encoding: 0b0000000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LW:
+    index: 97
+    encoding: 0b0100000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LD:
+    index: 98
+    encoding: 0b0110000000000000
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__SW:
+    index: 99
+    encoding: 0b1100000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SD:
+    index: 100
+    encoding: 0b1110000000000000
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDI:
+    index: 101
+    encoding: 0b0000000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__NOP:
+    index: 102
+    encoding: 0b0000000000000001
+    mask: 0b1110111110000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDIW:
+    index: 103
+    encoding: 0b0010000000000001
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__LI:
+    index: 104
+    encoding: 0b0100000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LUI:
+    index: 105
+    encoding: 0b0110000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDI16SP:
+    index: 106
+    encoding: 0b0110000100000001
+    mask: 0b1110111110000011
+    size:   16
+    branch:   false
+    delay:   1
+  __reserved_clui:
+    index: 107
+    encoding: 0b0110000000000001
+    mask: 0b1111000001111111
+    size:   16
+    branch:   false
+    delay:   1
+  C__SRLI:
+    index: 108
+    encoding: 0b1000000000000001
+    mask: 0b1110110000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__SRAI:
+    index: 109
+    encoding: 0b1000010000000001
+    mask: 0b1110110000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__ANDI:
+    index: 110
+    encoding: 0b1000100000000001
+    mask: 0b1110110000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SUB:
+    index: 111
+    encoding: 0b1000110000000001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__XOR:
+    index: 112
+    encoding: 0b1000110000100001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__OR:
+    index: 113
+    encoding: 0b1000110001000001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__AND:
+    index: 114
+    encoding: 0b1000110001100001
+    mask: 0b1111110001100011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SUBW:
+    index: 115
+    encoding: 0b1001110000000001
+    mask: 0b1111110001100011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADDW:
+    index: 116
+    encoding: 0b1001110000100001
+    mask: 0b1111110001100011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__J:
+    index: 117
+    encoding: 0b1010000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   1
+  C__BEQZ:
+    index: 118
+    encoding: 0b1100000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   [1,1]
+  C__BNEZ:
+    index: 119
+    encoding: 0b1110000000000001
+    mask: 0b1110000000000011
+    size:   16
+    branch:   true
+    delay:   [1,1]
+  C__SLLI:
+    index: 120
+    encoding: 0b0000000000000010
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__LWSP:
+    index: 121
+    encoding: 0b0100000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__LDSP:
+    index: 122
+    encoding: 0b0110000000000010
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  C__MV:
+    index: 123
+    encoding: 0b1000000000000010
+    mask: 0b1111000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__JR:
+    index: 124
+    encoding: 0b1000000000000010
+    mask: 0b1111000001111111
+    size:   16
+    branch:   true
+    delay:   1
+  __reserved_cmv:
+    index: 125
+    encoding: 0b1000000000000010
+    mask: 0b1111111111111111
+    size:   16
+    branch:   false
+    delay:   1
+  C__ADD:
+    index: 126
+    encoding: 0b1001000000000010
+    mask: 0b1111000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__JALR:
+    index: 127
+    encoding: 0b1001000000000010
+    mask: 0b1111000001111111
+    size:   16
+    branch:   true
+    delay:   1
+  C__EBREAK:
+    index: 128
+    encoding: 0b1001000000000010
+    mask: 0b1111111111111111
+    size:   16
+    branch:   false
+    delay:   1
+  C__SWSP:
+    index: 129
+    encoding: 0b1100000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__SDSP:
+    index: 130
+    encoding: 0b1110000000000010
+    mask: 0b1110000000000011
+    attributes: [[name:enable, value:1]]
+    size:   16
+    branch:   false
+    delay:   1
+  DII:
+    index: 131
+    encoding: 0b0000000000000000
+    mask: 0b1111111111111111
+    size:   16
+    branch:   false
+    delay:   1
+RVF: 
+  FLW:
+    index: 132
+    encoding: 0b00000000000000000010000000000111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSW:
+    index: 133
+    encoding: 0b00000000000000000010000000100111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FADD__S:
+    index: 134
+    encoding: 0b00000000000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSUB__S:
+    index: 135
+    encoding: 0b00001000000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMUL__S:
+    index: 136
+    encoding: 0b00010000000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FDIV__S:
+    index: 137
+    encoding: 0b00011000000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMIN__S:
+    index: 138
+    encoding: 0b00101000000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMAX__S:
+    index: 139
+    encoding: 0b00101000000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSQRT__S:
+    index: 140
+    encoding: 0b01011000000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMADD__S:
+    index: 141
+    encoding: 0b00000000000000000000000001000011
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMSUB__S:
+    index: 142
+    encoding: 0b00000000000000000000000001000111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMADD__S:
+    index: 143
+    encoding: 0b00000000000000000000000001001111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMSUB__S:
+    index: 144
+    encoding: 0b00000000000000000000000001001011
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__W__S:
+    index: 145
+    encoding: 0b11000000000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__WU__S:
+    index: 146
+    encoding: 0b11000000000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__L__S:
+    index: 147
+    encoding: 0b11000000001000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__LU__S:
+    index: 148
+    encoding: 0b11000000001100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__W:
+    index: 149
+    encoding: 0b11010000000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__WU:
+    index: 150
+    encoding: 0b11010000000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__L:
+    index: 151
+    encoding: 0b11010000001000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__LU:
+    index: 152
+    encoding: 0b11010000001100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJ__S:
+    index: 153
+    encoding: 0b00100000000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJN__S:
+    index: 154
+    encoding: 0b00100000000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJX__S:
+    index: 155
+    encoding: 0b00100000000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMV__X__W:
+    index: 156
+    encoding: 0b11100000000000000000000001010011
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMV__W__X:
+    index: 157
+    encoding: 0b11110000000000000000000001010011
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FEQ__S:
+    index: 158
+    encoding: 0b10100000000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLT__S:
+    index: 159
+    encoding: 0b10100000000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLE__S:
+    index: 160
+    encoding: 0b10100000000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCLASS__S:
+    index: 161
+    encoding: 0b11100000000000000001000001010011
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVD: 
+  FLD:
+    index: 162
+    encoding: 0b00000000000000000011000000000111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSD:
+    index: 163
+    encoding: 0b00000000000000000011000000100111
+    mask: 0b00000000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FADD__D:
+    index: 164
+    encoding: 0b00000010000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSUB__D:
+    index: 165
+    encoding: 0b00001010000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMUL__D:
+    index: 166
+    encoding: 0b00010010000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FDIV__D:
+    index: 167
+    encoding: 0b00011010000000000000000001010011
+    mask: 0b11111110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMIN__D:
+    index: 168
+    encoding: 0b00101010000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMAX__D:
+    index: 169
+    encoding: 0b00101010000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSQRT__D:
+    index: 170
+    encoding: 0b01011010000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMADD__D:
+    index: 171
+    encoding: 0b00000010000000000000000001000011
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMSUB__D:
+    index: 172
+    encoding: 0b00000010000000000000000001000111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMADD__D:
+    index: 173
+    encoding: 0b00000010000000000000000001001111
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FNMSUB__D:
+    index: 174
+    encoding: 0b00000010000000000000000001001011
+    mask: 0b00000110000000000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__W__D:
+    index: 175
+    encoding: 0b11000010000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__WU__D:
+    index: 176
+    encoding: 0b11000010000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__L__D:
+    index: 177
+    encoding: 0b11000010001000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__LU__D:
+    index: 178
+    encoding: 0b11000010001100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__W:
+    index: 179
+    encoding: 0b11010010000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__WU:
+    index: 180
+    encoding: 0b11010010000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__L:
+    index: 181
+    encoding: 0b11010010001000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__LU:
+    index: 182
+    encoding: 0b11010010001100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__S__D:
+    index: 183
+    encoding: 0b01000000000100000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCVT__D__S:
+    index: 184
+    encoding: 0b01000010000000000000000001010011
+    mask: 0b11111111111100000000000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJ__D:
+    index: 185
+    encoding: 0b00100010000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJN__D:
+    index: 186
+    encoding: 0b00100010000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FSGNJX__D:
+    index: 187
+    encoding: 0b00100010000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FMV__X__D:
+    index: 188
+    encoding: 0b11100010000000000000000001010011
+    mask: 0b11111111111100000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FMV__D__X:
+    index: 189
+    encoding: 0b11110010000000000000000001010011
+    mask: 0b11111111111100000111000001111111
+    attributes: [[name:enable, value:1]]
+    size:   32
+    branch:   false
+    delay:   1
+  FEQ__D:
+    index: 190
+    encoding: 0b10100010000000000010000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLT__D:
+    index: 191
+    encoding: 0b10100010000000000001000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FLE__D:
+    index: 192
+    encoding: 0b10100010000000000000000001010011
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  FCLASS__D:
+    index: 193
+    encoding: 0b11100010000000000001000001010011
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+Zcd: 
+  C__FLD:
+    index: 194
+    encoding: 0b0010000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__FSD:
+    index: 195
+    encoding: 0b1010000000000000
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__FLDSP:
+    index: 196
+    encoding: 0b0010000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+  C__FSDSP:
+    index: 197
+    encoding: 0b1010000000000010
+    mask: 0b1110000000000011
+    size:   16
+    branch:   false
+    delay:   1
+RVSMode: 
+  SFENCE__VMA:
+    index: 198
+    encoding: 0b00010010000000000000000001110011
+    mask: 0b11111110000000000111111111111111
+    size:   32
+    branch:   false
+    delay:   1
+  SRET:
+    index: 199
+    encoding: 0b00010000001000000000000001110011
+    mask: 0b11111111111111111111111111111111
+    attributes: [[name:no_cont]]
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_vset: 
+  VSETVLI:
+    index: 200
+    encoding: 0b00000000000000000111000001010111
+    mask: 0b11110000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSETIVLI:
+    index: 201
+    encoding: 0b11000000000000000111000001010111
+    mask: 0b11110000000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSETVL:
+    index: 202
+    encoding: 0b10000000000000000111000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_mem: 
+  VLE8__V:
+    index: 203
+    encoding: 0b00000000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE16__V:
+    index: 204
+    encoding: 0b00000000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE32__V:
+    index: 205
+    encoding: 0b00000000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE64__V:
+    index: 206
+    encoding: 0b00000000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E8__V:
+    index: 207
+    encoding: 0b00100000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E16__V:
+    index: 208
+    encoding: 0b00100000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E32__V:
+    index: 209
+    encoding: 0b00100000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E64__V:
+    index: 210
+    encoding: 0b00100000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E8__V:
+    index: 211
+    encoding: 0b01000000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E16__V:
+    index: 212
+    encoding: 0b01000000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E32__V:
+    index: 213
+    encoding: 0b01000000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E64__V:
+    index: 214
+    encoding: 0b01000000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E8__V:
+    index: 215
+    encoding: 0b01100000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E16__V:
+    index: 216
+    encoding: 0b01100000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E32__V:
+    index: 217
+    encoding: 0b01100000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E64__V:
+    index: 218
+    encoding: 0b01100000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E8__V:
+    index: 219
+    encoding: 0b10000000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E16__V:
+    index: 220
+    encoding: 0b10000000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E32__V:
+    index: 221
+    encoding: 0b10000000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E64__V:
+    index: 222
+    encoding: 0b10000000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E8__V:
+    index: 223
+    encoding: 0b10100000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E16__V:
+    index: 224
+    encoding: 0b10100000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E32__V:
+    index: 225
+    encoding: 0b10100000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E64__V:
+    index: 226
+    encoding: 0b10100000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E8__V:
+    index: 227
+    encoding: 0b11000000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E16__V:
+    index: 228
+    encoding: 0b11000000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E32__V:
+    index: 229
+    encoding: 0b11000000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E64__V:
+    index: 230
+    encoding: 0b11000000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E8__V:
+    index: 231
+    encoding: 0b11100000000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E16__V:
+    index: 232
+    encoding: 0b11100000000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E32__V:
+    index: 233
+    encoding: 0b11100000000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E64__V:
+    index: 234
+    encoding: 0b11100000000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSE8__V:
+    index: 235
+    encoding: 0b00000000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSE16__V:
+    index: 236
+    encoding: 0b00000000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSE32__V:
+    index: 237
+    encoding: 0b00000000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSE64__V:
+    index: 238
+    encoding: 0b00000000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG2E8__V:
+    index: 239
+    encoding: 0b00100000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG2E16__V:
+    index: 240
+    encoding: 0b00100000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG2E32__V:
+    index: 241
+    encoding: 0b00100000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG2E64__V:
+    index: 242
+    encoding: 0b00100000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG3E8__V:
+    index: 243
+    encoding: 0b01000000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG3E16__V:
+    index: 244
+    encoding: 0b01000000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG3E32__V:
+    index: 245
+    encoding: 0b01000000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG3E64__V:
+    index: 246
+    encoding: 0b01000000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG4E8__V:
+    index: 247
+    encoding: 0b01100000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG4E16__V:
+    index: 248
+    encoding: 0b01100000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG4E32__V:
+    index: 249
+    encoding: 0b01100000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG4E64__V:
+    index: 250
+    encoding: 0b01100000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG5E8__V:
+    index: 251
+    encoding: 0b10000000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG5E16__V:
+    index: 252
+    encoding: 0b10000000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG5E32__V:
+    index: 253
+    encoding: 0b10000000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG5E64__V:
+    index: 254
+    encoding: 0b10000000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG6E8__V:
+    index: 255
+    encoding: 0b10100000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG6E16__V:
+    index: 256
+    encoding: 0b10100000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG6E32__V:
+    index: 257
+    encoding: 0b10100000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG6E64__V:
+    index: 258
+    encoding: 0b10100000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG7E8__V:
+    index: 259
+    encoding: 0b11000000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG7E16__V:
+    index: 260
+    encoding: 0b11000000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG7E32__V:
+    index: 261
+    encoding: 0b11000000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG7E64__V:
+    index: 262
+    encoding: 0b11000000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG8E8__V:
+    index: 263
+    encoding: 0b11100000000000000000000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG8E16__V:
+    index: 264
+    encoding: 0b11100000000000000101000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG8E32__V:
+    index: 265
+    encoding: 0b11100000000000000110000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSEG8E64__V:
+    index: 266
+    encoding: 0b11100000000000000111000000100111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSE8__V:
+    index: 267
+    encoding: 0b00001000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSE16__V:
+    index: 268
+    encoding: 0b00001000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSE32__V:
+    index: 269
+    encoding: 0b00001000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSE64__V:
+    index: 270
+    encoding: 0b00001000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG2E8__V:
+    index: 271
+    encoding: 0b00101000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG2E16__V:
+    index: 272
+    encoding: 0b00101000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG2E32__V:
+    index: 273
+    encoding: 0b00101000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG2E64__V:
+    index: 274
+    encoding: 0b00101000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG3E8__V:
+    index: 275
+    encoding: 0b01001000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG3E16__V:
+    index: 276
+    encoding: 0b01001000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG3E32__V:
+    index: 277
+    encoding: 0b01001000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG3E64__V:
+    index: 278
+    encoding: 0b01001000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG4E8__V:
+    index: 279
+    encoding: 0b01101000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG4E16__V:
+    index: 280
+    encoding: 0b01101000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG4E32__V:
+    index: 281
+    encoding: 0b01101000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG4E64__V:
+    index: 282
+    encoding: 0b01101000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG5E8__V:
+    index: 283
+    encoding: 0b10001000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG5E16__V:
+    index: 284
+    encoding: 0b10001000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG5E32__V:
+    index: 285
+    encoding: 0b10001000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG5E64__V:
+    index: 286
+    encoding: 0b10001000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG6E8__V:
+    index: 287
+    encoding: 0b10101000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG6E16__V:
+    index: 288
+    encoding: 0b10101000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG6E32__V:
+    index: 289
+    encoding: 0b10101000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG6E64__V:
+    index: 290
+    encoding: 0b10101000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG7E8__V:
+    index: 291
+    encoding: 0b11001000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG7E16__V:
+    index: 292
+    encoding: 0b11001000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG7E32__V:
+    index: 293
+    encoding: 0b11001000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG7E64__V:
+    index: 294
+    encoding: 0b11001000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG8E8__V:
+    index: 295
+    encoding: 0b11101000000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG8E16__V:
+    index: 296
+    encoding: 0b11101000000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG8E32__V:
+    index: 297
+    encoding: 0b11101000000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSSEG8E64__V:
+    index: 298
+    encoding: 0b11101000000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSE8__V:
+    index: 299
+    encoding: 0b00001000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSE16__V:
+    index: 300
+    encoding: 0b00001000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSE32__V:
+    index: 301
+    encoding: 0b00001000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSE64__V:
+    index: 302
+    encoding: 0b00001000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG2E8__V:
+    index: 303
+    encoding: 0b00101000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG2E16__V:
+    index: 304
+    encoding: 0b00101000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG2E32__V:
+    index: 305
+    encoding: 0b00101000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG2E64__V:
+    index: 306
+    encoding: 0b00101000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG3E8__V:
+    index: 307
+    encoding: 0b01001000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG3E16__V:
+    index: 308
+    encoding: 0b01001000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG3E32__V:
+    index: 309
+    encoding: 0b01001000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG3E64__V:
+    index: 310
+    encoding: 0b01001000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG4E8__V:
+    index: 311
+    encoding: 0b01101000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG4E16__V:
+    index: 312
+    encoding: 0b01101000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG4E32__V:
+    index: 313
+    encoding: 0b01101000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG4E64__V:
+    index: 314
+    encoding: 0b01101000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG5E8__V:
+    index: 315
+    encoding: 0b10001000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG5E16__V:
+    index: 316
+    encoding: 0b10001000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG5E32__V:
+    index: 317
+    encoding: 0b10001000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG5E64__V:
+    index: 318
+    encoding: 0b10001000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG6E8__V:
+    index: 319
+    encoding: 0b10101000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG6E16__V:
+    index: 320
+    encoding: 0b10101000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG6E32__V:
+    index: 321
+    encoding: 0b10101000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG6E64__V:
+    index: 322
+    encoding: 0b10101000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG7E8__V:
+    index: 323
+    encoding: 0b11001000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG7E16__V:
+    index: 324
+    encoding: 0b11001000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG7E32__V:
+    index: 325
+    encoding: 0b11001000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG7E64__V:
+    index: 326
+    encoding: 0b11001000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG8E8__V:
+    index: 327
+    encoding: 0b11101000000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG8E16__V:
+    index: 328
+    encoding: 0b11101000000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG8E32__V:
+    index: 329
+    encoding: 0b11101000000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSSEG8E64__V:
+    index: 330
+    encoding: 0b11101000000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE8FF__V:
+    index: 331
+    encoding: 0b00000001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE16FF__V:
+    index: 332
+    encoding: 0b00000001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE32FF__V:
+    index: 333
+    encoding: 0b00000001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLE64FF__V:
+    index: 334
+    encoding: 0b00000001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E8FF__V:
+    index: 335
+    encoding: 0b00100001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E16FF__V:
+    index: 336
+    encoding: 0b00100001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E32FF__V:
+    index: 337
+    encoding: 0b00100001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG2E64FF__V:
+    index: 338
+    encoding: 0b00100001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E8FF__V:
+    index: 339
+    encoding: 0b01000001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E16FF__V:
+    index: 340
+    encoding: 0b01000001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E32FF__V:
+    index: 341
+    encoding: 0b01000001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG3E64FF__V:
+    index: 342
+    encoding: 0b01000001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E8FF__V:
+    index: 343
+    encoding: 0b01100001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E16FF__V:
+    index: 344
+    encoding: 0b01100001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E32FF__V:
+    index: 345
+    encoding: 0b01100001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG4E64FF__V:
+    index: 346
+    encoding: 0b01100001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E8FF__V:
+    index: 347
+    encoding: 0b10000001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E16FF__V:
+    index: 348
+    encoding: 0b10000001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E32FF__V:
+    index: 349
+    encoding: 0b10000001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG5E64FF__V:
+    index: 350
+    encoding: 0b10000001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E8FF__V:
+    index: 351
+    encoding: 0b10100001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E16FF__V:
+    index: 352
+    encoding: 0b10100001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E32FF__V:
+    index: 353
+    encoding: 0b10100001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG6E64FF__V:
+    index: 354
+    encoding: 0b10100001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E8FF__V:
+    index: 355
+    encoding: 0b11000001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E16FF__V:
+    index: 356
+    encoding: 0b11000001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E32FF__V:
+    index: 357
+    encoding: 0b11000001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG7E64FF__V:
+    index: 358
+    encoding: 0b11000001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E8FF__V:
+    index: 359
+    encoding: 0b11100001000000000000000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E16FF__V:
+    index: 360
+    encoding: 0b11100001000000000101000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E32FF__V:
+    index: 361
+    encoding: 0b11100001000000000110000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLSEG8E64FF__V:
+    index: 362
+    encoding: 0b11100001000000000111000000000111
+    mask: 0b11101101111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSM__V:
+    index: 363
+    encoding: 0b00000010101100000000000000100111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLM__V:
+    index: 364
+    encoding: 0b00000010101100000000000000000111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL1RE8__V:
+    index: 365
+    encoding: 0b00000010100000000000000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL1RE16__V:
+    index: 366
+    encoding: 0b00000010100000000101000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL1RE32__V:
+    index: 367
+    encoding: 0b00000010100000000110000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL1RE64__V:
+    index: 368
+    encoding: 0b00000010100000000111000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL2RE8__V:
+    index: 369
+    encoding: 0b00100010100000000000000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL2RE16__V:
+    index: 370
+    encoding: 0b00100010100000000101000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL2RE32__V:
+    index: 371
+    encoding: 0b00100010100000000110000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL2RE64__V:
+    index: 372
+    encoding: 0b00100010100000000111000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL4RE8__V:
+    index: 373
+    encoding: 0b01100010100000000000000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL4RE16__V:
+    index: 374
+    encoding: 0b01100010100000000101000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL4RE32__V:
+    index: 375
+    encoding: 0b01100010100000000110000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL4RE64__V:
+    index: 376
+    encoding: 0b01100010100000000111000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL8RE8__V:
+    index: 377
+    encoding: 0b11100010100000000000000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL8RE16__V:
+    index: 378
+    encoding: 0b11100010100000000101000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL8RE32__V:
+    index: 379
+    encoding: 0b11100010100000000110000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VL8RE64__V:
+    index: 380
+    encoding: 0b11100010100000000111000000000111
+    mask: 0b11101111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VS1RE64__V:
+    index: 381
+    encoding: 0b00000010100000000000000000100111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VS2RE64__V:
+    index: 382
+    encoding: 0b00100010100000000000000000100111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VS4RE64__V:
+    index: 383
+    encoding: 0b01100010100000000000000000100111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VS8RE64__V:
+    index: 384
+    encoding: 0b11100010100000000000000000100111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXEI8__V:
+    index: 385
+    encoding: 0b00001100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXEI16__V:
+    index: 386
+    encoding: 0b00001100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXEI32__V:
+    index: 387
+    encoding: 0b00001100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXEI64__V:
+    index: 388
+    encoding: 0b00001100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG2EI8__V:
+    index: 389
+    encoding: 0b00101100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG2EI16__V:
+    index: 390
+    encoding: 0b00101100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG2EI32__V:
+    index: 391
+    encoding: 0b00101100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG2EI64__V:
+    index: 392
+    encoding: 0b00101100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG3EI8__V:
+    index: 393
+    encoding: 0b01001100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG3EI16__V:
+    index: 394
+    encoding: 0b01001100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG3EI32__V:
+    index: 395
+    encoding: 0b01001100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG3EI64__V:
+    index: 396
+    encoding: 0b01001100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG4EI8__V:
+    index: 397
+    encoding: 0b01101100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG4EI16__V:
+    index: 398
+    encoding: 0b01101100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG4EI32__V:
+    index: 399
+    encoding: 0b01101100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG4EI64__V:
+    index: 400
+    encoding: 0b01101100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG5EI8__V:
+    index: 401
+    encoding: 0b10001100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG5EI16__V:
+    index: 402
+    encoding: 0b10001100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG5EI32__V:
+    index: 403
+    encoding: 0b10001100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG5EI64__V:
+    index: 404
+    encoding: 0b10001100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG6EI8__V:
+    index: 405
+    encoding: 0b10101100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG6EI16__V:
+    index: 406
+    encoding: 0b10101100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG6EI32__V:
+    index: 407
+    encoding: 0b10101100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG6EI64__V:
+    index: 408
+    encoding: 0b10101100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG7EI8__V:
+    index: 409
+    encoding: 0b11001100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG7EI16__V:
+    index: 410
+    encoding: 0b11001100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG7EI32__V:
+    index: 411
+    encoding: 0b11001100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG7EI64__V:
+    index: 412
+    encoding: 0b11001100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG8EI8__V:
+    index: 413
+    encoding: 0b11101100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG8EI16__V:
+    index: 414
+    encoding: 0b11101100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG8EI32__V:
+    index: 415
+    encoding: 0b11101100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLOXSEG8EI64__V:
+    index: 416
+    encoding: 0b11101100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXEI8__V:
+    index: 417
+    encoding: 0b00001100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXEI16__V:
+    index: 418
+    encoding: 0b00001100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXEI32__V:
+    index: 419
+    encoding: 0b00001100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXEI64__V:
+    index: 420
+    encoding: 0b00001100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG2EI8__V:
+    index: 421
+    encoding: 0b00101100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG2EI16__V:
+    index: 422
+    encoding: 0b00101100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG2EI32__V:
+    index: 423
+    encoding: 0b00101100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG2EI64__V:
+    index: 424
+    encoding: 0b00101100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG3EI8__V:
+    index: 425
+    encoding: 0b01001100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG3EI16__V:
+    index: 426
+    encoding: 0b01001100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG3EI32__V:
+    index: 427
+    encoding: 0b01001100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG3EI64__V:
+    index: 428
+    encoding: 0b01001100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG4EI8__V:
+    index: 429
+    encoding: 0b01101100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG4EI16__V:
+    index: 430
+    encoding: 0b01101100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG4EI32__V:
+    index: 431
+    encoding: 0b01101100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG4EI64__V:
+    index: 432
+    encoding: 0b01101100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG5EI8__V:
+    index: 433
+    encoding: 0b10001100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG5EI16__V:
+    index: 434
+    encoding: 0b10001100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG5EI32__V:
+    index: 435
+    encoding: 0b10001100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG5EI64__V:
+    index: 436
+    encoding: 0b10001100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG6EI8__V:
+    index: 437
+    encoding: 0b10101100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG6EI16__V:
+    index: 438
+    encoding: 0b10101100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG6EI32__V:
+    index: 439
+    encoding: 0b10101100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG6EI64__V:
+    index: 440
+    encoding: 0b10101100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG7EI8__V:
+    index: 441
+    encoding: 0b11001100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG7EI16__V:
+    index: 442
+    encoding: 0b11001100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG7EI32__V:
+    index: 443
+    encoding: 0b11001100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG7EI64__V:
+    index: 444
+    encoding: 0b11001100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG8EI8__V:
+    index: 445
+    encoding: 0b11101100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG8EI16__V:
+    index: 446
+    encoding: 0b11101100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG8EI32__V:
+    index: 447
+    encoding: 0b11101100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSOXSEG8EI64__V:
+    index: 448
+    encoding: 0b11101100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXEI8__V:
+    index: 449
+    encoding: 0b00000100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXEI16__V:
+    index: 450
+    encoding: 0b00000100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXEI32__V:
+    index: 451
+    encoding: 0b00000100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXEI64__V:
+    index: 452
+    encoding: 0b00000100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG2EI8__V:
+    index: 453
+    encoding: 0b00100100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG2EI16__V:
+    index: 454
+    encoding: 0b00100100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG2EI32__V:
+    index: 455
+    encoding: 0b00100100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG2EI64__V:
+    index: 456
+    encoding: 0b00100100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG3EI8__V:
+    index: 457
+    encoding: 0b01000100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG3EI16__V:
+    index: 458
+    encoding: 0b01000100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG3EI32__V:
+    index: 459
+    encoding: 0b01000100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG3EI64__V:
+    index: 460
+    encoding: 0b01000100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG4EI8__V:
+    index: 461
+    encoding: 0b01100100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG4EI16__V:
+    index: 462
+    encoding: 0b01100100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG4EI32__V:
+    index: 463
+    encoding: 0b01100100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG4EI64__V:
+    index: 464
+    encoding: 0b01100100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG5EI8__V:
+    index: 465
+    encoding: 0b10000100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG5EI16__V:
+    index: 466
+    encoding: 0b10000100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG5EI32__V:
+    index: 467
+    encoding: 0b10000100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG5EI64__V:
+    index: 468
+    encoding: 0b10000100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG6EI8__V:
+    index: 469
+    encoding: 0b10100100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG6EI16__V:
+    index: 470
+    encoding: 0b10100100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG6EI32__V:
+    index: 471
+    encoding: 0b10100100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG6EI64__V:
+    index: 472
+    encoding: 0b10100100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG7EI8__V:
+    index: 473
+    encoding: 0b11000100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG7EI16__V:
+    index: 474
+    encoding: 0b11000100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG7EI32__V:
+    index: 475
+    encoding: 0b11000100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG7EI64__V:
+    index: 476
+    encoding: 0b11000100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG8EI8__V:
+    index: 477
+    encoding: 0b11100100000000000000000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG8EI16__V:
+    index: 478
+    encoding: 0b11100100000000000101000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG8EI32__V:
+    index: 479
+    encoding: 0b11100100000000000110000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VLUXSEG8EI64__V:
+    index: 480
+    encoding: 0b11100100000000000111000000000111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXEI8__V:
+    index: 481
+    encoding: 0b00000100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXEI16__V:
+    index: 482
+    encoding: 0b00000100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXEI32__V:
+    index: 483
+    encoding: 0b00000100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXEI64__V:
+    index: 484
+    encoding: 0b00000100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG2EI8__V:
+    index: 485
+    encoding: 0b00100100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG2EI16__V:
+    index: 486
+    encoding: 0b00100100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG2EI32__V:
+    index: 487
+    encoding: 0b00100100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG2EI64__V:
+    index: 488
+    encoding: 0b00100100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG3EI8__V:
+    index: 489
+    encoding: 0b01000100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG3EI16__V:
+    index: 490
+    encoding: 0b01000100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG3EI32__V:
+    index: 491
+    encoding: 0b01000100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG3EI64__V:
+    index: 492
+    encoding: 0b01000100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG4EI8__V:
+    index: 493
+    encoding: 0b01100100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG4EI16__V:
+    index: 494
+    encoding: 0b01100100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG4EI32__V:
+    index: 495
+    encoding: 0b01100100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG4EI64__V:
+    index: 496
+    encoding: 0b01100100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG5EI8__V:
+    index: 497
+    encoding: 0b10000100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG5EI16__V:
+    index: 498
+    encoding: 0b10000100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG5EI32__V:
+    index: 499
+    encoding: 0b10000100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG5EI64__V:
+    index: 500
+    encoding: 0b10000100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG6EI8__V:
+    index: 501
+    encoding: 0b10100100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG6EI16__V:
+    index: 502
+    encoding: 0b10100100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG6EI32__V:
+    index: 503
+    encoding: 0b10100100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG6EI64__V:
+    index: 504
+    encoding: 0b10100100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG7EI8__V:
+    index: 505
+    encoding: 0b11000100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG7EI16__V:
+    index: 506
+    encoding: 0b11000100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG7EI32__V:
+    index: 507
+    encoding: 0b11000100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG7EI64__V:
+    index: 508
+    encoding: 0b11000100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG8EI8__V:
+    index: 509
+    encoding: 0b11100100000000000000000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG8EI16__V:
+    index: 510
+    encoding: 0b11100100000000000101000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG8EI32__V:
+    index: 511
+    encoding: 0b11100100000000000110000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUXSEG8EI64__V:
+    index: 512
+    encoding: 0b11100100000000000111000000100111
+    mask: 0b11101100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_arith: 
+  VADD__VI:
+    index: 513
+    encoding: 0b00000000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VADD__VV:
+    index: 514
+    encoding: 0b00000000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VADD__VX:
+    index: 515
+    encoding: 0b00000000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUB__VV:
+    index: 516
+    encoding: 0b00001000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSUB__VX:
+    index: 517
+    encoding: 0b00001000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRSUB__VI:
+    index: 518
+    encoding: 0b00001100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRSUB__VX:
+    index: 519
+    encoding: 0b00001100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADDU__VV:
+    index: 520
+    encoding: 0b11000000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADDU__VX:
+    index: 521
+    encoding: 0b11000000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUBU__VV:
+    index: 522
+    encoding: 0b11001000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUBU__VX:
+    index: 523
+    encoding: 0b11001000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADD__VV:
+    index: 524
+    encoding: 0b11000100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADD__VX:
+    index: 525
+    encoding: 0b11000100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUB__VV:
+    index: 526
+    encoding: 0b11001100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUB__VX:
+    index: 527
+    encoding: 0b11001100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADDU__WV:
+    index: 528
+    encoding: 0b11010000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADDU__WX:
+    index: 529
+    encoding: 0b11010000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUBU__WV:
+    index: 530
+    encoding: 0b11011000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUBU__WX:
+    index: 531
+    encoding: 0b11011000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADD__WV:
+    index: 532
+    encoding: 0b11010100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWADD__WX:
+    index: 533
+    encoding: 0b11010100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUB__WV:
+    index: 534
+    encoding: 0b11011100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWSUB__WX:
+    index: 535
+    encoding: 0b11011100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VZEXT__VF2:
+    index: 536
+    encoding: 0b01001000000000110010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSEXT__VF2:
+    index: 537
+    encoding: 0b01001000000000111010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VZEXT__VF4:
+    index: 538
+    encoding: 0b01001000000000100010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSEXT__VF4:
+    index: 539
+    encoding: 0b01001000000000101010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VZEXT__VF8:
+    index: 540
+    encoding: 0b01001000000000010010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSEXT__VF8:
+    index: 541
+    encoding: 0b01001000000000011010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VADC__VVM:
+    index: 542
+    encoding: 0b01000000000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VADC__VXM:
+    index: 543
+    encoding: 0b01000000000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VADC__VIM:
+    index: 544
+    encoding: 0b01000000000000000011000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VVM:
+    index: 545
+    encoding: 0b01000100000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VXM:
+    index: 546
+    encoding: 0b01000100000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VIM:
+    index: 547
+    encoding: 0b01000100000000000011000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VV:
+    index: 548
+    encoding: 0b01000110000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VX:
+    index: 549
+    encoding: 0b01000110000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADC__VI:
+    index: 550
+    encoding: 0b01000110000000000011000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSBC__VVM:
+    index: 551
+    encoding: 0b01001000000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSBC__VXM:
+    index: 552
+    encoding: 0b01001000000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSBC__VVM:
+    index: 553
+    encoding: 0b01001100000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSBC__VXM:
+    index: 554
+    encoding: 0b01001100000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSBC__VV:
+    index: 555
+    encoding: 0b01001110000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSBC__VX:
+    index: 556
+    encoding: 0b01001110000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAND__VI:
+    index: 557
+    encoding: 0b00100100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAND__VV:
+    index: 558
+    encoding: 0b00100100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAND__VX:
+    index: 559
+    encoding: 0b00100100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VOR__VI:
+    index: 560
+    encoding: 0b00101000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VOR__VV:
+    index: 561
+    encoding: 0b00101000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VOR__VX:
+    index: 562
+    encoding: 0b00101000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VXOR__VI:
+    index: 563
+    encoding: 0b00101100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VXOR__VV:
+    index: 564
+    encoding: 0b00101100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VXOR__VX:
+    index: 565
+    encoding: 0b00101100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLL__VI:
+    index: 566
+    encoding: 0b10010100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLL__VV:
+    index: 567
+    encoding: 0b10010100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLL__VX:
+    index: 568
+    encoding: 0b10010100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRL__VI:
+    index: 569
+    encoding: 0b10100000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRL__VV:
+    index: 570
+    encoding: 0b10100000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRL__VX:
+    index: 571
+    encoding: 0b10100000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRA__VI:
+    index: 572
+    encoding: 0b10100100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRA__VV:
+    index: 573
+    encoding: 0b10100100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSRA__VX:
+    index: 574
+    encoding: 0b10100100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRL__WI:
+    index: 575
+    encoding: 0b10110000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRL__WV:
+    index: 576
+    encoding: 0b10110000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRL__WX:
+    index: 577
+    encoding: 0b10110000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRA__WI:
+    index: 578
+    encoding: 0b10110100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRA__WV:
+    index: 579
+    encoding: 0b10110100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNSRA__WX:
+    index: 580
+    encoding: 0b10110100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSEQ__VI:
+    index: 581
+    encoding: 0b01100000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSEQ__VV:
+    index: 582
+    encoding: 0b01100000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSEQ__VX:
+    index: 583
+    encoding: 0b01100000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSNE__VI:
+    index: 584
+    encoding: 0b01100100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSNE__VV:
+    index: 585
+    encoding: 0b01100100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSNE__VX:
+    index: 586
+    encoding: 0b01100100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLTU__VV:
+    index: 587
+    encoding: 0b01101000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLTU__VX:
+    index: 588
+    encoding: 0b01101000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLT__VV:
+    index: 589
+    encoding: 0b01101100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLT__VX:
+    index: 590
+    encoding: 0b01101100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLEU__VI:
+    index: 591
+    encoding: 0b01110000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLEU__VV:
+    index: 592
+    encoding: 0b01110000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLEU__VX:
+    index: 593
+    encoding: 0b01110000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLE__VI:
+    index: 594
+    encoding: 0b01110100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLE__VV:
+    index: 595
+    encoding: 0b01110100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSLE__VX:
+    index: 596
+    encoding: 0b01110100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSGTU__VI:
+    index: 597
+    encoding: 0b01111000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSGTU__VX:
+    index: 598
+    encoding: 0b01111000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSGT__VI:
+    index: 599
+    encoding: 0b01111100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSGT__VX:
+    index: 600
+    encoding: 0b01111100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMINU__VV:
+    index: 601
+    encoding: 0b00010000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMINU__VX:
+    index: 602
+    encoding: 0b00010000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMIN__VV:
+    index: 603
+    encoding: 0b00010100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMIN__VX:
+    index: 604
+    encoding: 0b00010100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMAXU__VV:
+    index: 605
+    encoding: 0b00011000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMAXU__VX:
+    index: 606
+    encoding: 0b00011000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMAX__VV:
+    index: 607
+    encoding: 0b00011100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMAX__VX:
+    index: 608
+    encoding: 0b00011100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMUL__VV:
+    index: 609
+    encoding: 0b10010100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMUL__VX:
+    index: 610
+    encoding: 0b10010100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULH__VV:
+    index: 611
+    encoding: 0b10011100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULH__VX:
+    index: 612
+    encoding: 0b10011100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULHU__VV:
+    index: 613
+    encoding: 0b10010000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULHU__VX:
+    index: 614
+    encoding: 0b10010000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULHSU__VV:
+    index: 615
+    encoding: 0b10011000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMULHSU__VX:
+    index: 616
+    encoding: 0b10011000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VDIVU__VV:
+    index: 617
+    encoding: 0b10000000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VDIVU__VX:
+    index: 618
+    encoding: 0b10000000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VDIV__VV:
+    index: 619
+    encoding: 0b10000100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VDIV__VX:
+    index: 620
+    encoding: 0b10000100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREMU__VV:
+    index: 621
+    encoding: 0b10001000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREMU__VX:
+    index: 622
+    encoding: 0b10001000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREM__VV:
+    index: 623
+    encoding: 0b10001100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREM__VX:
+    index: 624
+    encoding: 0b10001100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMUL__VV:
+    index: 625
+    encoding: 0b11101100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMUL__VX:
+    index: 626
+    encoding: 0b11101100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMULU__VV:
+    index: 627
+    encoding: 0b11100000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMULU__VX:
+    index: 628
+    encoding: 0b11100000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMULSU__VV:
+    index: 629
+    encoding: 0b11101000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMULSU__VX:
+    index: 630
+    encoding: 0b11101000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMACC__VV:
+    index: 631
+    encoding: 0b10110100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMACC__VX:
+    index: 632
+    encoding: 0b10110100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNMSAC__VV:
+    index: 633
+    encoding: 0b10111100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNMSAC__VX:
+    index: 634
+    encoding: 0b10111100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADD__VV:
+    index: 635
+    encoding: 0b10100100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMADD__VX:
+    index: 636
+    encoding: 0b10100100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNMSUB__VV:
+    index: 637
+    encoding: 0b10101100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNMSUB__VX:
+    index: 638
+    encoding: 0b10101100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACCU__VV:
+    index: 639
+    encoding: 0b11110000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACCU__VX:
+    index: 640
+    encoding: 0b11110000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACC__VV:
+    index: 641
+    encoding: 0b11110100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACC__VX:
+    index: 642
+    encoding: 0b11110100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACCSU__VV:
+    index: 643
+    encoding: 0b11111100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACCSU__VX:
+    index: 644
+    encoding: 0b11111100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWMACCUS__VX:
+    index: 645
+    encoding: 0b11111000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMERGE__VIM:
+    index: 646
+    encoding: 0b01011100000000000011000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMERGE__VVM:
+    index: 647
+    encoding: 0b01011100000000000000000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMERGE__VXM:
+    index: 648
+    encoding: 0b01011100000000000100000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV__V__I:
+    index: 649
+    encoding: 0b01011110000000000011000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV__V__V:
+    index: 650
+    encoding: 0b01011110000000000000000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV__V__X:
+    index: 651
+    encoding: 0b01011110000000000100000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_fixed: 
+  VSADDU__VI:
+    index: 652
+    encoding: 0b10000000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSADDU__VV:
+    index: 653
+    encoding: 0b10000000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSADDU__VX:
+    index: 654
+    encoding: 0b10000000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSADD__VI:
+    index: 655
+    encoding: 0b10000100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSADD__VV:
+    index: 656
+    encoding: 0b10000100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSADD__VX:
+    index: 657
+    encoding: 0b10000100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSUBU__VV:
+    index: 658
+    encoding: 0b10001000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSUBU__VX:
+    index: 659
+    encoding: 0b10001000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSUB__VV:
+    index: 660
+    encoding: 0b10001100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSUB__VX:
+    index: 661
+    encoding: 0b10001100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAADDU__VV:
+    index: 662
+    encoding: 0b00100000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAADDU__VX:
+    index: 663
+    encoding: 0b00100000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAADD__VV:
+    index: 664
+    encoding: 0b00100100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VAADD__VX:
+    index: 665
+    encoding: 0b00100100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VASUBU__VV:
+    index: 666
+    encoding: 0b00101000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VASUBU__VX:
+    index: 667
+    encoding: 0b00101000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VASUB__VV:
+    index: 668
+    encoding: 0b00101100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VASUB__VX:
+    index: 669
+    encoding: 0b00101100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSMUL__VV:
+    index: 670
+    encoding: 0b10011100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSMUL__VX:
+    index: 671
+    encoding: 0b10011100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRL__VI:
+    index: 672
+    encoding: 0b10101000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRL__VV:
+    index: 673
+    encoding: 0b10101000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRL__VX:
+    index: 674
+    encoding: 0b10101000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRA__VI:
+    index: 675
+    encoding: 0b10101100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRA__VV:
+    index: 676
+    encoding: 0b10101100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSSRA__VX:
+    index: 677
+    encoding: 0b10101100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIPU__WI:
+    index: 678
+    encoding: 0b10111000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIPU__WV:
+    index: 679
+    encoding: 0b10111000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIPU__WX:
+    index: 680
+    encoding: 0b10111000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIP__WI:
+    index: 681
+    encoding: 0b10111100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIP__WV:
+    index: 682
+    encoding: 0b10111100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VNCLIP__WX:
+    index: 683
+    encoding: 0b10111100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_red: 
+  VREDSUM__VS:
+    index: 684
+    encoding: 0b00000000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDMAXU__VS:
+    index: 685
+    encoding: 0b00011000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDMAX__VS:
+    index: 686
+    encoding: 0b00011100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDMINU__VS:
+    index: 687
+    encoding: 0b00010000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDMIN__VS:
+    index: 688
+    encoding: 0b00010100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDAND__VS:
+    index: 689
+    encoding: 0b00000100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDOR__VS:
+    index: 690
+    encoding: 0b00001000000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VREDXOR__VS:
+    index: 691
+    encoding: 0b00001100000000000010000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWREDSUMU__VS:
+    index: 692
+    encoding: 0b11000000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VWREDSUM__VS:
+    index: 693
+    encoding: 0b11000100000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_red_fp: 
+  VFREDOSUM__VS:
+    index: 694
+    encoding: 0b00001100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFREDUSUM__VS:
+    index: 695
+    encoding: 0b00000100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFREDMAX__VS:
+    index: 696
+    encoding: 0b00011100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFREDMIN__VS:
+    index: 697
+    encoding: 0b00010100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWREDOSUM__VS:
+    index: 698
+    encoding: 0b11001100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWREDUSUM__VS:
+    index: 699
+    encoding: 0b11000100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_mask: 
+  VMAND__MM:
+    index: 700
+    encoding: 0b01100110000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMNAND__MM:
+    index: 701
+    encoding: 0b01110110000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMANDN__MM:
+    index: 702
+    encoding: 0b01100010000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMXOR__MM:
+    index: 703
+    encoding: 0b01101110000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMOR__MM:
+    index: 704
+    encoding: 0b01101010000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMNOR__MM:
+    index: 705
+    encoding: 0b01111010000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMORN__MM:
+    index: 706
+    encoding: 0b01110010000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMXNOR__MM:
+    index: 707
+    encoding: 0b01111110000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VCPOP__M:
+    index: 708
+    encoding: 0b01000000000010000010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFIRST__M:
+    index: 709
+    encoding: 0b01000000000010001010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSBF__M:
+    index: 710
+    encoding: 0b01010000000000001010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSIF__M:
+    index: 711
+    encoding: 0b01010000000000011010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMSOF__M:
+    index: 712
+    encoding: 0b01010000000000010010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VIOTA__M:
+    index: 713
+    encoding: 0b01010000000010000010000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VID__V:
+    index: 714
+    encoding: 0b01010000000010001010000001010111
+    mask: 0b11111101111111111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_perm: 
+  VMV__S__X:
+    index: 715
+    encoding: 0b01000010000000000110000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV__X__S:
+    index: 716
+    encoding: 0b01000010000000000010000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDEUP__VI:
+    index: 717
+    encoding: 0b00111000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDEUP__VX:
+    index: 718
+    encoding: 0b00111000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDEDOWN__VI:
+    index: 719
+    encoding: 0b00111100000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDEDOWN__VX:
+    index: 720
+    encoding: 0b00111100000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDE1UP__VX:
+    index: 721
+    encoding: 0b00111000000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VSLIDE1DOWN__VX:
+    index: 722
+    encoding: 0b00111100000000000110000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRGATHER__VI:
+    index: 723
+    encoding: 0b00110000000000000011000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRGATHER__VV:
+    index: 724
+    encoding: 0b00110000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRGATHER__VX:
+    index: 725
+    encoding: 0b00110000000000000100000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VRGATHEREI16__VV:
+    index: 726
+    encoding: 0b00111000000000000000000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VCOMPRESS__VM:
+    index: 727
+    encoding: 0b01011110000000000010000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV1R__V:
+    index: 728
+    encoding: 0b10011110000000000011000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV2R__V:
+    index: 729
+    encoding: 0b10011110000000001011000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV4R__V:
+    index: 730
+    encoding: 0b10011110000000011011000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMV8R__V:
+    index: 731
+    encoding: 0b10011110000000111011000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_perm_fp: 
+  VFMV__S__F:
+    index: 732
+    encoding: 0b01000010000000000101000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMV__F__S:
+    index: 733
+    encoding: 0b01000010000000000001000001010111
+    mask: 0b11111110000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSLIDE1UP__VF:
+    index: 734
+    encoding: 0b00111000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSLIDE1DOWN__VF:
+    index: 735
+    encoding: 0b00111100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+RVVBase_fp: 
+  VFADD__VF:
+    index: 736
+    encoding: 0b00000000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFADD__VV:
+    index: 737
+    encoding: 0b00000000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSUB__VF:
+    index: 738
+    encoding: 0b00001000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSUB__VV:
+    index: 739
+    encoding: 0b00001000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFRSUB__VF:
+    index: 740
+    encoding: 0b10011100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWADD__VF:
+    index: 741
+    encoding: 0b11000000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWADD__VV:
+    index: 742
+    encoding: 0b11000000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWSUB__VF:
+    index: 743
+    encoding: 0b11001000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWSUB__VV:
+    index: 744
+    encoding: 0b11001000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWADD__WF:
+    index: 745
+    encoding: 0b11010000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWADD__WV:
+    index: 746
+    encoding: 0b11010000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWSUB__WF:
+    index: 747
+    encoding: 0b11011000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWSUB__WV:
+    index: 748
+    encoding: 0b11011000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMUL__VF:
+    index: 749
+    encoding: 0b10010000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMUL__VV:
+    index: 750
+    encoding: 0b10010000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFDIV__VF:
+    index: 751
+    encoding: 0b10000000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFDIV__VV:
+    index: 752
+    encoding: 0b10000000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFRDIV__VF:
+    index: 753
+    encoding: 0b10000100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMUL__VF:
+    index: 754
+    encoding: 0b11100000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMUL__VV:
+    index: 755
+    encoding: 0b11100000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMACC__VF:
+    index: 756
+    encoding: 0b10110000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMACC__VV:
+    index: 757
+    encoding: 0b10110000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMACC__VF:
+    index: 758
+    encoding: 0b10110100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMACC__VV:
+    index: 759
+    encoding: 0b10110100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMSAC__VF:
+    index: 760
+    encoding: 0b10111000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMSAC__VV:
+    index: 761
+    encoding: 0b10111000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMSAC__VF:
+    index: 762
+    encoding: 0b10111100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMSAC__VV:
+    index: 763
+    encoding: 0b10111100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMADD__VF:
+    index: 764
+    encoding: 0b10100000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMADD__VV:
+    index: 765
+    encoding: 0b10100000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMADD__VF:
+    index: 766
+    encoding: 0b10100100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMADD__VV:
+    index: 767
+    encoding: 0b10100100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMSUB__VF:
+    index: 768
+    encoding: 0b10101000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMSUB__VV:
+    index: 769
+    encoding: 0b10101000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMSUB__VF:
+    index: 770
+    encoding: 0b10101100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNMSUB__VV:
+    index: 771
+    encoding: 0b10101100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMACC__VF:
+    index: 772
+    encoding: 0b11110000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMACC__VV:
+    index: 773
+    encoding: 0b11110000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWNMACC__VF:
+    index: 774
+    encoding: 0b11110100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWNMACC__VV:
+    index: 775
+    encoding: 0b11110100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMSAC__VF:
+    index: 776
+    encoding: 0b11111000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWMSAC__VV:
+    index: 777
+    encoding: 0b11111000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWNMSAC__VF:
+    index: 778
+    encoding: 0b11111100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWNMSAC__VV:
+    index: 779
+    encoding: 0b11111100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSQRT__V:
+    index: 780
+    encoding: 0b01001100000000000001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFRSQRT7__V:
+    index: 781
+    encoding: 0b01001100000000100001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFREC7__V:
+    index: 782
+    encoding: 0b01001100000000101001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMIN__VF:
+    index: 783
+    encoding: 0b00010000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMIN__VV:
+    index: 784
+    encoding: 0b00010000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMAX__VF:
+    index: 785
+    encoding: 0b00011000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMAX__VV:
+    index: 786
+    encoding: 0b00011000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJ__VF:
+    index: 787
+    encoding: 0b00100000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJ__VV:
+    index: 788
+    encoding: 0b00100000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJN__VF:
+    index: 789
+    encoding: 0b00100100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJN__VV:
+    index: 790
+    encoding: 0b00100100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJX__VF:
+    index: 791
+    encoding: 0b00101000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFSGNJX__VV:
+    index: 792
+    encoding: 0b00101000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFEQ__VF:
+    index: 793
+    encoding: 0b01100000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFEQ__VV:
+    index: 794
+    encoding: 0b01100000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFNE__VF:
+    index: 795
+    encoding: 0b01110000000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFNE__VV:
+    index: 796
+    encoding: 0b01110000000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFLT__VF:
+    index: 797
+    encoding: 0b01101100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFLT__VV:
+    index: 798
+    encoding: 0b01101100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFLE__VF:
+    index: 799
+    encoding: 0b01100100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFLE__VV:
+    index: 800
+    encoding: 0b01100100000000000001000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFGT__VF:
+    index: 801
+    encoding: 0b01110100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VMFGE__VF:
+    index: 802
+    encoding: 0b01111100000000000101000001010111
+    mask: 0b11111100000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCLASS__V:
+    index: 803
+    encoding: 0b01001100000010000001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMERGE__VFM:
+    index: 804
+    encoding: 0b01011100000000000101000001010111
+    mask: 0b11111110000000000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFMV__V__F:
+    index: 805
+    encoding: 0b01011110000000000101000001010111
+    mask: 0b11111111111100000111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__XU__F__V:
+    index: 806
+    encoding: 0b01001000000000000001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__X__F__V:
+    index: 807
+    encoding: 0b01001000000000001001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__RTZ__XU__F__V:
+    index: 808
+    encoding: 0b01001000000000110001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__RTZ__X__F__V:
+    index: 809
+    encoding: 0b01001000000000111001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__F__XU__V:
+    index: 810
+    encoding: 0b01001000000000010001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFCVT__F__X__V:
+    index: 811
+    encoding: 0b01001000000000011001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__XU__F__V:
+    index: 812
+    encoding: 0b01001000000001000001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__X__F__V:
+    index: 813
+    encoding: 0b01001000000001001001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__RTZ__XU__F__V:
+    index: 814
+    encoding: 0b01001000000001110001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__RTZ__X__F__V:
+    index: 815
+    encoding: 0b01001000000001111001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__F__XU__V:
+    index: 816
+    encoding: 0b01001000000001010001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__F__X__V:
+    index: 817
+    encoding: 0b01001000000001011001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFWCVT__F__F__V:
+    index: 818
+    encoding: 0b01001000000001100001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__X__F__W:
+    index: 819
+    encoding: 0b01001000000010001001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__XU__F__W:
+    index: 820
+    encoding: 0b01001000000010000001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__RTZ__XU__F__W:
+    index: 821
+    encoding: 0b01001000000010110001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__RTZ__X__F__W:
+    index: 822
+    encoding: 0b01001000000010111001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__F__XU__W:
+    index: 823
+    encoding: 0b01001000000010010001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__F__X__W:
+    index: 824
+    encoding: 0b01001000000010011001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__F__F__W:
+    index: 825
+    encoding: 0b01001000000010100001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+  VFNCVT__ROD__F__F__W:
+    index: 826
+    encoding: 0b01001000000010101001000001010111
+    mask: 0b11111100000011111111000001111111
+    size:   32
+    branch:   false
+    delay:   1
+
