@@ -32,7 +32,6 @@
 //       alex@minres.com - initial API and implementation
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "iss/interp/vm_base.h"
 extern "C" {
 #include <softfloat.h>
 }

@@ -34,9 +34,6 @@
 
 #ifndef _VM_VECTOR_FUNCTIONS_H_
 #define _VM_VECTOR_FUNCTIONS_H_
-
-#include "iss/arch_if.h"
-#include "iss/vm_types.h"
 #include <cstdint>
 #include <functional>
 #include <stdint.h>
@@ -78,9 +75,6 @@ std::function<uint128_t(uint128_t, uint128_t, uint128_t)> get_crypto_funct(unsig
 
 template <typename dest_elem_t, typename src_elem_t = dest_elem_t> dest_elem_t brev(src_elem_t vs2);
 template <typename dest_elem_t, typename src_elem_t = dest_elem_t> dest_elem_t brev8(src_elem_t vs2);
-
-bool softvec_read(void* core, uint64_t addr, uint64_t length, uint8_t* data);
-bool softvec_write(void* core, uint64_t addr, uint64_t length, uint8_t* data);
 
 template <unsigned VLEN, typename eew_t>
 uint64_t vector_load_store(void* core, std::function<bool(void*, uint64_t, uint64_t, uint8_t*)> load_store_fn, uint8_t* V, uint64_t vl,

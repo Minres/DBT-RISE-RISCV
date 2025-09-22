@@ -33,7 +33,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "vector_functions.h"
-#include "iss/vm_types.h"
 #include "vm/aes_sbox.h"
 #include <algorithm>
 #include <cassert>
@@ -43,22 +42,10 @@
 #include <limits>
 #include <math.h>
 #include <stdexcept>
+#include <util/ities.h>
 #include <vector>
 
 namespace softvector {
-
-bool softvec_read(void* core, uint64_t addr, uint64_t length, uint8_t* data) {
-    // Read length bytes from addr into *data
-    iss::status status = static_cast<iss::arch_if*>(core)->read(iss::address_type::PHYSICAL, iss::access_type::READ,
-                                                                0 /*traits<ARCH>::MEM*/, addr, length, data);
-    return status == iss::Ok;
-}
-bool softvec_write(void* core, uint64_t addr, uint64_t length, uint8_t* data) {
-    // Write length bytes from addr into *data
-    iss::status status = static_cast<iss::arch_if*>(core)->write(iss::address_type::PHYSICAL, iss::access_type::READ,
-                                                                 0 /*traits<ARCH>::MEM*/, addr, length, data);
-    return status == iss::Ok;
-}
 
 vtype_t::vtype_t(uint32_t vtype_val) { underlying = (vtype_val & 0x8000) << 32 | (vtype_val & ~0x8000); }
 vtype_t::vtype_t(uint64_t vtype_val) { underlying = vtype_val; }
