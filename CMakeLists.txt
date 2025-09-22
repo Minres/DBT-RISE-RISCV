@@ -69,6 +69,7 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv64gcv.cpp
     src/vm/fp_functions.cpp
     src/vm/vector_functions.cpp
+    src/vm/new_vector_functions.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
 )
