@@ -32,8 +32,8 @@
 //       eyck@minres.com - initial API and implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _VM_FP_FUNCTIONS_H_
-#define _VM_FP_FUNCTIONS_H_
+#ifndef RISCV_SRC_VM_FP_FUNCTIONS_H_
+#define RISCV_SRC_VM_FP_FUNCTIONS_H_
 
 #include <stdint.h>
 
