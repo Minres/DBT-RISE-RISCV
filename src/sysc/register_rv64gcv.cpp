@@ -95,5 +95,27 @@ volatile std::array<bool, 2> rv64gcv_init = {
 };
 }
 #endif
+#if defined(WITH_ASMJIT)
+namespace asmjit {
+using namespace sysc;
+volatile std::array<bool, 2 + 1> rv64gcv_init = {
+        iss_factory::instance().register_creator("rv64gcv_msu:asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
+            auto* cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+            auto* cpu = new sc_core_adapter<arch::riscv_hart_msu_vp<arch::rv64gcv>>(cc);
+            return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gcv*>(cpu), gdb_port)}};
+        }),
+        iss_factory::instance().register_creator("rv64gcv_m:asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
+            auto* cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+            auto* cpu = new sc_core_adapter<arch::riscv_hart_m_p<arch::rv64gcv>>(cc);
+            return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gcv*>(cpu), gdb_port)}};
+        }),
+        iss_factory::instance().register_creator("rv64gcv_mu:asmjit", [](unsigned gdb_port, void* data) -> iss_factory::base_t {
+            auto* cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+            auto* cpu = new sc_core_adapter<arch::riscv_hart_mu_p<arch::rv64gcv>>(cc);
+            return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gcv*>(cpu), gdb_port)}};
+        })
+};
+}
+#endif
 }
 // clang-format on

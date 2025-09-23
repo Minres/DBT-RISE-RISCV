@@ -104,8 +104,10 @@ if(WITH_ASMJIT)
         src/vm/asmjit/vm_rv32i.cpp
         src/vm/asmjit/vm_rv32imac.cpp
         src/vm/asmjit/vm_rv32gc.cpp
+        src/vm/asmjit/vm_rv32gcv.cpp
         src/vm/asmjit/vm_rv64i.cpp
         src/vm/asmjit/vm_rv64gc.cpp
+        src/vm/asmjit/vm_rv64gcv.cpp
     )
 endif()
 
