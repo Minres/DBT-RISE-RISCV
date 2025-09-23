@@ -185,26 +185,6 @@ if(vector) {%>
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
-<%if(vector) { %>
-    uint64_t vlseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
-        return ::vlseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size);
-    }
-    uint64_t vsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
-        return ::vsseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size);
-    }
-    uint64_t vlsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
-        return ::vlsseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size, stride);
-    }
-    uint64_t vssseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
-        return ::vssseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size, stride);
-    }
-    uint64_t vlxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
-        return ::vlxseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, vs2, segment_size, index_byte_size, data_byte_size, ordered);
-    }
-    uint64_t vsxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vs3, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
-        return ::vsxseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vs3, rs1_val, vs2, segment_size, index_byte_size, data_byte_size, ordered);
-    }
-<%}%>
     uint64_t fetch_count{0};
     uint64_t tval{0};
 

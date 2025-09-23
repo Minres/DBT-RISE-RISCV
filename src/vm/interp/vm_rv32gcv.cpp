@@ -169,26 +169,6 @@ protected:
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
-
-    uint64_t vlseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
-        return ::vlseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size);
-    }
-    uint64_t vsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size){
-        return ::vsseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size);
-    }
-    uint64_t vlsseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
-        return ::vlsseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size, stride);
-    }
-    uint64_t vssseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t width_val, uint8_t segment_size, int64_t stride){
-        return ::vssseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, width_val, segment_size, stride);
-    }
-    uint64_t vlxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vd, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
-        return ::vlxseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vd, rs1_val, vs2, segment_size, index_byte_size, data_byte_size, ordered);
-    }
-    uint64_t vsxseg(uint8_t* V, uint64_t vl, uint64_t vstart, softvector::vtype_t vtype, bool vm, uint8_t vs3, uint64_t rs1_val, uint8_t vs2, uint8_t segment_size, uint8_t index_byte_size, uint8_t data_byte_size, bool ordered){
-        return ::vsxseg(static_cast<void*>(this->get_arch()), V, vl, vstart, vtype, vm, vs3, rs1_val, vs2, segment_size, index_byte_size, data_byte_size, ordered);
-    }
-
     uint64_t fetch_count{0};
     uint64_t tval{0};
 
@@ -5992,7 +5972,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -6032,7 +6012,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1);
                                             }
                                         }
                                     }
@@ -6072,7 +6052,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1);
                                             }
                                         }
                                     }
@@ -6112,7 +6092,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1);
                                             }
                                         }
                                     }
@@ -6152,7 +6132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2);
                                             }
                                         }
                                     }
@@ -6192,7 +6172,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2);
                                             }
                                         }
                                     }
@@ -6232,7 +6212,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2);
                                             }
                                         }
                                     }
@@ -6272,7 +6252,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2);
                                             }
                                         }
                                     }
@@ -6312,7 +6292,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3);
                                             }
                                         }
                                     }
@@ -6352,7 +6332,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3);
                                             }
                                         }
                                     }
@@ -6392,7 +6372,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3);
                                             }
                                         }
                                     }
@@ -6432,7 +6412,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3);
                                             }
                                         }
                                     }
@@ -6472,7 +6452,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4);
                                             }
                                         }
                                     }
@@ -6512,7 +6492,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4);
                                             }
                                         }
                                     }
@@ -6552,7 +6532,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4);
                                             }
                                         }
                                     }
@@ -6592,7 +6572,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4);
                                             }
                                         }
                                     }
@@ -6632,7 +6612,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5);
                                             }
                                         }
                                     }
@@ -6672,7 +6652,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5);
                                             }
                                         }
                                     }
@@ -6712,7 +6692,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5);
                                             }
                                         }
                                     }
@@ -6752,7 +6732,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5);
                                             }
                                         }
                                     }
@@ -6792,7 +6772,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6);
                                             }
                                         }
                                     }
@@ -6832,7 +6812,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6);
                                             }
                                         }
                                     }
@@ -6872,7 +6852,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6);
                                             }
                                         }
                                     }
@@ -6912,7 +6892,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6);
                                             }
                                         }
                                     }
@@ -6952,7 +6932,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7);
                                             }
                                         }
                                     }
@@ -6992,7 +6972,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7);
                                             }
                                         }
                                     }
@@ -7032,7 +7012,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7);
                                             }
                                         }
                                     }
@@ -7072,7 +7052,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7);
                                             }
                                         }
                                     }
@@ -7112,7 +7092,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8);
                                             }
                                         }
                                     }
@@ -7152,7 +7132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8);
                                             }
                                         }
                                     }
@@ -7192,7 +7172,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8);
                                             }
                                         }
                                     }
@@ -7232,7 +7212,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8);
                                             }
                                         }
                                     }
@@ -7272,7 +7252,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -7312,7 +7292,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 1);
                                             }
                                         }
                                     }
@@ -7352,7 +7332,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 1);
                                             }
                                         }
                                     }
@@ -7392,7 +7372,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 1);
                                             }
                                         }
                                     }
@@ -7432,7 +7412,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 2);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 2);
                                             }
                                         }
                                     }
@@ -7472,7 +7452,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 2);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 2);
                                             }
                                         }
                                     }
@@ -7512,7 +7492,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 2);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 2);
                                             }
                                         }
                                     }
@@ -7552,7 +7532,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 2);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 2);
                                             }
                                         }
                                     }
@@ -7592,7 +7572,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 3);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 3);
                                             }
                                         }
                                     }
@@ -7632,7 +7612,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 3);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 3);
                                             }
                                         }
                                     }
@@ -7672,7 +7652,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 3);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 3);
                                             }
                                         }
                                     }
@@ -7712,7 +7692,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 3);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 3);
                                             }
                                         }
                                     }
@@ -7752,7 +7732,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 4);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 4);
                                             }
                                         }
                                     }
@@ -7792,7 +7772,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 4);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 4);
                                             }
                                         }
                                     }
@@ -7832,7 +7812,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 4);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 4);
                                             }
                                         }
                                     }
@@ -7872,7 +7852,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 4);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 4);
                                             }
                                         }
                                     }
@@ -7912,7 +7892,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 5);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 5);
                                             }
                                         }
                                     }
@@ -7952,7 +7932,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 5);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 5);
                                             }
                                         }
                                     }
@@ -7992,7 +7972,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 5);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 5);
                                             }
                                         }
                                     }
@@ -8032,7 +8012,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 5);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 5);
                                             }
                                         }
                                     }
@@ -8072,7 +8052,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 6);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 6);
                                             }
                                         }
                                     }
@@ -8112,7 +8092,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 6);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 6);
                                             }
                                         }
                                     }
@@ -8152,7 +8132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 6);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 6);
                                             }
                                         }
                                     }
@@ -8192,7 +8172,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 6);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 6);
                                             }
                                         }
                                     }
@@ -8232,7 +8212,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 7);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 7);
                                             }
                                         }
                                     }
@@ -8272,7 +8252,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 7);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 7);
                                             }
                                         }
                                     }
@@ -8312,7 +8292,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 7);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 7);
                                             }
                                         }
                                     }
@@ -8352,7 +8332,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 7);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 7);
                                             }
                                         }
                                     }
@@ -8392,7 +8372,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 8);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 8);
                                             }
                                         }
                                     }
@@ -8432,7 +8412,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 8);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 8);
                                             }
                                         }
                                     }
@@ -8472,7 +8452,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 8);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 8);
                                             }
                                         }
                                     }
@@ -8512,7 +8492,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 8);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 8);
                                             }
                                         }
                                     }
@@ -8553,7 +8533,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8594,7 +8574,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8635,7 +8615,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8676,7 +8656,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8717,7 +8697,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8758,7 +8738,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8799,7 +8779,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8840,7 +8820,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8881,7 +8861,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8922,7 +8902,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -8963,7 +8943,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9004,7 +8984,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9045,7 +9025,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9086,7 +9066,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9127,7 +9107,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9168,7 +9148,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9209,7 +9189,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9250,7 +9230,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9291,7 +9271,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9332,7 +9312,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9373,7 +9353,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9414,7 +9394,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9455,7 +9435,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9496,7 +9476,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9537,7 +9517,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9578,7 +9558,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9619,7 +9599,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9660,7 +9640,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9701,7 +9681,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9742,7 +9722,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9783,7 +9763,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9824,7 +9804,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlsseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vlsseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9865,7 +9845,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9906,7 +9886,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9947,7 +9927,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -9988,7 +9968,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 1, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 1, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10029,7 +10009,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10070,7 +10050,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10111,7 +10091,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10152,7 +10132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 2, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 2, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10193,7 +10173,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10234,7 +10214,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10275,7 +10255,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10316,7 +10296,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 3, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 3, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10357,7 +10337,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10398,7 +10378,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10439,7 +10419,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10480,7 +10460,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 4, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 4, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10521,7 +10501,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10562,7 +10542,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10603,7 +10583,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10644,7 +10624,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 5, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 5, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10685,7 +10665,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10726,7 +10706,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10767,7 +10747,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10808,7 +10788,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 6, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 6, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10849,7 +10829,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10890,7 +10870,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10931,7 +10911,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -10972,7 +10952,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 7, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 7, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -11013,7 +10993,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 0, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -11054,7 +11034,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 5, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -11095,7 +11075,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 6, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -11136,7 +11116,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vssseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 8, (int32_t)*(X+rs2));
+                                                *vstart = (uint32_t)vssseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), 7, 8, (int32_t)*(X+rs2));
                                             }
                                         }
                                     }
@@ -11175,7 +11155,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 1);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11217,7 +11197,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 1);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11259,7 +11239,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 1);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11301,7 +11281,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 1);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11343,7 +11323,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 2);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11385,7 +11365,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 2);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11427,7 +11407,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 2);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11469,7 +11449,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 2);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11511,7 +11491,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 3);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11553,7 +11533,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 3);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11595,7 +11575,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 3);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11637,7 +11617,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 3);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11679,7 +11659,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 4);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11721,7 +11701,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 4);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11763,7 +11743,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 4);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11805,7 +11785,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 4);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11847,7 +11827,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 5);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11889,7 +11869,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 5);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11931,7 +11911,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 5);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -11973,7 +11953,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 5);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12015,7 +11995,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 6);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12057,7 +12037,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 6);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12099,7 +12079,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 6);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12141,7 +12121,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 6);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12183,7 +12163,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 7);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12225,7 +12205,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 7);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12267,7 +12247,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 7);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12309,7 +12289,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 7);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12351,7 +12331,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 0, 8);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12393,7 +12373,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 5, 8);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12435,7 +12415,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 6, 8);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12477,7 +12457,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         else {
-                                            uint64_t trapped_idx = (uint32_t)vlseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8);
+                                            uint64_t trapped_idx = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), 7, 8);
                                             if(trapped_idx != 1) {
                                                 *vl = (uint32_t)trapped_idx;
                                                 lower();
@@ -12516,7 +12496,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         uint32_t _vtype = (bit_sub<uint32_t>(*vtype, 7, (uint64_t)(traits::XLEN) - (uint64_t)(1)-7+1)<<7)|((uint32_t)1<<6)|((uint32_t)0<<3)|bit_sub<0, 2-0+1>(*vtype);
-                                        *vstart = (uint32_t)vsseg((uint8_t*)V, evl, *vstart, _vtype, 1, vs3, *(X+rs1), 0, 1);
+                                        *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, evl, *vstart, _vtype, 1, vs3, *(X+rs1), 0, 1);
                                     }
                                 }
                     break;
@@ -12550,7 +12530,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                         }
                                         uint32_t _vtype = (bit_sub<uint32_t>(*vtype, 7, (uint64_t)(traits::XLEN) - (uint64_t)(1)-7+1)<<7)|((uint32_t)1<<6)|((uint32_t)0<<3)|bit_sub<0, 2-0+1>(*vtype);
-                                        *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, _vtype, 1, vd, *(X+rs1), 0, 1);
+                                        *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, _vtype, 1, vd, *(X+rs1), 0, 1);
                                     }
                                 }
                     break;
@@ -12581,7 +12561,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t evl = (uint32_t)((uint64_t)(1) * (uint64_t)(traits::VLEN) / (uint64_t)(8));
                                         if(evl > *vstart) {
-                                            *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
+                                            *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
                                         }
                                     }
                                 }
@@ -12613,7 +12593,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t evl = (uint32_t)((uint64_t)(1) * (uint64_t)(traits::VLEN) / (uint64_t)(16));
                                         if(evl > *vstart) {
-                                            *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
+                                            *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
                                         }
                                     }
                                 }
@@ -12645,7 +12625,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t evl = (uint32_t)((uint64_t)(1) * (uint64_t)(traits::VLEN) / (uint64_t)(32));
                                         if(evl > *vstart) {
-                                            *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
+                                            *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
                                         }
                                     }
                                 }
@@ -12677,7 +12657,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t evl = (uint32_t)((uint64_t)(1) * (uint64_t)(traits::VLEN) / (uint64_t)(64));
                                         if(evl > *vstart) {
-                                            *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
+                                            *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
                                         }
                                     }
                                 }
@@ -12713,7 +12693,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -12750,7 +12730,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
                                             }
                                         }
                                     }
@@ -12787,7 +12767,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
                                             }
                                         }
                                     }
@@ -12824,7 +12804,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
                                             }
                                         }
                                     }
@@ -12861,7 +12841,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -12898,7 +12878,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
                                             }
                                         }
                                     }
@@ -12935,7 +12915,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
                                             }
                                         }
                                     }
@@ -12972,7 +12952,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
                                             }
                                         }
                                     }
@@ -13009,7 +12989,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -13046,7 +13026,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 5, 1);
                                             }
                                         }
                                     }
@@ -13083,7 +13063,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 6, 1);
                                             }
                                         }
                                     }
@@ -13120,7 +13100,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vlseg((uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
+                                                *vstart = (uint32_t)vlseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vd, *(X+rs1), 7, 1);
                                             }
                                         }
                                     }
@@ -13152,7 +13132,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t evl = (uint32_t)((uint64_t)(1) * (uint64_t)(traits::VLEN) / (uint64_t)(8));
                                         if(evl > *vstart) {
-                                            *vstart = (uint32_t)vsseg((uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
+                                            *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
                                         }
                                     }
                                 }
@@ -13187,7 +13167,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -13223,7 +13203,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -13259,7 +13239,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(evl > *vstart) {
-                                                *vstart = (uint32_t)vsseg((uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
+                                                *vstart = (uint32_t)vsseg(this->get_arch(), (uint8_t*)V, evl, *vstart, *vtype, 1, vs3, *(X+rs1), 0, 1);
                                             }
                                         }
                                     }
@@ -13300,7 +13280,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -13341,7 +13321,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -13382,7 +13362,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -13423,7 +13403,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -13464,7 +13444,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -13505,7 +13485,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -13546,7 +13526,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -13587,7 +13567,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -13628,7 +13608,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -13669,7 +13649,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -13710,7 +13690,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -13751,7 +13731,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -13792,7 +13772,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -13833,7 +13813,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -13874,7 +13854,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -13915,7 +13895,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -13956,7 +13936,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -13997,7 +13977,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14038,7 +14018,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14079,7 +14059,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14120,7 +14100,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14161,7 +14141,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14202,7 +14182,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14243,7 +14223,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14284,7 +14264,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14325,7 +14305,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14366,7 +14346,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14407,7 +14387,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14448,7 +14428,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 1, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14489,7 +14469,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 2, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14530,7 +14510,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 4, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14571,7 +14551,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 8, sew(), 1);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14612,7 +14592,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14653,7 +14633,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14694,7 +14674,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14735,7 +14715,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14776,7 +14756,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14817,7 +14797,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -14858,7 +14838,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -14899,7 +14879,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -14940,7 +14920,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -14981,7 +14961,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15022,7 +15002,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15063,7 +15043,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15104,7 +15084,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -15145,7 +15125,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15186,7 +15166,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15227,7 +15207,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15268,7 +15248,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -15309,7 +15289,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15350,7 +15330,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15391,7 +15371,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15432,7 +15412,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -15473,7 +15453,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15514,7 +15494,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15555,7 +15535,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15596,7 +15576,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -15637,7 +15617,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15678,7 +15658,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15719,7 +15699,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15760,7 +15740,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 1, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 1, sew(), 1);
                                             }
                                         }
                                     }
@@ -15801,7 +15781,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 2, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 2, sew(), 1);
                                             }
                                         }
                                     }
@@ -15842,7 +15822,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 4, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 4, sew(), 1);
                                             }
                                         }
                                     }
@@ -15883,7 +15863,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 8, sew(), 1);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 8, sew(), 1);
                                             }
                                         }
                                     }
@@ -15924,7 +15904,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -15965,7 +15945,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16006,7 +15986,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16047,7 +16027,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 1, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16088,7 +16068,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16129,7 +16109,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16170,7 +16150,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16211,7 +16191,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 2, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16252,7 +16232,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16293,7 +16273,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16334,7 +16314,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16375,7 +16355,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 3, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16416,7 +16396,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16457,7 +16437,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16498,7 +16478,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16539,7 +16519,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 4, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16580,7 +16560,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16621,7 +16601,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16662,7 +16642,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16703,7 +16683,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 5, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16744,7 +16724,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16785,7 +16765,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16826,7 +16806,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -16867,7 +16847,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 6, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -16908,7 +16888,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -16949,7 +16929,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -16990,7 +16970,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17031,7 +17011,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 7, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17072,7 +17052,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 1, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17113,7 +17093,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 2, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17154,7 +17134,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 4, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17195,7 +17175,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vlxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 8, sew(), 0);
+                                                *vstart = (uint32_t)vlxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vd, *(X+rs1), vs2, 8, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17236,7 +17216,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17277,7 +17257,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17318,7 +17298,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17359,7 +17339,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 1, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17400,7 +17380,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17441,7 +17421,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17482,7 +17462,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17523,7 +17503,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 2, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17564,7 +17544,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17605,7 +17585,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17646,7 +17626,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17687,7 +17667,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 3, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17728,7 +17708,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17769,7 +17749,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17810,7 +17790,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -17851,7 +17831,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 4, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -17892,7 +17872,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -17933,7 +17913,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -17974,7 +17954,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -18015,7 +17995,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 5, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -18056,7 +18036,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -18097,7 +18077,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -18138,7 +18118,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -18179,7 +18159,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 6, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -18220,7 +18200,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -18261,7 +18241,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -18302,7 +18282,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -18343,7 +18323,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 7, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -18384,7 +18364,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 1, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 1, sew(), 0);
                                             }
                                         }
                                     }
@@ -18425,7 +18405,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 2, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 2, sew(), 0);
                                             }
                                         }
                                     }
@@ -18466,7 +18446,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 4, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 4, sew(), 0);
                                             }
                                         }
                                     }
@@ -18507,7 +18487,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         }
                                         else {
                                             if(*vl > *vstart) {
-                                                *vstart = (uint32_t)vsxseg((uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 8, sew(), 0);
+                                                *vstart = (uint32_t)vsxseg(this->get_arch(), (uint8_t*)V, *vl, *vstart, *vtype, vm, vs3, *(X+rs1), vs2, 8, 8, sew(), 0);
                                             }
                                         }
                                     }
@@ -29751,8 +29731,8 @@ std::unique_ptr<vm_if> create<arch::rv32gcv>(arch::rv32gcv *core, unsigned short
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
