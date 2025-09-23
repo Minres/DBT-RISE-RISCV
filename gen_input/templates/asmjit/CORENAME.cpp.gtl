@@ -29,6 +29,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
+ <%
+def floating_point = registers.find {it.name=='FCSR'} != null
+def vector = registers.find {it.name=='vtype'} != null
+def aes = functions.find { it.contains('aes') } != null
+def nativeTypeSize(int size){
+    if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
+}
+%>
 // clang-format off
 #include <iss/arch/${coreDef.name.toLowerCase()}.h>
 #include <iss/debugger/gdb_session.h>
@@ -38,11 +46,19 @@
 #include <asmjit/asmjit.h>
 #include <util/logging.h>
 #include <iss/instruction_decoder.h>
-<%def fcsr = registers.find {it.name=='FCSR'}
-if(fcsr != null) {%>
-#include <vm/fp_functions.h><%}
-def aes = functions.find { it.contains('aes') }
-if(aes != null) {%>
+<%
+if(floating_point) {%>
+#include <vm/fp_functions.h>
+<%}
+if(vector) {
+def xlen = constants.find { it.name == 'XLEN' }?.value ?: 0
+def vlen = constants.find { it.name == 'VLEN' }?.value ?: 0 %>
+#define CUR_VLEN ${vlen}
+#define CUR_XLEN ${xlen}
+#include <vm/vector_functions.h>
+#include <vm/new_vector_functions.h>
+<%}
+if(aes) {%>
 #include <vm/aes_sbox.h>
 <%}%>
 #ifndef FMT_HEADER_ONLY
@@ -121,12 +137,52 @@ protected:
     void gen_block_prologue(jit_holder& jh) override;
     void gen_block_epilogue(jit_holder& jh) override;
     inline const char *name(size_t index){return traits::reg_aliases.at(index);}
-<%if(fcsr != null) {%>
+<%if(floating_point) {%>
     inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}   
+<%}
+if(vector) {%>
+    inline const char* vname(size_t index) { return index < 32 ? name(index + traits::V0) : "illegal"; }
+    inline const char* sew_name(size_t bits) {
+        switch(bits) {
+        case 0b000:
+            return "e8";
+        case 0b001:
+            return "e16";
+        case 0b010:
+            return "e32";
+        case 0b011:
+            return "e64";
+        default:
+            return "illegal";
+        }
+    }
+    inline const char* lmul_name(size_t bits) {
+        switch(bits) {
+        case 0b101:
+            return "mf8";
+        case 0b110:
+            return "mf4";
+        case 0b111:
+            return "mf2";
+        case 0b000:
+            return "m1";
+        case 0b001:
+            return "m2";
+        case 0b010:
+            return "m4";
+        case 0b011:
+            return "m8";
+        default:
+            return "illegal";
+        }
+    }
+    inline const char* ma_name(bool ma) { return ma ? "ma" : "mu"; }
+    inline const char* ta_name(bool ta) { return ta ? "ta" : "tu"; }
 <%}%>
     void gen_instr_prologue(jit_holder& jh);
     void gen_instr_epilogue(jit_holder& jh);
     inline void gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause);
+    inline void gen_lower(jit_holder& jh);
     template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type> void gen_set_tval(jit_holder& jh, T new_tval) ;
     void gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) ;
 
@@ -329,6 +385,14 @@ inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t 
     auto& cc = jh.cc;
     auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
+    mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
+    cc.jmp(jh.trap_entry);
+}
+template <typename ARCH>
+inline void vm_impl<ARCH>::gen_lower(jit_holder& jh) {
+    auto& cc = jh.cc;
+    auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, tmp1, 0);
     mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
     cc.jmp(jh.trap_entry);
 }
