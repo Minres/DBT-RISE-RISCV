@@ -20,7 +20,7 @@ if(NOT TARGET dbt-rise-core)
 	    dbt_rise_core_git
 	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
 	    #GIT_TAG         "origin/develop"
-	    GIT_TAG         718f877
+	    GIT_TAG         d2bafe
 	    GIT_SHALLOW     OFF
 	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
 	)
