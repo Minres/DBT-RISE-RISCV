@@ -40,9 +40,6 @@
 
 #include <vm/fp_functions.h>
 
-#define CUR_VLEN 256
-#define CUR_XLEN 32
-#include <vm/vector_functions.h>
 #include <vm/new_vector_functions.h>
 
 #include <util/logging.h>
@@ -65,6 +62,7 @@
 namespace iss {
 namespace interp {
 namespace rv32gcv {
+
 using namespace iss::arch;
 using namespace iss::debugger;
 using namespace std::placeholders;
@@ -84,7 +82,73 @@ public:
     using reg_t       = typename traits::reg_t;
     using mem_type_e  = typename traits::mem_type_e;
     using opcode_e    = typename traits::opcode_e;
-    
+
+
+    static constexpr auto& vlseg = trampoline::vlseg<traits::VLEN>;
+    static constexpr auto& vsseg = trampoline::vsseg<traits::VLEN>;
+    static constexpr auto& vlsseg = trampoline::vlsseg<traits::VLEN>;
+    static constexpr auto& vssseg = trampoline::vssseg<traits::VLEN>;
+    static constexpr auto& vlxseg = trampoline::vlxseg<traits::VLEN, traits::XLEN>;
+    static constexpr auto& vsxseg = trampoline::vsxseg<traits::VLEN, traits::XLEN>;
+    static constexpr auto& vector_vector_op = trampoline::vector_vector_op<traits::VLEN>;
+    static constexpr auto& vector_imm_op = trampoline::vector_imm_op<traits::VLEN>;
+    static constexpr auto& vector_vector_wv = trampoline::vector_vector_wv<traits::VLEN>;
+    static constexpr auto& vector_imm_wv = trampoline::vector_imm_wv<traits::VLEN>;
+    static constexpr auto& vector_vector_ww = trampoline::vector_vector_ww<traits::VLEN>;
+    static constexpr auto& vector_imm_ww = trampoline::vector_imm_ww<traits::VLEN>;
+    static constexpr auto& vector_extend = trampoline::vector_extend<traits::VLEN>;
+    static constexpr auto& vector_vector_carry = trampoline::vector_vector_carry<traits::VLEN>;
+    static constexpr auto& vector_imm_carry = trampoline::vector_imm_carry<traits::VLEN>;
+    static constexpr auto& carry_vector_vector_op = trampoline::carry_vector_vector_op<traits::VLEN>;
+    static constexpr auto& carry_vector_imm_op = trampoline::carry_vector_imm_op<traits::VLEN>;
+    static constexpr auto& mask_vector_vector_op = trampoline::mask_vector_vector_op<traits::VLEN>;
+    static constexpr auto& mask_vector_imm_op = trampoline::mask_vector_imm_op<traits::VLEN>;
+    static constexpr auto& vector_vector_vw = trampoline::vector_vector_vw<traits::VLEN>;
+    static constexpr auto& vector_imm_vw = trampoline::vector_imm_vw<traits::VLEN>;
+    static constexpr auto& vector_vector_merge = trampoline::vector_vector_merge<traits::VLEN>;
+    static constexpr auto& vector_imm_merge = trampoline::vector_imm_merge<traits::VLEN>;
+    static constexpr auto& sat_vector_vector_op = trampoline::sat_vector_vector_op<traits::VLEN>;
+    static constexpr auto& sat_vector_imm_op = trampoline::sat_vector_imm_op<traits::VLEN>;
+    static constexpr auto& sat_vector_vector_vw = trampoline::sat_vector_vector_vw<traits::VLEN>;
+    static constexpr auto& sat_vector_imm_vw = trampoline::sat_vector_imm_vw<traits::VLEN>;
+    static constexpr auto& vector_red_op = trampoline::vector_red_op<traits::VLEN>;
+    static constexpr auto& vector_red_wv = trampoline::vector_red_wv<traits::VLEN>;
+    static constexpr auto& mask_mask_op = trampoline::mask_mask_op<traits::VLEN>;
+    static constexpr auto& vcpop = trampoline::vcpop<traits::VLEN>;
+    static constexpr auto& vfirst = trampoline::vfirst<traits::VLEN>;
+    static constexpr auto& mask_set_op = trampoline::mask_set_op<traits::VLEN>;
+    static constexpr auto& viota = trampoline::viota<traits::VLEN>;
+    static constexpr auto& vid = trampoline::vid<traits::VLEN>;
+    static constexpr auto& scalar_to_vector = trampoline::scalar_to_vector<traits::VLEN>;
+    static constexpr auto& scalar_from_vector = trampoline::scalar_from_vector<traits::VLEN>;
+    static constexpr auto& vector_slideup = trampoline::vector_slideup<traits::VLEN>;
+    static constexpr auto& vector_slidedown = trampoline::vector_slidedown<traits::VLEN>;
+    static constexpr auto& vector_slide1up = trampoline::vector_slide1up<traits::VLEN>;
+    static constexpr auto& vector_slide1down = trampoline::vector_slide1down<traits::VLEN>;
+    static constexpr auto& vector_vector_gather = trampoline::vector_vector_gather<traits::VLEN>;
+    static constexpr auto& vector_vector_gatherei16 = trampoline::vector_vector_gatherei16<traits::VLEN>;
+    static constexpr auto& vector_imm_gather = trampoline::vector_imm_gather<traits::VLEN>;
+    static constexpr auto& vector_compress = trampoline::vector_compress<traits::VLEN>;
+    static constexpr auto& vector_whole_move = trampoline::vector_whole_move<traits::VLEN>;
+    static constexpr auto& fp_scalar_from_vector = trampoline::fp_scalar_from_vector<traits::VLEN>;
+    static constexpr auto& fp_vector_slide1up = trampoline::fp_vector_slide1up<traits::VLEN>;
+    static constexpr auto& fp_vector_slide1down = trampoline::fp_vector_slide1down<traits::VLEN>;
+    static constexpr auto& fp_vector_red_op = trampoline::fp_vector_red_op<traits::VLEN>;
+    static constexpr auto& fp_vector_red_wv = trampoline::fp_vector_red_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_op = trampoline::fp_vector_vector_op<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_op = trampoline::fp_vector_imm_op<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_wv = trampoline::fp_vector_vector_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_wv = trampoline::fp_vector_imm_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_ww = trampoline::fp_vector_vector_ww<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_ww = trampoline::fp_vector_imm_ww<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_op = trampoline::fp_vector_unary_op<traits::VLEN>;
+    static constexpr auto& mask_fp_vector_vector_op = trampoline::mask_fp_vector_vector_op<traits::VLEN>;
+    static constexpr auto& mask_fp_vector_imm_op = trampoline::mask_fp_vector_imm_op<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_merge = trampoline::fp_vector_imm_merge<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_w = trampoline::fp_vector_unary_w<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_n = trampoline::fp_vector_unary_n<traits::VLEN>;
+    static constexpr auto& vector_unary_op = trampoline::vector_unary_op<traits::VLEN>;
+
     vm_impl();
 
     vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
@@ -336,8 +400,8 @@ protected:
     }
 
     uint8_t valid_reg_overlap(uint8_t rs, uint8_t rd, int8_t EMUL_pow_rs, int8_t EMUL_pow_rd){
-        uint8_t rs_group = EMUL_pow_rs > 0? (uint8_t)(1 << EMUL_pow_rs) & (~1)& (1ULL << 4) : 1;
-        uint8_t rd_group = EMUL_pow_rd > 0? (uint8_t)(1 << EMUL_pow_rd) & (~1)& (1ULL << 4) : 1;
+        uint8_t rs_group = EMUL_pow_rs > 0? (uint8_t)(1 << EMUL_pow_rs) & (~1)& ((1ULL << 5)-1) : 1;
+        uint8_t rd_group = EMUL_pow_rd > 0? (uint8_t)(1 << EMUL_pow_rd) & (~1)& ((1ULL << 5)-1) : 1;
         if(EMUL_pow_rs < EMUL_pow_rd) {
             return (rs + rs_group <= rd) || (rs >= rd + rd_group) || ((rs + rs_group == rd + rd_group) & (EMUL_pow_rs >= 0));
         }
@@ -433,13 +497,17 @@ protected:
         return ! valid_vtype() || *vstart != 0;
     }
 
-    uint8_t illegal_reduction_widen(uint8_t EEW, int8_t EMUL_pow){
-        return illegal_reduction() || ! valid_eew_emul(EEW, EMUL_pow);
+    uint8_t illegal_reduction_widen(uint8_t EEW){
+        return illegal_reduction() || ! (EEW >= 8 && EEW <= traits::ELEN);
     }
 
     uint8_t illegal_fp_reduction(uint8_t SEW, uint8_t rm){
         auto* vstart = reinterpret_cast<uint32_t*>(this->regs_base_ptr+::iss::arch::traits<ARCH>::reg_byte_offsets[::iss::arch::traits<ARCH>::vstart]); 
         return ! valid_vtype() || *vstart != 0 || ! valid_fp_op(SEW, rm);
+    }
+
+    uint8_t illegal_fp_reduction_widen(uint8_t SEW, uint8_t rm, uint8_t EEW){
+        return illegal_fp_reduction(SEW, rm) || ! (EEW >= 8 && EEW <= traits::ELEN);
     }
 
     uint8_t illegal_fp_variable_width(uint8_t vd, uint8_t vm, uint8_t SEW, uint8_t rm, uint8_t SEW_new, int8_t LMUL_pow_new){
@@ -4636,7 +4704,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox32(((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& (1ULL << 0)<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox32(((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5486,7 +5554,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox64(((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& (1ULL << 0)<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox64(((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -19389,9 +19457,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 2;
+                        uint8_t SEW_target = (uint8_t)(SEW / 2);
                         int8_t LMUL_pow_target = LMUL_pow - 1;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -19426,9 +19494,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 2;
+                        uint8_t SEW_target = (uint8_t)(SEW / 2);
                         int8_t LMUL_pow_target = LMUL_pow - 1;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -19463,9 +19531,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 4;
+                        uint8_t SEW_target = (uint8_t)(SEW / 4);
                         int8_t LMUL_pow_target = LMUL_pow - 2;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -19500,9 +19568,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 4;
+                        uint8_t SEW_target = (uint8_t)(SEW / 4);
                         int8_t LMUL_pow_target = LMUL_pow - 2;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -19537,9 +19605,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 8;
+                        uint8_t SEW_target = (uint8_t)(SEW / 8);
                         int8_t LMUL_pow_target = LMUL_pow - 3;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -19574,9 +19642,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW_pow = get_sew_pow();
-                        uint8_t SEW = (uint8_t)(1 << SEW_pow) & (~1)& (1ULL << 4);
+                        uint8_t SEW = (uint8_t)(1 << SEW_pow);
                         int8_t LMUL_pow = get_lmul_pow();
-                        uint8_t SEW_target = SEW / 8;
+                        uint8_t SEW_target = (uint8_t)(SEW / 8);
                         int8_t LMUL_pow_target = LMUL_pow - 3;
                         if(illegal_variable_width(vd, vm, SEW_target, LMUL_pow_target) || ! valid_reg_overlap(vs2, vd, LMUL_pow_target, LMUL_pow)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -23156,9 +23224,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
-                                        uint8_t SEW = (uint8_t)(1 << get_sew_pow()) & (~1)& (1ULL << 4);
+                                        uint8_t SEW = (uint8_t)(1 << get_sew_pow()) & ~1;
                                         int8_t LMUL_pow = get_lmul_pow();
-                                        uint8_t SEW_widen = (uint8_t)(SEW * 2);
+                                        uint8_t SEW_widen = (uint8_t)((uint16_t)(SEW) * (uint16_t)(2));
                                         int8_t LMUL_pow_widen = LMUL_pow + 1;
                                         if(illegal_variable_width(vd, vm, SEW_widen, LMUL_pow_widen) || ! valid_reg_overlap(vs2, vd, LMUL_pow, LMUL_pow_widen)) {
                                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
@@ -24803,10 +24871,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW = (uint8_t)(1 << get_sew_pow()) & ~1;
-                        int8_t LMUL_pow = get_lmul_pow();
                         uint8_t SEW_widen = (uint8_t)((uint16_t)(SEW) * (uint16_t)(2));
-                        int8_t LMUL_pow_widen = LMUL_pow + 1;
-                        if(illegal_reduction_widen(SEW_widen, LMUL_pow_widen)) {
+                        if(illegal_reduction_widen(SEW_widen)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
                         else {
@@ -24840,10 +24906,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                         uint8_t SEW = (uint8_t)(1 << get_sew_pow()) & ~1;
-                        int8_t LMUL_pow = get_lmul_pow();
                         uint8_t SEW_widen = (uint8_t)((uint16_t)(SEW) * (uint16_t)(2));
-                        int8_t LMUL_pow_widen = LMUL_pow + 1;
-                        if(illegal_reduction_widen(SEW_widen, LMUL_pow_widen)) {
+                        if(illegal_reduction_widen(SEW_widen)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
                         else {
@@ -25027,7 +25091,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         uint8_t SEW = (uint8_t)(1 << (get_sew_pow())) & ~1;
                         uint8_t rm = bit_sub<5, 7-5+1>(*FCSR);
-                        if(illegal_fp_reduction(SEW, rm)) {
+                        uint8_t SEW_widen = (uint8_t)((uint16_t)(SEW) * (uint16_t)(2));
+                        if(illegal_fp_reduction_widen(SEW, rm, SEW_widen)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
                         else {
@@ -25065,7 +25130,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         uint8_t SEW = (uint8_t)(1 << (get_sew_pow())) & ~1;
                         uint8_t rm = bit_sub<5, 7-5+1>(*FCSR);
-                        if(illegal_fp_reduction(SEW, rm)) {
+                        uint8_t SEW_widen = (uint8_t)((uint16_t)(SEW) * (uint16_t)(2));
+                        if(illegal_fp_reduction_widen(SEW, rm, SEW_widen)) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
                         else {
