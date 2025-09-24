@@ -100,7 +100,7 @@ private:
         // this->tohost handling in case of riscv-test
         // according to https://github.com/riscv-software-src/riscv-isa-sim/issues/364#issuecomment-607657754:
         if(access && iss::access_type::FUNC && addr == hart_if.tohost) {
-            return hart_if.exec_htif(data);
+            return hart_if.exec_htif(data, length);
         }
         return iss::Ok;
     }

@@ -293,7 +293,7 @@ template <typename WORD_TYPE> struct priv_if {
 
     std::function<iss::status(unsigned, WORD_TYPE&)> read_csr;
     std::function<iss::status(unsigned, WORD_TYPE)> write_csr;
-    std::function<iss::status(uint8_t const*)> exec_htif;
+    std::function<iss::status(uint8_t const*, unsigned)> exec_htif;
     std::function<void(uint16_t, uint16_t, WORD_TYPE)> raise_trap; // trap_id, cause, fault_data
     std::unordered_map<unsigned, rd_csr_f>& csr_rd_cb;
     std::unordered_map<unsigned, wr_csr_f>& csr_wr_cb;
@@ -861,7 +861,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     priv_if<reg_t> get_priv_if() {
         return priv_if<reg_t>{.read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
                               .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
-                              .exec_htif = [this](uint8_t const* data) -> iss::status { return execute_htif(data); },
+                              .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
                               .raise_trap =
                                   [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
                                       this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
@@ -877,8 +877,9 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                               .max_irq{mcause_max_irq}};
     }
 
-    iss::status execute_htif(uint8_t const* data) {
-        reg_t cur_data = *reinterpret_cast<const reg_t*>(data);
+    iss::status execute_htif(uint8_t const* data, unsigned length) {
+        reg_t cur_data{0};
+        memcpy(&cur_data, data, length);
         // Extract Device (bits 63:56)
         uint8_t device = traits<BASE>::XLEN == 32 ? 0 : (cur_data >> 56) & 0xFF;
         // Extract Command (bits 55:48)
