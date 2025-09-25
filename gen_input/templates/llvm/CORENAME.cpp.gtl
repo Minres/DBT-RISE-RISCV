@@ -41,7 +41,7 @@
 #include <util/logging.h>
 <%def fcsr = registers.find {it.name=='FCSR'}
 if(fcsr != null) {%>
-#include <vm/fp_functions.h><%}%>
+#include <fp_functions.h><%}%>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif

@@ -1,3 +1,6 @@
 [submodule "gen_input/ISA"]
 	path = gen_input/ISA
 	url = https://github.com/Minres/RISCV_ISA_CoreDSL.git
+[submodule "softvector"]
+	path = softvector
+	url = https://github.com/Minres/softvector.git

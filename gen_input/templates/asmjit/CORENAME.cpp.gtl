@@ -48,10 +48,10 @@ def nativeTypeSize(int size){
 #include <iss/instruction_decoder.h>
 <%
 if(floating_point) {%>
-#include <vm/fp_functions.h>
+#include <fp_functions.h>
 <%}
 if(vector){%>
-#include <vm/new_vector_functions.h>
+#include <vm/vector_functions.h>
 <%}
 if(aes) {%>
 #include <vm/aes_sbox.h>
