@@ -250,7 +250,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         T cmd_addr = sh_read_field<T>(arch_if_ptr, *parameter);
         T cmd_len = sh_read_field<T>(arch_if_ptr, (*parameter) + 1);
         std::string cmd = sh_read_string<T>(arch_if_ptr, cmd_addr, cmd_len);
-        system(cmd.c_str());
+        auto _ = system(cmd.c_str());
         break;
     }
     case semihosting_syscalls::SYS_TICKFREQ: {
