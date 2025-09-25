@@ -38,9 +38,9 @@
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
 
-#include <vm/fp_functions.h>
+#include <fp_functions.h>
 
-#include <vm/new_vector_functions.h>
+#include <vm/vector_functions.h>
 
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
