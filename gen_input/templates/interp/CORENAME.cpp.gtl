@@ -32,7 +32,6 @@
 <%
 def floating_point = registers.find {it.name=='FCSR'} != null
 def vector = registers.find {it.name=='vtype'} != null
-def aes = functions.find { it.contains('aes') } != null
 def nativeTypeSize(int size){
     if(size<=8) return 8; else if(size<=16) return 16; else if(size<=32) return 32; else return 64;
 }
@@ -50,10 +49,8 @@ if(floating_point) {%>
 <%}
 if(vector) {%>
 #include <vm/vector_functions.h>
-<%}
-if(aes) {%>
-#include <vm/aes_sbox.h>
 <%}%>
+
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
