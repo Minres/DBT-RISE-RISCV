@@ -152,6 +152,12 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
         ${constants.collect{c -> c.name+"="+getCString(c.value)}.collate(4).collect { it.join(', ') }.join(',\n        ')}
     };
 
+    <% for (array in const_arrays) { %>
+    static constexpr std::array<${array.clangValueType}, ${array.dimension}> ${array.name} = {
+        {${array.values.join(", ")}}
+        };
+
+    <% } %>
     constexpr static unsigned FP_REGS_SIZE = ${constants.find {it.name=='FLEN'}?.value?:0};
     constexpr static unsigned V_REGS_SIZE = ${constants.find {it.name=='VLEN'}?.value?:0};
 
