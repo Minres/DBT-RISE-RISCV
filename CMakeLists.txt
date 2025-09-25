@@ -16,19 +16,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
-	FetchContent_Declare(
-	    dbt_rise_core_git
-	    GIT_REPOSITORY  "https://github.com/Minres/DBT-RISE-Core.git"
-	    #GIT_TAG         "origin/develop"
-	    GIT_TAG         d2bafe
-	    GIT_SHALLOW     OFF
-	    UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
-	)
-	FetchContent_GetProperties(dbt_rise_core_git)
-	if(NOT dbt_rise_core_git_POPULATED)
-	  FetchContent_Populate(dbt_rise_core_git)
-	endif()
-	add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
+    FetchContent_Declare(
+        dbt_rise_core_git
+        GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
+        #GIT_TAG         "origin/develop"
+        GIT_TAG d2bafe
+        GIT_SHALLOW OFF
+        UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
+    )
+    FetchContent_GetProperties(dbt_rise_core_git)
+    if(NOT dbt_rise_core_git_POPULATED)
+        FetchContent_Populate(dbt_rise_core_git)
+    endif()
+    add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
 endif()
 FetchContent_GetProperties(scc_git)
 list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
@@ -39,22 +39,21 @@ find_package(yaml-cpp)
 find_package(Boost COMPONENTS coroutine REQUIRED)
 
 if(CMAKE_PROJECT_NAME STREQUAL "dbt-rise-riscv")
-	set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
-	find_package(ClangFormat)
+    set(CLANG_FORMAT_EXCLUDE_PATTERNS /build/ /.direnv/ softfloat/)
+    find_package(ClangFormat)
 else()
-	set(CLANG_FORMAT_EXCLUDE_PATTERNS ${CLANG_FORMAT_EXCLUDE_PATTERNS} /build/ /.direnv/ softfloat/ PARENT_SCOPE)
+    set(CLANG_FORMAT_EXCLUDE_PATTERNS ${CLANG_FORMAT_EXCLUDE_PATTERNS} /build/ /.direnv/ softfloat/ PARENT_SCOPE)
 endif()
 
-add_subdirectory(softfloat)
-
+add_subdirectory(softvector)
 set(LIB_SOURCES
     src/iss/plugin/instruction_count.cpp
-	src/iss/arch/rv32i.cpp
+    src/iss/arch/rv32i.cpp
     src/iss/arch/rv32imc.cpp
     src/iss/arch/rv32imac.cpp
     src/iss/arch/rv32gc.cpp
     src/iss/arch/rv32gcv.cpp
-	src/iss/arch/rv64i.cpp
+    src/iss/arch/rv64i.cpp
     src/iss/arch/rv64gc.cpp
     src/iss/arch/rv64gcv.cpp
     src/iss/arch/tgc5c.cpp
@@ -67,8 +66,6 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv64i.cpp
     src/vm/interp/vm_rv64gc.cpp
     src/vm/interp/vm_rv64gcv.cpp
-    src/vm/fp_functions.cpp
-    src/vm/vector_functions.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
 )
@@ -163,11 +160,11 @@ get_target_property(DBT_CORE_INCL dbt-rise-core INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(${PROJECT_NAME} INTERFACE ${DBT_CORE_INCL})
 get_target_property(DBT_CORE_DEFS dbt-rise-core INTERFACE_COMPILE_DEFINITIONS)
 
-if(NOT(DBT_CORE_DEFS STREQUAL DBT_CORE_DEFS-NOTFOUND))
+if(NOT (DBT_CORE_DEFS STREQUAL DBT_CORE_DEFS-NOTFOUND))
     target_compile_definitions(${PROJECT_NAME} INTERFACE ${DBT_CORE_DEFS})
 endif()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC elfio::elfio softfloat scc-util Boost::coroutine)
+target_link_libraries(${PROJECT_NAME} PUBLIC elfio::elfio softfloat softvector scc-util Boost::coroutine)
 
 if(TARGET yaml-cpp::yaml-cpp)
     target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_PLUGINS)
@@ -216,9 +213,9 @@ endforeach()
 
 target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv yaml-cpp::yaml-cpp Boost::program_options)
 if(TARGET fmt::fmt-header-only)
-	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt-header-only)
+    target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt-header-only)
 else()
-	target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
+    target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS})
 
