@@ -42,7 +42,7 @@
 #include "iss/vm_types.h"
 #include <vm/vector_functions.h>
 
-namespace trampoline {
+namespace softvec_if {
 using indexed_load_store_t = std::function<uint64_t(void*, std::function<bool(void*, uint64_t, uint64_t, uint8_t*)>, uint8_t*, uint64_t,
                                                     uint64_t, softvector::vtype_t, bool, uint8_t, uint64_t, uint8_t, uint8_t)>;
 template <size_t VLEN, size_t XLEN, typename T1, typename T2> indexed_load_store_t getFunction() {
@@ -985,5 +985,5 @@ void vector_unary_op(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart,
         throw new std::runtime_error("Unsupported sew_val");
     }
 }
-} // namespace trampoline
+} // namespace softvec_if
 #endif /* RISCV_SRC_VM_VECTOR_FUNCTIONS_H_ */

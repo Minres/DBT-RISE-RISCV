@@ -84,70 +84,70 @@ public:
     using opcode_e    = typename traits::opcode_e;
 
 
-    static constexpr auto& vlseg = trampoline::vlseg<traits::VLEN>;
-    static constexpr auto& vsseg = trampoline::vsseg<traits::VLEN>;
-    static constexpr auto& vlsseg = trampoline::vlsseg<traits::VLEN>;
-    static constexpr auto& vssseg = trampoline::vssseg<traits::VLEN>;
-    static constexpr auto& vlxseg = trampoline::vlxseg<traits::VLEN, traits::XLEN>;
-    static constexpr auto& vsxseg = trampoline::vsxseg<traits::VLEN, traits::XLEN>;
-    static constexpr auto& vector_vector_op = trampoline::vector_vector_op<traits::VLEN>;
-    static constexpr auto& vector_imm_op = trampoline::vector_imm_op<traits::VLEN>;
-    static constexpr auto& vector_vector_wv = trampoline::vector_vector_wv<traits::VLEN>;
-    static constexpr auto& vector_imm_wv = trampoline::vector_imm_wv<traits::VLEN>;
-    static constexpr auto& vector_vector_ww = trampoline::vector_vector_ww<traits::VLEN>;
-    static constexpr auto& vector_imm_ww = trampoline::vector_imm_ww<traits::VLEN>;
-    static constexpr auto& vector_extend = trampoline::vector_extend<traits::VLEN>;
-    static constexpr auto& vector_vector_carry = trampoline::vector_vector_carry<traits::VLEN>;
-    static constexpr auto& vector_imm_carry = trampoline::vector_imm_carry<traits::VLEN>;
-    static constexpr auto& carry_vector_vector_op = trampoline::carry_vector_vector_op<traits::VLEN>;
-    static constexpr auto& carry_vector_imm_op = trampoline::carry_vector_imm_op<traits::VLEN>;
-    static constexpr auto& mask_vector_vector_op = trampoline::mask_vector_vector_op<traits::VLEN>;
-    static constexpr auto& mask_vector_imm_op = trampoline::mask_vector_imm_op<traits::VLEN>;
-    static constexpr auto& vector_vector_vw = trampoline::vector_vector_vw<traits::VLEN>;
-    static constexpr auto& vector_imm_vw = trampoline::vector_imm_vw<traits::VLEN>;
-    static constexpr auto& vector_vector_merge = trampoline::vector_vector_merge<traits::VLEN>;
-    static constexpr auto& vector_imm_merge = trampoline::vector_imm_merge<traits::VLEN>;
-    static constexpr auto& sat_vector_vector_op = trampoline::sat_vector_vector_op<traits::VLEN>;
-    static constexpr auto& sat_vector_imm_op = trampoline::sat_vector_imm_op<traits::VLEN>;
-    static constexpr auto& sat_vector_vector_vw = trampoline::sat_vector_vector_vw<traits::VLEN>;
-    static constexpr auto& sat_vector_imm_vw = trampoline::sat_vector_imm_vw<traits::VLEN>;
-    static constexpr auto& vector_red_op = trampoline::vector_red_op<traits::VLEN>;
-    static constexpr auto& vector_red_wv = trampoline::vector_red_wv<traits::VLEN>;
-    static constexpr auto& mask_mask_op = trampoline::mask_mask_op<traits::VLEN>;
-    static constexpr auto& vcpop = trampoline::vcpop<traits::VLEN>;
-    static constexpr auto& vfirst = trampoline::vfirst<traits::VLEN>;
-    static constexpr auto& mask_set_op = trampoline::mask_set_op<traits::VLEN>;
-    static constexpr auto& viota = trampoline::viota<traits::VLEN>;
-    static constexpr auto& vid = trampoline::vid<traits::VLEN>;
-    static constexpr auto& scalar_to_vector = trampoline::scalar_to_vector<traits::VLEN>;
-    static constexpr auto& scalar_from_vector = trampoline::scalar_from_vector<traits::VLEN>;
-    static constexpr auto& vector_slideup = trampoline::vector_slideup<traits::VLEN>;
-    static constexpr auto& vector_slidedown = trampoline::vector_slidedown<traits::VLEN>;
-    static constexpr auto& vector_slide1up = trampoline::vector_slide1up<traits::VLEN>;
-    static constexpr auto& vector_slide1down = trampoline::vector_slide1down<traits::VLEN>;
-    static constexpr auto& vector_vector_gather = trampoline::vector_vector_gather<traits::VLEN>;
-    static constexpr auto& vector_vector_gatherei16 = trampoline::vector_vector_gatherei16<traits::VLEN>;
-    static constexpr auto& vector_imm_gather = trampoline::vector_imm_gather<traits::VLEN>;
-    static constexpr auto& vector_compress = trampoline::vector_compress<traits::VLEN>;
-    static constexpr auto& vector_whole_move = trampoline::vector_whole_move<traits::VLEN>;
-    static constexpr auto& fp_scalar_from_vector = trampoline::fp_scalar_from_vector<traits::VLEN>;
-    static constexpr auto& fp_vector_slide1up = trampoline::fp_vector_slide1up<traits::VLEN>;
-    static constexpr auto& fp_vector_slide1down = trampoline::fp_vector_slide1down<traits::VLEN>;
-    static constexpr auto& fp_vector_red_op = trampoline::fp_vector_red_op<traits::VLEN>;
-    static constexpr auto& fp_vector_red_wv = trampoline::fp_vector_red_wv<traits::VLEN>;
-    static constexpr auto& fp_vector_vector_op = trampoline::fp_vector_vector_op<traits::VLEN>;
-    static constexpr auto& fp_vector_imm_op = trampoline::fp_vector_imm_op<traits::VLEN>;
-    static constexpr auto& fp_vector_vector_wv = trampoline::fp_vector_vector_wv<traits::VLEN>;
-    static constexpr auto& fp_vector_imm_wv = trampoline::fp_vector_imm_wv<traits::VLEN>;
-    static constexpr auto& fp_vector_vector_ww = trampoline::fp_vector_vector_ww<traits::VLEN>;
-    static constexpr auto& fp_vector_imm_ww = trampoline::fp_vector_imm_ww<traits::VLEN>;
-    static constexpr auto& fp_vector_unary_op = trampoline::fp_vector_unary_op<traits::VLEN>;
-    static constexpr auto& mask_fp_vector_vector_op = trampoline::mask_fp_vector_vector_op<traits::VLEN>;
-    static constexpr auto& mask_fp_vector_imm_op = trampoline::mask_fp_vector_imm_op<traits::VLEN>;
-    static constexpr auto& fp_vector_imm_merge = trampoline::fp_vector_imm_merge<traits::VLEN>;
-    static constexpr auto& fp_vector_unary_w = trampoline::fp_vector_unary_w<traits::VLEN>;
-    static constexpr auto& fp_vector_unary_n = trampoline::fp_vector_unary_n<traits::VLEN>;
-    static constexpr auto& vector_unary_op = trampoline::vector_unary_op<traits::VLEN>;
+    static constexpr auto& vlseg = softvec_if::vlseg<traits::VLEN>;
+    static constexpr auto& vsseg = softvec_if::vsseg<traits::VLEN>;
+    static constexpr auto& vlsseg = softvec_if::vlsseg<traits::VLEN>;
+    static constexpr auto& vssseg = softvec_if::vssseg<traits::VLEN>;
+    static constexpr auto& vlxseg = softvec_if::vlxseg<traits::VLEN, traits::XLEN>;
+    static constexpr auto& vsxseg = softvec_if::vsxseg<traits::VLEN, traits::XLEN>;
+    static constexpr auto& vector_vector_op = softvec_if::vector_vector_op<traits::VLEN>;
+    static constexpr auto& vector_imm_op = softvec_if::vector_imm_op<traits::VLEN>;
+    static constexpr auto& vector_vector_wv = softvec_if::vector_vector_wv<traits::VLEN>;
+    static constexpr auto& vector_imm_wv = softvec_if::vector_imm_wv<traits::VLEN>;
+    static constexpr auto& vector_vector_ww = softvec_if::vector_vector_ww<traits::VLEN>;
+    static constexpr auto& vector_imm_ww = softvec_if::vector_imm_ww<traits::VLEN>;
+    static constexpr auto& vector_extend = softvec_if::vector_extend<traits::VLEN>;
+    static constexpr auto& vector_vector_carry = softvec_if::vector_vector_carry<traits::VLEN>;
+    static constexpr auto& vector_imm_carry = softvec_if::vector_imm_carry<traits::VLEN>;
+    static constexpr auto& carry_vector_vector_op = softvec_if::carry_vector_vector_op<traits::VLEN>;
+    static constexpr auto& carry_vector_imm_op = softvec_if::carry_vector_imm_op<traits::VLEN>;
+    static constexpr auto& mask_vector_vector_op = softvec_if::mask_vector_vector_op<traits::VLEN>;
+    static constexpr auto& mask_vector_imm_op = softvec_if::mask_vector_imm_op<traits::VLEN>;
+    static constexpr auto& vector_vector_vw = softvec_if::vector_vector_vw<traits::VLEN>;
+    static constexpr auto& vector_imm_vw = softvec_if::vector_imm_vw<traits::VLEN>;
+    static constexpr auto& vector_vector_merge = softvec_if::vector_vector_merge<traits::VLEN>;
+    static constexpr auto& vector_imm_merge = softvec_if::vector_imm_merge<traits::VLEN>;
+    static constexpr auto& sat_vector_vector_op = softvec_if::sat_vector_vector_op<traits::VLEN>;
+    static constexpr auto& sat_vector_imm_op = softvec_if::sat_vector_imm_op<traits::VLEN>;
+    static constexpr auto& sat_vector_vector_vw = softvec_if::sat_vector_vector_vw<traits::VLEN>;
+    static constexpr auto& sat_vector_imm_vw = softvec_if::sat_vector_imm_vw<traits::VLEN>;
+    static constexpr auto& vector_red_op = softvec_if::vector_red_op<traits::VLEN>;
+    static constexpr auto& vector_red_wv = softvec_if::vector_red_wv<traits::VLEN>;
+    static constexpr auto& mask_mask_op = softvec_if::mask_mask_op<traits::VLEN>;
+    static constexpr auto& vcpop = softvec_if::vcpop<traits::VLEN>;
+    static constexpr auto& vfirst = softvec_if::vfirst<traits::VLEN>;
+    static constexpr auto& mask_set_op = softvec_if::mask_set_op<traits::VLEN>;
+    static constexpr auto& viota = softvec_if::viota<traits::VLEN>;
+    static constexpr auto& vid = softvec_if::vid<traits::VLEN>;
+    static constexpr auto& scalar_to_vector = softvec_if::scalar_to_vector<traits::VLEN>;
+    static constexpr auto& scalar_from_vector = softvec_if::scalar_from_vector<traits::VLEN>;
+    static constexpr auto& vector_slideup = softvec_if::vector_slideup<traits::VLEN>;
+    static constexpr auto& vector_slidedown = softvec_if::vector_slidedown<traits::VLEN>;
+    static constexpr auto& vector_slide1up = softvec_if::vector_slide1up<traits::VLEN>;
+    static constexpr auto& vector_slide1down = softvec_if::vector_slide1down<traits::VLEN>;
+    static constexpr auto& vector_vector_gather = softvec_if::vector_vector_gather<traits::VLEN>;
+    static constexpr auto& vector_vector_gatherei16 = softvec_if::vector_vector_gatherei16<traits::VLEN>;
+    static constexpr auto& vector_imm_gather = softvec_if::vector_imm_gather<traits::VLEN>;
+    static constexpr auto& vector_compress = softvec_if::vector_compress<traits::VLEN>;
+    static constexpr auto& vector_whole_move = softvec_if::vector_whole_move<traits::VLEN>;
+    static constexpr auto& fp_scalar_from_vector = softvec_if::fp_scalar_from_vector<traits::VLEN>;
+    static constexpr auto& fp_vector_slide1up = softvec_if::fp_vector_slide1up<traits::VLEN>;
+    static constexpr auto& fp_vector_slide1down = softvec_if::fp_vector_slide1down<traits::VLEN>;
+    static constexpr auto& fp_vector_red_op = softvec_if::fp_vector_red_op<traits::VLEN>;
+    static constexpr auto& fp_vector_red_wv = softvec_if::fp_vector_red_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_op = softvec_if::fp_vector_vector_op<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_op = softvec_if::fp_vector_imm_op<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_wv = softvec_if::fp_vector_vector_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_wv = softvec_if::fp_vector_imm_wv<traits::VLEN>;
+    static constexpr auto& fp_vector_vector_ww = softvec_if::fp_vector_vector_ww<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_ww = softvec_if::fp_vector_imm_ww<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_op = softvec_if::fp_vector_unary_op<traits::VLEN>;
+    static constexpr auto& mask_fp_vector_vector_op = softvec_if::mask_fp_vector_vector_op<traits::VLEN>;
+    static constexpr auto& mask_fp_vector_imm_op = softvec_if::mask_fp_vector_imm_op<traits::VLEN>;
+    static constexpr auto& fp_vector_imm_merge = softvec_if::fp_vector_imm_merge<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_w = softvec_if::fp_vector_unary_w<traits::VLEN>;
+    static constexpr auto& fp_vector_unary_n = softvec_if::fp_vector_unary_n<traits::VLEN>;
+    static constexpr auto& vector_unary_op = softvec_if::vector_unary_op<traits::VLEN>;
 
     vm_impl();
 
@@ -31140,8 +31140,8 @@ std::unique_ptr<vm_if> create<arch::rv64gcv>(arch::rv64gcv *core, unsigned short
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
