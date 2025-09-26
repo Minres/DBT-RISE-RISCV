@@ -160,6 +160,10 @@ public:
     static constexpr auto& fp_vector_unary_w = softvec_if::fp_vector_unary_w<traits::VLEN>;
     static constexpr auto& fp_vector_unary_n = softvec_if::fp_vector_unary_n<traits::VLEN>;
     static constexpr auto& vector_unary_op = softvec_if::vector_unary_op<traits::VLEN>;
+    static constexpr auto& vector_vector_crypto = softvec_if::vector_vector_crypto<traits::VLEN>;
+    static constexpr auto& vector_scalar_crypto = softvec_if::vector_scalar_crypto<traits::VLEN>;
+    static constexpr auto& vector_imm_crypto = softvec_if::vector_imm_crypto<traits::VLEN>;
+    static constexpr auto& vector_crypto = softvec_if::vector_crypto<traits::VLEN>;
 <%}%>
     vm_impl();
 

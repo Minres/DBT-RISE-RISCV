@@ -985,5 +985,68 @@ void vector_unary_op(uint8_t* V, uint8_t unary_op, uint64_t vl, uint64_t vstart,
         throw new std::runtime_error("Unsupported sew_val");
     }
 }
+template <size_t VLEN>
+void vector_vector_crypto(uint8_t* V, uint8_t funct6, uint64_t eg_len, uint64_t eg_start, softvector::vtype_t vtype, uint8_t vd,
+                          uint8_t vs2, uint8_t vs1, uint8_t egs) {
+    switch(egs) {
+    case 4:
+        return softvector::vector_vector_crypto<VLEN, 4>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+    case 8:
+        return softvector::vector_vector_crypto<VLEN, 8>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+    default:
+        throw new std::runtime_error("Unsupported egs");
+    }
+}
+template <size_t VLEN>
+void vector_scalar_crypto(uint8_t* V, uint8_t funct6, uint64_t eg_len, uint64_t eg_start, softvector::vtype_t vtype, uint8_t vd,
+                          uint8_t vs2, uint8_t vs1, uint8_t egs) {
+    switch(egs) {
+    case 4:
+        return softvector::vector_scalar_crypto<VLEN, 4>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+    case 8:
+        return softvector::vector_scalar_crypto<VLEN, 8>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+    default:
+        throw new std::runtime_error("Unsupported egs");
+    }
+}
+template <size_t VLEN>
+void vector_imm_crypto(uint8_t* V, uint8_t funct6, uint64_t eg_len, uint64_t eg_start, softvector::vtype_t vtype, uint8_t vd, uint8_t vs2,
+                       uint8_t imm, uint8_t egs) {
+    switch(egs) {
+    case 4:
+        return softvector::vector_imm_crypto<VLEN, 4>(V, funct6, eg_len, eg_start, vtype, vd, vs2, imm);
+    case 8:
+        return softvector::vector_imm_crypto<VLEN, 8>(V, funct6, eg_len, eg_start, vtype, vd, vs2, imm);
+    default:
+        throw new std::runtime_error("Unsupported egs");
+    }
+}
+template <size_t VLEN>
+void vector_crypto(uint8_t* V, uint8_t funct6, uint64_t eg_len, uint64_t eg_start, softvector::vtype_t vtype, uint8_t vd, uint8_t vs2,
+                   uint8_t vs1, uint8_t egs, uint8_t sew) {
+    switch(egs) {
+    case 4:
+        switch(sew) {
+        case 32:
+            return softvector::vector_crypto<VLEN, 4, uint32_t>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+        case 64:
+            return softvector::vector_crypto<VLEN, 4, uint64_t>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+        default:
+            throw new std::runtime_error("Unsupported sew");
+        }
+    case 8:
+        switch(sew) {
+        case 32:
+            return softvector::vector_crypto<VLEN, 8, uint32_t>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+        case 64:
+            return softvector::vector_crypto<VLEN, 8, uint64_t>(V, funct6, eg_len, eg_start, vtype, vd, vs2, vs1);
+        default:
+            throw new std::runtime_error("Unsupported sew");
+        }
+    default:
+        throw new std::runtime_error("Unsupported egs");
+    }
+}
+
 } // namespace softvec_if
 #endif /* RISCV_SRC_VM_VECTOR_FUNCTIONS_H_ */
