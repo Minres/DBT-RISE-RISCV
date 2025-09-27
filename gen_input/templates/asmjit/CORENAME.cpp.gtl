@@ -387,6 +387,7 @@ void vm_impl<ARCH>::gen_instr_prologue(jit_holder& jh) {
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     mov(cc, get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
     cc.comment("//Instruction prologue end");
 
 }
@@ -395,7 +396,6 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//Instruction epilogue begin");
-    cc.inc(get_ptr_for(jh, traits::CYCLE));
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     cmp(cc, current_trap_state, 0);
