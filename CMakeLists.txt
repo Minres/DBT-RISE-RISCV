@@ -20,7 +20,7 @@ if(NOT TARGET dbt-rise-core)
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
         #GIT_TAG         "origin/develop"
-        GIT_TAG d2bafe
+        GIT_TAG 0c7532f6
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
@@ -262,13 +262,9 @@ if(TARGET scc-sysc)
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
         src/sysc/register_cores.cpp
+        src/sysc/register_rv32gcv.cpp
+        src/sysc/register_rv64gcv.cpp
     )
-    if(WITH_ASMJIT)
-        list(APPEND LIB_SOURCES
-            src/sysc/register_rv32gcv.cpp
-            src/sysc/register_rv64gcv.cpp
-        )
-    endif()
 
     if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
         FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)

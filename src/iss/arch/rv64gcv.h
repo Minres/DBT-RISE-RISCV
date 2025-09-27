@@ -64,8 +64,6 @@ struct rv64gcv: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
-
-#pragma pack(push, 1)
     struct RV64GCV_regs {
         uint64_t X0 = 0;
         uint64_t X1 = 0;
@@ -136,38 +134,38 @@ struct rv64gcv: public arch_if {
         uint64_t F30 = 0;
         uint64_t F31 = 0;
         uint32_t FCSR = 0;
-        uint8_t V0[64] = {0};
-        uint8_t V1[64] = {0};
-        uint8_t V2[64] = {0};
-        uint8_t V3[64] = {0};
-        uint8_t V4[64] = {0};
-        uint8_t V5[64] = {0};
-        uint8_t V6[64] = {0};
-        uint8_t V7[64] = {0};
-        uint8_t V8[64] = {0};
-        uint8_t V9[64] = {0};
-        uint8_t V10[64] = {0};
-        uint8_t V11[64] = {0};
-        uint8_t V12[64] = {0};
-        uint8_t V13[64] = {0};
-        uint8_t V14[64] = {0};
-        uint8_t V15[64] = {0};
-        uint8_t V16[64] = {0};
-        uint8_t V17[64] = {0};
-        uint8_t V18[64] = {0};
-        uint8_t V19[64] = {0};
-        uint8_t V20[64] = {0};
-        uint8_t V21[64] = {0};
-        uint8_t V22[64] = {0};
-        uint8_t V23[64] = {0};
-        uint8_t V24[64] = {0};
-        uint8_t V25[64] = {0};
-        uint8_t V26[64] = {0};
-        uint8_t V27[64] = {0};
-        uint8_t V28[64] = {0};
-        uint8_t V29[64] = {0};
-        uint8_t V30[64] = {0};
-        uint8_t V31[64] = {0};
+        alignas(16) uint8_t V0[64] = {0};
+        alignas(16) uint8_t V1[64] = {0};
+        alignas(16) uint8_t V2[64] = {0};
+        alignas(16) uint8_t V3[64] = {0};
+        alignas(16) uint8_t V4[64] = {0};
+        alignas(16) uint8_t V5[64] = {0};
+        alignas(16) uint8_t V6[64] = {0};
+        alignas(16) uint8_t V7[64] = {0};
+        alignas(16) uint8_t V8[64] = {0};
+        alignas(16) uint8_t V9[64] = {0};
+        alignas(16) uint8_t V10[64] = {0};
+        alignas(16) uint8_t V11[64] = {0};
+        alignas(16) uint8_t V12[64] = {0};
+        alignas(16) uint8_t V13[64] = {0};
+        alignas(16) uint8_t V14[64] = {0};
+        alignas(16) uint8_t V15[64] = {0};
+        alignas(16) uint8_t V16[64] = {0};
+        alignas(16) uint8_t V17[64] = {0};
+        alignas(16) uint8_t V18[64] = {0};
+        alignas(16) uint8_t V19[64] = {0};
+        alignas(16) uint8_t V20[64] = {0};
+        alignas(16) uint8_t V21[64] = {0};
+        alignas(16) uint8_t V22[64] = {0};
+        alignas(16) uint8_t V23[64] = {0};
+        alignas(16) uint8_t V24[64] = {0};
+        alignas(16) uint8_t V25[64] = {0};
+        alignas(16) uint8_t V26[64] = {0};
+        alignas(16) uint8_t V27[64] = {0};
+        alignas(16) uint8_t V28[64] = {0};
+        alignas(16) uint8_t V29[64] = {0};
+        alignas(16) uint8_t V30[64] = {0};
+        alignas(16) uint8_t V31[64] = {0};
         uint64_t vstart = 0;
         uint64_t vxsat = 0;
         uint64_t vxrm = 0;
@@ -180,7 +178,7 @@ struct rv64gcv: public arch_if {
         uint32_t instruction = 0;
         uint32_t last_branch = 0;
     } reg;
-#pragma pack(pop)
+
     std::array<address_type, 4> addr_mode;
     
     uint64_t interrupt_sim=0;
@@ -338,6 +336,7 @@ template <> struct traits<rv64gcv> {
         VLENB_ADDR=3106ULL, MISA_VAL=9223372036854780205ULL, MARCHID_VAL=0ULL, CLIC_NUM_IRQ=0ULL
     };
 
+    
     constexpr static unsigned FP_REGS_SIZE = 64;
     constexpr static unsigned V_REGS_SIZE = 512;
 
