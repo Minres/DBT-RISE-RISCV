@@ -33,6 +33,11 @@
 #ifndef _SYSC_CORE_COMPLEX_H_
 #define _SYSC_CORE_COMPLEX_H_
 
+#include "core_complex_if.h"
+#include "sc2core_if.h"
+#include <iss/debugger/target_adapter_if.h>
+#include <iss/debugger_if.h>
+#include <iss/vm_if.h>
 #include <scc/signal_opt_ports.h>
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
@@ -74,31 +79,6 @@ using irq_signal_t = tlm::scc::tlm_signal_bool_opt_in;
 #else
 using irq_signal_t = sc_core::sc_in<bool>;
 #endif
-class core_wrapper;
-struct core_trace;
-struct core_complex_if {
-
-    virtual ~core_complex_if() = default;
-
-    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) = 0;
-
-    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
-
-    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) = 0;
-
-    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
-
-    virtual bool disass_output(uint64_t pc, const std::string instr) = 0;
-
-    virtual unsigned get_last_bus_cycles() = 0;
-
-    //! Allow quantum keeper handling
-    virtual void sync(uint64_t) = 0;
-
-    virtual char const* hier_name() = 0;
-
-    scc::sc_in_opt<uint64_t> mtime_i{"mtime_i"};
-};
 
 template <unsigned int BUSWIDTH = scc::LT> class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
@@ -220,7 +200,16 @@ public:
 
     char const* hier_name() override { return name(); }
 
+    void reset(uint64_t addr);
+
+    inline void start(bool dump = false);
+
+    inline std::pair<uint64_t, bool> load_file(std::string const& name);
+
 protected:
+    void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
+    int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
+
     void before_end_of_elaboration() override;
     void start_of_simulation() override;
     void forward();
@@ -236,10 +225,21 @@ protected:
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
     tlm_utils::tlm_quantumkeeper quantum_keeper;
     std::vector<uint8_t> write_buf;
-    core_wrapper* core_holder{nullptr};
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
     uint64_t ibus_inc{0}, dbus_inc{0};
-    core_trace* trc{nullptr};
+    std::unique_ptr<sc2core_if> core;
+    std::unique_ptr<iss::vm_if> vm;
+    iss::debugger::target_adapter_if* tgt_adapter{nullptr};
+
+    struct {
+        //! transaction recording database
+        SCVNS scv_tr_db* m_db{nullptr};
+        //! blocking transaction recording stream handle
+        SCVNS scv_tr_stream* stream_handle{nullptr};
+        //! transaction generator handle for blocking transactions
+        SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data>* instr_tr_handle{nullptr};
+        SCVNS scv_tr_handle tr_handle;
+    } trc;
     std::unique_ptr<scc::tick2time> t2t;
 
 private:

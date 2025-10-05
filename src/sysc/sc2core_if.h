@@ -32,8 +32,8 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
-#ifndef _SYSC_SC_CORE_ADAPTER_IF_H_
-#define _SYSC_SC_CORE_ADAPTER_IF_H_
+#ifndef _SYSC_SC2CORE_IF_H_
+#define _SYSC_SC2CORE_IF_H_
 
 #include <iss/iss.h>
 #include <iss/vm_types.h>
@@ -42,10 +42,11 @@
 #include <util/ities.h>
 
 namespace sysc {
-struct core_facade {
-    virtual ~core_facade() = default;
+//! an adpater to call specific RISC-V core function without knowing the exact type.
+struct sc2core_if {
+    // this is needed since we want to call the destructor with a pointer-to-base
+    virtual ~sc2core_if() = default;
 
-    util::delegate<iss::arch_if*()> get_arch_if;
     util::delegate<void(unsigned)> set_hartid;
     util::delegate<void(unsigned)> set_irq_count;
     util::delegate<uint32_t()> get_mode;
@@ -53,10 +54,12 @@ struct core_facade {
     util::delegate<bool()> get_interrupt_execution;
     util::delegate<void(bool)> set_interrupt_execution;
     util::delegate<void(short, bool)> local_irq; // id, value
+    //! sets a callback for CSR read requests. The callback gets always 64bit data passed no matter what size the actual CSR has
     using rd_csr_f = std::function<iss::status(unsigned addr, uint64_t&)>;
-    using wr_csr_f = std::function<iss::status(unsigned addr, uint64_t)>;
     util::delegate<void(unsigned, rd_csr_f)> register_csr_rd;
+    //! sets a callback for CSR write requests. The callback gets always 64bit data passed no matter what size the actual CSR has
+    using wr_csr_f = std::function<iss::status(unsigned addr, uint64_t)>;
     util::delegate<void(unsigned, wr_csr_f)> register_csr_wr;
 };
 } // namespace sysc
-#endif /* _SYSC_SC_CORE_ADAPTER_IF_H_ */
+#endif /* _SYSC_SC2CORE_IF_H_ */

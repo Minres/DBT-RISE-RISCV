@@ -63,6 +63,7 @@ public:
     using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_mu_p<BASE, FEAT, LOGCAT>;
     using reg_t = typename core::reg_t;
+    using phys_addr_t = typename core::phys_addr_t;
 
     static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
         if(sizeof(reg_t) == 4) {

@@ -64,8 +64,6 @@ struct tgc5c: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
-
-#pragma pack(push, 1)
     struct TGC5C_regs {
         uint32_t X0 = 0;
         uint32_t X1 = 0;
@@ -110,7 +108,7 @@ struct tgc5c: public arch_if {
         uint32_t instruction = 0;
         uint32_t last_branch = 0;
     } reg;
-#pragma pack(pop)
+
     std::array<address_type, 4> addr_mode;
     
     uint64_t interrupt_sim=0;
@@ -265,6 +263,7 @@ template <> struct traits<tgc5c> {
         MISA_VAL=1073746180ULL, MARCHID_VAL=2147483651ULL, CLIC_NUM_IRQ=0ULL
     };
 
+    
     constexpr static unsigned FP_REGS_SIZE = 0;
     constexpr static unsigned V_REGS_SIZE = 0;
 

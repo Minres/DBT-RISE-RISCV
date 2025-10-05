@@ -29,6 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
+ 
 // clang-format off
 #include <iss/arch/rv64gc.h>
 #include <iss/debugger/gdb_session.h>
@@ -40,6 +41,8 @@
 #include <iss/instruction_decoder.h>
 
 #include <fp_functions.h>
+
+
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -66,9 +69,8 @@ template <> struct is_unsigned<uint128_t> { static constexpr bool value = true; 
 
 namespace iss {
 namespace asmjit {
+namespace rv64gc{
 
-
-namespace rv64gc {
 using namespace ::asmjit;
 using namespace iss::arch;
 using namespace iss::debugger;
@@ -82,6 +84,7 @@ public:
     using code_word_t = typename super::code_word_t;
     using mem_type_e = typename super::mem_type_e;
     using addr_t = typename super::addr_t;
+
 
     vm_impl();
 
@@ -122,6 +125,7 @@ protected:
     void gen_instr_prologue(jit_holder& jh);
     void gen_instr_epilogue(jit_holder& jh);
     inline void gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause);
+    inline void gen_lower(jit_holder& jh);
     template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type> void gen_set_tval(jit_holder& jh, T new_tval) ;
     void gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) ;
 
@@ -2765,7 +2769,7 @@ private:
         gen_instr_prologue(jh);
         /*generate behavior*/
         InvokeNode* call_wait_5;
-        cc.invoke(&call_wait_5,  &wait, FuncSignature::build<void, uint32_t>());
+        cc.invoke(&call_wait_5, &wait, FuncSignature::build<void, uint32_t>());
         setArg(call_wait_5, 0, 1);
         auto returnValue = CONT;
         
@@ -7739,11 +7743,11 @@ private:
         InvokeNode* call_unbox_s_19;
         auto unbox_s_19_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_19 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_19,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_19, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_20;
         auto unbox_s_20_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_20 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_20,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_20, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_21;
         x86::Gp ret_val_get_rm_21 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_21, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -7752,7 +7756,7 @@ private:
         auto fadd_s_18_arg1 = ret_val_unbox_s_20;
         auto fadd_s_18_arg2 = ret_val_get_rm_21;
         x86::Gp ret_val_fadd_s_18 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fadd_s_18,  &fadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fadd_s_18, &fadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_17;
         auto NaNBox32_17_arg0 = ret_val_fadd_s_18;
         x86::Gp ret_val_NaNBox32_17 = get_reg_Gp(cc, 64, false);
@@ -7777,7 +7781,7 @@ private:
         setRet(call_NaNBox32_17, 0, ret_val_NaNBox32_17);
         InvokeNode* call_fget_flags_22;
         x86::Gp ret_val_fget_flags_22 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_22,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_22, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_22;
         setRet(call_fget_flags_22, 0, ret_val_fget_flags_22);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -7824,11 +7828,11 @@ private:
         InvokeNode* call_unbox_s_25;
         auto unbox_s_25_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_25 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_25,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_25, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_26;
         auto unbox_s_26_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_26 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_26,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_26, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_27;
         x86::Gp ret_val_get_rm_27 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_27, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -7837,7 +7841,7 @@ private:
         auto fsub_s_24_arg1 = ret_val_unbox_s_26;
         auto fsub_s_24_arg2 = ret_val_get_rm_27;
         x86::Gp ret_val_fsub_s_24 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fsub_s_24,  &fsub_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fsub_s_24, &fsub_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_23;
         auto NaNBox32_23_arg0 = ret_val_fsub_s_24;
         x86::Gp ret_val_NaNBox32_23 = get_reg_Gp(cc, 64, false);
@@ -7862,7 +7866,7 @@ private:
         setRet(call_NaNBox32_23, 0, ret_val_NaNBox32_23);
         InvokeNode* call_fget_flags_28;
         x86::Gp ret_val_fget_flags_28 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_28,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_28, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_28;
         setRet(call_fget_flags_28, 0, ret_val_fget_flags_28);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -7909,11 +7913,11 @@ private:
         InvokeNode* call_unbox_s_31;
         auto unbox_s_31_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_31 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_31,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_31, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_32;
         auto unbox_s_32_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_32 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_32,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_32, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_33;
         x86::Gp ret_val_get_rm_33 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_33, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -7922,7 +7926,7 @@ private:
         auto fmul_s_30_arg1 = ret_val_unbox_s_32;
         auto fmul_s_30_arg2 = ret_val_get_rm_33;
         x86::Gp ret_val_fmul_s_30 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fmul_s_30,  &fmul_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fmul_s_30, &fmul_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_29;
         auto NaNBox32_29_arg0 = ret_val_fmul_s_30;
         x86::Gp ret_val_NaNBox32_29 = get_reg_Gp(cc, 64, false);
@@ -7947,7 +7951,7 @@ private:
         setRet(call_NaNBox32_29, 0, ret_val_NaNBox32_29);
         InvokeNode* call_fget_flags_34;
         x86::Gp ret_val_fget_flags_34 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_34,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_34, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_34;
         setRet(call_fget_flags_34, 0, ret_val_fget_flags_34);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -7994,11 +7998,11 @@ private:
         InvokeNode* call_unbox_s_37;
         auto unbox_s_37_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_37 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_37,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_37, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_38;
         auto unbox_s_38_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_38 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_38,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_38, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_39;
         x86::Gp ret_val_get_rm_39 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_39, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8007,7 +8011,7 @@ private:
         auto fdiv_s_36_arg1 = ret_val_unbox_s_38;
         auto fdiv_s_36_arg2 = ret_val_get_rm_39;
         x86::Gp ret_val_fdiv_s_36 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fdiv_s_36,  &fdiv_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fdiv_s_36, &fdiv_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_35;
         auto NaNBox32_35_arg0 = ret_val_fdiv_s_36;
         x86::Gp ret_val_NaNBox32_35 = get_reg_Gp(cc, 64, false);
@@ -8032,7 +8036,7 @@ private:
         setRet(call_NaNBox32_35, 0, ret_val_NaNBox32_35);
         InvokeNode* call_fget_flags_40;
         x86::Gp ret_val_fget_flags_40 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_40,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_40, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_40;
         setRet(call_fget_flags_40, 0, ret_val_fget_flags_40);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8078,16 +8082,16 @@ private:
         InvokeNode* call_unbox_s_43;
         auto unbox_s_43_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_43 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_43,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_43, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_44;
         auto unbox_s_44_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_44 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_44,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_44, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_fsel_s_42;
         auto fsel_s_42_arg0 = ret_val_unbox_s_43;
         auto fsel_s_42_arg1 = ret_val_unbox_s_44;
         x86::Gp ret_val_fsel_s_42 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fsel_s_42,  &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+        cc.invoke(&call_fsel_s_42, &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
         InvokeNode* call_NaNBox32_41;
         auto NaNBox32_41_arg0 = ret_val_fsel_s_42;
         x86::Gp ret_val_NaNBox32_41 = get_reg_Gp(cc, 64, false);
@@ -8109,7 +8113,7 @@ private:
         setRet(call_NaNBox32_41, 0, ret_val_NaNBox32_41);
         InvokeNode* call_fget_flags_45;
         x86::Gp ret_val_fget_flags_45 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_45,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_45, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_45;
         setRet(call_fget_flags_45, 0, ret_val_fget_flags_45);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8155,16 +8159,16 @@ private:
         InvokeNode* call_unbox_s_48;
         auto unbox_s_48_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_48 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_48,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_48, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_49;
         auto unbox_s_49_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_49 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_49,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_49, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_fsel_s_47;
         auto fsel_s_47_arg0 = ret_val_unbox_s_48;
         auto fsel_s_47_arg1 = ret_val_unbox_s_49;
         x86::Gp ret_val_fsel_s_47 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fsel_s_47,  &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+        cc.invoke(&call_fsel_s_47, &fsel_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
         InvokeNode* call_NaNBox32_46;
         auto NaNBox32_46_arg0 = ret_val_fsel_s_47;
         x86::Gp ret_val_NaNBox32_46 = get_reg_Gp(cc, 64, false);
@@ -8186,7 +8190,7 @@ private:
         setRet(call_NaNBox32_46, 0, ret_val_NaNBox32_46);
         InvokeNode* call_fget_flags_50;
         x86::Gp ret_val_fget_flags_50 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_50,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_50, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_50;
         setRet(call_fget_flags_50, 0, ret_val_fget_flags_50);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8232,7 +8236,7 @@ private:
         InvokeNode* call_unbox_s_53;
         auto unbox_s_53_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_53 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_53,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_53, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_54;
         x86::Gp ret_val_get_rm_54 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_54, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8240,7 +8244,7 @@ private:
         auto fsqrt_s_52_arg0 = ret_val_unbox_s_53;
         auto fsqrt_s_52_arg1 = ret_val_get_rm_54;
         x86::Gp ret_val_fsqrt_s_52 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fsqrt_s_52,  &fsqrt_s, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fsqrt_s_52, &fsqrt_s, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_51;
         auto NaNBox32_51_arg0 = ret_val_fsqrt_s_52;
         x86::Gp ret_val_NaNBox32_51 = get_reg_Gp(cc, 64, false);
@@ -8261,7 +8265,7 @@ private:
         setRet(call_NaNBox32_51, 0, ret_val_NaNBox32_51);
         InvokeNode* call_fget_flags_55;
         x86::Gp ret_val_fget_flags_55 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_55,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_55, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_55;
         setRet(call_fget_flags_55, 0, ret_val_fget_flags_55);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8309,15 +8313,15 @@ private:
         InvokeNode* call_unbox_s_58;
         auto unbox_s_58_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_58 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_58,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_58, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_59;
         auto unbox_s_59_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_59 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_59,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_59, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_60;
         auto unbox_s_60_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_s_60 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_60,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_60, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_61;
         x86::Gp ret_val_get_rm_61 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_61, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8327,7 +8331,7 @@ private:
         auto fmadd_s_57_arg2 = ret_val_unbox_s_60;
         auto fmadd_s_57_arg4 = ret_val_get_rm_61;
         x86::Gp ret_val_fmadd_s_57 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fmadd_s_57,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fmadd_s_57, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_56;
         auto NaNBox32_56_arg0 = ret_val_fmadd_s_57;
         x86::Gp ret_val_NaNBox32_56 = get_reg_Gp(cc, 64, false);
@@ -8357,7 +8361,7 @@ private:
         setRet(call_NaNBox32_56, 0, ret_val_NaNBox32_56);
         InvokeNode* call_fget_flags_62;
         x86::Gp ret_val_fget_flags_62 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_62,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_62, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_62;
         setRet(call_fget_flags_62, 0, ret_val_fget_flags_62);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8405,15 +8409,15 @@ private:
         InvokeNode* call_unbox_s_65;
         auto unbox_s_65_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_65 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_65,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_65, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_66;
         auto unbox_s_66_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_66 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_66,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_66, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_67;
         auto unbox_s_67_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_s_67 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_67,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_67, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_68;
         x86::Gp ret_val_get_rm_68 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_68, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8423,7 +8427,7 @@ private:
         auto fmadd_s_64_arg2 = ret_val_unbox_s_67;
         auto fmadd_s_64_arg4 = ret_val_get_rm_68;
         x86::Gp ret_val_fmadd_s_64 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fmadd_s_64,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fmadd_s_64, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_63;
         auto NaNBox32_63_arg0 = ret_val_fmadd_s_64;
         x86::Gp ret_val_NaNBox32_63 = get_reg_Gp(cc, 64, false);
@@ -8453,7 +8457,7 @@ private:
         setRet(call_NaNBox32_63, 0, ret_val_NaNBox32_63);
         InvokeNode* call_fget_flags_69;
         x86::Gp ret_val_fget_flags_69 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_69,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_69, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_69;
         setRet(call_fget_flags_69, 0, ret_val_fget_flags_69);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8501,15 +8505,15 @@ private:
         InvokeNode* call_unbox_s_72;
         auto unbox_s_72_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_72 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_72,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_72, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_73;
         auto unbox_s_73_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_73 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_73,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_73, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_74;
         auto unbox_s_74_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_s_74 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_74,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_74, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_75;
         x86::Gp ret_val_get_rm_75 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_75, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8519,7 +8523,7 @@ private:
         auto fmadd_s_71_arg2 = ret_val_unbox_s_74;
         auto fmadd_s_71_arg4 = ret_val_get_rm_75;
         x86::Gp ret_val_fmadd_s_71 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fmadd_s_71,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fmadd_s_71, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_70;
         auto NaNBox32_70_arg0 = ret_val_fmadd_s_71;
         x86::Gp ret_val_NaNBox32_70 = get_reg_Gp(cc, 64, false);
@@ -8549,7 +8553,7 @@ private:
         setRet(call_NaNBox32_70, 0, ret_val_NaNBox32_70);
         InvokeNode* call_fget_flags_76;
         x86::Gp ret_val_fget_flags_76 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_76,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_76, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_76;
         setRet(call_fget_flags_76, 0, ret_val_fget_flags_76);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8597,15 +8601,15 @@ private:
         InvokeNode* call_unbox_s_79;
         auto unbox_s_79_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_79 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_79,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_79, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_80;
         auto unbox_s_80_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_80 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_80,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_80, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_81;
         auto unbox_s_81_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_s_81 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_81,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_81, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_82;
         x86::Gp ret_val_get_rm_82 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_82, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8615,7 +8619,7 @@ private:
         auto fmadd_s_78_arg2 = ret_val_unbox_s_81;
         auto fmadd_s_78_arg4 = ret_val_get_rm_82;
         x86::Gp ret_val_fmadd_s_78 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fmadd_s_78,  &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
+        cc.invoke(&call_fmadd_s_78, &fmadd_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox32_77;
         auto NaNBox32_77_arg0 = ret_val_fmadd_s_78;
         x86::Gp ret_val_NaNBox32_77 = get_reg_Gp(cc, 64, false);
@@ -8645,7 +8649,7 @@ private:
         setRet(call_NaNBox32_77, 0, ret_val_NaNBox32_77);
         InvokeNode* call_fget_flags_83;
         x86::Gp ret_val_fget_flags_83 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_83,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_83, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_83;
         setRet(call_fget_flags_83, 0, ret_val_fget_flags_83);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8695,7 +8699,7 @@ private:
             InvokeNode* call_unbox_s_85;
             auto unbox_s_85_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_85 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_85,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_85, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_86;
             x86::Gp ret_val_get_rm_86 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_86, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8703,7 +8707,7 @@ private:
             auto f32toi32_84_arg0 = ret_val_unbox_s_85;
             auto f32toi32_84_arg1 = ret_val_get_rm_86;
             x86::Gp ret_val_f32toi32_84 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_f32toi32_84,  &f32toi32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            cc.invoke(&call_f32toi32_84, &f32toi32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f32toi32_84, 32, false), 64, true);
@@ -8723,7 +8727,7 @@ private:
             }
             InvokeNode* call_fget_flags_87;
             x86::Gp ret_val_fget_flags_87 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_87,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_87, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_87;
             setRet(call_fget_flags_87, 0, ret_val_fget_flags_87);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8774,7 +8778,7 @@ private:
             InvokeNode* call_unbox_s_89;
             auto unbox_s_89_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_89 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_89,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_89, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_90;
             x86::Gp ret_val_get_rm_90 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_90, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8782,7 +8786,7 @@ private:
             auto f32toui32_88_arg0 = ret_val_unbox_s_89;
             auto f32toui32_88_arg1 = ret_val_get_rm_90;
             x86::Gp ret_val_f32toui32_88 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_f32toui32_88,  &f32toui32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            cc.invoke(&call_f32toui32_88, &f32toui32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f32toui32_88, 32, false), 64, true);
@@ -8802,7 +8806,7 @@ private:
             }
             InvokeNode* call_fget_flags_91;
             x86::Gp ret_val_fget_flags_91 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_91,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_91, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_91;
             setRet(call_fget_flags_91, 0, ret_val_fget_flags_91);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8853,7 +8857,7 @@ private:
             InvokeNode* call_unbox_s_93;
             auto unbox_s_93_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_93 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_93,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_93, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_94;
             x86::Gp ret_val_get_rm_94 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_94, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8861,7 +8865,7 @@ private:
             auto f32toi64_92_arg0 = ret_val_unbox_s_93;
             auto f32toi64_92_arg1 = ret_val_get_rm_94;
             x86::Gp ret_val_f32toi64_92 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_f32toi64_92,  &f32toi64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            cc.invoke(&call_f32toi64_92, &f32toi64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f32toi64_92, 64, false), 64, true);
@@ -8881,7 +8885,7 @@ private:
             }
             InvokeNode* call_fget_flags_95;
             x86::Gp ret_val_fget_flags_95 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_95,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_95, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_95;
             setRet(call_fget_flags_95, 0, ret_val_fget_flags_95);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -8932,7 +8936,7 @@ private:
             InvokeNode* call_unbox_s_97;
             auto unbox_s_97_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_97 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_97,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_97, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_98;
             x86::Gp ret_val_get_rm_98 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_98, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -8940,7 +8944,7 @@ private:
             auto f32toui64_96_arg0 = ret_val_unbox_s_97;
             auto f32toui64_96_arg1 = ret_val_get_rm_98;
             x86::Gp ret_val_f32toui64_96 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_f32toui64_96,  &f32toui64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            cc.invoke(&call_f32toui64_96, &f32toui64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
             auto res = ret_val_f32toui64_96;
             setArg(call_unbox_s_97, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_s_97, 1, unbox_s_97_arg1);
@@ -8957,7 +8961,7 @@ private:
             }
             InvokeNode* call_fget_flags_99;
             x86::Gp ret_val_fget_flags_99 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_99,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_99, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_99;
             setRet(call_fget_flags_99, 0, ret_val_fget_flags_99);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9013,7 +9017,7 @@ private:
                 load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
             auto i32tof32_101_arg1 = ret_val_get_rm_102;
             x86::Gp ret_val_i32tof32_101 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_i32tof32_101,  &i32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            cc.invoke(&call_i32tof32_101, &i32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
             InvokeNode* call_NaNBox32_100;
             auto NaNBox32_100_arg0 = ret_val_i32tof32_101;
             x86::Gp ret_val_NaNBox32_100 = get_reg_Gp(cc, 64, false);
@@ -9031,7 +9035,7 @@ private:
             setRet(call_NaNBox32_100, 0, ret_val_NaNBox32_100);
             InvokeNode* call_fget_flags_103;
             x86::Gp ret_val_fget_flags_103 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_103,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_103, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_103;
             setRet(call_fget_flags_103, 0, ret_val_fget_flags_103);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9087,7 +9091,7 @@ private:
                 load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
             auto ui32tof32_105_arg1 = ret_val_get_rm_106;
             x86::Gp ret_val_ui32tof32_105 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_ui32tof32_105,  &ui32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
+            cc.invoke(&call_ui32tof32_105, &ui32tof32, FuncSignature::build<uint32_t, uint32_t, uint8_t>());
             InvokeNode* call_NaNBox32_104;
             auto NaNBox32_104_arg0 = ret_val_ui32tof32_105;
             x86::Gp ret_val_NaNBox32_104 = get_reg_Gp(cc, 64, false);
@@ -9105,7 +9109,7 @@ private:
             setRet(call_NaNBox32_104, 0, ret_val_NaNBox32_104);
             InvokeNode* call_fget_flags_107;
             x86::Gp ret_val_fget_flags_107 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_107,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_107, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_107;
             setRet(call_fget_flags_107, 0, ret_val_fget_flags_107);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9160,7 +9164,7 @@ private:
             auto i64tof32_109_arg0 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto i64tof32_109_arg1 = ret_val_get_rm_110;
             x86::Gp ret_val_i64tof32_109 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_i64tof32_109,  &i64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            cc.invoke(&call_i64tof32_109, &i64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
             InvokeNode* call_NaNBox32_108;
             auto NaNBox32_108_arg0 = ret_val_i64tof32_109;
             x86::Gp ret_val_NaNBox32_108 = get_reg_Gp(cc, 64, false);
@@ -9178,7 +9182,7 @@ private:
             setRet(call_NaNBox32_108, 0, ret_val_NaNBox32_108);
             InvokeNode* call_fget_flags_111;
             x86::Gp ret_val_fget_flags_111 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_111,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_111, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_111;
             setRet(call_fget_flags_111, 0, ret_val_fget_flags_111);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9233,7 +9237,7 @@ private:
             auto ui64tof32_113_arg0 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto ui64tof32_113_arg1 = ret_val_get_rm_114;
             x86::Gp ret_val_ui64tof32_113 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_ui64tof32_113,  &ui64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            cc.invoke(&call_ui64tof32_113, &ui64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
             InvokeNode* call_NaNBox32_112;
             auto NaNBox32_112_arg0 = ret_val_ui64tof32_113;
             x86::Gp ret_val_NaNBox32_112 = get_reg_Gp(cc, 64, false);
@@ -9251,7 +9255,7 @@ private:
             setRet(call_NaNBox32_112, 0, ret_val_NaNBox32_112);
             InvokeNode* call_fget_flags_115;
             x86::Gp ret_val_fget_flags_115 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_115,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_115, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_115;
             setRet(call_fget_flags_115, 0, ret_val_fget_flags_115);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9298,13 +9302,14 @@ private:
         InvokeNode* call_unbox_s_117;
         auto unbox_s_117_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_117 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_117,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_117, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_118;
         auto unbox_s_118_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_118 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_118,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_118, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox32_116;
-        auto NaNBox32_116_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_s_117, 31, 31-31+1), 32, false), 31), gen_ext(cc, gen_slice(cc, ret_val_unbox_s_118, 0, 30-0+1), 32, false));
+        auto NaNBox32_116_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_s_117, (uint32_t)(31), (uint32_t)(31-31+1)), 32, false), (uint32_t)31), 
+                gen_ext(cc, gen_slice(cc, ret_val_unbox_s_118, (uint32_t)(0), (uint32_t)(30-0+1)), 32, false));
         x86::Gp ret_val_NaNBox32_116 = get_reg_Gp(cc, 64, false);
         cc.invoke(&call_NaNBox32_116, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
@@ -9360,13 +9365,14 @@ private:
         InvokeNode* call_unbox_s_120;
         auto unbox_s_120_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_120 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_120,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_120, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_121;
         auto unbox_s_121_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_121 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_121,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_121, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox32_119;
-        auto NaNBox32_119_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_s_120, 31, 31-31+1)), 32, false), 31), gen_ext(cc, gen_slice(cc, ret_val_unbox_s_121, 0, 30-0+1), 32, false));
+        auto NaNBox32_119_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation( cc, band, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_s_120, (uint32_t)(31), (uint32_t)(31-31+1))), (uint8_t)((1ULL<<1)-1)), 32, false), (uint32_t)31), 
+                gen_ext(cc, gen_slice(cc, ret_val_unbox_s_121, (uint32_t)(0), (uint32_t)(30-0+1)), 32, false));
         x86::Gp ret_val_NaNBox32_119 = get_reg_Gp(cc, 64, false);
         cc.invoke(&call_NaNBox32_119, (uintptr_t)&vm_impl::_NaNBox32, FuncSignature::build<uint64_t, uintptr_t, uint32_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
@@ -9422,11 +9428,11 @@ private:
         InvokeNode* call_unbox_s_123;
         auto unbox_s_123_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_s_123 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_123,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_123, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_s_124;
         auto unbox_s_124_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_124 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_124,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_124, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox32_122;
         auto NaNBox32_122_arg0 = gen_operation(cc, bxor, (gen_operation(cc, band, ret_val_unbox_s_123, ((uint32_t)1<<31))), ret_val_unbox_s_124);
         x86::Gp ret_val_NaNBox32_122 = get_reg_Gp(cc, 64, false);
@@ -9591,16 +9597,16 @@ private:
             InvokeNode* call_unbox_s_127;
             auto unbox_s_127_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_127 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_127,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_127, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_s_128;
             auto unbox_s_128_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_s_128 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_128,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_128, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_s_126;
             auto fcmp_s_126_arg0 = ret_val_unbox_s_127;
             auto fcmp_s_126_arg1 = ret_val_unbox_s_128;
             x86::Gp ret_val_fcmp_s_126 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fcmp_s_126,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            cc.invoke(&call_fcmp_s_126, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
             auto res = ret_val_fcmp_s_126;
             setArg(call_unbox_s_127, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_s_127, 1, unbox_s_127_arg1);
@@ -9619,7 +9625,7 @@ private:
             }
             InvokeNode* call_fget_flags_129;
             x86::Gp ret_val_fget_flags_129 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_129,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_129, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_129;
             setRet(call_fget_flags_129, 0, ret_val_fget_flags_129);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9670,16 +9676,16 @@ private:
             InvokeNode* call_unbox_s_131;
             auto unbox_s_131_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_131 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_131,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_131, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_s_132;
             auto unbox_s_132_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_s_132 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_132,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_132, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_s_130;
             auto fcmp_s_130_arg0 = ret_val_unbox_s_131;
             auto fcmp_s_130_arg1 = ret_val_unbox_s_132;
             x86::Gp ret_val_fcmp_s_130 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fcmp_s_130,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            cc.invoke(&call_fcmp_s_130, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
             auto res = ret_val_fcmp_s_130;
             setArg(call_unbox_s_131, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_s_131, 1, unbox_s_131_arg1);
@@ -9698,7 +9704,7 @@ private:
             }
             InvokeNode* call_fget_flags_133;
             x86::Gp ret_val_fget_flags_133 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_133,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_133, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_133;
             setRet(call_fget_flags_133, 0, ret_val_fget_flags_133);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9749,16 +9755,16 @@ private:
             InvokeNode* call_unbox_s_135;
             auto unbox_s_135_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_135 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_135,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_135, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_s_136;
             auto unbox_s_136_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_s_136 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_136,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_136, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_s_134;
             auto fcmp_s_134_arg0 = ret_val_unbox_s_135;
             auto fcmp_s_134_arg1 = ret_val_unbox_s_136;
             x86::Gp ret_val_fcmp_s_134 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fcmp_s_134,  &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
+            cc.invoke(&call_fcmp_s_134, &fcmp_s, FuncSignature::build<uint32_t, uint32_t, uint32_t, uint32_t>());
             auto res = ret_val_fcmp_s_134;
             setArg(call_unbox_s_135, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_s_135, 1, unbox_s_135_arg1);
@@ -9777,7 +9783,7 @@ private:
             }
             InvokeNode* call_fget_flags_137;
             x86::Gp ret_val_fget_flags_137 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_137,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_137, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_137;
             setRet(call_fget_flags_137, 0, ret_val_fget_flags_137);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -9827,11 +9833,11 @@ private:
             InvokeNode* call_unbox_s_139;
             auto unbox_s_139_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_s_139 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_unbox_s_139,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_s_139, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
             InvokeNode* call_fclass_s_138;
             auto fclass_s_138_arg0 = ret_val_unbox_s_139;
             x86::Gp ret_val_fclass_s_138 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fclass_s_138,  &fclass_s, FuncSignature::build<uint32_t, uint32_t>());
+            cc.invoke(&call_fclass_s_138, &fclass_s, FuncSignature::build<uint32_t, uint32_t>());
             auto res = ret_val_fclass_s_138;
             setArg(call_unbox_s_139, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_s_139, 1, unbox_s_139_arg1);
@@ -9990,11 +9996,11 @@ private:
         InvokeNode* call_unbox_d_143;
         auto unbox_d_143_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_143 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_143,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_143, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_144;
         auto unbox_d_144_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_144 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_144,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_144, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_145;
         x86::Gp ret_val_get_rm_145 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_145, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10003,7 +10009,7 @@ private:
         auto fadd_d_142_arg1 = ret_val_unbox_d_144;
         auto fadd_d_142_arg2 = ret_val_get_rm_145;
         x86::Gp ret_val_fadd_d_142 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fadd_d_142,  &fadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fadd_d_142, &fadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_141;
         auto NaNBox64_141_arg0 = ret_val_fadd_d_142;
         x86::Gp ret_val_NaNBox64_141 = get_reg_Gp(cc, 64, false);
@@ -10028,7 +10034,7 @@ private:
         setRet(call_NaNBox64_141, 0, ret_val_NaNBox64_141);
         InvokeNode* call_fget_flags_146;
         x86::Gp ret_val_fget_flags_146 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_146,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_146, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_146;
         setRet(call_fget_flags_146, 0, ret_val_fget_flags_146);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10075,11 +10081,11 @@ private:
         InvokeNode* call_unbox_d_149;
         auto unbox_d_149_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_149 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_149,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_149, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_150;
         auto unbox_d_150_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_150 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_150,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_150, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_151;
         x86::Gp ret_val_get_rm_151 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_151, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10088,7 +10094,7 @@ private:
         auto fsub_d_148_arg1 = ret_val_unbox_d_150;
         auto fsub_d_148_arg2 = ret_val_get_rm_151;
         x86::Gp ret_val_fsub_d_148 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fsub_d_148,  &fsub_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fsub_d_148, &fsub_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_147;
         auto NaNBox64_147_arg0 = ret_val_fsub_d_148;
         x86::Gp ret_val_NaNBox64_147 = get_reg_Gp(cc, 64, false);
@@ -10113,7 +10119,7 @@ private:
         setRet(call_NaNBox64_147, 0, ret_val_NaNBox64_147);
         InvokeNode* call_fget_flags_152;
         x86::Gp ret_val_fget_flags_152 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_152,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_152, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_152;
         setRet(call_fget_flags_152, 0, ret_val_fget_flags_152);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10160,11 +10166,11 @@ private:
         InvokeNode* call_unbox_d_155;
         auto unbox_d_155_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_155 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_155,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_155, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_156;
         auto unbox_d_156_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_156 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_156,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_156, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_157;
         x86::Gp ret_val_get_rm_157 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_157, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10173,7 +10179,7 @@ private:
         auto fmul_d_154_arg1 = ret_val_unbox_d_156;
         auto fmul_d_154_arg2 = ret_val_get_rm_157;
         x86::Gp ret_val_fmul_d_154 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fmul_d_154,  &fmul_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fmul_d_154, &fmul_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_153;
         auto NaNBox64_153_arg0 = ret_val_fmul_d_154;
         x86::Gp ret_val_NaNBox64_153 = get_reg_Gp(cc, 64, false);
@@ -10198,7 +10204,7 @@ private:
         setRet(call_NaNBox64_153, 0, ret_val_NaNBox64_153);
         InvokeNode* call_fget_flags_158;
         x86::Gp ret_val_fget_flags_158 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_158,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_158, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_158;
         setRet(call_fget_flags_158, 0, ret_val_fget_flags_158);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10245,11 +10251,11 @@ private:
         InvokeNode* call_unbox_d_161;
         auto unbox_d_161_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_161 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_161,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_161, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_162;
         auto unbox_d_162_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_162 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_162,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_162, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_163;
         x86::Gp ret_val_get_rm_163 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_163, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10258,7 +10264,7 @@ private:
         auto fdiv_d_160_arg1 = ret_val_unbox_d_162;
         auto fdiv_d_160_arg2 = ret_val_get_rm_163;
         x86::Gp ret_val_fdiv_d_160 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fdiv_d_160,  &fdiv_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fdiv_d_160, &fdiv_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_159;
         auto NaNBox64_159_arg0 = ret_val_fdiv_d_160;
         x86::Gp ret_val_NaNBox64_159 = get_reg_Gp(cc, 64, false);
@@ -10283,7 +10289,7 @@ private:
         setRet(call_NaNBox64_159, 0, ret_val_NaNBox64_159);
         InvokeNode* call_fget_flags_164;
         x86::Gp ret_val_fget_flags_164 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_164,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_164, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_164;
         setRet(call_fget_flags_164, 0, ret_val_fget_flags_164);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10329,16 +10335,16 @@ private:
         InvokeNode* call_unbox_d_167;
         auto unbox_d_167_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_167 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_167,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_167, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_168;
         auto unbox_d_168_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_168 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_168,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_168, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_fsel_d_166;
         auto fsel_d_166_arg0 = ret_val_unbox_d_167;
         auto fsel_d_166_arg1 = ret_val_unbox_d_168;
         x86::Gp ret_val_fsel_d_166 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fsel_d_166,  &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+        cc.invoke(&call_fsel_d_166, &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
         InvokeNode* call_NaNBox64_165;
         auto NaNBox64_165_arg0 = ret_val_fsel_d_166;
         x86::Gp ret_val_NaNBox64_165 = get_reg_Gp(cc, 64, false);
@@ -10360,7 +10366,7 @@ private:
         setRet(call_NaNBox64_165, 0, ret_val_NaNBox64_165);
         InvokeNode* call_fget_flags_169;
         x86::Gp ret_val_fget_flags_169 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_169,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_169, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_169;
         setRet(call_fget_flags_169, 0, ret_val_fget_flags_169);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10406,16 +10412,16 @@ private:
         InvokeNode* call_unbox_d_172;
         auto unbox_d_172_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_172 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_172,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_172, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_173;
         auto unbox_d_173_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_173 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_173,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_173, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_fsel_d_171;
         auto fsel_d_171_arg0 = ret_val_unbox_d_172;
         auto fsel_d_171_arg1 = ret_val_unbox_d_173;
         x86::Gp ret_val_fsel_d_171 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fsel_d_171,  &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+        cc.invoke(&call_fsel_d_171, &fsel_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
         InvokeNode* call_NaNBox64_170;
         auto NaNBox64_170_arg0 = ret_val_fsel_d_171;
         x86::Gp ret_val_NaNBox64_170 = get_reg_Gp(cc, 64, false);
@@ -10437,7 +10443,7 @@ private:
         setRet(call_NaNBox64_170, 0, ret_val_NaNBox64_170);
         InvokeNode* call_fget_flags_174;
         x86::Gp ret_val_fget_flags_174 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_174,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_174, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_174;
         setRet(call_fget_flags_174, 0, ret_val_fget_flags_174);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10483,7 +10489,7 @@ private:
         InvokeNode* call_unbox_d_177;
         auto unbox_d_177_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_177 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_177,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_177, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_178;
         x86::Gp ret_val_get_rm_178 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_178, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10491,7 +10497,7 @@ private:
         auto fsqrt_d_176_arg0 = ret_val_unbox_d_177;
         auto fsqrt_d_176_arg1 = ret_val_get_rm_178;
         x86::Gp ret_val_fsqrt_d_176 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fsqrt_d_176,  &fsqrt_d, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fsqrt_d_176, &fsqrt_d, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_175;
         auto NaNBox64_175_arg0 = ret_val_fsqrt_d_176;
         x86::Gp ret_val_NaNBox64_175 = get_reg_Gp(cc, 64, false);
@@ -10512,7 +10518,7 @@ private:
         setRet(call_NaNBox64_175, 0, ret_val_NaNBox64_175);
         InvokeNode* call_fget_flags_179;
         x86::Gp ret_val_fget_flags_179 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_179,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_179, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_179;
         setRet(call_fget_flags_179, 0, ret_val_fget_flags_179);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10560,15 +10566,15 @@ private:
         InvokeNode* call_unbox_d_182;
         auto unbox_d_182_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_182 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_182,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_182, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_183;
         auto unbox_d_183_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_183 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_183,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_183, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_184;
         auto unbox_d_184_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_d_184 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_184,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_184, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_185;
         x86::Gp ret_val_get_rm_185 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_185, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10578,7 +10584,7 @@ private:
         auto fmadd_d_181_arg2 = ret_val_unbox_d_184;
         auto fmadd_d_181_arg4 = ret_val_get_rm_185;
         x86::Gp ret_val_fmadd_d_181 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fmadd_d_181,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fmadd_d_181, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_180;
         auto NaNBox64_180_arg0 = ret_val_fmadd_d_181;
         x86::Gp ret_val_NaNBox64_180 = get_reg_Gp(cc, 64, false);
@@ -10608,7 +10614,7 @@ private:
         setRet(call_NaNBox64_180, 0, ret_val_NaNBox64_180);
         InvokeNode* call_fget_flags_186;
         x86::Gp ret_val_fget_flags_186 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_186,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_186, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_186;
         setRet(call_fget_flags_186, 0, ret_val_fget_flags_186);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10656,15 +10662,15 @@ private:
         InvokeNode* call_unbox_d_189;
         auto unbox_d_189_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_189 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_189,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_189, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_190;
         auto unbox_d_190_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_190 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_190,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_190, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_191;
         auto unbox_d_191_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_d_191 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_191,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_191, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_192;
         x86::Gp ret_val_get_rm_192 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_192, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10674,7 +10680,7 @@ private:
         auto fmadd_d_188_arg2 = ret_val_unbox_d_191;
         auto fmadd_d_188_arg4 = ret_val_get_rm_192;
         x86::Gp ret_val_fmadd_d_188 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fmadd_d_188,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fmadd_d_188, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_187;
         auto NaNBox64_187_arg0 = ret_val_fmadd_d_188;
         x86::Gp ret_val_NaNBox64_187 = get_reg_Gp(cc, 64, false);
@@ -10705,7 +10711,7 @@ private:
               res);
         InvokeNode* call_fget_flags_193;
         x86::Gp ret_val_fget_flags_193 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_193,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_193, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_193;
         setRet(call_fget_flags_193, 0, ret_val_fget_flags_193);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10753,15 +10759,15 @@ private:
         InvokeNode* call_unbox_d_196;
         auto unbox_d_196_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_196 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_196,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_196, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_197;
         auto unbox_d_197_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_197 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_197,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_197, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_198;
         auto unbox_d_198_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_d_198 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_198,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_198, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_199;
         x86::Gp ret_val_get_rm_199 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_199, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10771,7 +10777,7 @@ private:
         auto fmadd_d_195_arg2 = ret_val_unbox_d_198;
         auto fmadd_d_195_arg4 = ret_val_get_rm_199;
         x86::Gp ret_val_fmadd_d_195 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fmadd_d_195,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fmadd_d_195, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_194;
         auto NaNBox64_194_arg0 = ret_val_fmadd_d_195;
         x86::Gp ret_val_NaNBox64_194 = get_reg_Gp(cc, 64, false);
@@ -10801,7 +10807,7 @@ private:
         setRet(call_NaNBox64_194, 0, ret_val_NaNBox64_194);
         InvokeNode* call_fget_flags_200;
         x86::Gp ret_val_fget_flags_200 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_200,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_200, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_200;
         setRet(call_fget_flags_200, 0, ret_val_fget_flags_200);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10849,15 +10855,15 @@ private:
         InvokeNode* call_unbox_d_203;
         auto unbox_d_203_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_203 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_203,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_203, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_204;
         auto unbox_d_204_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_204 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_204,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_204, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_205;
         auto unbox_d_205_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs3);
         x86::Gp ret_val_unbox_d_205 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_205,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_205, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_206;
         x86::Gp ret_val_get_rm_206 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_206, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10867,7 +10873,7 @@ private:
         auto fmadd_d_202_arg2 = ret_val_unbox_d_205;
         auto fmadd_d_202_arg4 = ret_val_get_rm_206;
         x86::Gp ret_val_fmadd_d_202 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_fmadd_d_202,  &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
+        cc.invoke(&call_fmadd_d_202, &fmadd_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox64_201;
         auto NaNBox64_201_arg0 = ret_val_fmadd_d_202;
         x86::Gp ret_val_NaNBox64_201 = get_reg_Gp(cc, 64, false);
@@ -10897,7 +10903,7 @@ private:
         setRet(call_NaNBox64_201, 0, ret_val_NaNBox64_201);
         InvokeNode* call_fget_flags_207;
         x86::Gp ret_val_fget_flags_207 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_207,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_207, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_207;
         setRet(call_fget_flags_207, 0, ret_val_fget_flags_207);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -10947,7 +10953,7 @@ private:
             InvokeNode* call_unbox_d_209;
             auto unbox_d_209_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_209 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_209,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_209, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_210;
             x86::Gp ret_val_get_rm_210 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_210, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -10955,7 +10961,7 @@ private:
             auto f64toi32_208_arg0 = ret_val_unbox_d_209;
             auto f64toi32_208_arg1 = ret_val_get_rm_210;
             x86::Gp ret_val_f64toi32_208 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_f64toi32_208,  &f64toi32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            cc.invoke(&call_f64toi32_208, &f64toi32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f64toi32_208, 32, false), 64, true);
@@ -10975,7 +10981,7 @@ private:
             }
             InvokeNode* call_fget_flags_211;
             x86::Gp ret_val_fget_flags_211 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_211,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_211, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_211;
             setRet(call_fget_flags_211, 0, ret_val_fget_flags_211);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11026,7 +11032,7 @@ private:
             InvokeNode* call_unbox_d_213;
             auto unbox_d_213_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_213 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_213,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_213, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_214;
             x86::Gp ret_val_get_rm_214 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_214, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -11034,7 +11040,7 @@ private:
             auto f64toui32_212_arg0 = ret_val_unbox_d_213;
             auto f64toui32_212_arg1 = ret_val_get_rm_214;
             x86::Gp ret_val_f64toui32_212 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_f64toui32_212,  &f64toui32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+            cc.invoke(&call_f64toui32_212, &f64toui32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f64toui32_212, 32, false), 64, true);
@@ -11054,7 +11060,7 @@ private:
             }
             InvokeNode* call_fget_flags_215;
             x86::Gp ret_val_fget_flags_215 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_215,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_215, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_215;
             setRet(call_fget_flags_215, 0, ret_val_fget_flags_215);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11105,7 +11111,7 @@ private:
             InvokeNode* call_unbox_d_217;
             auto unbox_d_217_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_217 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_217,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_217, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_218;
             x86::Gp ret_val_get_rm_218 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_218, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -11113,7 +11119,7 @@ private:
             auto f64toi64_216_arg0 = ret_val_unbox_d_217;
             auto f64toi64_216_arg1 = ret_val_get_rm_218;
             x86::Gp ret_val_f64toi64_216 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_f64toi64_216,  &f64toi64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+            cc.invoke(&call_f64toi64_216, &f64toi64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
             auto res = gen_ext(cc, 
                 gen_ext(cc, 
                     ret_val_f64toi64_216, 64, false), 64, true);
@@ -11133,7 +11139,7 @@ private:
             }
             InvokeNode* call_fget_flags_219;
             x86::Gp ret_val_fget_flags_219 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_219,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_219, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_219;
             setRet(call_fget_flags_219, 0, ret_val_fget_flags_219);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11184,7 +11190,7 @@ private:
             InvokeNode* call_unbox_d_221;
             auto unbox_d_221_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_221 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_221,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_221, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_get_rm_222;
             x86::Gp ret_val_get_rm_222 = get_reg_Gp(cc, 8, false);
             cc.invoke(&call_get_rm_222, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -11192,7 +11198,7 @@ private:
             auto f64toui64_220_arg0 = ret_val_unbox_d_221;
             auto f64toui64_220_arg1 = ret_val_get_rm_222;
             x86::Gp ret_val_f64toui64_220 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_f64toui64_220,  &f64toui64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+            cc.invoke(&call_f64toui64_220, &f64toui64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
             auto res = ret_val_f64toui64_220;
             setArg(call_unbox_d_221, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_d_221, 1, unbox_d_221_arg1);
@@ -11209,7 +11215,7 @@ private:
             }
             InvokeNode* call_fget_flags_223;
             x86::Gp ret_val_fget_flags_223 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_223,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_223, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_223;
             setRet(call_fget_flags_223, 0, ret_val_fget_flags_223);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11265,7 +11271,7 @@ private:
                 load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
             auto i32tof64_225_arg1 = ret_val_get_rm_226;
             x86::Gp ret_val_i32tof64_225 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_i32tof64_225,  &i32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            cc.invoke(&call_i32tof64_225, &i32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
             InvokeNode* call_NaNBox64_224;
             auto NaNBox64_224_arg0 = ret_val_i32tof64_225;
             x86::Gp ret_val_NaNBox64_224 = get_reg_Gp(cc, 64, false);
@@ -11283,7 +11289,7 @@ private:
             setRet(call_NaNBox64_224, 0, ret_val_NaNBox64_224);
             InvokeNode* call_fget_flags_227;
             x86::Gp ret_val_fget_flags_227 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_227,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_227, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_227;
             setRet(call_fget_flags_227, 0, ret_val_fget_flags_227);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11339,7 +11345,7 @@ private:
                 load_reg_from_mem_Gp(jh, traits::X0 + rs1), 32, false);
             auto ui32tof64_229_arg1 = ret_val_get_rm_230;
             x86::Gp ret_val_ui32tof64_229 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_ui32tof64_229,  &ui32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+            cc.invoke(&call_ui32tof64_229, &ui32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
             InvokeNode* call_NaNBox64_228;
             auto NaNBox64_228_arg0 = ret_val_ui32tof64_229;
             x86::Gp ret_val_NaNBox64_228 = get_reg_Gp(cc, 64, false);
@@ -11357,7 +11363,7 @@ private:
             setRet(call_NaNBox64_228, 0, ret_val_NaNBox64_228);
             InvokeNode* call_fget_flags_231;
             x86::Gp ret_val_fget_flags_231 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_231,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_231, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_231;
             setRet(call_fget_flags_231, 0, ret_val_fget_flags_231);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11412,7 +11418,7 @@ private:
             auto i64tof64_233_arg0 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto i64tof64_233_arg1 = ret_val_get_rm_234;
             x86::Gp ret_val_i64tof64_233 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_i64tof64_233,  &i64tof64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+            cc.invoke(&call_i64tof64_233, &i64tof64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
             InvokeNode* call_NaNBox64_232;
             auto NaNBox64_232_arg0 = ret_val_i64tof64_233;
             x86::Gp ret_val_NaNBox64_232 = get_reg_Gp(cc, 64, false);
@@ -11430,7 +11436,7 @@ private:
             setRet(call_NaNBox64_232, 0, ret_val_NaNBox64_232);
             InvokeNode* call_fget_flags_235;
             x86::Gp ret_val_fget_flags_235 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_235,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_235, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_235;
             setRet(call_fget_flags_235, 0, ret_val_fget_flags_235);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11485,7 +11491,7 @@ private:
             auto ui64tof64_237_arg0 = load_reg_from_mem_Gp(jh, traits::X0 + rs1);
             auto ui64tof64_237_arg1 = ret_val_get_rm_238;
             x86::Gp ret_val_ui64tof64_237 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_ui64tof64_237,  &ui64tof64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
+            cc.invoke(&call_ui64tof64_237, &ui64tof64, FuncSignature::build<uint64_t, uint64_t, uint8_t>());
             InvokeNode* call_NaNBox64_236;
             auto NaNBox64_236_arg0 = ret_val_ui64tof64_237;
             x86::Gp ret_val_NaNBox64_236 = get_reg_Gp(cc, 64, false);
@@ -11503,7 +11509,7 @@ private:
             setRet(call_NaNBox64_236, 0, ret_val_NaNBox64_236);
             InvokeNode* call_fget_flags_239;
             x86::Gp ret_val_fget_flags_239 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_239,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_239, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_239;
             setRet(call_fget_flags_239, 0, ret_val_fget_flags_239);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11550,7 +11556,7 @@ private:
         InvokeNode* call_unbox_d_242;
         auto unbox_d_242_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_242 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_242,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_242, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_243;
         x86::Gp ret_val_get_rm_243 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_243, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -11558,7 +11564,7 @@ private:
         auto f64tof32_241_arg0 = ret_val_unbox_d_242;
         auto f64tof32_241_arg1 = ret_val_get_rm_243;
         x86::Gp ret_val_f64tof32_241 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_f64tof32_241,  &f64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
+        cc.invoke(&call_f64tof32_241, &f64tof32, FuncSignature::build<uint32_t, uint64_t, uint8_t>());
         InvokeNode* call_NaNBox32_240;
         auto NaNBox32_240_arg0 = ret_val_f64tof32_241;
         x86::Gp ret_val_NaNBox32_240 = get_reg_Gp(cc, 64, false);
@@ -11579,7 +11585,7 @@ private:
         setRet(call_NaNBox32_240, 0, ret_val_NaNBox32_240);
         InvokeNode* call_fget_flags_244;
         x86::Gp ret_val_fget_flags_244 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_fget_flags_244,  &fget_flags, FuncSignature::build<uint32_t>());
+        cc.invoke(&call_fget_flags_244, &fget_flags, FuncSignature::build<uint32_t>());
         auto flags = ret_val_fget_flags_244;
         setRet(call_fget_flags_244, 0, ret_val_fget_flags_244);
         mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -11625,7 +11631,7 @@ private:
         InvokeNode* call_unbox_s_247;
         auto unbox_s_247_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_s_247 = get_reg_Gp(cc, 32, false);
-        cc.invoke(&call_unbox_s_247,  &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_s_247, &unbox_s, FuncSignature::build<uint32_t, uint32_t, uint64_t>());
         InvokeNode* call_get_rm_248;
         x86::Gp ret_val_get_rm_248 = get_reg_Gp(cc, 8, false);
         cc.invoke(&call_get_rm_248, (uintptr_t)&vm_impl::_get_rm, FuncSignature::build<uint8_t, uintptr_t, uint8_t>());
@@ -11633,7 +11639,7 @@ private:
         auto f32tof64_246_arg0 = ret_val_unbox_s_247;
         auto f32tof64_246_arg1 = ret_val_get_rm_248;
         x86::Gp ret_val_f32tof64_246 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_f32tof64_246,  &f32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
+        cc.invoke(&call_f32tof64_246, &f32tof64, FuncSignature::build<uint64_t, uint32_t, uint8_t>());
         InvokeNode* call_NaNBox64_245;
         auto NaNBox64_245_arg0 = ret_val_f32tof64_246;
         x86::Gp ret_val_NaNBox64_245 = get_reg_Gp(cc, 64, false);
@@ -11694,13 +11700,14 @@ private:
         InvokeNode* call_unbox_d_250;
         auto unbox_d_250_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_250 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_250,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_250, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_251;
         auto unbox_d_251_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_251 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_251,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_251, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox64_249;
-        auto NaNBox64_249_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_d_250, 63, 63-63+1), 64, false), 63), gen_ext(cc, gen_slice(cc, ret_val_unbox_d_251, 0, 62-0+1), 64, false));
+        auto NaNBox64_249_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_slice(cc, ret_val_unbox_d_250, (uint64_t)(63), (uint64_t)(63-63+1)), 64, false), (uint64_t)63), 
+                gen_ext(cc, gen_slice(cc, ret_val_unbox_d_251, (uint64_t)(0), (uint64_t)(62-0+1)), 64, false));
         x86::Gp ret_val_NaNBox64_249 = get_reg_Gp(cc, 64, false);
         cc.invoke(&call_NaNBox64_249, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
@@ -11756,13 +11763,14 @@ private:
         InvokeNode* call_unbox_d_253;
         auto unbox_d_253_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_253 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_253,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_253, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_254;
         auto unbox_d_254_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_254 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_254,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_254, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox64_252;
-        auto NaNBox64_252_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_d_253, 63, 63-63+1)), 64, false), 63), gen_ext(cc, gen_slice(cc, ret_val_unbox_d_254, 0, 62-0+1), 64, false));
+        auto NaNBox64_252_arg0 = gen_operation(cc, bor, gen_operation(cc, shl, gen_ext(cc, gen_operation( cc, band, gen_operation(cc, bnot, gen_slice(cc, ret_val_unbox_d_253, (uint64_t)(63), (uint64_t)(63-63+1))), (uint8_t)((1ULL<<1)-1)), 64, false), (uint64_t)63), 
+                gen_ext(cc, gen_slice(cc, ret_val_unbox_d_254, (uint64_t)(0), (uint64_t)(62-0+1)), 64, false));
         x86::Gp ret_val_NaNBox64_252 = get_reg_Gp(cc, 64, false);
         cc.invoke(&call_NaNBox64_252, (uintptr_t)&vm_impl::_NaNBox64, FuncSignature::build<uint64_t, uintptr_t, uint64_t>());
         mov(cc, get_ptr_for(jh, traits::F0+ rd),
@@ -11818,11 +11826,11 @@ private:
         InvokeNode* call_unbox_d_256;
         auto unbox_d_256_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
         x86::Gp ret_val_unbox_d_256 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_256,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_256, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_unbox_d_257;
         auto unbox_d_257_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
         x86::Gp ret_val_unbox_d_257 = get_reg_Gp(cc, 64, false);
-        cc.invoke(&call_unbox_d_257,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+        cc.invoke(&call_unbox_d_257, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
         InvokeNode* call_NaNBox64_255;
         auto NaNBox64_255_arg0 = gen_operation(cc, bxor, (gen_operation(cc, band, ret_val_unbox_d_256, ((uint64_t)1<<63))), ret_val_unbox_d_257);
         x86::Gp ret_val_NaNBox64_255 = get_reg_Gp(cc, 64, false);
@@ -11987,16 +11995,16 @@ private:
             InvokeNode* call_unbox_d_260;
             auto unbox_d_260_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_260 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_260,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_260, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_d_261;
             auto unbox_d_261_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_d_261 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_261,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_261, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_d_259;
             auto fcmp_d_259_arg0 = ret_val_unbox_d_260;
             auto fcmp_d_259_arg1 = ret_val_unbox_d_261;
             x86::Gp ret_val_fcmp_d_259 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_fcmp_d_259,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            cc.invoke(&call_fcmp_d_259, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
             auto res = ret_val_fcmp_d_259;
             setArg(call_unbox_d_260, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_d_260, 1, unbox_d_260_arg1);
@@ -12015,7 +12023,7 @@ private:
             }
             InvokeNode* call_fget_flags_262;
             x86::Gp ret_val_fget_flags_262 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_262,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_262, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_262;
             setRet(call_fget_flags_262, 0, ret_val_fget_flags_262);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -12066,16 +12074,16 @@ private:
             InvokeNode* call_unbox_d_264;
             auto unbox_d_264_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_264 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_264,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_264, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_d_265;
             auto unbox_d_265_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_d_265 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_265,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_265, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_d_263;
             auto fcmp_d_263_arg0 = ret_val_unbox_d_264;
             auto fcmp_d_263_arg1 = ret_val_unbox_d_265;
             x86::Gp ret_val_fcmp_d_263 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_fcmp_d_263,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            cc.invoke(&call_fcmp_d_263, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
             auto res = ret_val_fcmp_d_263;
             setArg(call_unbox_d_264, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_d_264, 1, unbox_d_264_arg1);
@@ -12094,7 +12102,7 @@ private:
             }
             InvokeNode* call_fget_flags_266;
             x86::Gp ret_val_fget_flags_266 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_266,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_266, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_266;
             setRet(call_fget_flags_266, 0, ret_val_fget_flags_266);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -12145,16 +12153,16 @@ private:
             InvokeNode* call_unbox_d_268;
             auto unbox_d_268_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_268 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_268,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_268, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_unbox_d_269;
             auto unbox_d_269_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs2);
             x86::Gp ret_val_unbox_d_269 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_269,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_269, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_fcmp_d_267;
             auto fcmp_d_267_arg0 = ret_val_unbox_d_268;
             auto fcmp_d_267_arg1 = ret_val_unbox_d_269;
             x86::Gp ret_val_fcmp_d_267 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_fcmp_d_267,  &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
+            cc.invoke(&call_fcmp_d_267, &fcmp_d, FuncSignature::build<uint64_t, uint64_t, uint64_t, uint32_t>());
             auto res = ret_val_fcmp_d_267;
             setArg(call_unbox_d_268, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_d_268, 1, unbox_d_268_arg1);
@@ -12173,7 +12181,7 @@ private:
             }
             InvokeNode* call_fget_flags_270;
             x86::Gp ret_val_fget_flags_270 = get_reg_Gp(cc, 32, false);
-            cc.invoke(&call_fget_flags_270,  &fget_flags, FuncSignature::build<uint32_t>());
+            cc.invoke(&call_fget_flags_270, &fget_flags, FuncSignature::build<uint32_t>());
             auto flags = ret_val_fget_flags_270;
             setRet(call_fget_flags_270, 0, ret_val_fget_flags_270);
             mov(cc, load_reg_from_mem(jh, traits::FCSR), gen_operation(cc, bor, (gen_operation(cc, band, load_reg_from_mem(jh, traits::FCSR), ~ static_cast<uint32_t>(traits::FFLAG_MASK))), (gen_operation(cc, band, flags, static_cast<uint32_t>(traits::FFLAG_MASK)))));
@@ -12223,11 +12231,11 @@ private:
             InvokeNode* call_unbox_d_272;
             auto unbox_d_272_arg1 = load_reg_from_mem_Gp(jh, traits::F0 + rs1);
             x86::Gp ret_val_unbox_d_272 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_unbox_d_272,  &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
+            cc.invoke(&call_unbox_d_272, &unbox_d, FuncSignature::build<uint64_t, uint32_t, uint64_t>());
             InvokeNode* call_fclass_d_271;
             auto fclass_d_271_arg0 = ret_val_unbox_d_272;
             x86::Gp ret_val_fclass_d_271 = get_reg_Gp(cc, 64, false);
-            cc.invoke(&call_fclass_d_271,  &fclass_d, FuncSignature::build<uint64_t, uint64_t>());
+            cc.invoke(&call_fclass_d_271, &fclass_d, FuncSignature::build<uint64_t, uint64_t>());
             auto res = ret_val_fclass_d_271;
             setArg(call_unbox_d_272, 0, static_cast<uint32_t>(traits::FLEN));
             setArg(call_unbox_d_272, 1, unbox_d_272_arg1);
@@ -12581,6 +12589,7 @@ void vm_impl<ARCH>::gen_instr_prologue(jit_holder& jh) {
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     mov(cc, get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
     cc.comment("//Instruction prologue end");
 
 }
@@ -12589,7 +12598,6 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//Instruction epilogue begin");
-    cc.inc(get_ptr_for(jh, traits::CYCLE));
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     cmp(cc, current_trap_state, 0);
@@ -12644,6 +12652,13 @@ inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t 
     cc.jmp(jh.trap_entry);
 }
 template <typename ARCH>
+inline void vm_impl<ARCH>::gen_lower(jit_holder& jh) {
+    auto& cc = jh.cc;
+    auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, tmp1, 0);
+    mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
+}
+template <typename ARCH>
 template <typename T, typename>
 void vm_impl<ARCH>::gen_set_tval(jit_holder& jh, T new_tval) {
         mov(jh.cc, jh.globals[TVAL], new_tval);
@@ -12672,8 +12687,8 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {

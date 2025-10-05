@@ -39,12 +39,12 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
+#include <memory>
 #include <sstream>
 #include <tlm/scc/tlm_signal_gp.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
-#include "core_facade.h"
 #include <scc/report.h>
 #include <util/ities.h>
 #include <array>
@@ -91,7 +91,9 @@ iss::debugger::encoder_decoder encdec;
 std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
 } // namespace
 
-int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func df, debugger::target_adapter_if* tgt_adapter) {
+template <unsigned int BUSWIDTH>
+int core_complex<BUSWIDTH>::cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func df,
+                                     debugger::target_adapter_if* tgt_adapter) {
     if(argc > 1) {
         if(strcasecmp(argv[1], "print_time") == 0) {
             std::string t = sc_time_stamp().to_string();
@@ -120,86 +122,65 @@ int cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func 
     return Err;
 }
 
-using cpu_ptr = std::unique_ptr<iss::arch_if>;
-using vm_ptr = std::unique_ptr<iss::vm_if>;
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::reset(uint64_t addr) { vm->reset(addr); }
+template <unsigned int BUSWIDTH> inline void core_complex<BUSWIDTH>::start(bool dump) {
+    vm->start(std::numeric_limits<uint64_t>::max(), dump);
+}
+template <unsigned int BUSWIDTH> inline std::pair<uint64_t, bool> core_complex<BUSWIDTH>::load_file(std::string const& name) {
+    iss::arch_if* cc = vm->get_arch();
+    return cc->load_file(name);
+};
 
-class core_wrapper {
-public:
-    core_wrapper(core_complex_if* owner)
-    : owner(owner) {}
-
-    void reset(uint64_t addr) { vm->reset(addr); }
-    inline void start(bool dump = false) { vm->start(std::numeric_limits<uint64_t>::max(), dump); }
-    inline std::pair<uint64_t, bool> load_file(std::string const& name) {
-        iss::arch_if* cc = core->get_arch_if();
-        return cc->load_file(name);
-    };
-
-    void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
-        auto& f = sysc::iss_factory::instance();
-        if(type.size() == 0 || type == "?") {
-            std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
-            for(auto& e : f.get_names()) {
-                auto p = e.find(':');
-                assert(p != std::string::npos);
-                core_by_backend[e.substr(p + 1)].push_back(e.substr(0, p));
-            }
-            std::ostringstream os;
-            os << "Available implementations\n";
-            os << "=========================\n";
-            for(auto& e : core_by_backend) {
-                std::sort(std::begin(e.second), std::end(e.second));
-                if(os.str().size())
-                    os << "\n";
-                os << "  backend " << e.first << ":\n  - " << util::join(e.second, "\n  - ");
-            }
-            SCCINFO(owner->hier_name()) << "\n" << os.str();
-            sc_core::sc_stop();
-        } else if(type.find(':') == std::string::npos) {
-            std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, owner);
-        } else {
-            auto base_isa = type.substr(0, 5);
-            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                std::tie(core, vm) = f.create(type + "_clic_pmp:" + backend, gdb_port, owner);
-            } else {
-                std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, owner);
-            }
+template <unsigned int BUSWIDTH>
+void core_complex<BUSWIDTH>::create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
+    auto& f = sysc::iss_factory::instance();
+    if(type.size() == 0 || type == "?") {
+        std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
+        for(auto& e : f.get_names()) {
+            auto p = e.find(':');
+            assert(p != std::string::npos);
+            core_by_backend[e.substr(p + 1)].push_back(e.substr(0, p));
         }
-        if(!core) {
-            if(type != "?")
-                SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
-        } else if(!vm) {
-            if(type != "?")
-                SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
+        std::ostringstream os;
+        os << "Available implementations\n";
+        os << "=========================\n";
+        for(auto& e : core_by_backend) {
+            std::sort(std::begin(e.second), std::end(e.second));
+            if(os.str().size())
+                os << "\n";
+            os << "  backend " << e.first << ":\n  - " << util::join(e.second, "\n  - ");
+        }
+        SCCINFO(SCMOD) << "\n" << os.str();
+        sc_core::sc_stop();
+    } else if(type.find(':') == std::string::npos) {
+        std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, this);
+    } else {
+        auto base_isa = type.substr(0, 5);
+        if(base_isa == "tgc5d" || base_isa == "tgc5e") {
+            std::tie(core, vm) = f.create(type + "_clic_pmp:" + backend, gdb_port, this);
         } else {
-            core->set_hartid(hart_id);
-            auto* srv = debugger::server<debugger::gdb_session>::get();
-            if(srv)
-                tgt_adapter = srv->get_target(0); // FIXME: add core_id
-            if(tgt_adapter)
-                tgt_adapter->add_custom_command({"sysc",
-                                                 [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
-                                                     return cmd_sysc(argc, argv, of, df, tgt_adapter);
-                                                 },
-                                                 "SystemC sub-commands: break <time>, print_time"});
+            std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, this);
         }
     }
-
-    core_complex_if* const owner;
-    vm_ptr vm{nullptr};
-    core_ptr core{nullptr};
-    iss::debugger::target_adapter_if* tgt_adapter{nullptr};
-};
-
-struct core_trace {
-    //! transaction recording database
-    scv_tr_db* m_db{nullptr};
-    //! blocking transaction recording stream handle
-    scv_tr_stream* stream_handle{nullptr};
-    //! transaction generator handle for blocking transactions
-    scv_tr_generator<_scv_tr_generator_default_data, _scv_tr_generator_default_data>* instr_tr_handle{nullptr};
-    scv_tr_handle tr_handle;
-};
+    if(!core) {
+        if(type != "?")
+            SCCFATAL() << "Could not create cpu for isa " << type << " and backend " << backend;
+    } else if(!vm) {
+        if(type != "?")
+            SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
+    } else {
+        core->set_hartid(hart_id);
+        auto* srv = debugger::server<debugger::gdb_session>::get();
+        if(srv)
+            tgt_adapter = srv->get_target(0); // FIXME: add core_id
+        if(tgt_adapter)
+            tgt_adapter->add_custom_command({"sysc",
+                                             [this](int argc, char* argv[], debugger::out_func of, debugger::data_func df) -> int {
+                                                 return cmd_sysc(argc, argv, of, df, tgt_adapter);
+                                             },
+                                             "SystemC sub-commands: break <time>, print_time"});
+    }
+}
 
 #ifndef CWR_SYSTEMC
 template <unsigned int BUSWIDTH>
@@ -213,7 +194,6 @@ core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
 #endif
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
-    trc = new core_trace();
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
@@ -264,7 +244,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
     for(auto pin : local_irq_i)
         sensitive << pin;
 #endif
-    trc->m_db = scv_tr_db::get_default_db();
+    trc.m_db = scv_tr_db::get_default_db();
 
     SC_METHOD(forward);
 #ifndef CWR_SYSTEMC
@@ -278,8 +258,6 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 }
 
 template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
-    delete core_holder;
-    delete trc;
     for(auto* p : plugin_list)
         delete p;
 }
@@ -290,20 +268,19 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     auto& type = GET_PROP_VALUE(core_type);
     SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
-    core_holder = new core_wrapper(this);
-    core_holder->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
     if(type == "?")
         return;
 #ifndef CWR_SYSTEMC
     if(!local_irq_num.is_default_value()) {
-        core_holder->core->set_irq_count(16 + local_irq_num);
+        core->set_irq_count(16 + local_irq_num);
     }
 #endif
-    sc_assert(core->vm != nullptr);
+    sc_assert(vm);
     auto disass = GET_PROP_VALUE(enable_disass);
-    if(disass && trc->m_db)
+    if(disass && trc.m_db)
         SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
-    core_holder->vm->setDisassEnabled(disass || trc->m_db != nullptr);
+    vm->setDisassEnabled(disass || trc.m_db != nullptr);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -316,11 +293,11 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
             }
             if(plugin_name == "ic") {
                 auto* plugin = new iss::plugin::instruction_count(filename);
-                core_holder->vm->register_plugin(*plugin);
+                vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else if(plugin_name == "ce") {
                 auto* plugin = new iss::plugin::cycle_estimate(filename);
-                core_holder->vm->register_plugin(*plugin);
+                vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else {
 #ifndef WIN32
@@ -328,7 +305,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
                 iss::plugin::loader l(plugin_name, {{"initPlugin"}});
                 auto* plugin = l.call_function<iss::vm_plugin*>("initPlugin", a.size(), a.data());
                 if(plugin) {
-                    core_holder->vm->register_plugin(*plugin);
+                    vm->register_plugin(*plugin);
                     plugin_list.push_back(plugin);
                 } else
 #endif
@@ -343,7 +320,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
-            std::pair<uint64_t, bool> load_result = core_holder->load_file(s);
+            std::pair<uint64_t, bool> load_result = load_file(s);
             if(!std::get<1>(load_result)) {
                 SCCWARN(SCMOD) << "Could not load FW file " << s;
             } else {
@@ -357,24 +334,24 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
             }
         }
     }
-    if(trc->m_db != nullptr && trc->stream_handle == nullptr) {
+    if(trc.m_db != nullptr && trc.stream_handle == nullptr) {
         string basename(this->name());
-        trc->stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", trc->m_db);
-        trc->instr_tr_handle = new scv_tr_generator<>("execute", *trc->stream_handle);
+        trc.stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", trc.m_db);
+        trc.instr_tr_handle = new scv_tr_generator<>("execute", *trc.stream_handle);
     }
 }
 
 template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
-    if(trc->m_db == nullptr)
+    if(trc.m_db == nullptr)
         return false;
-    if(trc->tr_handle.is_active())
-        trc->tr_handle.end_transaction();
-    trc->tr_handle = trc->instr_tr_handle->begin_transaction();
-    trc->tr_handle.record_attribute("PC", pc);
-    trc->tr_handle.record_attribute("INSTR", instr_str);
-    trc->tr_handle.record_attribute("MODE", lvl[core_holder->core->get_mode()]);
-    trc->tr_handle.record_attribute("MSTATUS", core_holder->core->get_state());
-    trc->tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
+    if(trc.tr_handle.is_active())
+        trc.tr_handle.end_transaction();
+    trc.tr_handle = trc.instr_tr_handle->begin_transaction();
+    trc.tr_handle.record_attribute("PC", pc);
+    trc.tr_handle.record_attribute("INSTR", instr_str);
+    trc.tr_handle.record_attribute("MODE", lvl[core->get_mode()]);
+    trc.tr_handle.record_attribute("MSTATUS", core->get_state());
+    trc.tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
     return true;
 }
 
@@ -390,25 +367,25 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
-        core_holder->core->set_interrupt_execution(true);
+        core->set_interrupt_execution(true);
 }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
     if(rst_i.read())
-        core_holder->core->set_interrupt_execution(true);
+        core->set_interrupt_execution(true);
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core_holder->core->local_irq(3, sw_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core->local_irq(3, sw_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core_holder->core->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core->local_irq(7, timer_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core_holder->core->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core->local_irq(11, ext_irq_i.read()); }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
-            core_holder->core->local_irq(16 + i, local_irq_i[i].read());
+            core->local_irq(16 + i, local_irq_i[i].read());
         }
     }
 }
@@ -419,16 +396,16 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     do {
         wait(SC_ZERO_TIME);
         if(rst_i.read()) {
-            core_holder->reset(GET_PROP_VALUE(reset_address));
+            reset(GET_PROP_VALUE(reset_address));
             wait(rst_i.negedge_event());
         }
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
         }
         quantum_keeper.reset();
-        core_holder->core->set_interrupt_execution(false);
-        core_holder->start(dump_ir);
-    } while(!core_holder->core->get_interrupt_execution());
+        core->set_interrupt_execution(false);
+        start(dump_ir);
+    } while(!core->get_interrupt_execution());
     sc_stop();
 }
 
@@ -452,11 +429,11 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc->m_db != nullptr && trc->tr_handle.is_valid()) {
-            if(is_fetch && trc->tr_handle.is_active()) {
-                trc->tr_handle.end_transaction();
+        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
+            if(is_fetch && trc.tr_handle.is_active()) {
+                trc.tr_handle.end_transaction();
             }
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc->tr_handle, this);
+            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
             gp.set_extension(preExt);
         }
         auto pre_delay = delay;
@@ -507,8 +484,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc->m_db != nullptr && trc->tr_handle.is_valid()) {
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc->tr_handle, this);
+        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
+            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
             gp.set_extension(preExt);
         }
         auto pre_delay = delay;

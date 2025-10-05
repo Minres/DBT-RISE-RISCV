@@ -29,6 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
+ 
 // clang-format off
 #include <iss/arch/rv32imac.h>
 #include <iss/debugger/gdb_session.h>
@@ -38,6 +39,7 @@
 #include <asmjit/asmjit.h>
 #include <util/logging.h>
 #include <iss/instruction_decoder.h>
+
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -65,9 +67,8 @@ template <> struct is_unsigned<uint128_t> { static constexpr bool value = true; 
 
 namespace iss {
 namespace asmjit {
+namespace rv32imac{
 
-
-namespace rv32imac {
 using namespace ::asmjit;
 using namespace iss::arch;
 using namespace iss::debugger;
@@ -81,6 +82,7 @@ public:
     using code_word_t = typename super::code_word_t;
     using mem_type_e = typename super::mem_type_e;
     using addr_t = typename super::addr_t;
+
 
     vm_impl();
 
@@ -119,6 +121,7 @@ protected:
     void gen_instr_prologue(jit_holder& jh);
     void gen_instr_epilogue(jit_holder& jh);
     inline void gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t cause);
+    inline void gen_lower(jit_holder& jh);
     template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type> void gen_set_tval(jit_holder& jh, T new_tval) ;
     void gen_set_tval(jit_holder& jh, x86_reg_t _new_tval) ;
 
@@ -2513,7 +2516,7 @@ private:
         gen_instr_prologue(jh);
         /*generate behavior*/
         InvokeNode* call_wait_5;
-        cc.invoke(&call_wait_5,  &wait, FuncSignature::build<void, uint32_t>());
+        cc.invoke(&call_wait_5, &wait, FuncSignature::build<void, uint32_t>());
         setArg(call_wait_5, 0, 1);
         auto returnValue = CONT;
         
@@ -5448,6 +5451,7 @@ void vm_impl<ARCH>::gen_instr_prologue(jit_holder& jh) {
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     mov(cc, get_ptr_for(jh, traits::PENDING_TRAP), current_trap_state);
+    cc.inc(get_ptr_for(jh, traits::CYCLE));
     cc.comment("//Instruction prologue end");
 
 }
@@ -5456,7 +5460,6 @@ void vm_impl<ARCH>::gen_instr_epilogue(jit_holder& jh) {
     auto& cc = jh.cc;
 
     cc.comment("//Instruction epilogue begin");
-    cc.inc(get_ptr_for(jh, traits::CYCLE));
     x86_reg_t current_trap_state = get_reg_for(cc, traits::TRAP_STATE);
     mov(cc, current_trap_state, get_ptr_for(jh, traits::TRAP_STATE));
     cmp(cc, current_trap_state, 0);
@@ -5509,6 +5512,13 @@ inline void vm_impl<ARCH>::gen_raise(jit_holder& jh, uint16_t trap_id, uint16_t 
     mov(cc, tmp1, 0x80ULL << 24 | (cause << 16) | trap_id);
     mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
     cc.jmp(jh.trap_entry);
+}
+template <typename ARCH>
+inline void vm_impl<ARCH>::gen_lower(jit_holder& jh) {
+    auto& cc = jh.cc;
+    auto tmp1 = get_reg_for(cc, traits::TRAP_STATE);
+    mov(cc, tmp1, 0);
+    mov(cc, get_ptr_for(jh, traits::TRAP_STATE), tmp1);
 }
 template <typename ARCH>
 template <typename T, typename>

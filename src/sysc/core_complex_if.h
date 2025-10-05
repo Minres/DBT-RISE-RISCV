@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2021 MINRES Technologies GmbH
+ * Copyright (C) 2017-2021 MINRES Technologies GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,62 +30,37 @@
  *
  *******************************************************************************/
 
-#ifndef _ISS_FACTORY_H_
-#define _ISS_FACTORY_H_
+#ifndef _SYSC_CORE_COMPLEX__IF_H_
+#define _SYSC_CORE_COMPLEX__IF_H_
 
-#include "core_complex_if.h"
-#include "sc2core_if.h"
-#include <algorithm>
-#include <functional>
-#include <iss/iss.h>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include <scc/signal_opt_ports.h>
 
 namespace sysc {
+namespace riscv {
+struct core_complex_if {
 
-using core_ptr = std::unique_ptr<sc2core_if>;
-using vm_ptr = std::unique_ptr<iss::vm_if>;
+    virtual ~core_complex_if() = default;
 
-class iss_factory {
-public:
-    using base_t = std::tuple<core_ptr, vm_ptr>;
-    using create_fn = std::function<base_t(unsigned, sysc::riscv::core_complex_if*)>;
-    using registry_t = std::unordered_map<std::string, create_fn>;
+    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) = 0;
 
-    iss_factory() = default;
-    iss_factory(const iss_factory&) = delete;
-    iss_factory& operator=(const iss_factory&) = delete;
+    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    static iss_factory& instance() {
-        static iss_factory bf;
-        return bf;
-    }
+    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) = 0;
 
-    bool register_creator(const std::string& className, create_fn const& fn) {
-        registry[className] = fn;
-        return true;
-    }
+    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    base_t create(std::string const& className, unsigned gdb_port = 0, sysc::riscv::core_complex_if* init_data = nullptr) const {
-        registry_t::const_iterator regEntry = registry.find(className);
-        if(regEntry != registry.end())
-            return regEntry->second(gdb_port, init_data);
-        return {nullptr, nullptr};
-    }
+    virtual bool disass_output(uint64_t pc, const std::string instr) = 0;
 
-    std::vector<std::string> get_names() {
-        std::vector<std::string> keys{registry.size()};
-        std::transform(std::begin(registry), std::end(registry), std::begin(keys),
-                       [](std::pair<std::string, create_fn> const& p) { return p.first; });
-        return keys;
-    }
+    virtual unsigned get_last_bus_cycles() = 0;
 
-private:
-    registry_t registry;
+    //! Allow quantum keeper handling
+    virtual void sync(uint64_t) = 0;
+
+    virtual char const* hier_name() = 0;
+
+    scc::sc_in_opt<uint64_t> mtime_i{"mtime_i"};
 };
+} // namespace riscv
+} /* namespace sysc */
 
-} // namespace sysc
-
-#endif /* _ISS_FACTORY_H_ */
+#endif /* _SYSC_CORE_COMPLEX__IF_H_ */
