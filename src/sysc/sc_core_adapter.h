@@ -48,6 +48,7 @@ namespace sysc {
 template <typename PLAT> class sc_core_adapter : public PLAT, public core_facade {
 public:
     using this_class = sc_core_adapter<PLAT>;
+    using core = typename PLAT::core;
     using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
     using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
     sc_core_adapter(sysc::riscv::core_complex_if* owner)
@@ -64,23 +65,11 @@ public:
         this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution>(this);
         this->set_interrupt_execution = util::delegate<void(bool)>::from<this_class, &this_class::_set_interrupt_execution>(this);
         this->local_irq = util::delegate<void(short, bool)>::from<this_class, &this_class::_local_irq>(this);
+        this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd>(this);
+        this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr>(this);
     }
 
     virtual ~sc_core_adapter() {}
-
-    iss::arch_if* _get_arch_if() { return this; }
-
-    void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
-
-    void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
-
-    uint32_t _get_mode() { return this->reg.PRIV; }
-
-    void _set_interrupt_execution(bool v) { this->interrupt_sim = v ? 1 : 0; }
-
-    bool _get_interrupt_execution() { return this->interrupt_sim; }
-
-    uint64_t _get_state() { return this->state.mstatus.backing.val; }
 
     void notify_phase(iss::arch_if::exec_phase p) override {
         if(p == iss::arch_if::ISTART && !first) {
@@ -188,6 +177,21 @@ public:
         }
     }
 
+private:
+    iss::arch_if* _get_arch_if() { return this; }
+
+    void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
+
+    void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
+
+    uint32_t _get_mode() { return this->reg.PRIV; }
+
+    void _set_interrupt_execution(bool v) { this->interrupt_sim = v ? 1 : 0; }
+
+    bool _get_interrupt_execution() { return this->interrupt_sim; }
+
+    uint64_t _get_state() { return this->state.mstatus.backing.val; }
+
     void _local_irq(short id, bool value) {
         reg_t mask = 0;
         switch(id) {
@@ -215,7 +219,20 @@ public:
             SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
     }
 
-private:
+    void _register_csr_rd(unsigned addr, rd_csr_f cb) {
+        std::function<iss::status(unsigned addr, reg_t&)> lambda = [cb](unsigned addr, reg_t& r) -> iss::status {
+            uint64_t temp = r;
+            auto ret = cb(addr, temp);
+            r = temp;
+            return ret;
+        };
+        this->register_csr(addr, lambda);
+    }
+    void _register_csr_wr(unsigned addr, wr_csr_f cb) {
+        std::function<iss::status(unsigned addr, reg_t)> lambda = [cb](unsigned addr, reg_t r) -> iss::status { return cb(addr, r); };
+        this->register_csr(addr, lambda);
+    }
+
     sysc::riscv::core_complex_if* const owner{nullptr};
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;

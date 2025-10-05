@@ -53,6 +53,10 @@ struct core_facade {
     util::delegate<bool()> get_interrupt_execution;
     util::delegate<void(bool)> set_interrupt_execution;
     util::delegate<void(short, bool)> local_irq; // id, value
+    using rd_csr_f = std::function<iss::status(unsigned addr, uint64_t&)>;
+    using wr_csr_f = std::function<iss::status(unsigned addr, uint64_t)>;
+    util::delegate<void(unsigned, rd_csr_f)> register_csr_rd;
+    util::delegate<void(unsigned, wr_csr_f)> register_csr_wr;
 };
 } // namespace sysc
 #endif /* _SYSC_SC_CORE_ADAPTER_IF_H_ */
