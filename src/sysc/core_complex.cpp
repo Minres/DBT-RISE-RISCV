@@ -138,21 +138,22 @@ public:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
         auto& f = sysc::iss_factory::instance();
         if(type.size() == 0 || type == "?") {
-                        std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
-            for(auto& e: f.get_names()) {
+            std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
+            for(auto& e : f.get_names()) {
                 auto p = e.find(':');
-                assert(p!=std::string::npos);
-                core_by_backend[e.substr(p+1)].push_back(e.substr(0, p));
+                assert(p != std::string::npos);
+                core_by_backend[e.substr(p + 1)].push_back(e.substr(0, p));
             }
             std::ostringstream os;
             os << "Available implementations\n";
             os << "=========================\n";
-            for(auto& e:core_by_backend) {
+            for(auto& e : core_by_backend) {
                 std::sort(std::begin(e.second), std::end(e.second));
-                if(os.str().size()) os<<"\n";
-                os<<"  backend "<<e.first<<":\n  - "<< util::join(e.second, "\n  - ");
+                if(os.str().size())
+                    os << "\n";
+                os << "  backend " << e.first << ":\n  - " << util::join(e.second, "\n  - ");
             }
-            SCCINFO(owner->hier_name()) << "\n"<<os.str();
+            SCCINFO(owner->hier_name()) << "\n" << os.str();
             sc_core::sc_stop();
         } else if(type.find(':') == std::string::npos) {
             std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, owner);
@@ -277,7 +278,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 }
 
 template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
-    delete core;
+    delete core_holder;
     delete trc;
     for(auto* p : plugin_list)
         delete p;
@@ -289,21 +290,20 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     auto& type = GET_PROP_VALUE(core_type);
     SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
-    core = new core_wrapper(this);
-    core->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    core_holder = new core_wrapper(this);
+    core_holder->create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
     if(type == "?")
         return;
 #ifndef CWR_SYSTEMC
     if(!local_irq_num.is_default_value()) {
-        auto* sc_cpu_if = reinterpret_cast<core_facade*>(core->core.get());
-        sc_cpu_if->set_irq_count(16 + local_irq_num);
+        core_holder->core->set_irq_count(16 + local_irq_num);
     }
 #endif
     sc_assert(core->vm != nullptr);
     auto disass = GET_PROP_VALUE(enable_disass);
     if(disass && trc->m_db)
         SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
-    core->vm->setDisassEnabled(disass || trc->m_db != nullptr);
+    core_holder->vm->setDisassEnabled(disass || trc->m_db != nullptr);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -316,11 +316,11 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
             }
             if(plugin_name == "ic") {
                 auto* plugin = new iss::plugin::instruction_count(filename);
-                core->vm->register_plugin(*plugin);
+                core_holder->vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else if(plugin_name == "ce") {
                 auto* plugin = new iss::plugin::cycle_estimate(filename);
-                core->vm->register_plugin(*plugin);
+                core_holder->vm->register_plugin(*plugin);
                 plugin_list.push_back(plugin);
             } else {
 #ifndef WIN32
@@ -328,7 +328,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
                 iss::plugin::loader l(plugin_name, {{"initPlugin"}});
                 auto* plugin = l.call_function<iss::vm_plugin*>("initPlugin", a.size(), a.data());
                 if(plugin) {
-                    core->vm->register_plugin(*plugin);
+                    core_holder->vm->register_plugin(*plugin);
                     plugin_list.push_back(plugin);
                 } else
 #endif
@@ -343,7 +343,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
-            std::pair<uint64_t, bool> load_result = core->load_file(s);
+            std::pair<uint64_t, bool> load_result = core_holder->load_file(s);
             if(!std::get<1>(load_result)) {
                 SCCWARN(SCMOD) << "Could not load FW file " << s;
             } else {
@@ -372,8 +372,8 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint
     trc->tr_handle = trc->instr_tr_handle->begin_transaction();
     trc->tr_handle.record_attribute("PC", pc);
     trc->tr_handle.record_attribute("INSTR", instr_str);
-    trc->tr_handle.record_attribute("MODE", lvl[core->core->get_mode()]);
-    trc->tr_handle.record_attribute("MSTATUS", core->core->get_state());
+    trc->tr_handle.record_attribute("MODE", lvl[core_holder->core->get_mode()]);
+    trc->tr_handle.record_attribute("MSTATUS", core_holder->core->get_state());
     trc->tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
     return true;
 }
@@ -390,25 +390,25 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
-        core->core->set_interrupt_execution(true);
+        core_holder->core->set_interrupt_execution(true);
 }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
     if(rst_i.read())
-        core->core->set_interrupt_execution(true);
+        core_holder->core->set_interrupt_execution(true);
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core->core->local_irq(3, sw_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core_holder->core->local_irq(3, sw_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core->core->local_irq(7, timer_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core_holder->core->local_irq(7, timer_irq_i.read()); }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core->core->local_irq(11, ext_irq_i.read()); }
+template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core_holder->core->local_irq(11, ext_irq_i.read()); }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
     for(auto i = 0U; i < local_irq_i.size(); ++i) {
         if(local_irq_i[i].event()) {
-            core->core->local_irq(16 + i, local_irq_i[i].read());
+            core_holder->core->local_irq(16 + i, local_irq_i[i].read());
         }
     }
 }
@@ -419,16 +419,16 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
     do {
         wait(SC_ZERO_TIME);
         if(rst_i.read()) {
-            core->reset(GET_PROP_VALUE(reset_address));
+            core_holder->reset(GET_PROP_VALUE(reset_address));
             wait(rst_i.negedge_event());
         }
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
         }
         quantum_keeper.reset();
-        core->core->set_interrupt_execution(false);
-        core->start(dump_ir);
-    } while(!core->core->get_interrupt_execution());
+        core_holder->core->set_interrupt_execution(false);
+        core_holder->start(dump_ir);
+    } while(!core_holder->core->get_interrupt_execution());
     sc_stop();
 }
 

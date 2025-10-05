@@ -236,7 +236,7 @@ protected:
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
     tlm_utils::tlm_quantumkeeper quantum_keeper;
     std::vector<uint8_t> write_buf;
-    core_wrapper* core{nullptr};
+    core_wrapper* core_holder{nullptr};
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
     uint64_t ibus_inc{0}, dbus_inc{0};
     core_trace* trc{nullptr};
