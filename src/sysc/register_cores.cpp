@@ -50,86 +50,72 @@ namespace interp {
 using namespace sysc;
 volatile std::array<bool, 14> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32i_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_msu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = dynamic_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_msu_vp<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64i_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64i_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_msu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_msu_vp<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_m:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_mu:interp",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              })}; // namespace interp
@@ -139,26 +125,22 @@ namespace llvm {
 using namespace sysc;
 volatile std::array<bool, 4> riscv_init = {
     iss_factory::instance().register_creator("rv32imc_m:llvm",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imc_mu:llvm",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_m:llvm",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_mu:llvm",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              })};
@@ -169,86 +151,72 @@ namespace asmjit {
 using namespace sysc;
 volatile std::array<bool, 14> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32i_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_msu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_msu_vp<arch::rv32gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64i_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64i_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv64i>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv64gc_msu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_msu_vp<arch::rv64gc>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_m:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_mu:asmjit",
-                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* data) -> iss_factory::base_t {
-                                                 auto cc = reinterpret_cast<sysc::riscv::core_complex_if*>(data);
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::tgc5c>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::tgc5c*>(cpu), gdb_port)}};
                                              })};
