@@ -42,6 +42,7 @@
 
 #include <vm/vector_functions.h>
 
+
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
@@ -148,6 +149,10 @@ public:
     static constexpr auto& fp_vector_unary_w = softvec_if::fp_vector_unary_w<traits::VLEN>;
     static constexpr auto& fp_vector_unary_n = softvec_if::fp_vector_unary_n<traits::VLEN>;
     static constexpr auto& vector_unary_op = softvec_if::vector_unary_op<traits::VLEN>;
+    static constexpr auto& vector_vector_crypto = softvec_if::vector_vector_crypto<traits::VLEN>;
+    static constexpr auto& vector_scalar_crypto = softvec_if::vector_scalar_crypto<traits::VLEN>;
+    static constexpr auto& vector_imm_crypto = softvec_if::vector_imm_crypto<traits::VLEN>;
+    static constexpr auto& vector_crypto = softvec_if::vector_crypto<traits::VLEN>;
 
     vm_impl();
 
@@ -29797,8 +29802,8 @@ std::unique_ptr<vm_if> create<arch::rv32gcv>(arch::rv32gcv *core, unsigned short
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {

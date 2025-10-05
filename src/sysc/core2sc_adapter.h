@@ -32,32 +32,31 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
-#ifndef _SYSC_SC_CORE_ADAPTER_H_
-#define _SYSC_SC_CORE_ADAPTER_H_
+#ifndef _SYSC_CORE2SC_ADAPTER_H_
+#define _SYSC_CORE2SC_ADAPTER_H_
 
 #include "core_complex.h"
-#include "core_facade.h"
+#include "sc2core_if.h"
 #include <iostream>
+#include <iss/arch/riscv_hart_common.h>
 #include <iss/iss.h>
 #include <iss/mem/memory_if.h>
 #include <iss/vm_types.h>
 #include <scc/report.h>
 #include <util/ities.h>
-
 namespace sysc {
-template <typename PLAT> class sc_core_adapter : public PLAT, public core_facade {
+template <typename PLAT> class core2sc_adapter : public PLAT, public sc2core_if {
 public:
-    using this_class = sc_core_adapter<PLAT>;
+    using this_class = core2sc_adapter<PLAT>;
     using core = typename PLAT::core;
-    using reg_t = typename iss::arch::traits<typename PLAT::core>::reg_t;
-    using phys_addr_t = typename iss::arch::traits<typename PLAT::core>::phys_addr_t;
-    sc_core_adapter(sysc::riscv::core_complex_if* owner)
+    using reg_t = typename PLAT::reg_t;
+    using phys_addr_t = typename PLAT::phys_addr_t;
+    core2sc_adapter(sysc::riscv::core_complex_if* owner)
     : owner(owner) {
         this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
         if(sizeof(reg_t) == 4)
             this->csr_rd_cb[iss::arch::timeh] = MK_CSR_RD_CB(read_time);
         this->memories.replace_last(*this);
-        this->get_arch_if = util::delegate<iss::arch_if*()>::from<this_class, &this_class::_get_arch_if>(this);
         this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid>(this);
         this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num>(this);
         this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode>(this);
@@ -69,9 +68,9 @@ public:
         this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr>(this);
     }
 
-    virtual ~sc_core_adapter() {}
+    virtual ~core2sc_adapter() {}
 
-    void notify_phase(iss::arch_if::exec_phase p) override {
+    void notify_phase(iss::arch_if::exec_phase p) {
         if(p == iss::arch_if::ISTART && !first) {
             auto cycle_incr = owner->get_last_bus_cycles();
             if(cycle_incr > 1)
@@ -81,9 +80,9 @@ public:
         first = false;
     }
 
-    iss::sync_type needed_sync() const override { return iss::PRE_SYNC; }
+    iss::sync_type needed_sync() const { return iss::PRE_SYNC; }
 
-    void disass_output(uint64_t pc, const std::string instr) override {
+    void disass_output(uint64_t pc, const std::string instr) {
         static constexpr std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
         if(!owner->disass_output(pc, instr)) {
             std::stringstream s;
@@ -94,7 +93,7 @@ public:
         }
     };
 
-    iss::mem::memory_if get_mem_if() override {
+    iss::mem::memory_if get_mem_if() {
         return iss::mem::memory_if{.rd_mem{util::delegate<iss::mem::rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
                                    .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
     }
@@ -169,7 +168,7 @@ public:
         return iss::Ok;
     }
 
-    void wait_until(uint64_t flags) override {
+    void wait_until(uint64_t flags) {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         PLAT::wait_until(flags);
         while(this->reg.pending_trap == 0 && (this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
@@ -178,8 +177,6 @@ public:
     }
 
 private:
-    iss::arch_if* _get_arch_if() { return this; }
-
     void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
 
     void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
@@ -239,4 +236,4 @@ private:
     bool first{true};
 };
 } // namespace sysc
-#endif /* _SYSC_SC_CORE_ADAPTER_H_ */
+#endif /* _SYSC_CORE2SC_ADAPTER_H_ */

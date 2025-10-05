@@ -38,6 +38,7 @@
 #include <iss/iss.h>
 #include <iss/interp/vm_base.h>
 
+
 #include <util/logging.h>
 #include <boost/coroutine2/all.hpp>
 #include <functional>
@@ -58,6 +59,7 @@
 namespace iss {
 namespace interp {
 namespace rv64i {
+
 using namespace iss::arch;
 using namespace iss::debugger;
 using namespace std::placeholders;
@@ -77,7 +79,8 @@ public:
     using reg_t       = typename traits::reg_t;
     using mem_type_e  = typename traits::mem_type_e;
     using opcode_e    = typename traits::opcode_e;
-    
+
+
     vm_impl();
 
     vm_impl(ARCH &core, unsigned core_id = 0, unsigned cluster_id = 0);
@@ -119,7 +122,6 @@ protected:
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
-
     uint64_t fetch_count{0};
     uint64_t tval{0};
 
