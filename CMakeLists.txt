@@ -261,6 +261,7 @@ if(TARGET scc-sysc)
     project(dbt-rise-riscv_sc VERSION 1.0.0)
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
+        src/sysc/core_complex_mt.cpp
         src/sysc/register_cores.cpp
         src/sysc/register_rv32gcv.cpp
         src/sysc/register_rv64gcv.cpp
