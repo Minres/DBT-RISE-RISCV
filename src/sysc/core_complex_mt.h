@@ -196,7 +196,7 @@ protected:
     }
     uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
-    tlm::scc::quantumkeeper quantum_keeper;
+    tlm::scc::quantumkeeper_mt quantum_keeper;
     std::vector<uint8_t> write_buf;
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
     uint64_t ibus_inc{0}, dbus_inc{0};
