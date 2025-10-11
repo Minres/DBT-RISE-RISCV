@@ -410,19 +410,12 @@ bool core_complex_mt<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-            if(is_fetch && trc.tr_handle.is_active()) {
-                trc.tr_handle.end_transaction();
-            }
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-            gp.set_extension(preExt);
-        }
         auto pre_delay = delay;
-        exec_b_transport(gp, delay);
+        exec_b_transport(gp, delay, is_fetch);
         if(pre_delay > delay) {
             quantum_keeper.reset();
         } else {
-            auto incr = (delay - quantum_keeper.get_local_time()) / curr_clk;
+            auto incr = (delay - pre_delay) / curr_clk;
             if(is_fetch)
                 ibus_inc += incr;
             else

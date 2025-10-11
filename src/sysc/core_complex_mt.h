@@ -134,11 +134,7 @@ public:
 
     void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
-        quantum_keeper.inc(core_inc);
-        if(quantum_keeper.need_sync()) {
-            wait(quantum_keeper.get_local_time());
-            quantum_keeper.reset();
-        }
+        quantum_keeper.check_and_sync(core_inc);
         last_sync_cycle = cycle;
     }
 
@@ -177,16 +173,21 @@ protected:
     void ext_irq_cb();
     void local_irq_cb();
 #endif
-    void exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay) {
-        std::packaged_task<bool()> t([this, &gp, &delay]() {
+    void exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
+        std::packaged_task<bool()> t([this, &gp, &delay, is_fetch]() {
+            if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
+                if(is_fetch && trc.tr_handle.is_active()) {
+                    trc.tr_handle.end_transaction();
+                }
+                auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
+                gp.set_extension(preExt);
+            }
             dbus->b_transport(gp, delay);
             return true;
         });
         std::future<bool> fu = t.get_future();
         core_tasks.emplace(std::move(t));
         fu.get();
-        std::deque<std::packaged_task<bool()>> q;
-        // q.push_back(std::move(t));
     }
     bool exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
         std::packaged_task<bool()> t([this, &gp, &dmi_data]() { return dbus->get_direct_mem_ptr(gp, dmi_data); });
