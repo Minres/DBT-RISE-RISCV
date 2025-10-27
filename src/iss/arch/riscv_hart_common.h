@@ -854,27 +854,27 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     }
 
     iss::status read_vlenb(unsigned addr, reg_t& val) {
-        val = csr[vlenb];
+        val = traits<BASE>::V_REGS_SIZE;
         return iss::Ok;
     }
 
     priv_if<reg_t> get_priv_if() {
         return priv_if<reg_t>{.read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
-                              .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
-                              .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
-                              .raise_trap =
-                                  [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
-                                      this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
-                                      this->fault_data = fault_data;
-                                  },
-                              .csr_rd_cb{this->csr_rd_cb},
-                              .csr_wr_cb{csr_wr_cb},
-                              .state{this->state},
-                              .PRIV{this->reg.PRIV},
-                              .PC{this->reg.PC},
-                              .tohost{this->tohost},
-                              .fromhost{this->fromhost},
-                              .max_irq{mcause_max_irq}};
+            .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
+            .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
+            .raise_trap =
+                [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
+                    this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
+                    this->fault_data = fault_data;
+                },
+            .csr_rd_cb{this->csr_rd_cb},
+            .csr_wr_cb{csr_wr_cb},
+            .state{this->state},
+            .PRIV{this->reg.PRIV},
+            .PC{this->reg.PC},
+            .tohost{this->tohost},
+            .fromhost{this->fromhost},
+            .max_irq{mcause_max_irq}};
     }
 
     iss::status execute_htif(uint8_t const* data, unsigned length) {
