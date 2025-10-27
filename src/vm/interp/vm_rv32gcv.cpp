@@ -5942,7 +5942,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         else {
                                             uint16_t VLMAX = (uint16_t)(1 << ((uint16_t)(get_pow(traits::VLEN)) + (int16_t)(get_lmul_pow()) - (uint16_t)(get_sew_pow()))) & ~1;
                                             *vl = calculate_new_vl(uimm, VLMAX);
-                                            *(X+rd) = *vl;
+                                            if(rd != 0) {
+                                                *(X+rd) = *vl;
+                                            }
                                             *vstart = 0;
                                         }
                                     }
