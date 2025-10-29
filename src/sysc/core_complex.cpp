@@ -260,6 +260,12 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
     for(auto* p : plugin_list)
         delete p;
+    if(post_run_stats.get_value()) {
+        auto instr_if = vm->get_arch()->get_instrumentation_if();
+        auto instrs = instr_if->get_instr_count();
+        auto cycles = instr_if->get_total_cycles();
+        SCCINFO(SCMOD) << "Ran " << instrs << " instructions in " << cycles << " cycles";
+    }
 }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
