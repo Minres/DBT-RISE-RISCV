@@ -102,16 +102,19 @@ int main(int argc, char* argv[]) {
     LOGGER(DEFAULT)::print_time() = false;
     LOGGER(connection)::print_time() = false;
     LOGGER(dbt_rise_iss)::print_time() = false;
+    LOGGER(disass)::print_time() = false;
     auto l = logging::as_log_level(clim["verbose"].as<int>());
     LOGGER(DEFAULT)::reporting_level() = l;
     LOGGER(connection)::reporting_level() = l;
     LOGGER(dbt_rise_iss)::reporting_level() = l;
+    LOGGER(disass)::reporting_level() = l;
     if(clim.count("logfile")) {
         // configure the connection logger
         auto f = fopen(clim["logfile"].as<std::string>().c_str(), "w");
         LOG_OUTPUT(DEFAULT)::stream() = f;
         LOG_OUTPUT(connection)::stream() = f;
         LOG_OUTPUT(dbt_rise_iss)::stream() = f;
+        LOG_OUTPUT(disass)::stream() = f;
     }
 
     std::vector<iss::vm_plugin*> plugin_list;
