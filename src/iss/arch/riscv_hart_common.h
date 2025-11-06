@@ -36,8 +36,6 @@
 #define _RISCV_HART_COMMON
 
 #include "mstatus.h"
-#include "util/delegate.h"
-#include "util/logging.h"
 #include <array>
 #include <cstdint>
 #include <elfio/elf_types.hpp>
@@ -53,7 +51,10 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <util/delegate.h>
 #include <util/instance_logger.h>
+#include <util/ities.h>
+#include <util/logging.h>
 #include <util/sparse_array.h>
 
 #if defined(__GNUC__)
@@ -544,10 +545,13 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     constexpr reg_t get_pc_mask() { return has_compressed() ? (reg_t)~1 : (reg_t)~3; }
 
-    void disass_output(uint64_t pc, const std::string instr) override {
-        if(::logging ::INFO <= disasslogger.get_log_level())
-            ILOG(disasslogger, ::logging ::INFO,
-                 fmt::format("0x{:016x}    {:40} [p:{};c:{}]", pc, instr, lvl[this->reg.PRIV], this->reg.cycle + cycle_offset));
+    void disass_output(uint64_t pc, std::string const& instr) override {
+        static CONSTEXPR char const* fmt_str =
+            sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:{:08};i:{};c:{}]" : "0x{:016x}    {:40} [p:{};s:{:016};i:{};c:{}]";
+        if(::logging::DEBUG <= disasslogger.get_log_level())
+            ILOG(disasslogger, ::logging::DEBUG,
+                 fmt::format(fmt_str, pc, instr, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                             this->reg.cycle + cycle_offset));
     };
 
     void register_csr(unsigned addr, rd_csr_f f) { csr_rd_cb[addr] = f; }
@@ -888,12 +892,13 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         // Extract payload (bits 47:0)
         uint64_t payload_data = cur_data & 0xFFFFFFFFFFFFULL;
         if(payload_data & 1) {
-            if(payload_data & ~1)
+            if(payload_data & ~1) {
                 ILOG(isslogger, logging::FATAL,
                      fmt::format("this->tohost value is 0x{:x} ({}), stopping simulation", payload_data, payload_data));
-            else
+            } else {
                 ILOG(isslogger, logging::INFO,
                      fmt::format("this->tohost value is 0x{:x} ({}), stopping simulation", payload_data, payload_data));
+            }
             this->reg.trap_state = std::numeric_limits<uint32_t>::max();
             this->interrupt_sim = payload_data;
             return iss::Ok;

@@ -131,14 +131,10 @@ public:
         }
     }
 
-    void disass_output(uint64_t pc, const std::string instr) {
+    void disass_output(uint64_t pc, std::string const& instr) {
         static constexpr std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
         if(!owner->disass_output(pc, instr)) {
-            std::stringstream s;
-            s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
-              << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCINFO(owner->hier_name()) << "[disass] " << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc
-                                        << "\t\t" << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
+            PLAT::disass_output(pc, instr);
         }
     };
 

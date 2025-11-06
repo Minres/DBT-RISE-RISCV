@@ -347,7 +347,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, std::string const& instr_str) {
     if(trc.m_db == nullptr)
         return false;
     if(trc.tr_handle.is_active())

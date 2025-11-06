@@ -243,11 +243,11 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
                                                         const uint64_t addr, const unsigned length, uint8_t* const data) {
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
-        CPPLOG(TRACEALL) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
     } else if(is_fetch(access)) {
-        CPPLOG(TRACEALL) << "fetch of " << length << " bytes  @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("fetch of {} bytes @addr 0x{:x}", length, addr));
     } else {
-        CPPLOG(TRACE) << "read of " << length << " bytes  @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("read of {} bytes @addr 0x{:x}", length, addr));
     }
 #endif
     try {
@@ -332,23 +332,23 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
     case 8:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint64_t*>(&data[0]), addr));
         break;
     case 4:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint32_t*>(&data[0]), addr));
         break;
     case 2:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint16_t*>(&data[0]), addr));
         break;
     case 1:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, (uint16_t)data[0], addr));
         break;
     default:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("{}write of {} bytes @addr 0x{:x}", prefix, length, addr));
     }
 #endif
     try {
@@ -613,8 +613,7 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #else
                     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-                    NSCLOG(INFO, LOGCAT) << "Semihosting call at address " << buffer.data() << " occurred ";
-
+                    ILOG(disasslogger, logging::INFO, fmt::format("Semihosting call at address {} occurred ", buffer.data()));
                     this->semihosting_cb(this, &(this->reg.X10) /*a0*/, &(this->reg.X11) /*a1*/);
                     return this->reg.NEXT_PC;
                 }
@@ -689,11 +688,15 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #else
     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-    if((flags & 0xffffffff) != 0xffffffff)
-        NSCLOG(DEBUG, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                              << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                              << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                              << this->lvl[new_priv];
+    if((flags & 0xffffffff) != 0xffffffff) {
+        if(trap_id) {
+            ILOG(disasslogger, logging::DEBUG,
+                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", this->irq_str[cause], cause, buffer.data()));
+        } else {
+            ILOG(disasslogger, logging::DEBUG,
+                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", this->trap_str[cause], cause, buffer.data()));
+        }
+    }
     // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
@@ -733,8 +736,8 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
         }
         // sets the pc to the value stored in the x epc register.
         this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
-        NSCLOG(DEBUG, LOGCAT) << "Executing xRET , changing privilege level from " << this->lvl[cur_priv] << " to "
-                              << this->lvl[this->reg.PRIV];
+        ILOG(disasslogger, logging::DEBUG,
+             fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
         check_interrupt();
     }
     this->reg.trap_state = this->reg.pending_trap;
