@@ -6219,6 +6219,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")
                 default: {
+                    if(this->core.can_handle_unknown_instruction()) {
+                        auto res = this->core.handle_unknown_instruction(pc.val, sizeof(instr), reinterpret_cast<uint8_t*>(&instr));
+                        if(std::get<0>(res)) {
+                            *NEXT_PC = std::get<1>(res);
+                            break;
+                        }
+                    }
                     if(this->disass_enabled){
                         std::string mnemonic = "Illegal Instruction";
                         this->core.disass_output(pc.val, mnemonic);
@@ -6263,8 +6270,8 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {

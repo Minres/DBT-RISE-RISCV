@@ -80,6 +80,10 @@ public:
 
     virtual ~core2sc_adapter() {}
 
+    void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
+        PLAT::unknown_instr_cb = handler;
+    };
+
     void notify_phase(iss::arch_if::exec_phase p) {
         if(p == iss::arch_if::ISTART && !first) {
             auto cycle_incr = owner->get_last_bus_cycles();
@@ -262,6 +266,7 @@ private:
     }
 
     void _register_csr_rd(unsigned addr, rd_csr_f cb) {
+        // we need to remap the callback as the cores expects reg_t size datat
         std::function<iss::status(unsigned addr, reg_t&)> lambda = [cb](unsigned addr, reg_t& r) -> iss::status {
             uint64_t temp = r;
             auto ret = cb(addr, temp);
@@ -271,6 +276,7 @@ private:
         this->register_csr(addr, lambda);
     }
     void _register_csr_wr(unsigned addr, wr_csr_f cb) {
+        // we need to remap the callback as the cores expects reg_t size datat
         std::function<iss::status(unsigned addr, reg_t)> lambda = [cb](unsigned addr, reg_t r) -> iss::status { return cb(addr, r); };
         this->register_csr(addr, lambda);
     }
