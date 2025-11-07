@@ -56,12 +56,11 @@
 namespace iss {
 namespace arch {
 
-template <typename BASE, features_e FEAT = FEAT_NONE, typename LOGCAT = logging::disass>
-class riscv_hart_mu_p : public riscv_hart_common<BASE> {
+template <typename BASE, features_e FEAT = FEAT_NONE> class riscv_hart_mu_p : public riscv_hart_common<BASE> {
 public:
     using core = BASE;
     using base = riscv_hart_common<BASE>;
-    using this_class = riscv_hart_mu_p<BASE, FEAT, LOGCAT>;
+    using this_class = riscv_hart_mu_p<BASE, FEAT>;
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
 
@@ -163,8 +162,8 @@ protected:
     mem::memory_with_htif<reg_t> default_mem;
 };
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
+template <typename BASE, features_e FEAT>
+riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
 : state()
 , default_mem(base::get_priv_if()) {
     this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
@@ -205,9 +204,9 @@ riscv_hart_mu_p<BASE, FEAT, LOGCAT>::riscv_hart_mu_p()
     this->csr[misa] |= extension_encoding::U;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, const access_type access, const uint32_t space,
-                                                      const uint64_t addr, const unsigned length, uint8_t* const data) {
+template <typename BASE, features_e FEAT>
+iss::status riscv_hart_mu_p<BASE, FEAT>::read(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
+                                              const unsigned length, uint8_t* const data) {
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
         ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
@@ -289,9 +288,9 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read(const address_type type, c
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, const access_type access, const uint32_t space,
-                                                       const uint64_t addr, const unsigned length, const uint8_t* const data) {
+template <typename BASE, features_e FEAT>
+iss::status riscv_hart_mu_p<BASE, FEAT>::write(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
+                                               const unsigned length, const uint8_t* const data) {
 #ifndef NDEBUG
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
@@ -380,47 +379,42 @@ iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write(const address_type type, 
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
     val = state.mstatus & get_mstatus_mask((addr >> 8) & 0x3);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_status(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_status(unsigned addr, reg_t val) {
     write_mstatus(val, (addr >> 8) & 0x3);
     check_interrupt();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
     auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mie] & mask;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
     auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_mu_p<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
     auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mip] & mask;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
+template <typename BASE, features_e FEAT> inline void riscv_hart_mu_p<BASE, FEAT>::reset(uint64_t address) {
     BASE::reset(address);
     state.mstatus = hart_state<reg_t>::mstatus_reset_val;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::check_interrupt() {
+template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::check_interrupt() {
     // TODO: Implement CLIC functionality
     // Multiple simultaneous interrupts and traps at the same privilege level are
     // handled in the following decreasing priority order:
@@ -442,8 +436,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
+template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
     if(flags == std::numeric_limits<uint64_t>::max())
@@ -579,7 +572,7 @@ uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_
     return this->reg.NEXT_PC;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_mu_p<BASE, FEAT, LOGCAT>::leave_trap(uint64_t flags) {
+template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::leave_trap(uint64_t flags) {
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = (flags & 0x3) ? 3 : 0;
     if(inst_priv > cur_priv) {
@@ -612,7 +605,7 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
     return this->reg.NEXT_PC;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_mu_p<BASE, FEAT, LOGCAT>::wait_until(uint64_t flags) {
+template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::wait_until(uint64_t flags) {
     auto status = state.mstatus;
     auto tw = status.TW;
     if(this->reg.PRIV == PRIV_S && tw != 0) {

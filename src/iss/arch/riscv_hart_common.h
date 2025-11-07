@@ -307,7 +307,7 @@ template <typename WORD_TYPE> struct priv_if {
     unsigned& max_irq;
 };
 
-template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
+template <typename BASE = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
     const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
     const std::array<const char*, 16> trap_str = {{""
                                                    "Instruction address misaligned", // 0
@@ -333,7 +333,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     constexpr static unsigned MEM = traits<BASE>::MEM;
 
     using core = BASE;
-    using this_class = riscv_hart_common<BASE, LOGCAT>;
+    using this_class = riscv_hart_common<BASE>;
     using reg_t = typename core::reg_t;
 
     using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
@@ -945,7 +945,7 @@ protected:
     mem::memory_if memory;
     struct riscv_instrumentation_if : public iss::instrumentation_if {
 
-        riscv_instrumentation_if(riscv_hart_common<BASE, LOGCAT>& arch)
+        riscv_instrumentation_if(riscv_hart_common<BASE>& arch)
         : arch(arch) {}
         /**
          * get the name of this architecture
@@ -976,7 +976,7 @@ protected:
 
         std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
-        riscv_hart_common<BASE, LOGCAT>& arch;
+        riscv_hart_common<BASE>& arch;
     };
 
     friend struct riscv_instrumentation_if;
