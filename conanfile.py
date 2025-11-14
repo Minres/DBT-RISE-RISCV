@@ -39,7 +39,6 @@ class Pkg(ConanFile):
         self.requires("fmt/8.0.1")
         self.requires("spdlog/1.9.2")
         self.requires("boost/1.85.0")
-        self.requires("abseil/20250127.0")
         self.requires("elfio/3.11")
         self.requires("lz4/1.9.3")
         self.requires("yaml-cpp/0.7.0")
