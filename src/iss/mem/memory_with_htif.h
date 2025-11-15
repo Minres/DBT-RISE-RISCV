@@ -47,7 +47,6 @@ namespace mem {
 template <typename PLAT> struct memory_with_htif : public memory_elem {
     using this_class = memory_with_htif<PLAT>;
     using reg_t = typename PLAT::reg_t;
-    constexpr static unsigned WORD_LEN = sizeof(PLAT::reg_t) * 8;
 
     memory_with_htif(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {}
