@@ -60,7 +60,7 @@ template <typename PLAT> struct memory_with_htif : public memory_elem {
     }
 
     void set_next(memory_if) override {
-        // intenrionally left empty, leaf element
+        // intentionally left empty, leaf element
     }
 
 private:
