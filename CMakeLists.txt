@@ -4,7 +4,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ###############################################################################
 #
 ###############################################################################
-project(dbt-rise-riscv VERSION 2.0.0 LANGUAGES C CXX)
+project(dbt-rise-riscv VERSION 2.1.0 LANGUAGES C CXX)
 
 option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON)
 
