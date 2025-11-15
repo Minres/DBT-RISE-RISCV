@@ -33,6 +33,7 @@
  ******************************************************************************/
 
 #include "iss/arch/riscv_hart_common.h"
+#include "iss/arch/traits.h"
 #include "iss/arch_if.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
@@ -103,12 +104,14 @@ private:
         return priv;
     }
 
-    bool needs_translation(iss::access_type type) {
-        return (effective_priv(type) == arch::PRIV_U || effective_priv(type) == arch::PRIV_S) && vm_setting.levels;
+    bool needs_translation(iss::access_type type, uint32_t space) {
+        return likely(space == arch::traits<PLAT>::MEM) && (effective_priv(type) == arch::PRIV_U || effective_priv(type) == arch::PRIV_S) &&
+               vm_setting.levels;
     }
 
     iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) &&
+                    needs_translation(access, space))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
             auto res = down_stream_mem.rd_mem(access, space, virt2phys(access, addr), len1, data);
@@ -116,11 +119,12 @@ private:
                 res = down_stream_mem.rd_mem(access, space, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.rd_mem(access, space, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.rd_mem(access, space, needs_translation(access, space) ? virt2phys(access, addr) : addr, length, data);
     }
 
     iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) &&
+                    needs_translation(access, space))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
             auto res = down_stream_mem.wr_mem(access, space, virt2phys(access, addr), len1, data);
@@ -128,7 +132,7 @@ private:
                 res = down_stream_mem.wr_mem(access, space, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.wr_mem(access, space, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.wr_mem(access, space, needs_translation(access, space) ? virt2phys(access, addr) : addr, length, data);
     }
 
     iss::status read_plain(unsigned addr, reg_t& val) {
