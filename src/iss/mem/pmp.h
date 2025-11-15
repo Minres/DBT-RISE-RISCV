@@ -32,9 +32,9 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
-#include "memory_if.h"
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/vm_types.h"
+#include "memory_if.h"
 #include <util/logging.h>
 
 namespace iss {
@@ -89,12 +89,11 @@ inline void write_reg_with_offset(uint32_t& reg, uint8_t offs, const uint8_t* co
     }
 }
 
-template <typename WORD_TYPE> struct pmp : public memory_elem {
-    using this_class = pmp<WORD_TYPE>;
-    using reg_t = WORD_TYPE;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
+template <typename PLAT> struct pmp : public memory_elem {
+    using this_class = pmp<PLAT>;
+    using reg_t = typename PLAT::reg_t;
 
-    pmp(arch::priv_if<WORD_TYPE> hart_if)
+    pmp(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {
         for(size_t i = arch::pmpaddr0; i <= arch::pmpaddr15; ++i) {
             hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_plain);
@@ -156,11 +155,11 @@ private:
     bool pmp_check(const access_type type, const uint64_t addr, const unsigned len);
 
 protected:
-    arch::priv_if<WORD_TYPE> hart_if;
+    arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
 };
 
-template <typename WORD_TYPE> bool pmp<WORD_TYPE>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
+template <typename PLAT> bool pmp<PLAT>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
     constexpr auto PMP_SHIFT = 2U;
     constexpr auto PMP_R = 0x1U;
     constexpr auto PMP_W = 0x2U;

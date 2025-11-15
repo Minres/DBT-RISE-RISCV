@@ -44,11 +44,12 @@
 
 namespace iss {
 namespace mem {
-template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
-    using this_class = memory_with_htif<WORD_TYPE>;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
+template <typename PLAT> struct memory_with_htif : public memory_elem {
+    using this_class = memory_with_htif<PLAT>;
+    using reg_t = typename PLAT::reg_t;
+    constexpr static unsigned WORD_LEN = sizeof(PLAT::reg_t) * 8;
 
-    memory_with_htif(arch::priv_if<WORD_TYPE> hart_if)
+    memory_with_htif(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {}
 
     ~memory_with_htif() = default;
@@ -108,7 +109,7 @@ private:
 protected:
     using mem_type = util::sparse_array<uint8_t, 1ULL << 32>;
     mem_type mem;
-    arch::priv_if<WORD_TYPE> hart_if;
+    arch::priv_if<reg_t> hart_if;
 };
 } // namespace mem
 } // namespace iss

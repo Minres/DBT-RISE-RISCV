@@ -159,7 +159,7 @@ protected:
     iss::status read_ip(unsigned addr, reg_t& val);
 
     void check_interrupt();
-    mem::memory_with_htif<reg_t> default_mem;
+    mem::memory_with_htif<BASE> default_mem;
 };
 
 template <typename BASE, features_e FEAT>

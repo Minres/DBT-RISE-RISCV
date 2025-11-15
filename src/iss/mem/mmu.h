@@ -68,14 +68,14 @@ struct vm_info {
     uint64_t ptbase;
 };
 
-template <typename WORD_TYPE> struct mmu : public memory_elem {
-    using this_class = mmu<WORD_TYPE>;
-    using reg_t = WORD_TYPE;
+template <typename PLAT> struct mmu : public memory_elem {
+    using this_class = mmu<PLAT>;
+    using reg_t = typename PLAT::reg_t;
 
     constexpr static reg_t PGSIZE = 1 << PGSHIFT;
     constexpr static reg_t PGMASK = PGSIZE - 1;
 
-    mmu(arch::priv_if<WORD_TYPE> hart_if)
+    mmu(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {
         hart_if.csr_rd_cb[arch::riscv_csr::satp] = MK_CSR_RD_CB(read_satp);
         hart_if.csr_wr_cb[arch::riscv_csr::satp] = MK_CSR_WR_CB(write_satp);
@@ -215,11 +215,11 @@ protected:
     reg_t satp;
     std::unordered_map<reg_t, uint64_t> tlb;
     vm_info vm_setting{0, 0, 0, 0};
-    arch::priv_if<WORD_TYPE> hart_if;
+    arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
 };
 
-template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_type access, uint64_t addr) {
+template <typename PLAT> uint64_t mmu<PLAT>::virt2phys(iss::access_type access, uint64_t addr) {
     const auto type = access & iss::access_type::FUNC;
     reg_t pte{0};
     if(auto it = tlb.find(addr >> PGSHIFT); it != tlb.end()) {

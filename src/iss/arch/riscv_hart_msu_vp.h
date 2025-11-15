@@ -169,8 +169,8 @@ protected:
     iss::status write_edelegh(unsigned addr, uint32_t val);
 
     void check_interrupt();
-    mem::mmu<reg_t> mmu;
-    mem::memory_with_htif<reg_t> default_mem;
+    mem::mmu<BASE> mmu;
+    mem::memory_with_htif<BASE> default_mem;
 };
 
 template <typename BASE, features_e FEAT>
