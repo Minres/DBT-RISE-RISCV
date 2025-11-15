@@ -63,7 +63,7 @@ template <typename PLAT> struct memory_with_htif : public memory_elem {
     }
 
 private:
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
+    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
         // for(auto offs = 0U; offs < length; ++offs) {
         //     *(data + offs) = mem[(addr + offs) % mem.size()];
         // }
@@ -86,7 +86,7 @@ private:
         return iss::Ok;
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
+    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
         auto& p = mem(addr / mem.page_size);
         auto offs = addr & mem.page_addr_mask;
         if((offs + length) > mem.page_size) {

@@ -233,7 +233,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const address_type type, const acc
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.rd_mem(access, addr, length, data);
+                auto res = this->memory.rd_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
                     this->fault_data = addr;
@@ -331,7 +331,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const address_type type, const ac
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.wr_mem(access, addr, length, data);
+                auto res = this->memory.wr_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
                     this->fault_data = addr;
@@ -478,9 +478,9 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
                 // Check for semihosting call
                 std::array<uint8_t, 8> data;
                 // check for SLLI_X0_X0_0X1F and SRAI_X0_X0_0X07
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data());
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data());
                 addr += 8;
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data() + 4);
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data() + 4);
 
                 const std::array<uint8_t, 8> ref_data = {0x13, 0x10, 0xf0, 0x01, 0x13, 0x50, 0x70, 0x40};
                 if(data == ref_data) {

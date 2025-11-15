@@ -115,7 +115,7 @@ template <typename PLAT> struct pmp : public memory_elem {
     void set_next(memory_if mem) override { down_stream_mem = mem; }
 
 private:
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
+    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
         if(!pmp_check(access, addr, length) && !is_debug(access)) {
             hart_if.fault_data = addr;
             if(is_debug(access))
@@ -123,10 +123,10 @@ private:
             hart_if.reg.trap_state = (1UL << 31) | ((access == access_type::FETCH ? 1 : 5) << 16); // issue trap 1
             return iss::Err;
         }
-        return down_stream_mem.rd_mem(access, addr, length, data);
+        return down_stream_mem.rd_mem(access, space, addr, length, data);
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
+    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
         if(!pmp_check(access, addr, length) && !is_debug(access)) {
             hart_if.fault_data = addr;
             if(is_debug(access))
@@ -134,7 +134,7 @@ private:
             hart_if.reg.trap_state = (1UL << 31) | (7 << 16); // issue trap 1
             return iss::Err;
         }
-        return down_stream_mem.wr_mem(access, addr, length, data);
+        return down_stream_mem.wr_mem(access, space, addr, length, data);
     }
 
     iss::status read_plain(unsigned addr, reg_t& val) {

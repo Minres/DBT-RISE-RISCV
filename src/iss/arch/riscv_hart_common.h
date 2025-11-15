@@ -904,7 +904,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
             return iss::Ok;
         } else if(device == 0 && command == 0) {
             std::array<uint64_t, 8> loaded_payload;
-            if(memory.rd_mem(access_type::DEBUG_READ, payload_data, 8 * sizeof(uint64_t),
+            if(memory.rd_mem(access_type::DEBUG_READ, traits<BASE>::MEM, payload_data, 8 * sizeof(uint64_t),
                              reinterpret_cast<uint8_t*>(loaded_payload.data())) == iss::Err)
                 ILOG(isslogger, logging::ERR, "Syscall read went wrong");
             uint64_t syscall_num = loaded_payload.at(0);

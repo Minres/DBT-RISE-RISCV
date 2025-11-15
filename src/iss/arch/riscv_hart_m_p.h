@@ -189,7 +189,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const address_type type, const acce
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.rd_mem(access, addr, length, data);
+                auto res = this->memory.rd_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
                     this->fault_data = addr;
@@ -287,7 +287,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const address_type type, const acc
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.wr_mem(access, addr, length, data);
+                auto res = this->memory.wr_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
                     this->fault_data = addr;
@@ -431,9 +431,9 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
                 // Check for semihosting call
                 std::array<uint8_t, 8> data;
                 // check for SLLI_X0_X0_0X1F and SRAI_X0_X0_0X07
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data());
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data());
                 addr += 8;
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data() + 4);
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data() + 4);
 
                 const std::array<uint8_t, 8> ref_data = {0x13, 0x10, 0xf0, 0x01, 0x13, 0x50, 0x70, 0x40};
                 if(data == ref_data) {
@@ -483,8 +483,8 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
     // calculate adds// set NEXT_PC to trap addressess to jump to based on MODE
     if(trap_id != 0 && (xtvec & 0x3UL) == 3UL) {
         reg_t data;
-        auto ret =
-            this->memory.rd_mem(iss::access_type::DEBUG_READ, this->csr[arch::mtvt], sizeof(reg_t), reinterpret_cast<uint8_t*>(&data));
+        auto ret = this->memory.rd_mem(access_type::DEBUG_READ, traits<BASE>::MEM, this->csr[arch::mtvt], sizeof(reg_t),
+                                       reinterpret_cast<uint8_t*>(&data));
         if(ret == iss::Err)
             return this->reg.PC;
         this->reg.NEXT_PC = data;
