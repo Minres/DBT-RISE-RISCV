@@ -6270,8 +6270,8 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
