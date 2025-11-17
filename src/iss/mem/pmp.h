@@ -117,7 +117,7 @@ template <typename PLAT> struct pmp : public memory_elem {
 
 private:
     iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
-        if(!pmp_check(access, addr, length) && space != arch::traits<PLAT>::MEM && !is_debug(access)) {
+        if(likely(space == arch::traits<PLAT>::MEM) && !pmp_check(access, addr, length) && !is_debug(access)) {
             hart_if.fault_data = addr;
             if(is_debug(access))
                 throw trap_access(0, addr);
@@ -128,7 +128,7 @@ private:
     }
 
     iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(!pmp_check(access, addr, length) && space != arch::traits<PLAT>::MEM && !is_debug(access)) {
+        if(likely(space == arch::traits<PLAT>::MEM) && !pmp_check(access, addr, length) && !is_debug(access)) {
             hart_if.fault_data = addr;
             if(is_debug(access))
                 throw trap_access(0, addr);
