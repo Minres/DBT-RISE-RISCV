@@ -69,7 +69,7 @@ private:
         // for(auto offs = 0U; offs < length; ++offs) {
         //     *(data + offs) = mem[(addr + offs) % mem.size()];
         // }
-        mem_type mem = memories[space];
+        mem_type& mem = memories[space];
         if(mem.is_allocated(addr)) {
             const auto& p = mem(addr / mem.page_size);
             auto offs = addr & mem.page_addr_mask;
@@ -90,7 +90,7 @@ private:
     }
 
     iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
-        mem_type mem = memories[space];
+        mem_type& mem = memories[space];
         auto& p = mem(addr / mem.page_size);
         auto offs = addr & mem.page_addr_mask;
         if((offs + length) > mem.page_size) {
@@ -114,7 +114,7 @@ protected:
     // have the largest possible size. Memory footprint should still be small as it
     // a sparse array
     using mem_type = util::sparse_array<uint8_t, arch::traits<PLAT>::max_mem_size>;
-    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories;
+    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories{};
     arch::priv_if<reg_t> hart_if;
 };
 } // namespace mem
