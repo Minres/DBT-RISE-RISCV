@@ -147,7 +147,7 @@ public:
                                    .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
     }
 
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
+    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
         if(access && iss::access_type::DEBUG)
             return owner->read_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         else {
@@ -155,7 +155,7 @@ public:
         }
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
+    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
         if(access && iss::access_type::DEBUG)
             return owner->write_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         if(addr == this->tohost) {
