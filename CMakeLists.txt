@@ -4,7 +4,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 ###############################################################################
 #
 ###############################################################################
-project(dbt-rise-riscv VERSION 2.0.0 LANGUAGES C CXX)
+project(dbt-rise-riscv VERSION 2.1.0 LANGUAGES C CXX)
 
 option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON)
 
@@ -20,7 +20,7 @@ if(NOT TARGET dbt-rise-core)
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
         #GIT_TAG         "origin/develop"
-        GIT_TAG 0c7532f6
+        GIT_TAG 6f2d15ec
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )

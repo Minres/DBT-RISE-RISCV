@@ -253,6 +253,12 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
     for(auto* p : plugin_list)
         delete p;
+    if(post_run_stats.get_value()) {
+        auto instr_if = vm->get_arch()->get_instrumentation_if();
+        auto instrs = instr_if->get_instr_count();
+        auto cycles = instr_if->get_total_cycles();
+        SCCINFO(SCMOD) << "Ran " << instrs << " instructions in " << cycles << " cycles";
+    }
 }
 
 template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
@@ -334,7 +340,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, std::string const& instr_str) {
     if(trc.m_db == nullptr)
         return false;
     if(trc.tr_handle.is_active())
@@ -412,6 +418,13 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
             ibus_inc += lut_entry.get_read_latency() / curr_clk;
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
+#ifndef NDEBUG
+        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex << addr
+                               << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
+#endif
         return true;
     } else {
         auto& sckt = is_fetch ? ibus : dbus;
@@ -466,6 +479,13 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
         auto offset = addr - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
+#ifndef NDEBUG
+        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex << addr
+                               << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
+#endif
         return true;
     } else {
         write_buf.resize(length);
@@ -487,10 +507,10 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t
             quantum_keeper.reset();
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
-        SCCTRACE() << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
-                   << (length == 4   ? *(uint32_t*)data
-                       : length == 2 ? *(uint16_t*)data
-                                     : (unsigned)*data);
+        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
             return false;
         }

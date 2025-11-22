@@ -148,7 +148,7 @@ public:
 
     void trace(sc_core::sc_trace_file* trf) const override;
 
-    bool disass_output(uint64_t pc, const std::string instr) override;
+    bool disass_output(uint64_t pc, std::string const& instr) override;
 
     void set_clock_period(sc_core::sc_time period);
 

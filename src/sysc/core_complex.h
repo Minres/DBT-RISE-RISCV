@@ -121,6 +121,8 @@ public:
 
     cci::cci_param<std::string> plugins{"plugins", ""};
 
+    cci::cci_param<bool> post_run_stats{"post_run_stats", false};
+
     core_complex(sc_core::sc_module_name const& name);
 
 #else
@@ -145,6 +147,8 @@ public:
     scml_property<uint32_t> mhartid{"mhartid", 0};
 
     scml_property<std::string> plugins{"plugins", ""};
+
+    scml_property<bool> post_run_stats{"post_run_stats", false};
 
     core_complex(sc_core::sc_module_name const& name)
     : sc_module(name)
@@ -194,7 +198,7 @@ public:
 
     void trace(sc_core::sc_trace_file* trf) const override;
 
-    bool disass_output(uint64_t pc, const std::string instr) override;
+    bool disass_output(uint64_t pc, std::string const& instr) override;
 
     void set_clock_period(sc_core::sc_time period);
 

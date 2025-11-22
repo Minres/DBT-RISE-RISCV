@@ -59,8 +59,7 @@
 namespace iss {
 namespace arch {
 
-template <typename BASE, features_e FEAT = FEAT_NONE, typename LOGCAT = logging::disass>
-class riscv_hart_msu_vp : public riscv_hart_common<BASE> {
+template <typename BASE, features_e FEAT = FEAT_NONE> class riscv_hart_msu_vp : public riscv_hart_common<BASE> {
 public:
     using core = BASE;
     using base = riscv_hart_common<BASE>;
@@ -170,12 +169,12 @@ protected:
     iss::status write_edelegh(unsigned addr, uint32_t val);
 
     void check_interrupt();
-    mem::mmu<reg_t> mmu;
-    mem::memory_with_htif<reg_t> default_mem;
+    mem::mmu<BASE> mmu;
+    mem::memory_with_htif<BASE> default_mem;
 };
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
+template <typename BASE, features_e FEAT>
+riscv_hart_msu_vp<BASE, FEAT>::riscv_hart_msu_vp()
 : mmu(base::get_priv_if())
 , default_mem(base::get_priv_if()) {
     // common regs
@@ -238,16 +237,16 @@ riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::riscv_hart_msu_vp()
     this->csr[misa] |= (extension_encoding::S | extension_encoding::U);
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type, const access_type access, const uint32_t space,
-                                                        const uint64_t addr, const unsigned length, uint8_t* const data) {
+template <typename BASE, features_e FEAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT>::read(const address_type type, const access_type access, const uint32_t space,
+                                                const uint64_t addr, const unsigned length, uint8_t* const data) {
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
-        CPPLOG(TRACEALL) << "debug read of " << length << " bytes @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
     } else if(is_fetch(access)) {
-        CPPLOG(TRACEALL) << "fetch of " << length << " bytes  @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("fetch of {} bytes @addr 0x{:x}", length, addr));
     } else {
-        CPPLOG(TRACE) << "read of " << length << " bytes  @addr 0x" << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("read of {} bytes @addr 0x{:x}", length, addr));
     }
 #endif
     try {
@@ -267,7 +266,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.rd_mem(access, addr, length, data);
+                auto res = this->memory.rd_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16);
                     this->fault_data = addr;
@@ -325,30 +324,30 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read(const address_type type,
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type, const access_type access, const uint32_t space,
-                                                         const uint64_t addr, const unsigned length, const uint8_t* const data) {
+template <typename BASE, features_e FEAT>
+iss::status riscv_hart_msu_vp<BASE, FEAT>::write(const address_type type, const access_type access, const uint32_t space,
+                                                 const uint64_t addr, const unsigned length, const uint8_t* const data) {
 #ifndef NDEBUG
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
     case 8:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint64_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint64_t*>(&data[0]), addr));
         break;
     case 4:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint32_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint32_t*>(&data[0]), addr));
         break;
     case 2:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << *(uint16_t*)&data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, *reinterpret_cast<const uint16_t*>(&data[0]), addr));
         break;
     case 1:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes (0x" << std::hex << (uint16_t)data[0] << std::dec << ") @addr 0x"
-                      << std::hex << addr;
+        ILOG(isslogger, logging::TRACEALL,
+             fmt::format("{}write of {} bytes (0x{:x}) @addr 0x{:x}", prefix, length, (uint16_t)data[0], addr));
         break;
     default:
-        CPPLOG(TRACE) << prefix << "write of " << length << " bytes @addr " << addr;
+        ILOG(isslogger, logging::TRACEALL, fmt::format("{}write of {} bytes @addr 0x{:x}", prefix, length, addr));
     }
 #endif
     try {
@@ -368,7 +367,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.wr_mem(access, addr, length, data);
+                auto res = this->memory.wr_mem(access, space, addr, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
                     this->reg.trap_state = (1UL << 31) | (traits<BASE>::RV_CAUSE_STORE_ACCESS << 16);
                     this->fault_data = addr;
@@ -427,34 +426,29 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write(const address_type type
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_status(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
     auto req_priv_lvl = (addr >> 8) & 0x3;
     val = this->state.mstatus & get_mstatus_rd_mask(req_priv_lvl);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_status(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_status(unsigned addr, reg_t val) {
     auto req_priv_lvl = (addr >> 8) & 0x3;
     write_mstatus(val, req_priv_lvl);
     check_interrupt();
     return iss::Ok;
 }
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_statush(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_statush(unsigned addr, reg_t& val) {
     val = this->csr[mstatush] & 0b11'1111'1000;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_statush(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_statush(unsigned addr, reg_t val) {
     this->csr[mstatush] = val & 0b11'1111'1000;
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
     val = this->csr[mie];
     if(addr < mie)
         val &= this->csr[mideleg];
@@ -463,16 +457,14 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ie(unsigned addr, reg_t&
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_ie(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
     auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t& val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
     val = this->csr[mip];
     if(addr < mip)
         val &= this->csr[mideleg];
@@ -481,24 +473,21 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::read_ip(unsigned addr, reg_t&
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_ideleg(unsigned addr, reg_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_ideleg(unsigned addr, reg_t val) {
     // only U and S mode interrupts can be delegated
     auto mask = 0b0011'0011'0011;
     this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, uint32_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_edeleg(unsigned addr, uint32_t val) {
     // bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved), bit 16-17 (reserved), bit 20-23 (reserved)
     uint32_t mask = 0b1111'1111'0000'1100'1011'0011'1111'0111;
     this->csr[arch::riscv_csr::medeleg] = (this->csr[arch::riscv_csr::medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, uint64_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_edeleg(unsigned addr, uint64_t val) {
     // bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved), bit 16-17 (reserved), bit 20-23 (reserved)
     uint32_t mask_lower = 0b1111'1111'0000'1100'1011'0011'1111'0111;
     // bit 32-47(reserved)
@@ -507,22 +496,21 @@ iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edeleg(unsigned addr, u
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-iss::status riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::write_edelegh(unsigned addr, uint32_t val) {
+template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_edelegh(unsigned addr, uint32_t val) {
     // bit 32-47(reserved)
     auto mask = 0b1111'1111'1111'1111'0000'0000'0000'0000;
     this->csr[medelegh] = (this->csr[medelegh] & ~mask) | (val & mask);
     return iss::Ok;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> inline void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::reset(uint64_t address) {
+template <typename BASE, features_e FEAT> inline void riscv_hart_msu_vp<BASE, FEAT>::reset(uint64_t address) {
     BASE::reset(address);
     this->state.mstatus = hart_state<reg_t>::mstatus_reset_val;
     if(sizeof(reg_t) == 8) // Set UXLEN and SXLEN to 64
         this->state.mstatus |= static_cast<reg_t>(0xa00000000ULL);
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::check_interrupt() {
+template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::check_interrupt() {
     auto status = this->state.mstatus;
     auto ip = this->csr[mip];
     auto ie = this->csr[mie];
@@ -550,8 +538,8 @@ template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_v
     }
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT>
-uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
+template <typename BASE, features_e FEAT>
+uint64_t riscv_hart_msu_vp<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
     if(flags == std::numeric_limits<uint32_t>::max())
@@ -599,9 +587,9 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
                 // Check for semihosting call
                 std::array<uint8_t, 8> data;
                 // check for SLLI_X0_X0_0X1F and SRAI_X0_X0_0X07
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data());
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data());
                 addr += 8;
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, addr - 4, 4, data.data() + 4);
+                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data() + 4);
 
                 const std::array<uint8_t, 8> ref_data = {0x13, 0x10, 0xf0, 0x01, 0x13, 0x50, 0x70, 0x40};
                 if(data == ref_data) {
@@ -613,8 +601,7 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #else
                     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-                    NSCLOG(INFO, LOGCAT) << "Semihosting call at address " << buffer.data() << " occurred ";
-
+                    ILOG(disasslogger, logging::INFO, fmt::format("Semihosting call at address {} occurred ", buffer.data()));
                     this->semihosting_cb(this, &(this->reg.X10) /*a0*/, &(this->reg.X11) /*a1*/);
                     return this->reg.NEXT_PC;
                 }
@@ -689,18 +676,22 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::enter_trap(uint64_t flags, uint6
 #else
     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-    if((flags & 0xffffffff) != 0xffffffff)
-        NSCLOG(DEBUG, LOGCAT) << (trap_id ? "Interrupt" : "Trap") << " with cause '"
-                              << (trap_id ? this->irq_str[cause] : this->trap_str[cause]) << "' (" << cause << ")" << " at address "
-                              << buffer.data() << " occurred, changing privilege level from " << this->lvl[this->reg.PRIV] << " to "
-                              << this->lvl[new_priv];
+    if((flags & 0xffffffff) != 0xffffffff) {
+        if(trap_id) {
+            ILOG(disasslogger, logging::DEBUG,
+                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", this->irq_str[cause], cause, buffer.data()));
+        } else {
+            ILOG(disasslogger, logging::DEBUG,
+                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", this->trap_str[cause], cause, buffer.data()));
+        }
+    }
     // reset trap this->state
     this->reg.PRIV = new_priv;
     this->reg.trap_state = 0;
     return this->reg.NEXT_PC;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::leave_trap(uint64_t flags) {
+template <typename BASE, features_e FEAT> uint64_t riscv_hart_msu_vp<BASE, FEAT>::leave_trap(uint64_t flags) {
     auto cur_priv = this->reg.PRIV;
     auto inst_priv = flags & 0x3;
 
@@ -733,15 +724,15 @@ template <typename BASE, features_e FEAT, typename LOGCAT> uint64_t riscv_hart_m
         }
         // sets the pc to the value stored in the x epc register.
         this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
-        NSCLOG(DEBUG, LOGCAT) << "Executing xRET , changing privilege level from " << this->lvl[cur_priv] << " to "
-                              << this->lvl[this->reg.PRIV];
+        ILOG(disasslogger, logging::DEBUG,
+             fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
         check_interrupt();
     }
     this->reg.trap_state = this->reg.pending_trap;
     return this->reg.NEXT_PC;
 }
 
-template <typename BASE, features_e FEAT, typename LOGCAT> void riscv_hart_msu_vp<BASE, FEAT, LOGCAT>::wait_until(uint64_t flags) {
+template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::wait_until(uint64_t flags) {
     auto status = this->state.mstatus;
     auto tw = status.TW;
     if(this->reg.PRIV < PRIV_M && tw != 0) {

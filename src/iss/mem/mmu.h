@@ -33,6 +33,7 @@
  ******************************************************************************/
 
 #include "iss/arch/riscv_hart_common.h"
+#include "iss/arch/traits.h"
 #include "iss/arch_if.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
@@ -68,14 +69,14 @@ struct vm_info {
     uint64_t ptbase;
 };
 
-template <typename WORD_TYPE> struct mmu : public memory_elem {
-    using this_class = mmu<WORD_TYPE>;
-    using reg_t = WORD_TYPE;
+template <typename PLAT> struct mmu : public memory_elem {
+    using this_class = mmu<PLAT>;
+    using reg_t = typename PLAT::reg_t;
 
     constexpr static reg_t PGSIZE = 1 << PGSHIFT;
     constexpr static reg_t PGMASK = PGSIZE - 1;
 
-    mmu(arch::priv_if<WORD_TYPE> hart_if)
+    mmu(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {
         hart_if.csr_rd_cb[arch::riscv_csr::satp] = MK_CSR_RD_CB(read_satp);
         hart_if.csr_wr_cb[arch::riscv_csr::satp] = MK_CSR_WR_CB(write_satp);
@@ -103,32 +104,35 @@ private:
         return priv;
     }
 
-    bool needs_translation(iss::access_type type) {
-        return (effective_priv(type) == arch::PRIV_U || effective_priv(type) == arch::PRIV_S) && vm_setting.levels;
+    bool needs_translation(iss::access_type type, uint32_t space) {
+        return likely(space == arch::traits<PLAT>::MEM) && (effective_priv(type) == arch::PRIV_U || effective_priv(type) == arch::PRIV_S) &&
+               vm_setting.levels;
     }
 
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
+    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) &&
+                    needs_translation(access, space))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
-            auto res = down_stream_mem.rd_mem(access, virt2phys(access, addr), len1, data);
+            auto res = down_stream_mem.rd_mem(access, space, virt2phys(access, addr), len1, data);
             if(res == iss::Ok)
-                res = down_stream_mem.rd_mem(access, virt2phys(access, split_addr), length - len1, data + len1);
+                res = down_stream_mem.rd_mem(access, space, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.rd_mem(access, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.rd_mem(access, space, needs_translation(access, space) ? virt2phys(access, addr) : addr, length, data);
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) && needs_translation(access))) { // we may cross a page boundary
+    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
+        if(unlikely((addr & ~PGMASK) != ((addr + length - 1) & ~PGMASK) &&
+                    needs_translation(access, space))) { // we may cross a page boundary
             auto split_addr = (addr + length) & ~PGMASK;
             auto len1 = split_addr - addr;
-            auto res = down_stream_mem.wr_mem(access, virt2phys(access, addr), len1, data);
+            auto res = down_stream_mem.wr_mem(access, space, virt2phys(access, addr), len1, data);
             if(res == iss::Ok)
-                res = down_stream_mem.wr_mem(access, virt2phys(access, split_addr), length - len1, data + len1);
+                res = down_stream_mem.wr_mem(access, space, virt2phys(access, split_addr), length - len1, data + len1);
             return res;
         }
-        return down_stream_mem.wr_mem(access, needs_translation(access) ? virt2phys(access, addr) : addr, length, data);
+        return down_stream_mem.wr_mem(access, space, needs_translation(access, space) ? virt2phys(access, addr) : addr, length, data);
     }
 
     iss::status read_plain(unsigned addr, reg_t& val) {
@@ -215,11 +219,11 @@ protected:
     reg_t satp;
     std::unordered_map<reg_t, uint64_t> tlb;
     vm_info vm_setting{0, 0, 0, 0};
-    arch::priv_if<WORD_TYPE> hart_if;
+    arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
 };
 
-template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_type access, uint64_t addr) {
+template <typename PLAT> uint64_t mmu<PLAT>::virt2phys(iss::access_type access, uint64_t addr) {
     const auto type = access & iss::access_type::FUNC;
     reg_t pte{0};
     if(auto it = tlb.find(addr >> PGSHIFT); it != tlb.end()) {
@@ -237,8 +241,8 @@ template <typename WORD_TYPE> uint64_t mmu<WORD_TYPE>::virt2phys(iss::access_typ
         for(int i = vm_setting.levels - 1; i >= 0; i--) {
             const int ptshift = i * vm_setting.idxbits;
             const reg_t idx = (addr >> (PGSHIFT + ptshift)) & ((1 << vm_setting.idxbits) - 1);
-            const iss::status res =
-                down_stream_mem.rd_mem(iss::access_type::READ, base + idx * vm_setting.ptesize, vm_setting.ptesize, (uint8_t*)&pte);
+            const iss::status res = down_stream_mem.rd_mem(iss::access_type::READ, arch::traits<PLAT>::MEM, base + idx * vm_setting.ptesize,
+                                                           vm_setting.ptesize, (uint8_t*)&pte);
             if(res != iss::status::Ok) {
                 CPPLOG(DEBUG) << "Access fault when trying to read next pte";
                 switch(type) {

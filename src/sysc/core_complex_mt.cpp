@@ -316,7 +316,7 @@ template <unsigned int BUSWIDTH> void core_complex_mt<BUSWIDTH>::start_of_simula
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex_mt<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
+template <unsigned int BUSWIDTH> bool core_complex_mt<BUSWIDTH>::disass_output(uint64_t pc, std::string const& instr_str) {
     if(trc.m_db == nullptr)
         return false;
     if(trc.tr_handle.is_active())
@@ -326,7 +326,7 @@ template <unsigned int BUSWIDTH> bool core_complex_mt<BUSWIDTH>::disass_output(u
     trc.tr_handle.record_attribute("INSTR", instr_str);
     trc.tr_handle.record_attribute("MODE", lvl[core->get_mode()]);
     trc.tr_handle.record_attribute("MSTATUS", core->get_state());
-    trc.tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
+    trc.tr_handle.record_attribute("LTIME_START", quantum_keeper.get_local_absolute_time().value() / 1000);
     return true;
 }
 
@@ -383,7 +383,10 @@ template <unsigned int BUSWIDTH> void core_complex_mt<BUSWIDTH>::run() {
         quantum_keeper.reset();
         core->set_interrupt_execution(false);
         core->setup_mt();
-        core_executor.start([this]() { vm->start(std::numeric_limits<uint64_t>::max(), dump_ir); });
+        core_executor.start([this]() {
+            vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
+            return sc_core::SC_ZERO_TIME; // TODO: need to return real time
+        });
         wait(core_executor.thread_finish_event());
     } while(!core->get_interrupt_execution());
     sc_stop();

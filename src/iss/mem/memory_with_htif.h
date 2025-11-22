@@ -36,19 +36,21 @@
 #define _MEMORY_WITH_HTIF_
 
 #include "iss/arch/riscv_hart_common.h"
+#include "iss/arch/traits.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
+#include <array>
 #include <cstdlib>
 #include <util/logging.h>
 #include <util/sparse_array.h>
 
 namespace iss {
 namespace mem {
-template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
-    using this_class = memory_with_htif<WORD_TYPE>;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
+template <typename PLAT> struct memory_with_htif : public memory_elem {
+    using this_class = memory_with_htif<PLAT>;
+    using reg_t = typename PLAT::reg_t;
 
-    memory_with_htif(arch::priv_if<WORD_TYPE> hart_if)
+    memory_with_htif(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {}
 
     ~memory_with_htif() = default;
@@ -59,14 +61,15 @@ template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
     }
 
     void set_next(memory_if) override {
-        // intenrionally left empty, leaf element
+        // intentionally left empty, leaf element
     }
 
 private:
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
+    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
         // for(auto offs = 0U; offs < length; ++offs) {
         //     *(data + offs) = mem[(addr + offs) % mem.size()];
         // }
+        mem_type& mem = memories[space];
         if(mem.is_allocated(addr)) {
             const auto& p = mem(addr / mem.page_size);
             auto offs = addr & mem.page_addr_mask;
@@ -86,7 +89,8 @@ private:
         return iss::Ok;
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
+    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
+        mem_type& mem = memories[space];
         auto& p = mem(addr / mem.page_size);
         auto offs = addr & mem.page_addr_mask;
         if((offs + length) > mem.page_size) {
@@ -106,9 +110,12 @@ private:
     }
 
 protected:
-    using mem_type = util::sparse_array<uint8_t, 1ULL << 32>;
-    mem_type mem;
-    arch::priv_if<WORD_TYPE> hart_if;
+    // Currently no type erasure for the sparse_array is available, so all memories
+    // have the largest possible size. Memory footprint should still be small as it
+    // a sparse array
+    using mem_type = util::sparse_array<uint8_t, arch::traits<PLAT>::max_mem_size>;
+    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories{};
+    arch::priv_if<reg_t> hart_if;
 };
 } // namespace mem
 } // namespace iss
