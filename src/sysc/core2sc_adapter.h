@@ -147,18 +147,18 @@ public:
                                    .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
     }
 
-    iss::status read_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t* data) {
-        if(access && iss::access_type::DEBUG)
-            return owner->read_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
+    iss::status read_mem(const iss::addr_t& addr, unsigned length, uint8_t* data) {
+        if(iss::is_debug(addr.access))
+            return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
         else {
-            return owner->read_mem(addr, length, data, is_fetch(access)) ? iss::Ok : iss::Err;
+            return owner->read_mem(addr.val, length, data, is_fetch(addr.access)) ? iss::Ok : iss::Err;
         }
     }
 
-    iss::status write_mem(iss::access_type access, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(access && iss::access_type::DEBUG)
-            return owner->write_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
-        if(addr == this->tohost) {
+    iss::status write_mem(const iss::addr_t& addr_, unsigned length, uint8_t const* data) {
+        if(iss::is_debug(addr.access))
+            return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+        if(addr.val == this->tohost) {
             reg_t cur_data = *reinterpret_cast<const reg_t*>(data);
             // Extract Device (bits 63:56)
             uint8_t device = sizeof(reg_t) == 4 ? 0 : (cur_data >> 56) & 0xFF;
@@ -201,7 +201,7 @@ public:
             this->interrupt_sim = payload_addr;
             return iss::Ok;
         }
-        auto res = owner->write_mem(addr, length, data) ? iss::Ok : iss::Err;
+        auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
         return res;
     }
 
