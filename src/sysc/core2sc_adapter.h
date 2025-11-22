@@ -155,7 +155,7 @@ public:
         }
     }
 
-    iss::status write_mem(const iss::addr_t& addr_, unsigned length, uint8_t const* data) {
+    iss::status write_mem(const iss::addr_t& addr, unsigned length, uint8_t const* data) {
         if(iss::is_debug(addr.access))
             return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
         if(addr.val == this->tohost) {
