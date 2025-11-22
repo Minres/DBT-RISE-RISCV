@@ -157,7 +157,7 @@ protected:
     iss::status read_ip(unsigned addr, reg_t& val);
 
     void check_interrupt();
-    mem::memory_with_htif<BASE> default_mem;
+    mem::neumann_memory_with_htif<BASE> default_mem;
 };
 
 template <typename BASE, features_e FEAT>
@@ -203,11 +203,12 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
 }
 
 template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& addr_, const unsigned length, uint8_t* const data) {
-    auto& addr = addr_.val;
-    auto& space = addr_.space;
-    auto& access = addr_.access;
-    auto& type = addr_.type;
+iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& a, const unsigned length, uint8_t* const data) {
+    auto& addr = a.val;
+    auto& space = a.space;
+    auto& access = a.access;
+    auto& type = a.type;
+
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
         ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
@@ -219,35 +220,6 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& addr_, const unsigne
 #endif
     try {
         switch(space) {
-        case traits<BASE>::MEM: {
-            auto alignment = is_fetch(access) ? (this->has_compressed() ? 2 : 4) : std::min<unsigned>(length, sizeof(reg_t));
-            if(unlikely(is_fetch(access) && (addr & (alignment - 1)))) {
-                this->fault_data = addr;
-                if(is_debug(access))
-                    throw trap_access(0, addr);
-                this->reg.trap_state = (1UL << 31); // issue trap 0
-                return iss::Err;
-            }
-            try {
-                if(!is_debug(access) && (addr & (alignment - 1))) {
-                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_LOAD << 16;
-                    this->fault_data = addr;
-                    return iss::Err;
-                }
-                auto res = this->memory.rd_mem({address_type::PHYSICAL, addr_.access, addr_.space, addr_.val}, length, data);
-                if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
-                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
-                    this->fault_data = addr;
-                }
-                return res;
-            } catch(trap_access& ta) {
-                if((access & access_type::DEBUG) == 0) {
-                    this->reg.trap_state = (1UL << 31) | ta.id;
-                    this->fault_data = ta.addr;
-                }
-                return iss::Err;
-            }
-        } break;
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
@@ -276,8 +248,35 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& addr_, const unsigne
             } else
                 memset(data, 0, length);
         } break;
-        default:
-            return iss::Err; // assert("Not supported");
+        default: {
+            auto alignment = is_fetch(access) ? (this->has_compressed() ? 2 : 4) : std::min<unsigned>(length, sizeof(reg_t));
+            if(unlikely(is_fetch(access) && (addr & (alignment - 1)))) {
+                this->fault_data = addr;
+                if(is_debug(access))
+                    throw trap_access(0, addr);
+                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_FETCH << 16;
+                return iss::Err;
+            }
+            try {
+                if(!is_debug(access) && (addr & (alignment - 1))) {
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_LOAD << 16;
+                    this->fault_data = addr;
+                    return iss::Err;
+                }
+                auto res = this->memory.rd_mem({address_type::PHYSICAL, a.access, a.space, a.val}, length, data);
+                if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
+                    this->fault_data = addr;
+                }
+                return res;
+            } catch(trap_access& ta) {
+                if((access & access_type::DEBUG) == 0) {
+                    this->reg.trap_state = (1UL << 31) | ta.id;
+                    this->fault_data = ta.addr;
+                }
+                return iss::Err;
+            }
+        } break;
         }
         return iss::Ok;
     } catch(trap_access& ta) {
@@ -290,11 +289,11 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& addr_, const unsigne
 }
 
 template <typename BASE, features_e FEAT>
-iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& addr_, const unsigned length, const uint8_t* const data) {
-    auto& addr = addr_.val;
-    auto& space = addr_.space;
-    auto& access = addr_.access;
-    auto& type = addr_.type;
+iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& a, const unsigned length, const uint8_t* const data) {
+    auto& addr = a.val;
+    auto& space = a.space;
+    auto& access = a.access;
+    auto& type = a.type;
 #ifndef NDEBUG
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
@@ -320,33 +319,6 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& addr_, const unsign
 #endif
     try {
         switch(space) {
-        case traits<BASE>::MEM: {
-            if(unlikely(is_fetch(access) && (addr & 0x1) == 1)) {
-                this->fault_data = addr;
-                if(access && iss::access_type::DEBUG)
-                    throw trap_access(0, addr);
-                this->reg.trap_state = (1UL << 31); // issue trap 0
-                return iss::Err;
-            }
-            try {
-                auto alignment = std::min<unsigned>(length, sizeof(reg_t));
-                if(length > 1 && (addr & (alignment - 1)) && !is_debug(access)) {
-                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_STORE << 16;
-                    this->fault_data = addr;
-                    return iss::Err;
-                }
-                auto res = this->memory.wr_mem({address_type::PHYSICAL, addr_.access, addr_.space, addr_.val}, length, data);
-                if(unlikely(res != iss::Ok && !is_debug(access))) {
-                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
-                    this->fault_data = addr;
-                }
-                return res;
-            } catch(trap_access& ta) {
-                this->reg.trap_state = (1UL << 31) | ta.id;
-                this->fault_data = ta.addr;
-                return iss::Err;
-            }
-        } break;
         case traits<BASE>::CSR: {
             if(length != sizeof(reg_t))
                 return iss::Err;
@@ -370,8 +342,33 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& addr_, const unsign
         case traits<BASE>::RES: {
             atomic_reservation[addr] = data[0];
         } break;
-        default:
-            return iss::Err;
+        default: {
+            if(unlikely(is_fetch(access) && (addr & 0x1) == 1)) {
+                this->fault_data = addr;
+                if(access && iss::access_type::DEBUG)
+                    throw trap_access(0, addr);
+                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_FETCH << 16;
+                return iss::Err;
+            }
+            try {
+                auto alignment = std::min<unsigned>(length, sizeof(reg_t));
+                if(length > 1 && (addr & (alignment - 1)) && !is_debug(access)) {
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_MISALIGNED_STORE << 16;
+                    this->fault_data = addr;
+                    return iss::Err;
+                }
+                auto res = this->memory.wr_mem({address_type::PHYSICAL, a.access, a.space, a.val}, length, data);
+                if(unlikely(res != iss::Ok && !is_debug(access))) {
+                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
+                    this->fault_data = addr;
+                }
+                return res;
+            } catch(trap_access& ta) {
+                this->reg.trap_state = (1UL << 31) | ta.id;
+                this->fault_data = ta.addr;
+                return iss::Err;
+            }
+        } break;
         }
         return iss::Ok;
     } catch(trap_access& ta) {

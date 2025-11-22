@@ -399,7 +399,7 @@ private:
     decoder instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
-        if (this->core.read(iss::address_type::PHYSICAL, pc.access, pc.space, pc.val, 4, data) != iss::Ok)
+        if (this->core.read({iss::address_type::LOGICAL, pc.access, arch::traits<ARCH>::IMEM, pc.val}, 4, data) != iss::Ok)
                     return iss::Err;
         return iss::Ok;
     }
