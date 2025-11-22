@@ -112,10 +112,8 @@ public:
 
     void reset(uint64_t address) override;
 
-    iss::status read(const address_type type, const access_type access, const uint32_t space, const uint64_t addr, const unsigned length,
-                     uint8_t* const data);
-    iss::status write(const address_type type, const access_type access, const uint32_t space, const uint64_t addr, const unsigned length,
-                      const uint8_t* const data);
+    iss::status read(const addr_t& addr, const unsigned length, uint8_t* const data);
+    iss::status write(const addr_t& addr, const unsigned length, const uint8_t* const data);
 
     uint64_t enter_trap(uint64_t flags) override { return riscv_hart_m_p::enter_trap(flags, this->fault_data, this->fault_data); }
     uint64_t enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) override;
@@ -124,9 +122,6 @@ public:
     void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
 
 protected:
-    using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
-    using mem_write_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t const* const);
-
     hart_state<reg_t> state;
 
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
@@ -161,8 +156,12 @@ riscv_hart_m_p<BASE, FEAT>::riscv_hart_m_p()
 }
 
 template <typename BASE, features_e FEAT>
-iss::status riscv_hart_m_p<BASE, FEAT>::read(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
-                                             const unsigned length, uint8_t* const data) {
+iss::status riscv_hart_m_p<BASE, FEAT>::read(const addr_t& a, const unsigned length, uint8_t* const data) {
+    auto& addr = a.val;
+    auto& space = a.space;
+    auto& access = a.access;
+    auto& type = a.type;
+
 #ifndef NDEBUG
     if(access && iss::access_type::DEBUG) {
         ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
@@ -189,7 +188,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const address_type type, const acce
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.rd_mem(access, space, addr, length, data);
+                auto res = this->memory.rd_mem({address_type::PHYSICAL, a.access, a.space, a.val}, length, data);
                 if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
                     this->fault_data = addr;
@@ -245,8 +244,11 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const address_type type, const acce
 }
 
 template <typename BASE, features_e FEAT>
-iss::status riscv_hart_m_p<BASE, FEAT>::write(const address_type type, const access_type access, const uint32_t space, const uint64_t addr,
-                                              const unsigned length, const uint8_t* const data) {
+iss::status riscv_hart_m_p<BASE, FEAT>::write(const addr_t& addr_, const unsigned length, const uint8_t* const data) {
+    auto& addr = addr_.val;
+    auto& space = addr_.space;
+    auto& access = addr_.access;
+    auto& type = addr_.type;
 #ifndef NDEBUG
     const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
     switch(length) {
@@ -287,7 +289,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const address_type type, const acc
                     this->fault_data = addr;
                     return iss::Err;
                 }
-                auto res = this->memory.wr_mem(access, space, addr, length, data);
+                auto res = this->memory.wr_mem({address_type::PHYSICAL, addr_.access, addr_.space, addr_.val}, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
                     this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_STORE_ACCESS << 16;
                     this->fault_data = addr;
@@ -431,9 +433,9 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
                 // Check for semihosting call
                 std::array<uint8_t, 8> data;
                 // check for SLLI_X0_X0_0X1F and SRAI_X0_X0_0X07
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data());
+                this->memory.rd_mem({address_type::PHYSICAL, access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4}, 4, data.data());
                 addr += 8;
-                this->memory.rd_mem(iss::access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4, 4, data.data() + 4);
+                this->memory.rd_mem({address_type::PHYSICAL, access_type::DEBUG_READ, traits<BASE>::IMEM, addr - 4}, 4, data.data() + 4);
 
                 const std::array<uint8_t, 8> ref_data = {0x13, 0x10, 0xf0, 0x01, 0x13, 0x50, 0x70, 0x40};
                 if(data == ref_data) {
@@ -483,8 +485,8 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
     // calculate adds// set NEXT_PC to trap addressess to jump to based on MODE
     if(trap_id != 0 && (xtvec & 0x3UL) == 3UL) {
         reg_t data;
-        auto ret = this->memory.rd_mem(access_type::DEBUG_READ, traits<BASE>::MEM, this->csr[arch::mtvt], sizeof(reg_t),
-                                       reinterpret_cast<uint8_t*>(&data));
+        auto ret = this->memory.rd_mem({address_type::PHYSICAL, access_type::DEBUG_READ, traits<BASE>::MEM, this->csr[arch::mtvt]},
+                                       sizeof(reg_t), reinterpret_cast<uint8_t*>(&data));
         if(ret == iss::Err)
             return this->reg.PC;
         this->reg.NEXT_PC = data;

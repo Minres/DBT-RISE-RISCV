@@ -44,7 +44,7 @@ const char* SYS_OPEN_MODES_STRS[] = {"r", "rb", "r+", "r+b", "w", "wb", "w+", "w
 
 template <typename T> T sh_read_field(iss::arch_if* arch_if_ptr, T addr, int len = 4) {
     uint8_t bytes[4];
-    auto res = arch_if_ptr->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, addr, 4, &bytes[0]);
+    auto res = arch_if_ptr->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, addr}, 4, &bytes[0]);
     // auto res = arch_if_ptr->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, *parameter, 1, &character);
 
     if(res != iss::Ok) {
@@ -199,7 +199,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         }
         buffer.resize(num_read);
         for(int i = 0; i < num_read; i++) {
-            auto res = arch_if_ptr->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, addr + i, 1, &buffer[i]);
+            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, addr + i}, 1, &buffer[i]);
             if(res != iss::Ok)
                 return;
         }
@@ -277,7 +277,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
 
         for(int i = 0; i < buffer_len; i++) {
             uint8_t character = filename[i];
-            auto res = arch_if_ptr->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, (*parameter) + i, 1, &character);
+            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, (*parameter) + i}, 1, &character);
             if(res != iss::Ok)
                 return;
         }
@@ -295,7 +295,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     }
     case semihosting_syscalls::SYS_WRITEC: {
         uint8_t character;
-        auto res = arch_if_ptr->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, *parameter, 1, &character);
+        auto res = arch_if_ptr->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, *parameter}, 1, &character);
         if(res != iss::Ok)
             return;
         putchar(character);
@@ -304,7 +304,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     case semihosting_syscalls::SYS_WRITE0: {
         uint8_t character;
         while(1) {
-            auto res = arch_if_ptr->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, *parameter, 1, &character);
+            auto res = arch_if_ptr->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, *parameter}, 1, &character);
             if(res != iss::Ok)
                 return;
             if(character == 0)
