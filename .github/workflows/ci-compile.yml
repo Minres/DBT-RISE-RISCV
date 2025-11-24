@@ -40,7 +40,7 @@ jobs:
           cmake --version
 
       - name: Configure
-        run: WITH_LLVM=1 cmake --preset Debug -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} WITH_LLVM=ON
+        run: WITH_LLVM=1 cmake --preset Debug -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} -DWITH_LLVM=ON
 
       - name: Build
         run: WITH_LLVM=1 cmake --build build -j
