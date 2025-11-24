@@ -173,15 +173,15 @@ public:
 
     iss::status read_mem(const iss::addr_t& addr, unsigned length, uint8_t* data) {
         if(iss::is_debug(addr.access))
-            return owner->read_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+            return owner->read_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         else {
-            return owner->read_mem(addr.val, length, data, is_fetch(addr.access)) ? iss::Ok : iss::Err;
+            return owner->read_mem(addr, length, data) ? iss::Ok : iss::Err;
         }
     }
 
     iss::status write_mem(const iss::addr_t& addr, unsigned length, uint8_t const* data) {
         if(iss::is_debug(addr.access))
-            return owner->write_mem_dbg(addr.val, length, data) ? iss::Ok : iss::Err;
+            return owner->write_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         if(addr.val == this->tohost) {
             reg_t cur_data = *reinterpret_cast<const reg_t*>(data);
             // Extract Device (bits 63:56)
@@ -204,7 +204,8 @@ public:
             }
             if(device == 0 && command == 0) {
                 std::array<uint64_t, 8> loaded_payload;
-                auto res = owner->read_mem(payload_addr, 8 * sizeof(uint64_t), reinterpret_cast<uint8_t*>(loaded_payload.data()), false)
+                auto res = owner->read_mem({addr.type, addr.access, addr.space, payload_addr}, 8 * sizeof(uint64_t),
+                                           reinterpret_cast<uint8_t*>(loaded_payload.data()))
                                ? iss::Ok
                                : iss::Err;
                 if(res == iss::Err) {
@@ -225,7 +226,7 @@ public:
             this->interrupt_sim = payload_addr;
             return iss::Ok;
         }
-        auto res = owner->write_mem(addr.val, length, data) ? iss::Ok : iss::Err;
+        auto res = owner->write_mem(addr, length, data) ? iss::Ok : iss::Err;
         return res;
     }
 

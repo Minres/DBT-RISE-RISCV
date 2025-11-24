@@ -33,6 +33,7 @@
 #ifndef _SYSC_CORE_COMPLEX__IF_H_
 #define _SYSC_CORE_COMPLEX__IF_H_
 
+#include <iss/vm_types.h>
 #include <scc/signal_opt_ports.h>
 
 namespace sysc {
@@ -41,13 +42,13 @@ struct core_complex_if {
 
     virtual ~core_complex_if() = default;
 
-    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) = 0;
+    virtual bool read_mem(iss::addr_t addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem(iss::addr_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) = 0;
+    virtual bool read_mem_dbg(iss::addr_t addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem_dbg(iss::addr_t addr, unsigned length, const uint8_t* const data) = 0;
 
     virtual void disass_output(uint64_t pc, std::string const& instr) = 0;
 

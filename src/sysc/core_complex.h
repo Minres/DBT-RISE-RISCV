@@ -197,13 +197,13 @@ public:
         last_sync_cycle = cycle;
     }
 
-    bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) override;
+    bool read_mem(iss::addr_t a, unsigned length, uint8_t* const data) override;
 
-    bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) override;
+    bool write_mem(iss::addr_t a, unsigned length, const uint8_t* const data) override;
 
-    bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) override;
+    bool read_mem_dbg(iss::addr_t a, unsigned length, uint8_t* const data) override;
 
-    bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) override;
+    bool write_mem_dbg(iss::addr_t a, unsigned length, const uint8_t* const data) override;
 
     void trace(sc_core::sc_trace_file* trf) const override;
 

@@ -397,19 +397,19 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
     }
 }
 
-template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
+template <unsigned int BUSWIDTH, typename QK> bool core_complex<BUSWIDTH, QK>::read_mem(addr_t addr, unsigned length, uint8_t* const data) {
+    bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
-    auto lut_entry = dmi_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
-        auto offset = addr - lut_entry.get_start_address();
+    auto lut_entry = dmi_lut.getEntry(addr.val);
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
+        auto offset = addr.val - lut_entry.get_start_address();
         std::copy(lut_entry.get_dmi_ptr() + offset, lut_entry.get_dmi_ptr() + offset + length, data);
         if(is_fetch)
             ibus_inc += lut_entry.get_read_latency() / curr_clk;
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex << addr
+        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex << addr.val
                                << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
@@ -419,7 +419,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_
     } else {
         tlm::tlm_generic_payload gp;
         gp.set_command(tlm::TLM_READ_COMMAND);
-        gp.set_address(addr);
+        gp.set_address(addr.val);
         gp.set_data_ptr(data);
         gp.set_data_length(length);
         gp.set_streaming_width(length);
@@ -435,7 +435,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_
             else
                 dbus_inc += incr;
         }
-        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr << ") : 0x"
+        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
@@ -444,10 +444,10 @@ bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_
         }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
-            gp.set_address(addr);
+            gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
             if(exec_get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_read_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
+                if(dmi_data.is_read_allowed() && (addr.val + length - 1) <= dmi_data.get_end_address())
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
@@ -456,14 +456,14 @@ bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
-    auto lut_entry = write_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
-        auto offset = addr - lut_entry.get_start_address();
+bool core_complex<BUSWIDTH, QK>::write_mem(addr_t addr, unsigned length, const uint8_t* const data) {
+    auto lut_entry = write_lut.getEntry(addr.val);
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
+        auto offset = addr.val - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex << addr
+        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex << addr.val
                                << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
@@ -475,7 +475,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const
         std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
         tlm::tlm_generic_payload gp;
         gp.set_command(tlm::TLM_WRITE_COMMAND);
-        gp.set_address(addr);
+        gp.set_address(addr.val);
         gp.set_data_ptr(write_buf.data());
         gp.set_data_length(length);
         gp.set_streaming_width(length);
@@ -486,7 +486,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const
             quantum_keeper.reset();
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
-        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
+        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
@@ -495,10 +495,10 @@ bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const
         }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
-            gp.set_address(addr);
+            gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
             if(exec_get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_write_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
+                if(dmi_data.is_write_allowed() && (addr.val + length - 1) <= dmi_data.get_end_address())
                     write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
                                        dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
@@ -508,10 +508,10 @@ bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
+bool core_complex<BUSWIDTH, QK>::read_mem_dbg(addr_t addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
-    gp.set_address(addr);
+    gp.set_address(addr.val);
     gp.set_data_ptr(data);
     gp.set_data_length(length);
     gp.set_streaming_width(length);
@@ -519,12 +519,12 @@ bool core_complex<BUSWIDTH, QK>::read_mem_dbg(uint64_t addr, unsigned length, ui
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
+bool core_complex<BUSWIDTH, QK>::write_mem_dbg(addr_t addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_WRITE_COMMAND);
-    gp.set_address(addr);
+    gp.set_address(addr.val);
     gp.set_data_ptr(write_buf.data());
     gp.set_data_length(length);
     gp.set_streaming_width(length);
