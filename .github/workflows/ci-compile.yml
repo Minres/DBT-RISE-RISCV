@@ -40,10 +40,10 @@ jobs:
           cmake --version
 
       - name: Configure
-        run: cmake --preset Debug -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
+        run: WITH_LLVM=1 cmake --preset Release -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} -DWITH_LLVM=ON
 
       - name: Build
-        run: cmake --build build -j
+        run: WITH_LLVM=1 cmake --build build -j
 
       - name: Run smoke test
         run: ./build/riscv-sim -h

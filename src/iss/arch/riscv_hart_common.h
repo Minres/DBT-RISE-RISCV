@@ -474,8 +474,9 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
                 const auto seg_data = pseg->get_data();
                 const auto type = pseg->get_type();
                 if(type == ELFIO::PT_LOAD && fsize > 0) {
-                    auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
-                                           pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
+                    auto res = this->write(
+                        {iss::address_type::LOGICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::IMEM, pseg->get_physical_address()},
+                        fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
                         ILOG(isslogger, logging::ERR,
                              fmt::format("problem writing {} bytes to 0x{:x}", fsize, pseg->get_physical_address()));
@@ -518,7 +519,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         uint64_t buf_ptr = loaded_payload[2];
         uint64_t len = loaded_payload[3];
         std::vector<char> buf(len);
-        if(aif->read(address_type::PHYSICAL, access_type::DEBUG_READ, mem_type, buf_ptr, len, reinterpret_cast<uint8_t*>(buf.data()))) {
+        if(aif->read({address_type::LOGICAL, access_type::DEBUG_READ, mem_type, buf_ptr}, len, reinterpret_cast<uint8_t*>(buf.data()))) {
             ILOG(isslogger, logging::ERR, "SYS_WRITE buffer read went wrong");
             return iss::Err;
         }
@@ -534,7 +535,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         // Not sure what the correct return value should be
         uint8_t ret_val = 1;
         if(fromhost != std::numeric_limits<uint64_t>::max())
-            if(aif->write(address_type::PHYSICAL, access_type::DEBUG_WRITE, mem_type, fromhost, 1, &ret_val)) {
+            if(aif->write({address_type::LOGICAL, access_type::DEBUG_WRITE, mem_type, fromhost}, 1, &ret_val) != iss::Ok) {
                 ILOG(isslogger, logging::ERR, "Fromhost write went wrong");
                 return iss::Err;
             }
@@ -885,6 +886,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     iss::status execute_htif(uint8_t const* data, unsigned length) {
         reg_t cur_data{0};
         memcpy(&cur_data, data, length);
+        // according to https://github.com/riscv-software-src/riscv-isa-sim/issues/364#issuecomment-607657754:
         // Extract Device (bits 63:56)
         uint8_t device = traits<BASE>::XLEN == 32 ? 0 : (cur_data >> 56) & 0xFF;
         // Extract Command (bits 55:48)
@@ -904,7 +906,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
             return iss::Ok;
         } else if(device == 0 && command == 0) {
             std::array<uint64_t, 8> loaded_payload;
-            if(memory.rd_mem(access_type::DEBUG_READ, traits<BASE>::MEM, payload_data, 8 * sizeof(uint64_t),
+            if(memory.rd_mem({address_type::LOGICAL, access_type::DEBUG_READ, traits<BASE>::MEM, payload_data}, 8 * sizeof(uint64_t),
                              reinterpret_cast<uint8_t*>(loaded_payload.data())) == iss::Err)
                 ILOG(isslogger, logging::ERR, "Syscall read went wrong");
             uint64_t syscall_num = loaded_payload.at(0);

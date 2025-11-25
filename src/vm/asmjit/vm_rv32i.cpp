@@ -2829,9 +2829,8 @@ template <typename ARCH>
 continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, jit_holder& jh) {
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
-    phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    auto res = this->core.read(paddr, 4, data);
+    auto res = this->core.read({address_type::LOGICAL, access_type::DEBUG_READ, arch::traits<ARCH>::IMEM, pc.val}, 4, data);
     if (res != iss::Ok)
         return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)

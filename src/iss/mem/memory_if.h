@@ -46,8 +46,8 @@
 namespace iss {
 namespace mem {
 
-using rd_mem_func_sig = iss::status(iss::access_type, uint32_t space, uint64_t addr, unsigned length, uint8_t* data);
-using wr_mem_func_sig = iss::status(iss::access_type, uint32_t space, uint64_t addr, unsigned length, uint8_t const* data);
+using rd_mem_func_sig = iss::status(const addr_t& addr, unsigned length, uint8_t* data);
+using wr_mem_func_sig = iss::status(const addr_t& addr, unsigned length, uint8_t const* data);
 
 struct memory_if {
     util::delegate<rd_mem_func_sig> rd_mem;

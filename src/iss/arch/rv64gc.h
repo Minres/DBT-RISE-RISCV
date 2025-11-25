@@ -477,7 +477,7 @@ template <> struct traits<rv64gc> {
 
     enum sreg_flag_e { FLAGS };
 
-    enum mem_type_e { MEM, FENCE, RES, CSR, IMEM = MEM };
+    enum mem_type_e { MEM, FENCE, RES, CSR, IMEM = std::numeric_limits<decltype(phys_addr_t::space)>::max()};
     
     static constexpr std::array<const uint64_t, 4> mem_sizes{{
         std::numeric_limits<uint64_t>::max(),

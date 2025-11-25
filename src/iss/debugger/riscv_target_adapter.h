@@ -267,13 +267,13 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_single_registe
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::read_mem(uint64_t addr, std::vector<uint8_t>& data) {
-    auto a = map_addr({iss::access_type::DEBUG_READ, iss::address_type::VIRTUAL, 0, addr});
+    auto a = map_addr({iss::address_type::VIRTUAL, iss::access_type::DEBUG_READ, 0, addr});
     auto f = [&]() -> status { return core->read(a, data.size(), data.data()); };
     return srv->execute_syncronized(f);
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t>& data) {
-    auto a = map_addr({iss::access_type::DEBUG_WRITE, iss::address_type::VIRTUAL, 0, addr});
+    auto a = map_addr({iss::address_type::VIRTUAL, iss::access_type::DEBUG_WRITE, 0, addr});
     auto f = [&]() -> status { return core->write(a, data.size(), data.data()); };
     return srv->execute_syncronized(f);
 }
@@ -322,8 +322,8 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(break_type
         return Err;
     case SW_EXEC:
     case HW_EXEC: {
-        auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
-        auto eaddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr + length});
+        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
+        auto eaddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr + length});
         target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val - saddr.val);
         CPPLOG(TRACE) << "Adding breakpoint with handle " << target_adapter_base::bp_count << " for addr 0x" << std::hex << saddr.val
                       << std::dec;
@@ -339,7 +339,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(break_t
         return Err;
     case SW_EXEC:
     case HW_EXEC: {
-        auto saddr = map_addr({iss::access_type::FETCH, iss::address_type::PHYSICAL, 0, addr});
+        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
         unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
         if(handle) {
             CPPLOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val << std::dec;

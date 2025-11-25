@@ -4,9 +4,16 @@
         "workbench.action.tasks.runTask"
     ],
     "clangd.arguments": [
-    "--pretty",
-    "--background-index",
-    "--compile-commands-dir=${workspaceFolder}/build"
+        "--pretty",
+        "--background-index",
+        "--compile-commands-dir=${workspaceFolder}/build"
     ],
-    "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json"
+    "cmake.copyCompileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "editor.rulers": [
+        {
+            "column": 140,
+            "comment": "clang-format"
+        }
+    ],
+    "editor.formatOnSave": true
 }

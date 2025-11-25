@@ -279,8 +279,8 @@ int main(int argc, char* argv[]) {
             }
             LOGGER(DEFAULT)::set_reporting_level(logging::ERR);
             for(auto addr = start_addr; addr < end_addr; addr += data.size()) {
-                vm->get_arch()->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0 /*MEM*/, addr, data.size(),
-                                     data.data()); // FIXME: get space from iss::arch::traits<ARCH>::mem_type_e::MEM
+                vm->get_arch()->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0 /*iss::arch::traits<ARCH>::MEM*/, addr},
+                                     data.size(), data.data());
 
                 // TODO : obey Target endianess
                 uint32_t to_print = (data[3] << 24) + (data[2] << 16) + (data[1] << 8) + data[0];

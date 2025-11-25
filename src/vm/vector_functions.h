@@ -74,14 +74,14 @@ constexpr size_t map_index_size[9] = {std::numeric_limits<size_t>::max(),
 
 inline bool softvec_read(void* core, uint64_t addr, uint64_t length, uint8_t* data) {
     // Read length bytes from addr into *data
-    iss::status status = static_cast<iss::arch_if*>(core)->read(iss::address_type::PHYSICAL, iss::access_type::READ,
-                                                                0 /*traits<ARCH>::MEM*/, addr, length, data);
+    iss::status status = static_cast<iss::arch_if*>(core)->read(
+        {iss::address_type::LOGICAL, iss::access_type::READ, 0 /*traits<ARCH>::MEM*/, addr}, length, data);
     return status == iss::Ok;
 }
 inline bool softvec_write(void* core, uint64_t addr, uint64_t length, uint8_t* data) {
     // Write length bytes from addr into *data
-    iss::status status = static_cast<iss::arch_if*>(core)->write(iss::address_type::PHYSICAL, iss::access_type::READ,
-                                                                 0 /*traits<ARCH>::MEM*/, addr, length, data);
+    iss::status status = static_cast<iss::arch_if*>(core)->write(
+        {iss::address_type::LOGICAL, iss::access_type::WRITE, 0 /*traits<ARCH>::MEM*/, addr}, length, data);
     return status == iss::Ok;
 }
 template <size_t VLEN>

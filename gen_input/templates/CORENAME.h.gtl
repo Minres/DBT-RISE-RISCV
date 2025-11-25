@@ -209,7 +209,7 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     enum sreg_flag_e { FLAGS };
 
-    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = MEM };
+    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = std::numeric_limits<decltype(phys_addr_t::space)>::max()};
     
     static constexpr std::array<const uint64_t, ${spaces.size()}> mem_sizes{{
         ${spaces.collect{overflowsafeSize(it.value)}.join(',\n        ')}
