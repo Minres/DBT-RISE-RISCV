@@ -42,13 +42,13 @@ struct core_complex_if {
 
     virtual ~core_complex_if() = default;
 
-    virtual bool read_mem(iss::addr_t addr, unsigned length, uint8_t* const data) = 0;
+    virtual bool read_mem(const iss::addr_t& addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem(iss::addr_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem(const iss::addr_t& addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool read_mem_dbg(iss::addr_t addr, unsigned length, uint8_t* const data) = 0;
+    virtual bool read_mem_dbg(const iss::addr_t& addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem_dbg(iss::addr_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem_dbg(const iss::addr_t& addr, unsigned length, const uint8_t* const data) = 0;
 
     virtual void disass_output(uint64_t pc, std::string const& instr) = 0;
 

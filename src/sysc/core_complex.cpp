@@ -397,7 +397,8 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
     }
 }
 
-template <unsigned int BUSWIDTH, typename QK> bool core_complex<BUSWIDTH, QK>::read_mem(addr_t addr, unsigned length, uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QK>
+bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, uint8_t* const data) {
     bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr.val);
@@ -456,7 +457,7 @@ template <unsigned int BUSWIDTH, typename QK> bool core_complex<BUSWIDTH, QK>::r
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::write_mem(addr_t addr, unsigned length, const uint8_t* const data) {
+bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = write_lut.getEntry(addr.val);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr.val - lut_entry.get_start_address();
@@ -508,7 +509,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem(addr_t addr, unsigned length, const u
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::read_mem_dbg(addr_t addr, unsigned length, uint8_t* const data) {
+bool core_complex<BUSWIDTH, QK>::read_mem_dbg(const addr_t& addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
     gp.set_address(addr.val);
@@ -519,7 +520,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem_dbg(addr_t addr, unsigned length, uint
 }
 
 template <unsigned int BUSWIDTH, typename QK>
-bool core_complex<BUSWIDTH, QK>::write_mem_dbg(addr_t addr, unsigned length, const uint8_t* const data) {
+bool core_complex<BUSWIDTH, QK>::write_mem_dbg(const addr_t& addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;
