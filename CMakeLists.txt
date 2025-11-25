@@ -49,7 +49,6 @@ add_subdirectory(softvector)
 set(LIB_SOURCES
     src/iss/plugin/instruction_count.cpp
     src/iss/arch/rv32i.cpp
-    src/iss/arch/rv32imc.cpp
     src/iss/arch/rv32imac.cpp
     src/iss/arch/rv32gc.cpp
     src/iss/arch/rv32gcv.cpp
