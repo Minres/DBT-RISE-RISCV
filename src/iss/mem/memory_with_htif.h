@@ -113,8 +113,7 @@ protected:
     // have the largest possible size. Memory footprint should still be small as it
     // a sparse array
     using mem_type = util::sparse_array<uint8_t, arch::traits<PLAT>::max_mem_size>;
-    // We need one fewer memory as the IMEM maps to MEM in von Neumann architecture
-    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size() - 1> memories{};
+    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories{};
     arch::priv_if<reg_t> hart_if;
 };
 } // namespace mem
