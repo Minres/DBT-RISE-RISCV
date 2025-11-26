@@ -40,6 +40,7 @@
 #include <iss/vm_types.h>
 #include "iss_factory.h"
 #include "tlm/scc/quantum_keeper.h"
+#include "sysc/memspace_extension.h"
 #include <memory>
 #include <sstream>
 #include <sysc/kernel/sc_simcontext.h>
@@ -399,6 +400,8 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
 
 template <unsigned int BUSWIDTH, typename QK>
 bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, uint8_t* const data) {
+    // basically checking for mem_type_e in CORENAME.h
+
     bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
     auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
     auto lut_entry = dmi_lut.getEntry(addr.val);
@@ -425,6 +428,8 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
+        if(!is_fetch)
+            gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
         auto pre_delay = delay;
         exec_b_transport(gp, delay, is_fetch);
         if(pre_delay > delay) {
@@ -481,6 +486,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
+        gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
         auto pre_delay = delay;
         exec_b_transport(gp, delay);
         if(pre_delay > delay)
@@ -516,6 +522,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem_dbg(const addr_t& addr, unsigned lengt
     gp.set_data_ptr(data);
     gp.set_data_length(length);
     gp.set_streaming_width(length);
+    gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
 
@@ -529,6 +536,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem_dbg(const addr_t& addr, unsigned leng
     gp.set_data_ptr(write_buf.data());
     gp.set_data_length(length);
     gp.set_streaming_width(length);
+    gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
 
