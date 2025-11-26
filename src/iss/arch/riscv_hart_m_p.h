@@ -163,7 +163,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const addr_t& a, const unsigned len
     auto& type = a.type;
 
 #ifndef NDEBUG
-    if(access && iss::access_type::DEBUG) {
+    if(is_debug(access)) {
         ILOG(isslogger, logging::TRACEALL, fmt::format("debug read of {} bytes @addr 0x{:x}", length, addr));
     } else if(is_fetch(access)) {
         ILOG(isslogger, logging::TRACEALL, fmt::format("fetch of {} bytes @addr 0x{:x}", length, addr));
@@ -248,7 +248,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const addr_t& a, const unsigned le
     auto& access = a.access;
     auto& type = a.type;
 #ifndef NDEBUG
-    const char* prefix = (access && iss::access_type::DEBUG) ? "debug " : "";
+    const char* prefix = (is_debug(access)) ? "debug " : "";
     switch(length) {
     case 8:
         ILOG(isslogger, logging::TRACEALL,
