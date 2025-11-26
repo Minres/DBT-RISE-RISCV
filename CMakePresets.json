@@ -22,7 +22,7 @@
                 "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "contrib/cmake/conan_provider.cmake",
                 "CONAN_HOST_PROFILE": "auto-cmake",
                 "CONAN_BUILD_PROFILE": "conan_host_profile",
-                "WITH_TCC": "OFF"
+                "WITH_ASMJIT": "OFF"
             }
         },
         {

@@ -76,12 +76,6 @@ if(TARGET yaml-cpp::yaml-cpp)
     )
 endif()
 
-if(WITH_TCC)
-    list(APPEND LIB_SOURCES
-        src/vm/tcc/vm_tgc5c.cpp
-    )
-endif()
-
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
         src/vm/llvm/vm_tgc5c.cpp
@@ -125,11 +119,6 @@ if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
     if(WITH_LLVM)
         FILE(GLOB LLVM_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/llvm/vm_*.cpp)
         list(APPEND LIB_SOURCES ${LLVM_GEN_SOURCES})
-    endif()
-
-    if(WITH_TCC)
-        FILE(GLOB TCC_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/tcc/vm_*.cpp)
-        list(APPEND LIB_SOURCES ${TCC_GEN_SOURCES})
     endif()
 
     if(WITH_ASMJIT)
@@ -237,11 +226,6 @@ if(BUILD_TESTING)
     # ... CMake code to create tests ...
     add_test(NAME riscv-sim-interp
         COMMAND riscv-sim -f ${CMAKE_BINARY_DIR}/../../Firmwares/hello-world/hello --backend interp)
-
-    if(WITH_TCC)
-        add_test(NAME riscv-sim-tcc
-            COMMAND riscv-sim -f ${CMAKE_BINARY_DIR}/../../Firmwares/hello-world/hello --backend tcc)
-    endif()
 
     if(WITH_LLVM)
         add_test(NAME riscv-sim-llvm
