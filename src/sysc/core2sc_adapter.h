@@ -45,9 +45,12 @@
 #include <iss/iss.h>
 #include <iss/mem/memory_if.h>
 #include <iss/vm_types.h>
+#include <scc/async_event.h>
 #include <scc/report.h>
+#include <shared_mutex>
 #include <util/instance_logger.h>
 #include <util/ities.h>
+
 namespace sysc {
 template <typename PLAT> class core2sc_adapter : public PLAT, public sc2core_if {
 public:
@@ -55,7 +58,7 @@ public:
     using core = typename PLAT::core;
     using reg_t = typename PLAT::reg_t;
     using phys_addr_t = typename PLAT::phys_addr_t;
-
+    using mutex_t = std::shared_mutex;
     core2sc_adapter(sysc::riscv::core_complex_if* owner)
     : owner(owner) {
         this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
@@ -76,6 +79,18 @@ public:
         log_delegate.level = static_cast<logging::log_level>(scc::get_logging_level());
         this->disasslogger.set_logger(log_delegate);
         this->isslogger.set_logger(log_delegate);
+    }
+
+    void setup_mt() override {
+        this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid_mt>(this);
+        this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num_mt>(this);
+        this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode_mt>(this);
+        this->get_state = util::delegate<uint64_t()>::from<this_class, &this_class::_get_state_mt>(this);
+        this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution_mt>(this);
+        this->set_interrupt_execution = util::delegate<void(bool)>::from<this_class, &this_class::_set_interrupt_execution_mt>(this);
+        this->local_irq = util::delegate<void(short, bool)>::from<this_class, &this_class::_local_irq_mt>(this);
+        this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd_mt>(this);
+        this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr_mt>(this);
     }
 
     virtual ~core2sc_adapter() {}
@@ -227,16 +242,40 @@ public:
 
 private:
     void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
+    void _set_mhartid_mt(unsigned id) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        PLAT::set_mhartid(id);
+    }
 
     void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
+    void _set_irq_num_mt(unsigned num) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        PLAT::set_irq_num(num);
+    }
 
     uint32_t _get_mode() { return this->reg.PRIV; }
+    uint32_t _get_mode_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->reg.PRIV;
+    }
 
     void _set_interrupt_execution(bool v) { this->interrupt_sim = v ? 1 : 0; }
+    void _set_interrupt_execution_mt(bool v) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        this->interrupt_sim = v ? 1 : 0;
+    }
 
     bool _get_interrupt_execution() { return this->interrupt_sim; }
+    bool _get_interrupt_execution_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->interrupt_sim;
+    }
 
     uint64_t _get_state() { return this->state.mstatus.backing.val; }
+    uint64_t _get_state_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->state.mstatus.backing.val;
+    }
 
     void _local_irq(short id, bool value) {
         reg_t mask = 0;
@@ -264,6 +303,10 @@ private:
         if(value)
             SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
     }
+    void _local_irq_mt(short id, bool value) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _local_irq(id, value);
+    }
 
     void _register_csr_rd(unsigned addr, rd_csr_f cb) {
         // we need to remap the callback as the cores expects reg_t size datat
@@ -275,10 +318,19 @@ private:
         };
         this->register_csr(addr, lambda);
     }
+    void _register_csr_rd_mt(unsigned addr, rd_csr_f cb) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _register_csr_rd(addr, cb);
+    }
+
     void _register_csr_wr(unsigned addr, wr_csr_f cb) {
         // we need to remap the callback as the cores expects reg_t size datat
         std::function<iss::status(unsigned addr, reg_t)> lambda = [cb](unsigned addr, reg_t r) -> iss::status { return cb(addr, r); };
         this->register_csr(addr, lambda);
+    }
+    void _register_csr_wr_mt(unsigned addr, wr_csr_f cb) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _register_csr_wr(addr, cb);
     }
 
     sysc::riscv::core_complex_if* const owner{nullptr};
@@ -286,6 +338,7 @@ private:
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};
+    mutex_t sync_mtx;
 };
 } // namespace sysc
 #endif /* _SYSC_CORE2SC_ADAPTER_H_ */

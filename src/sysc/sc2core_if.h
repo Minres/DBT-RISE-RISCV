@@ -48,6 +48,8 @@ struct sc2core_if {
     // this is needed since we want to call the destructor with a pointer-to-base
     virtual ~sc2core_if() = default;
 
+    virtual void setup_mt() = 0;
+
     util::delegate<void(unsigned)> set_hartid;
     util::delegate<void(unsigned)> set_irq_count;
     util::delegate<uint32_t()> get_mode;

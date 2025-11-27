@@ -42,7 +42,9 @@
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
 #include <scc/utilities.h>
+#include <sysc/kernel/sc_time.h>
 #include <tlm/scc/initiator_mixin.h>
+#include <tlm/scc/quantum_keeper.h>
 #include <tlm/scc/scv/tlm_rec_initiator_socket.h>
 #ifdef CWR_SYSTEMC
 #include <scmlinc/scml_property.h>
@@ -80,8 +82,11 @@ using irq_signal_t = tlm::scc::tlm_signal_bool_opt_in;
 using irq_signal_t = sc_core::sc_in<bool>;
 #endif
 
-template <unsigned int BUSWIDTH = scc::LT> class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
+template <unsigned int BUSWIDTH = scc::LT, typename QK = tlm::scc::quantumkeeper>
+class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
+    using this_class = core_complex<BUSWIDTH, QK>;
+
     tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> ibus{"ibus"};
 
     tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> dbus{"dbus"};
@@ -180,11 +185,12 @@ public:
 
     void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
-        quantum_keeper.inc(core_inc);
-        if(quantum_keeper.need_sync()) {
-            wait(quantum_keeper.get_local_time());
-            quantum_keeper.reset();
-        }
+        quantum_keeper.check_and_sync(core_inc);
+        // quantum_keeper.inc(core_inc);
+        // if(quantum_keeper.need_sync()) {
+        //     wait(quantum_keeper.get_local_time());
+        //     quantum_keeper.reset();
+        // }
         last_sync_cycle = cycle;
     }
 
@@ -206,14 +212,11 @@ public:
 
     void reset(uint64_t addr);
 
-    inline void start(bool dump = false);
-
     inline std::pair<uint64_t, bool> load_file(std::string const& name);
 
 protected:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
     int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
-
     void before_end_of_elaboration() override;
     void start_of_simulation() override;
     void forward();
@@ -225,16 +228,73 @@ protected:
     void ext_irq_cb();
     void local_irq_cb();
 #endif
+    ///////////////////////////////////////////////////////////////////////////////
+    // multi-threaded function implementations
+    ///////////////////////////////////////////////////////////////////////////////
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type
+    exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
+        quantum_keeper.execute_on_sysc([this, &gp, &delay, is_fetch]() {
+            if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
+                if(is_fetch && trc.tr_handle.is_active()) {
+                    trc.tr_handle.end_transaction();
+                }
+                auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
+                gp.set_extension(preExt);
+            }
+            dbus->b_transport(gp, delay);
+        });
+    }
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value, bool>::type
+    exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
+        return dbus->get_direct_mem_ptr(gp, dmi_data);
+    }
+    template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type run_iss() {
+        core->setup_mt();
+        quantum_keeper.check_and_sync(sc_core::SC_ZERO_TIME);
+        quantum_keeper.run_thread([this]() {
+            vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
+            return quantum_keeper.get_local_absolute_time();
+        });
+    }
+    ///////////////////////////////////////////////////////////////////////////////
+    // single-threaded function implementations
+    ///////////////////////////////////////////////////////////////////////////////
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type
+    exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
+        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
+            if(is_fetch && trc.tr_handle.is_active()) {
+                trc.tr_handle.end_transaction();
+            }
+            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
+            gp.set_extension(preExt);
+        }
+        dbus->b_transport(gp, delay);
+    }
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value, bool>::type
+    exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
+        auto result = false;
+        quantum_keeper.execute_on_sysc([this, &gp, &dmi_data, &result]() { result = dbus->get_direct_mem_ptr(gp, dmi_data); });
+        return result;
+    }
+    template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type run_iss() {
+        vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
+    }
+    ///////////////////////////////////////////////////////////////////////////////
+    //
+    ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
-    tlm_utils::tlm_quantumkeeper quantum_keeper;
+    QK quantum_keeper;
     std::vector<uint8_t> write_buf;
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
     uint64_t ibus_inc{0}, dbus_inc{0};
     std::unique_ptr<sc2core_if> core;
     std::unique_ptr<iss::vm_if> vm;
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
-
     struct {
         //! transaction recording database
         SCVNS scv_tr_db* m_db{nullptr};

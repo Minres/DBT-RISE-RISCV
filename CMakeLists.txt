@@ -114,7 +114,7 @@ if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
         list(APPEND LIB_DEFINES CORE_${CORE})
     endforeach()
 
-    message(STATUS "Core defines are ${LIB_DEFINES}")
+    #message(STATUS "Core defines are ${LIB_DEFINES}")
 
     if(WITH_LLVM)
         FILE(GLOB LLVM_GEN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/vm/llvm/vm_*.cpp)
