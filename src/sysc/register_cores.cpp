@@ -124,15 +124,15 @@ volatile std::array<bool, 14> riscv_init = {
 namespace llvm {
 using namespace sysc;
 volatile std::array<bool, 4> riscv_init = {
-    iss_factory::instance().register_creator("rv32imc_m:llvm",
+    iss_factory::instance().register_creator("rv32imac_m:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imc>>(cc);
-                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imc*>(cpu), gdb_port)}};
+                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
-    iss_factory::instance().register_creator("rv32imc_mu:llvm",
+    iss_factory::instance().register_creator("rv32imac_mu:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imc>>(cc);
-                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imc*>(cpu), gdb_port)}};
+                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_m:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {

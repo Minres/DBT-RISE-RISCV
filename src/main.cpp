@@ -210,8 +210,6 @@ int main(int argc, char* argv[]) {
         }
         if(clim.count("disass")) {
             vm->setDisassEnabled(true);
-            LOGGER(disass)::set_reporting_level(logging::DEBUG);
-            auto lvl = LOGGER(disass)::get_reporting_level();
             LOGGER(disass)::print_time() = false;
             auto file_name = clim["disass"].as<std::string>();
             if(file_name.length() > 0) {
