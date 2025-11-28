@@ -50,6 +50,7 @@ struct sc2core_if {
 
     virtual void setup_mt() = 0;
 
+    virtual void enable_disass(bool enable) = 0;
     util::delegate<void(unsigned)> set_hartid;
     util::delegate<void(unsigned)> set_irq_count;
     util::delegate<uint32_t()> get_mode;

@@ -34,6 +34,7 @@
 #define _SYSC_CORE_COMPLEX_H_
 
 #include "core_complex_if.h"
+#include "instr_recorder.h"
 #include "sc2core_if.h"
 #include <iss/debugger/target_adapter_if.h>
 #include <iss/debugger_if.h>
@@ -107,6 +108,8 @@ public:
     cci::cci_param<std::string> elf_file{"elf_file", ""};
 
     cci::cci_param<bool> enable_disass{"enable_disass", false};
+
+    cci::cci_param<bool> enable_instr_trace{"enable_instr_trace", true};
 
     cci::cci_param<bool> disable_dmi{"disable_dmi", false};
 
@@ -204,7 +207,7 @@ public:
 
     void trace(sc_core::sc_trace_file* trf) const override;
 
-    bool disass_output(uint64_t pc, std::string const& instr) override;
+    void disass_output(uint64_t pc, std::string const& instr) override;
 
     void set_clock_period(sc_core::sc_time period);
 
@@ -235,13 +238,7 @@ protected:
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type
     exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
         quantum_keeper.execute_on_sysc([this, &gp, &delay, is_fetch]() {
-            if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-                if(is_fetch && trc.tr_handle.is_active()) {
-                    trc.tr_handle.end_transaction();
-                }
-                auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-                gp.set_extension(preExt);
-            }
+            gp.set_extension(trc.get_recording_extension(is_fetch));
             dbus->b_transport(gp, delay);
         });
     }
@@ -264,13 +261,7 @@ protected:
     template <typename U = QK>
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type
     exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
-        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-            if(is_fetch && trc.tr_handle.is_active()) {
-                trc.tr_handle.end_transaction();
-            }
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-            gp.set_extension(preExt);
-        }
+        gp.set_extension(trc.get_recording_extension(is_fetch));
         dbus->b_transport(gp, delay);
     }
     template <typename U = QK>
@@ -295,15 +286,7 @@ protected:
     std::unique_ptr<sc2core_if> core;
     std::unique_ptr<iss::vm_if> vm;
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
-    struct {
-        //! transaction recording database
-        SCVNS scv_tr_db* m_db{nullptr};
-        //! blocking transaction recording stream handle
-        SCVNS scv_tr_stream* stream_handle{nullptr};
-        //! transaction generator handle for blocking transactions
-        SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data>* instr_tr_handle{nullptr};
-        SCVNS scv_tr_handle tr_handle;
-    } trc;
+    instr_recorder<QK> trc{quantum_keeper};
     std::unique_ptr<scc::tick2time> t2t;
 
 private:

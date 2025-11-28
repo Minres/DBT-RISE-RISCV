@@ -49,7 +49,7 @@ struct core_complex_if {
 
     virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool disass_output(uint64_t pc, std::string const& instr) = 0;
+    virtual void disass_output(uint64_t pc, std::string const& instr) = 0;
 
     virtual unsigned get_last_bus_cycles() = 0;
 

@@ -236,7 +236,6 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
     for(auto pin : local_irq_i)
         sensitive << pin;
 #endif
-    trc.m_db = scv_tr_db::get_default_db();
 
     SC_METHOD(forward);
 #ifndef CWR_SYSTEMC
@@ -275,10 +274,11 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::b
     }
 #endif
     sc_assert(vm);
+    auto instr_trace = GET_PROP_VALUE(enable_instr_trace) ? trc.init(this->name()) : false;
     auto disass = GET_PROP_VALUE(enable_disass);
-    if(disass && trc.m_db)
-        SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
-    vm->setDisassEnabled(disass || trc.m_db != nullptr);
+    if(disass)
+        core->enable_disass(true);
+    vm->setDisassEnabled(disass || instr_trace);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -314,7 +314,6 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::b
 }
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::start_of_simulation() {
-    // quantum_keeper.reset();
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
@@ -332,25 +331,10 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::s
             }
         }
     }
-    if(trc.m_db != nullptr && trc.stream_handle == nullptr) {
-        string basename(this->name());
-        trc.stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", trc.m_db);
-        trc.instr_tr_handle = new scv_tr_generator<>("execute", *trc.stream_handle);
-    }
 }
 
-template <unsigned int BUSWIDTH, typename QK> bool core_complex<BUSWIDTH, QK>::disass_output(uint64_t pc, std::string const& instr_str) {
-    if(trc.m_db == nullptr)
-        return false;
-    if(trc.tr_handle.is_active())
-        trc.tr_handle.end_transaction();
-    trc.tr_handle = trc.instr_tr_handle->begin_transaction();
-    trc.tr_handle.record_attribute("PC", pc);
-    trc.tr_handle.record_attribute("INSTR", instr_str);
-    trc.tr_handle.record_attribute("MODE", lvl[core->get_mode()]);
-    trc.tr_handle.record_attribute("MSTATUS", core->get_state());
-    trc.tr_handle.record_attribute("LTIME_START", quantum_keeper.get_local_absolute_time().value() / 1000);
-    return true;
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::disass_output(uint64_t pc, std::string const& instr_str) {
+    trc.disass_output(pc, instr_str, lvl[core->get_mode()], core->get_state());
 }
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::forward() {
@@ -491,10 +475,6 @@ bool core_complex<BUSWIDTH, QK>::write_mem(uint64_t addr, unsigned length, const
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-            gp.set_extension(preExt);
-        }
         auto pre_delay = delay;
         exec_b_transport(gp, delay);
         if(pre_delay > delay)

@@ -75,9 +75,11 @@ public:
         this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd>(this);
         this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr>(this);
 
+        disass_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::disass);
+        disass_delegate.level = logging::log_level::INFO;
+        this->disasslogger.set_logger(disass_delegate);
         log_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::log);
         log_delegate.level = static_cast<logging::log_level>(scc::get_logging_level());
-        this->disasslogger.set_logger(log_delegate);
         this->isslogger.set_logger(log_delegate);
     }
 
@@ -94,6 +96,10 @@ public:
     }
 
     virtual ~core2sc_adapter() {}
+
+    void enable_disass(bool enable) override {
+        this->disasslogger.set_log_level(enable ? logging::log_level::DEBUG : logging::log_level::INFO);
+    }
 
     void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
         PLAT::unknown_instr_cb = handler;
@@ -150,11 +156,14 @@ public:
         }
     }
 
+    void disass(logging::log_level lvl, std::string const& msg_type, std::string const& msg, unsigned line, char const* file) {
+        ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_HIGH).type(owner->hier_name()).get()
+            << "[" << msg_type << "] " << msg;
+    }
+
     void disass_output(uint64_t pc, std::string const& instr) {
-        static constexpr std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
-        if(!owner->disass_output(pc, instr)) {
-            PLAT::disass_output(pc, instr);
-        }
+        owner->disass_output(pc, instr);
+        PLAT::disass_output(pc, instr);
     };
 
     iss::mem::memory_if get_mem_if() {
@@ -335,6 +344,7 @@ private:
 
     sysc::riscv::core_complex_if* const owner{nullptr};
     util::LoggerDelegate log_delegate;
+    util::LoggerDelegate disass_delegate;
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};
