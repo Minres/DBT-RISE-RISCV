@@ -243,8 +243,9 @@ protected:
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type
     exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
         quantum_keeper.execute_on_sysc([this, &gp, &delay, is_fetch]() {
+            auto& sckt = is_fetch ? ibus : dbus;
             gp.set_extension(trc.get_recording_extension(is_fetch));
-            dbus->b_transport(gp, delay);
+            sckt->b_transport(gp, delay);
         });
     }
     template <typename U = QK>
