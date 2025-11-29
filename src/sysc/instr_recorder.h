@@ -18,52 +18,62 @@ namespace riscv {
 
 struct instr_recorder_b {
     bool init(std::string const& basename) {
-        if(m_db != nullptr) {
-            stream_handle = new SCVNS scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", m_db);
-            instr_tr_handle = new SCVNS scv_tr_generator<>("execute", *stream_handle);
+        if(tx_db != nullptr) {
+            stream_hnd = new SCVNS scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", tx_db);
+            gen_hndl = new SCVNS scv_tr_generator<>("execute", *stream_hnd);
+            gen_timed_hndl = new SCVNS scv_tr_generator<>("execute(timed)", *stream_hnd);
             return true;
         }
         return false;
     }
-    instr_recorder_b(SCVNS scv_tr_db* m_db = SCVNS scv_tr_db::get_default_db())
-    : m_db(m_db) {}
+    instr_recorder_b(SCVNS scv_tr_db* tx_db = SCVNS scv_tr_db::get_default_db())
+    : tx_db(tx_db) {}
     void record_instr(uint64_t pc, std::string const& instr_str, char mode, uint64_t status, sc_core::sc_time ltime) {
-        if(stream_handle == nullptr)
-            return;
-        if(tr_handle.is_active())
-            tr_handle.end_transaction();
-        tr_handle = instr_tr_handle->begin_transaction();
-        tr_handle.record_attribute("PC", pc);
-        tr_handle.record_attribute("INSTR", instr_str);
-        tr_handle.record_attribute("MODE", mode);
-        tr_handle.record_attribute("MSTATUS", status);
-        tr_handle.record_attribute("LTIME_START", ltime / 1_ns);
+        tx_hndl = gen_hndl->begin_transaction();
+        tx_hndl.record_attribute("PC", pc);
+        tx_hndl.record_attribute("INSTR", instr_str);
+        tx_hndl.record_attribute("MODE", mode);
+        tx_hndl.record_attribute("MSTATUS", status);
+        tx_hndl.record_attribute("LTIME_START(ps)", static_cast<uint64_t>(ltime / 1_ps));
+        tx_hndl.end_transaction();
+        if(tx_timed_hndl.is_active())
+            gen_timed_hndl->end_transaction(tx_timed_hndl, ltime);
+        tx_timed_hndl = gen_timed_hndl->begin_transaction(ltime);
+        tx_timed_hndl.record_attribute("PC", pc);
+        tx_timed_hndl.record_attribute("INSTR", instr_str);
+        tx_timed_hndl.record_attribute("MODE", mode);
+        tx_timed_hndl.record_attribute("MSTATUS", status);
+        tx_timed_hndl.add_relation("PARENT/CHILD", tx_hndl);
     }
 
     tlm::scc::scv::tlm_recording_extension* get_recording_extension(bool finish_instr) {
-        if(m_db != nullptr && tr_handle.is_valid()) {
-            if(finish_instr && tr_handle.is_active())
-                tr_handle.end_transaction();
-            return new tlm::scc::scv::tlm_recording_extension(tr_handle, this);
+        if(tx_db != nullptr) {
+            if(tx_timed_hndl.is_valid()) {
+                return new tlm::scc::scv::tlm_recording_extension(tx_timed_hndl, this);
+            } else if(tx_hndl.is_valid()) {
+                return new tlm::scc::scv::tlm_recording_extension(tx_hndl, this);
+            }
         }
         return nullptr;
     }
 
 protected:
     //! transaction recording database
-    SCVNS scv_tr_db* m_db{nullptr};
+    SCVNS scv_tr_db* tx_db{nullptr};
     //! blocking transaction recording stream handle
-    SCVNS scv_tr_stream* stream_handle{nullptr};
+    SCVNS scv_tr_stream* stream_hnd{nullptr};
     //! transaction generator handle for blocking transactions
-    SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data>* instr_tr_handle{nullptr};
-    SCVNS scv_tr_handle tr_handle;
+    SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data>* gen_hndl{nullptr};
+    SCVNS scv_tr_generator<SCVNS _scv_tr_generator_default_data, SCVNS _scv_tr_generator_default_data>* gen_timed_hndl{nullptr};
+    SCVNS scv_tr_handle tx_hndl;
+    SCVNS scv_tr_handle tx_timed_hndl;
 };
 
 template <typename QK> struct instr_recorder : instr_recorder_b {};
 
 template <> struct instr_recorder<tlm::scc::quantumkeeper> : instr_recorder_b {
     void disass_output(uint64_t pc, std::string const& instr_str, char mode, uint64_t status) {
-        if(stream_handle == nullptr)
+        if(stream_hnd == nullptr)
             return;
         record_instr(pc, instr_str, mode, status, quantum_keeper.get_local_absolute_time());
     }
@@ -76,7 +86,7 @@ protected:
 
 template <> struct instr_recorder<tlm::scc::quantumkeeper_mt> : instr_recorder_b {
     void disass_output(uint64_t pc, std::string const& instr_str, char mode, uint64_t status) {
-        if(stream_handle == nullptr)
+        if(stream_hnd == nullptr)
             return;
         que.push(instr_record{pc, instr_str, mode, status, quantum_keeper.get_local_absolute_time()});
     }
