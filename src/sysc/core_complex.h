@@ -217,6 +217,11 @@ public:
 
     inline std::pair<uint64_t, bool> load_file(std::string const& name);
 
+    sc_core::sc_event const& get_finish_event() {
+        finish_evt_inuse = true;
+        return finish_evt;
+    }
+
 protected:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
     int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
@@ -261,8 +266,9 @@ protected:
     template <typename U = QK>
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type
     exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
+        auto& sckt = is_fetch ? ibus : dbus;
         gp.set_extension(trc.get_recording_extension(is_fetch));
-        dbus->b_transport(gp, delay);
+        sckt->b_transport(gp, delay);
     }
     template <typename U = QK>
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value, bool>::type
@@ -288,6 +294,8 @@ protected:
     iss::debugger::target_adapter_if* tgt_adapter{nullptr};
     instr_recorder<QK> trc{quantum_keeper};
     std::unique_ptr<scc::tick2time> t2t;
+    sc_core::sc_event finish_evt{"finish_evt"};
+    bool finish_evt_inuse{false};
 
 private:
     void init();

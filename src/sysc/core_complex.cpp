@@ -42,6 +42,7 @@
 #include "tlm/scc/quantum_keeper.h"
 #include <memory>
 #include <sstream>
+#include <sysc/kernel/sc_simcontext.h>
 #include <tlm/scc/tlm_signal_gp.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
@@ -388,7 +389,12 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
         core->set_interrupt_execution(false);
         run_iss();
     } while(!core->get_interrupt_execution());
-    sc_stop();
+    if(finish_evt_inuse)
+        finish_evt.notify();
+    else {
+        if(sc_core::sc_get_simulator_status() != sc_core::SC_SIM_USER_STOP) // stop simulation
+            sc_stop();
+    }
 }
 
 template <unsigned int BUSWIDTH, typename QK>
@@ -411,7 +417,6 @@ bool core_complex<BUSWIDTH, QK>::read_mem(uint64_t addr, unsigned length, uint8_
 #endif
         return true;
     } else {
-        auto& sckt = is_fetch ? ibus : dbus;
         tlm::tlm_generic_payload gp;
         gp.set_command(tlm::TLM_READ_COMMAND);
         gp.set_address(addr);
