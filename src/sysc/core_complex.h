@@ -47,6 +47,7 @@
 #include <tlm/scc/initiator_mixin.h>
 #include <tlm/scc/quantum_keeper.h>
 #include <tlm/scc/scv/tlm_rec_initiator_socket.h>
+#include <vector>
 #ifdef CWR_SYSTEMC
 #include <scmlinc/scml_property.h>
 #else
@@ -285,7 +286,10 @@ protected:
     //
     ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
-    util::range_lut<tlm_dmi_ext> fetch_lut, read_lut, write_lut;
+    util::range_lut<tlm_dmi_ext> fetch_lut{tlm_dmi_ext()};
+    inline util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space);
+    inline util::range_lut<tlm_dmi_ext>& get_write_lut(unsigned space);
+
     QK quantum_keeper;
     std::vector<uint8_t> write_buf;
     sc_core::sc_signal<sc_core::sc_time> curr_clk;
@@ -300,6 +304,11 @@ protected:
 
 private:
     void init();
+    // we reserve for 8 memory spaces
+    using lut_vec_t = std::vector<util::range_lut<tlm_dmi_ext>>;
+    lut_vec_t dmi_read_luts{8, util::range_lut<tlm_dmi_ext>(tlm_dmi_ext())};
+    lut_vec_t dmi_write_luts{8, util::range_lut<tlm_dmi_ext>(tlm_dmi_ext())};
+    util::range_lut<tlm_dmi_ext>& get_lut(lut_vec_t& luts, unsigned space);
     std::vector<iss::vm_plugin*> plugin_list;
 };
 } // namespace riscv

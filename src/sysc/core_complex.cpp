@@ -41,6 +41,7 @@
 #include "iss_factory.h"
 #include "tlm/scc/quantum_keeper.h"
 #include "sysc/memspace_extension.h"
+#include "util/range_lut.h"
 #include <memory>
 #include <sstream>
 #include <sysc/kernel/sc_simcontext.h>
@@ -179,10 +180,7 @@ void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string
 #ifndef CWR_SYSTEMC
 template <unsigned int BUSWIDTH, typename QK>
 core_complex<BUSWIDTH, QK>::core_complex(sc_module_name const& name)
-: sc_module(name)
-, fetch_lut(tlm_dmi_ext())
-, read_lut(tlm_dmi_ext())
-, write_lut(tlm_dmi_ext()) {
+: sc_module(name) {
     init();
 }
 #endif
@@ -195,13 +193,17 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
         }
     });
     dbus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
-        auto lut_entry = read_lut.getEntry(start);
-        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
-            read_lut.removeEntry(lut_entry);
+        for(auto& read_lut : dmi_read_luts) {
+            auto lut_entry = read_lut.getEntry(start);
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
+                read_lut.removeEntry(lut_entry);
+            }
         }
-        lut_entry = write_lut.getEntry(start);
-        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
-            write_lut.removeEntry(lut_entry);
+        for(auto& write_lut : dmi_write_luts) {
+            auto lut_entry = write_lut.getEntry(start);
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
+                write_lut.removeEntry(lut_entry);
+            }
         }
     });
 
@@ -401,9 +403,8 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
 template <unsigned int BUSWIDTH, typename QK>
 bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, uint8_t* const data) {
     // basically checking for mem_type_e in CORENAME.h
-
     bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
-    auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
+    auto& dmi_lut = is_fetch ? fetch_lut : get_read_lut(addr.space);
     auto lut_entry = dmi_lut.getEntry(addr.val);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr.val - lut_entry.get_start_address();
@@ -463,7 +464,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
 
 template <unsigned int BUSWIDTH, typename QK>
 bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, const uint8_t* const data) {
-    auto lut_entry = write_lut.getEntry(addr.val);
+    auto lut_entry = get_write_lut(addr.space).getEntry(addr.val);
     if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
         auto offset = addr.val - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
@@ -506,8 +507,8 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
             tlm_dmi_ext dmi_data;
             if(exec_get_direct_mem_ptr(gp, dmi_data)) {
                 if(dmi_data.is_write_allowed() && (addr.val + length - 1) <= dmi_data.get_end_address())
-                    write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
-                                       dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
+                    get_write_lut(addr.space)
+                        .addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
         return true;
@@ -539,6 +540,22 @@ bool core_complex<BUSWIDTH, QK>::write_mem_dbg(const addr_t& addr, unsigned leng
     gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
+template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_read_lut(unsigned space) {
+    return get_lut(dmi_read_luts, space);
+};
+template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_write_lut(unsigned space) {
+    return get_lut(dmi_write_luts, space);
+};
+template <unsigned int BUSWIDTH, typename QK>
+util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_lut(lut_vec_t& luts, unsigned space) {
+    if(space >= luts.size()) {
+        luts.reserve(space + 1);
+        // cannot use resize as assignment and move assignment operator are not supported by range_luts with tlm_dmi_ext as defaults
+        while(space >= luts.size())
+            luts.emplace_back(tlm_dmi_ext());
+    }
+    return luts[space];
+};
 
 template class core_complex<scc::LT>;
 template class core_complex<32>;
