@@ -62,7 +62,7 @@ struct memspace_dispatcher : sc_core::sc_module {
         target.register_b_transport(
             [this](tlm::tlm_generic_payload& trans, sc_core::sc_time& delay) { mapped_intor(trans)->b_transport(trans, delay); });
         target.register_get_direct_mem_ptr([this](tlm::tlm_generic_payload& trans, tlm::tlm_dmi& dmi_data) {
-            return mapped_intor(trans)->get_direct_mem_ptr(trans, dmi_data);
+            return mapped_intor(trans, true)->get_direct_mem_ptr(trans, dmi_data);
         });
         target.register_transport_dbg([this](tlm::tlm_generic_payload& trans) { return mapped_intor(trans)->transport_dbg(trans); });
         for(size_t i = 0; i < initiator.size(); i++) {
@@ -86,17 +86,22 @@ struct memspace_dispatcher : sc_core::sc_module {
 private:
     std::unordered_map<MEMSPACE, size_t> space_mapping{};
     size_t default_port = 0;
-    intor_sckt& mapped_intor(const tlm::tlm_generic_payload& trans) {
+    intor_sckt& mapped_intor(const tlm::tlm_generic_payload& trans, bool dmi = false) {
+        auto prefix = dmi ? "DMI " : "";
         tlm_memspace_extension<MEMSPACE>* ext;
         trans.get_extension(ext);
         if(ext) {
             auto it = space_mapping.find(ext->get_space());
             if(it != space_mapping.end()) {
-                SCCTRACE(SCMOD) << "Sending transaction to initiator " << it->second;
+#ifndef NDEBUG
+                SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to initiator " << it->second;
+#endif
                 return initiator[it->second];
             }
         }
-        SCCTRACE(SCMOD) << "Sending transaction to default initiator " << default_port;
+#ifndef NDEBUG
+        SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to default initiator " << default_port;
+#endif
         return initiator[default_port];
     }
 };
