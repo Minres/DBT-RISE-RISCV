@@ -112,7 +112,8 @@ protected:
     // Currently no type erasure for the sparse_array is available, so all memories
     // have the largest possible size. Memory footprint should still be small as it
     // a sparse array
-    using mem_type = util::sparse_array<uint8_t, arch::traits<PLAT>::max_mem_size>;
+    using mem_type = util::sparse_array < uint8_t,
+          arch::traits<PLAT>::max_mem_size<1ull << 36 ? arch::traits<PLAT>::max_mem_size : (1ull << 36)>;
     std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories{};
     arch::priv_if<reg_t> hart_if;
 };
