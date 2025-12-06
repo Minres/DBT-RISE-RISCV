@@ -232,13 +232,17 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
 #else
     SC_METHOD(sw_irq_cb);
     sensitive << sw_irq_i;
+    dont_initialize();
     SC_METHOD(timer_irq_cb);
     sensitive << timer_irq_i;
+    dont_initialize();
     SC_METHOD(ext_irq_cb);
     sensitive << ext_irq_i;
+    dont_initialize();
     SC_METHOD(local_irq_cb);
     for(auto pin : local_irq_i)
         sensitive << pin;
+    dont_initialize();
 #endif
 
     SC_METHOD(forward);
@@ -378,6 +382,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::l
 #endif
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::run() {
+    reset(GET_PROP_VALUE(reset_address));
     wait(SC_ZERO_TIME); // separate from elaboration phase
     do {
         wait(SC_ZERO_TIME);
