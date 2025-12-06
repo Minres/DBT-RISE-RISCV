@@ -101,7 +101,7 @@ public:
 
     irq_signal_t sw_irq_i{"sw_irq_i"};
 
-    sc_core::sc_vector<irq_signal_t> local_irq_i{"local_irq_i", 16};
+    sc_core::sc_vector<irq_signal_t> clint_irq_i{"local_irq_i", 16};
 
 #ifndef CWR_SYSTEMC
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
@@ -235,7 +235,7 @@ protected:
     void sw_irq_cb();
     void timer_irq_cb();
     void ext_irq_cb();
-    void local_irq_cb();
+    void clint_irq_cb();
 #endif
     ///////////////////////////////////////////////////////////////////////////////
     // multi-threaded function implementations
