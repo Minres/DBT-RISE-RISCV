@@ -230,13 +230,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
             return tlm::TLM_COMPLETED;
         });
 #else
-    SC_METHOD(sw_irq_cb);
-    sensitive << sw_irq_i;
-    SC_METHOD(timer_irq_cb);
-    sensitive << timer_irq_i;
-    SC_METHOD(ext_irq_cb);
-    sensitive << ext_irq_i;
-    SC_METHOD(local_irq_cb);
+    SC_METHOD(clint_irq_cb);
     for(auto pin : clint_irq_i)
         sensitive << pin;
 #endif
@@ -362,21 +356,6 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::sw_irq_cb() {
-    if(!rst_i->read() && sc_core::sc_time_stamp().value())
-        core->local_irq(3, sw_irq_i.read());
-}
-
-template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::timer_irq_cb() {
-    if(!rst_i->read() && sc_core::sc_time_stamp().value())
-        core->local_irq(7, timer_irq_i.read());
-}
-
-template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::ext_irq_cb() {
-    if(!rst_i->read() && sc_core::sc_time_stamp().value())
-        core->local_irq(11, ext_irq_i.read());
-}
-
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::clint_irq_cb() {
     for(auto i = 0U; i < clint_irq_i.size(); ++i) {
         if(clint_irq_i[i].event()) {

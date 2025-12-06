@@ -84,6 +84,8 @@ using irq_signal_t = tlm::scc::tlm_signal_bool_opt_in;
 using irq_signal_t = sc_core::sc_in<bool>;
 #endif
 
+enum { SW_IRQ = 3, TIMER_IRQ = 7, EXT_IRQ = 11 };
+
 template <unsigned int BUSWIDTH = scc::LT, typename QK = tlm::scc::quantumkeeper>
 class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
@@ -94,12 +96,6 @@ public:
     tlm::scc::initiator_mixin<tlm::tlm_initiator_socket<BUSWIDTH>> dbus{"dbus"};
 
     sc_core::sc_in<bool> rst_i{"rst_i"};
-
-    irq_signal_t ext_irq_i{"ext_irq_i"};
-
-    irq_signal_t timer_irq_i{"timer_irq_i"};
-
-    irq_signal_t sw_irq_i{"sw_irq_i"};
 
     sc_core::sc_vector<irq_signal_t> clint_irq_i{"local_irq_i", 16};
 
@@ -232,9 +228,6 @@ protected:
     void run();
     void rst_cb();
 #ifndef USE_TLM_SIGNAL
-    void sw_irq_cb();
-    void timer_irq_cb();
-    void ext_irq_cb();
     void clint_irq_cb();
 #endif
     ///////////////////////////////////////////////////////////////////////////////
