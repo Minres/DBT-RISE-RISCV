@@ -548,7 +548,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
     void disass_output(uint64_t pc, std::string const& instr) override {
         static CONSTEXPR char const* fmt_str =
-            sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:{:08};i:{};c:{}]" : "0x{:016x}    {:40} [p:{};s:{:016};i:{};c:{}]";
+            sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
         if(::logging::DEBUG <= disasslogger.get_log_level())
             ILOG(disasslogger, ::logging::DEBUG,
                  fmt::format(fmt_str, pc, instr, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
