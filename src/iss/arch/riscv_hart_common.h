@@ -308,6 +308,11 @@ template <typename WORD_TYPE> struct priv_if {
 };
 
 template <typename BASE = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
+    // Extension status bits (SD needs to be set when writing FS / VS / XS):
+    // TODO implement XS
+    static constexpr uint32_t extension_status_mask =
+        (traits<BASE>::FP_REGS_SIZE ? (0b11u << 13) : 0u) | (traits<BASE>::V_REGS_SIZE ? (0b11u << 9) : 0u);
+
     const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
     const std::array<const char*, 16> trap_str = {{""
                                                    "Instruction address misaligned", // 0

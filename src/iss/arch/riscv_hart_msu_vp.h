@@ -35,6 +35,7 @@
 #ifndef _RISCV_HART_MSU_VP_H
 #define _RISCV_HART_MSU_VP_H
 
+#include "iss/arch/riscv_hart_mu_p.h"
 #include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
@@ -66,32 +67,33 @@ public:
     using this_class = riscv_hart_msu_vp<BASE>;
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
-
+    static constexpr uint32_t s_mask_lower = 0b00000000011111100000000100100010;
+    //                                         ||||||||||||||||/|/|/|/|||||||||
+    //                                         |||||||||||||||| | | | ||||||||+-- UIE
+    //                                         |||||||||||||||| | | | |||||||+--- SIE
+    //                                         |||||||||||||||| | | | ||||||+---- WPRI
+    //                                         |||||||||||||||| | | | |||||+----- MIE
+    //                                         |||||||||||||||| | | | ||||+------ UPIE
+    //                                         |||||||||||||||| | | | |||+------- SPIE
+    //                                         |||||||||||||||| | | | ||+-------- UBE
+    //                                         |||||||||||||||| | | | |+--------- MPIE
+    //                                         |||||||||||||||| | | | +---------- SPP
+    //                                         |||||||||||||||| | | +------------ VS
+    //                                         |||||||||||||||| | +-------------- MPP
+    //                                         |||||||||||||||| +---------------- FS
+    //                                         |||||||||||||||+------------------ XS
+    //                                         ||||||||||||||+------------------- MPRV
+    //                                         |||||||||||||+-------------------- SUM
+    //                                         ||||||||||||+--------------------- MXR
+    //                                         |||||||||||+---------------------- TVM
+    //                                         ||||||||||+----------------------- TW
+    //                                         |||||||||+------------------------ TSR
+    //                                         ||||||||+------------------------- SPELP
+    //                                         |||||||+-------------------------- SDT
+    //                                         ||||||+--------------------------- WPRI
+    //                                         +--------------------------------- SD / WPRI
     static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
-        if(sizeof(reg_t) == 4) {
-#if __cplusplus < 201402L
-            return priv_lvl == PRIV_U ? 0x80000011UL : priv_lvl == PRIV_S ? 0x800de133UL : 0x807ff9ddUL;
-#else
-            switch(priv_lvl) {
-            case PRIV_U:
-                return 0x80000000UL; // 0b1000 0000 0000 0000 0000 0000 0001 0001
-            case PRIV_S:
-                return 0x800de762UL; // 0b1000 0000 0000 1101 1110 0001 0011 0011
-            default:
-                return 0x801fffeaUL; // 0b1000 0000 0111 1111 1111 1001 1011 1011
-            }
-#endif
-        } else if(sizeof(reg_t) == 8) {
-            switch(priv_lvl) {
-            case PRIV_U:
-                return 0x8000000f00000000ULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
-            case PRIV_S:
-                return 0x80000003000de762ULL; // 0b1...0 0011 0000 0000 0000 1101 1110 0111 0110 0010
-            default:
-                return 0x80000030001fffeaULL; // 0b1...0 0000 0000 0000 0001 1111 1111 1111 1110 1010
-            }
-        } else
-            assert(false && "Unsupported XLEN value");
+        return riscv_hart_mu_p<BASE>::get_mstatus_mask(priv_lvl) | ((priv_lvl >= PRIV_S) ? s_mask_lower : 0);
     }
     static constexpr reg_t get_mstatus_rd_mask(unsigned priv_lvl) {
         if(sizeof(reg_t) == 4) {
@@ -115,6 +117,11 @@ public:
         reg_t old_val = this->state.mstatus;
         auto mask = get_mstatus_mask(priv_lvl);
         auto new_val = (old_val & ~mask) | (val & mask);
+        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
+            // set SD bit if any of FS or VS are dirty
+            // FIXME: this wont work if XS is 01 and FS is 10
+            if(reg_t masked = new_val & riscv_hart_common<BASE>::extension_status_mask && masked & (masked >> 1))
+                new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
         this->state.mstatus = new_val;
     }
 
@@ -129,6 +136,10 @@ public:
         if((new_val & this->state.mstatus.UXL.Mask) == 0) {
             new_val |= old_val & this->state.mstatus.UXL.Mask;
         }
+        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
+            if(new_val && riscv_hart_common<BASE>::extension_status_mask)
+                // set SD bit if any of FS, VS and XS are set
+                new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
         this->state.mstatus = new_val;
     }
 

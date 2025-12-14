@@ -35,6 +35,7 @@
 #ifndef _RISCV_HART_MU_P_H
 #define _RISCV_HART_MU_P_H
 
+#include "iss/arch/riscv_hart_m_p.h"
 #include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
@@ -42,6 +43,7 @@
 #include "util/logging.h"
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <elfio/elf_types.hpp>
 #include <elfio/elfio.hpp>
@@ -64,65 +66,43 @@ public:
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
 
+    static constexpr uint32_t u_mask_lower = 0b00000000000000000000000000010001;
+    //                                         ||||||||||||||||/|/|/|/|||||||||
+    //                                         |||||||||||||||| | | | ||||||||+-- UIE
+    //                                         |||||||||||||||| | | | |||||||+--- SIE
+    //                                         |||||||||||||||| | | | ||||||+---- WPRI
+    //                                         |||||||||||||||| | | | |||||+----- MIE
+    //                                         |||||||||||||||| | | | ||||+------ UPIE
+    //                                         |||||||||||||||| | | | |||+------- SPIE
+    //                                         |||||||||||||||| | | | ||+-------- UBE
+    //                                         |||||||||||||||| | | | |+--------- MPIE
+    //                                         |||||||||||||||| | | | +---------- SPP
+    //                                         |||||||||||||||| | | +------------ VS
+    //                                         |||||||||||||||| | +-------------- MPP
+    //                                         |||||||||||||||| +---------------- FS
+    //                                         |||||||||||||||+------------------ XS
+    //                                         ||||||||||||||+------------------- MPRV
+    //                                         |||||||||||||+-------------------- SUM
+    //                                         ||||||||||||+--------------------- MXR
+    //                                         |||||||||||+---------------------- TVM
+    //                                         ||||||||||+----------------------- TW
+    //                                         |||||||||+------------------------ TSR
+    //                                         ||||||||+------------------------- SPELP
+    //                                         |||||||+-------------------------- SDT
+    //                                         ||||||+--------------------------- WPRI
+    //                                         +--------------------------------- SD / WPRI
     static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
-        if(sizeof(reg_t) == 4) {
-#if __cplusplus < 201402L
-            return priv_lvl == PRIV_U ? 0x80000011UL : priv_lvl == PRIV_S ? 0x800de133UL : 0x807ff9ddUL;
-#else
-            switch(priv_lvl) {
-            case PRIV_U:
-                return FEAT & features_e::FEAT_EXT_N ? 0x00000011UL : 0UL; // 0b1...0 0001 0001
-            default:
-                //       +-SD
-                //       |        +-TSR
-                //       |        |+-TW
-                //       |        ||+-TVM
-                //       |        |||+-MXR
-                //       |        ||||+-SUM
-                //       |        |||||+-MPRV
-                //       |        |||||| +-XS
-                //       |        |||||| | +-FS
-                //       |        |||||| | | +-MPP
-                //       |        |||||| | | |  +-SPP
-                //       |        |||||| | | |  |+-MPIE
-                //       |        |||||| | | |  ||  +-UPIE
-                //       |        ||||||/|/|/|  ||  |+-MIE
-                //       |        ||||||/|/|/|  ||  ||  +-UIE
-                return 0b10000000001000000001100010011001;
-            }
-#endif
-        } else if(sizeof(reg_t) == 8) {
-#if __cplusplus < 201402L
-            return priv_lvl == PRIV_U ? 0x011ULL : priv_lvl == PRIV_S ? 0x000de133ULL : 0x007ff9ddULL;
-#else
-            switch(priv_lvl) {
-            case PRIV_U:
-                return FEAT & features_e::FEAT_EXT_N ? 0x8000000000000011ULL : 0ULL; // 0b1...0 0001 0001
-            default:
-                //                +-TSR
-                //                |+-TW
-                //                ||+-TVM
-                //                |||+-MXR
-                //                ||||+-SUM
-                //                |||||+-MPRV
-                //                |||||| +-XS
-                //                |||||| | +-FS
-                //                |||||| | | +-MPP
-                //                |||||| | | |  +-SPP
-                //                |||||| | | |  |+-MPIE
-                //                |||||| | | |  ||  +-UPIE
-                //                ||||||/|/|/|  ||  |+-MIE
-                //                ||||||/|/|/|  ||  ||  +-UIE
-                return 0b00000000001000000001100010011001 | 0x8000000000000000ULL;
-            }
-#endif
-        } else
-            assert(false && "Unsupported XLEN value");
+        return u_mask_lower | (priv_lvl >= PRIV_M ? riscv_hart_m_p<BASE>::get_mstatus_mask() : 0);
     }
 
     void write_mstatus(reg_t val, unsigned priv_lvl) {
         auto mask = get_mstatus_mask(priv_lvl);
         auto new_val = (this->state.mstatus() & ~mask) | (val & mask);
+        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
+            // set SD bit if any of FS or VS are dirty
+            // FIXME: this wont work if XS is 01 and FS is 10
+            if(reg_t masked = new_val & riscv_hart_common<BASE>::extension_status_mask && masked & (masked >> 1))
+                new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
         this->state.mstatus = new_val;
     }
 
