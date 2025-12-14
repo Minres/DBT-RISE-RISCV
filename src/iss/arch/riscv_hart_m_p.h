@@ -63,46 +63,65 @@ public:
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
 
+    // Notation for differing fields is: 32 bits / 64 bits
+    static constexpr uint32_t lower_half = 0b00000000000000000001100010001000;
+    //                                       ||||||||||||||||/|/|/|/|||||||||
+    //                                       |||||||||||||||| | | | ||||||||+-- UIE
+    //                                       |||||||||||||||| | | | |||||||+--- SIE
+    //                                       |||||||||||||||| | | | ||||||+---- WPRI
+    //                                       |||||||||||||||| | | | |||||+----- MIE
+    //                                       |||||||||||||||| | | | ||||+------ UPIE
+    //                                       |||||||||||||||| | | | |||+------- SPIE
+    //                                       |||||||||||||||| | | | ||+-------- UBE
+    //                                       |||||||||||||||| | | | |+--------- MPIE
+    //                                       |||||||||||||||| | | | +---------- SPP
+    //                                       |||||||||||||||| | | +------------ VS
+    //                                       |||||||||||||||| | +-------------- MPP
+    //                                       |||||||||||||||| +---------------- FS
+    //                                       |||||||||||||||+------------------ XS
+    //                                       ||||||||||||||+------------------- MPRV
+    //                                       |||||||||||||+-------------------- SUM
+    //                                       ||||||||||||+--------------------- MXR
+    //                                       |||||||||||+---------------------- TVM
+    //                                       ||||||||||+----------------------- TW
+    //                                       |||||||||+------------------------ TSR
+    //                                       ||||||||+------------------------- SPELP
+    //                                       |||||||+-------------------------- SDT
+    //                                       ||||||+--------------------------- WPRI
+    //                                       +--------------------------------- SD / WPRI
+
+    // upper half corresponds to mstatush bit meanings
+    static constexpr uint32_t upper_half = 0b00000000000000000000000000000000;
+    //                                       |||||||||||||||||||||||||||||/|/
+    //                                       ||||||||||||||||||||||||||||| +--- WPRI / UXL
+    //                                       ||||||||||||||||||||||||||||+----- WPRI / SXL
+    //                                       |||||||||||||||||||||||||||+------ SBE
+    //                                       |||||||||||||||||||||||||+-------- MBE
+    //                                       ||||||||||||||||||||||||+--------- GVA
+    //                                       |||||||||||||||||||||||+---------- MPV
+    //                                       ||||||||||||||||||||||+----------- WPRI
+    //                                       |||||||||||||||||||||+------------ MPELP
+    //                                       ||||||||||||||||||||+------------- MDT
+    //                                       +--------------------------------- WPRI / SD
+
     static constexpr reg_t get_mstatus_mask() {
-        if(sizeof(reg_t) == 4)
-            // return 0x807ff988UL; // 0b1000 0000 0111 1111 1111 1000 1000 1000  // only machine mode is supported
-            //       +-SD
-            //       |        +-TSR
-            //       |        |+-TW
-            //       |        ||+-TVM
-            //       |        |||+-MXR
-            //       |        ||||+-SUM
-            //       |        |||||+-MPRV
-            //       |        |||||| +-XS
-            //       |        |||||| | +-FS
-            //       |        |||||| | | +-MPP
-            //       |        |||||| | | |  +-SPP
-            //       |        |||||| | | |  |+-MPIE
-            //       |        ||||||/|/|/|  ||   +-MIE
-            return 0b00000000000000000001100010001000;
-        else if(sizeof(reg_t) == 8)
-            // return 0x8000000f007ff9ddULL; // 0b1...0 1111 0000 0000 0111 1111 1111 1001 1011 1011
-            //
-            //                +-TSR
-            //                |+-TW
-            //                ||+-TVM
-            //                |||+-MXR
-            //                ||||+-SUM
-            //                |||||+-MPRV
-            //                |||||| +-XS
-            //                |||||| | +-FS
-            //                |||||| | | +-MPP
-            //                |||||| | | |  +-SPP
-            //                |||||| | | |  |+-MPIE
-            //                ||||||/|/|/|  ||   +-MIE
-            return 0b00000000000000000001100010001000;
+        if constexpr(sizeof(reg_t) == 4)
+            return lower_half | riscv_hart_common<BASE>::extension_status_mask;
+        else if constexpr(sizeof(reg_t) == 8)
+            return static_cast<reg_t>(upper_half) << 32 | lower_half | riscv_hart_common<BASE>::extension_status_mask;
         else
-            assert(false && "Unsupported XLEN value");
+            static_assert("Unsupported XLEN value");
     }
 
     void write_mstatus(reg_t val) {
-        auto mask = get_mstatus_mask() & 0xff; // MPP is hardcoded as 0x3
+        constexpr auto mask = get_mstatus_mask();
         auto new_val = (this->state.mstatus() & ~mask) | (val & mask);
+        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
+            // set SD bit if any of FS or VS are dirty
+            // FIXME: this wont work if XS is 01 and FS is 10
+            if(reg_t masked = new_val & riscv_hart_common<BASE>::extension_status_mask; masked & (masked >> 1))
+                new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
+
         this->state.mstatus = new_val;
     }
 
