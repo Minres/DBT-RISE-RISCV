@@ -35,8 +35,6 @@
 #ifndef _SYSC_CORE2SC_ADAPTER_H_
 #define _SYSC_CORE2SC_ADAPTER_H_
 
-#include "core_complex.h"
-#include "iss/log_categories.h"
 #include "sc2core_if.h"
 #include "util/delegate.h"
 #include "util/logging.h"
@@ -48,6 +46,7 @@
 #include <scc/async_event.h>
 #include <scc/report.h>
 #include <shared_mutex>
+#include <sysc/kernel/sc_time.h>
 #include <util/instance_logger.h>
 #include <util/ities.h>
 
@@ -245,7 +244,7 @@ public:
     void wait_until(uint64_t flags) {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         PLAT::wait_until(flags);
-        while(this->reg.pending_trap == 0 && (this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
+        while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
             sc_core::wait(wfi_evt);
         }
     }
@@ -289,21 +288,8 @@ private:
 
     void _local_irq(short id, bool value) {
         reg_t mask = 0;
-        switch(id) {
-        case 3: // SW
-            mask = 1 << 3;
-            break;
-        case 7: // timer
-            mask = 1 << 7;
-            break;
-        case 11: // external
-            mask = 1 << 11;
-            break;
-        default:
-            if(id > 15)
-                mask = 1 << id;
-            break;
-        }
+        assert(id < 32 && "CLINT cannot handle more tahn 32 irq");
+        mask = 1 << id;
         if(value) {
             this->csr[iss::arch::mip] |= mask;
             wfi_evt.notify();
@@ -313,6 +299,7 @@ private:
         if(value)
             SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
     }
+
     void _local_irq_mt(short id, bool value) {
         std::unique_lock<mutex_t> lock(sync_mtx);
         _local_irq(id, value);

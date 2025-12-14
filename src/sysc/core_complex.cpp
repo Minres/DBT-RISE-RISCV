@@ -231,8 +231,8 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
         });
 #else
     SC_METHOD(clint_irq_cb);
-    for(auto pin : clint_irq_i)
-        sensitive << pin;
+    dont_initialize();
+    sensitive << clint_irq_i;
 #endif
 
     SC_METHOD(forward);
@@ -359,7 +359,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::clint_irq_cb() {
     for(auto i = 0U; i < clint_irq_i.size(); ++i) {
         if(clint_irq_i[i].event()) {
-            core->local_irq(16 + i, clint_irq_i[i].read());
+            core->local_irq(i, clint_irq_i[i].read());
         }
     }
 }

@@ -97,7 +97,7 @@ public:
 
     sc_core::sc_in<bool> rst_i{"rst_i"};
 
-    sc_core::sc_vector<irq_signal_t> clint_irq_i{"local_irq_i", 16};
+    sc_core::sc_vector<irq_signal_t> clint_irq_i{"clint_irq_i", 32};
 
 #ifndef CWR_SYSTEMC
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
@@ -186,11 +186,6 @@ public:
     void sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
         quantum_keeper.check_and_sync(core_inc);
-        // quantum_keeper.inc(core_inc);
-        // if(quantum_keeper.need_sync()) {
-        //     wait(quantum_keeper.get_local_time());
-        //     quantum_keeper.reset();
-        // }
         last_sync_cycle = cycle;
     }
 
