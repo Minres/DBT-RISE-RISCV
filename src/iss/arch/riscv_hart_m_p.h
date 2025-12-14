@@ -122,8 +122,6 @@ public:
     void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
 
 protected:
-    hart_state<reg_t> state;
-
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
 
     iss::status read_status(unsigned addr, reg_t& val);
@@ -375,7 +373,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_m_p<BASE, FEAT>::check
     // any synchronous traps.
     auto ena_irq = this->csr[mip] & this->csr[mie];
 
-    bool mstatus_mie = state.mstatus.MIE;
+    bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
     auto enabled_interrupts = m_enabled ? ena_irq : 0;
 

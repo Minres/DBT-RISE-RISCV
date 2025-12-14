@@ -146,8 +146,6 @@ protected:
     using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
     using mem_write_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t const* const);
 
-    hart_state<reg_t> state;
-
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
 
     iss::status read_status(unsigned addr, reg_t& val);
@@ -162,8 +160,7 @@ protected:
 
 template <typename BASE, features_e FEAT>
 riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
-: state()
-, default_mem(base::get_priv_if()) {
+: default_mem(base::get_priv_if()) {
     this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
     this->csr_wr_cb[mstatus] = MK_CSR_WR_CB(write_status);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
@@ -381,7 +378,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& a, const unsigned l
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
-    val = state.mstatus & get_mstatus_mask((addr >> 8) & 0x3);
+    val = this->state.mstatus & get_mstatus_mask((addr >> 8) & 0x3);
     return iss::Ok;
 }
 
@@ -412,7 +409,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
 
 template <typename BASE, features_e FEAT> inline void riscv_hart_mu_p<BASE, FEAT>::reset(uint64_t address) {
     BASE::reset(address);
-    state.mstatus = hart_state<reg_t>::mstatus_reset_val;
+    this->state.mstatus = hart_state<reg_t>::mstatus_reset_val;
 }
 
 template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::check_interrupt() {
@@ -423,7 +420,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::chec
     // any synchronous traps.
     auto ena_irq = this->csr[mip] & this->csr[mie];
 
-    bool mstatus_mie = state.mstatus.MIE;
+    bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
     auto enabled_interrupts = m_enabled ? ena_irq : 0;
 
@@ -527,13 +524,13 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
     // store the actual privilege level in yPP and store interrupt enable flags
     switch(new_priv) {
     case PRIV_M:
-        state.mstatus.MPP = this->reg.PRIV;
-        state.mstatus.MPIE = state.mstatus.MIE;
-        state.mstatus.MIE = false;
+        this->state.mstatus.MPP = this->reg.PRIV;
+        this->state.mstatus.MPIE = this->state.mstatus.MIE;
+        this->state.mstatus.MIE = false;
         break;
     case PRIV_U:
-        state.mstatus.UPIE = state.mstatus.UIE;
-        state.mstatus.UIE = false;
+        this->state.mstatus.UPIE = this->state.mstatus.UIE;
+        this->state.mstatus.UIE = false;
         break;
     default:
         break;
@@ -583,20 +580,20 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
         this->reg.trap_state = 0x80ULL << 24 | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
         this->reg.NEXT_PC = std::numeric_limits<uint32_t>::max();
     } else {
-        auto status = state.mstatus;
+        auto status = this->state.mstatus;
         // pop the relevant lower-privilege interrupt enable and privilege mode stack
         // clear respective yIE
         switch(inst_priv) {
         case PRIV_M:
-            this->reg.PRIV = state.mstatus.MPP;
-            state.mstatus.MPP = 0; // clear mpp to U mode
-            state.mstatus.MIE = state.mstatus.MPIE;
-            state.mstatus.MPIE = 1;
+            this->reg.PRIV = this->state.mstatus.MPP;
+            this->state.mstatus.MPP = 0; // clear mpp to U mode
+            this->state.mstatus.MIE = this->state.mstatus.MPIE;
+            this->state.mstatus.MPIE = 1;
             break;
         case PRIV_U:
             this->reg.PRIV = 0;
-            state.mstatus.UIE = state.mstatus.UPIE;
-            state.mstatus.UPIE = 1;
+            this->state.mstatus.UIE = this->state.mstatus.UPIE;
+            this->state.mstatus.UPIE = 1;
             break;
         }
         // sets the pc to the value stored in the x epc register.
@@ -610,7 +607,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
 }
 
 template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::wait_until(uint64_t flags) {
-    auto status = state.mstatus;
+    auto status = this->state.mstatus;
     auto tw = status.TW;
     if(this->reg.PRIV == PRIV_S && tw != 0) {
         this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
