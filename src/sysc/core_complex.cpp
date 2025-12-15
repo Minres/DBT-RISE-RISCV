@@ -41,6 +41,7 @@
 #include "iss_factory.h"
 #include "tlm/scc/quantum_keeper.h"
 #include "sysc/memspace_extension.h"
+#include "tlm/scc/tlm_id.h"
 #include "util/range_lut.h"
 #include <memory>
 #include <sstream>
@@ -418,8 +419,11 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
+        sysc::memspace::tlm_memspace_extension<> mem_spc(static_cast<memspace::common>(addr.space));
         if(!is_fetch)
-            gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
+            gp.set_extension(&mem_spc);
+        tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
+        gp.set_extension(&id_ext);
         auto pre_delay = delay;
         exec_b_transport(gp, delay, is_fetch);
         if(pre_delay > delay) {
@@ -447,6 +451,8 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
+        gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+        gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         return true;
     }
 }
@@ -476,7 +482,10 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
+        sysc::memspace::tlm_memspace_extension<> mem_spc(static_cast<memspace::common>(addr.space));
+        gp.set_extension(&mem_spc);
+        tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
+        gp.set_extension(&id_ext);
         auto pre_delay = delay;
         exec_b_transport(gp, delay);
         if(pre_delay > delay)
@@ -500,6 +509,8 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
                         .addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
+        gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+        gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         return true;
     }
 }
