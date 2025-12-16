@@ -288,7 +288,7 @@ private:
 
     void _local_irq(short id, bool value) {
         reg_t mask = 0;
-        assert(id < 32 && "CLINT cannot handle more tahn 32 irq");
+        assert(id < 32 && "CLINT cannot handle more than 32 irq");
         mask = 1 << id;
         if(value) {
             this->csr[iss::arch::mip] |= mask;
