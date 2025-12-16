@@ -127,6 +127,10 @@ template <typename BASE, features_e FEAT>
 riscv_hart_msu_vp<BASE, FEAT>::riscv_hart_msu_vp()
 : mmu(base::get_priv_if())
 , default_mem(base::get_priv_if()) {
+    if constexpr(sizeof(reg_t) == 8)
+        // set UXL and SXL to indicate 64 bits
+        // FIXME: this value is not preserved in resets
+        this->state.mstatus.backing.val |= 0x500000000;
     // common regs
     const std::array<unsigned, 16> rwaddrs{
         {mepc, mtvec, mscratch, mcause, mtval, sepc, stvec, sscratch, scause, stval, sscratch, uepc, utvec, uscratch, ucause, utval}};

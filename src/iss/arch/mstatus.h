@@ -73,6 +73,8 @@ template <typename T> struct status<T, typename std::enable_if<std::is_same<T, u
     static inline unsigned FS(T v) { return bit_sub<13, 2>(v); };
     // machine previous privilege
     static inline unsigned MPP(T v) { return bit_sub<11, 2>(v); };
+    // vector unit status Off/Initial/Clean/Dirty
+    static inline unsigned VS(T v) { return bit_sub<9, 2>(v); };
     // supervisor previous privilege
     static inline unsigned SPP(T v) { return bit_sub<8, 1>(v); };
     // previous machine interrupt-enable
@@ -121,6 +123,8 @@ public:
     static inline unsigned FS(T v) { return bit_sub<13, 2>(v); };
     // machine previous privilege
     static inline unsigned MPP(T v) { return bit_sub<11, 2>(v); };
+    // vector unit status Off/Initial/Clean/Dirty
+    static inline unsigned VS(T v) { return bit_sub<9, 2>(v); };
     // supervisor previous privilege
     static inline unsigned SPP(T v) { return bit_sub<8, 1>(v); };
     // previous machine interrupt-enable
@@ -165,6 +169,8 @@ public:
     BF_FIELD(FS, 13, 2);
     // machine previous privilege
     BF_FIELD(MPP, 11, 2);
+    // vector unit status Off/Initial/Clean/Dirty
+    BF_FIELD(VS, 9, 2);
     // supervisor previous privilege
     BF_FIELD(SPP, 8, 1);
     // previous machine interrupt-enable
@@ -220,6 +226,8 @@ public:
     BF_FIELD(FS, 13, 2);
     // machine previous privilege
     BF_FIELD(MPP, 11, 2);
+    // vector unit status Off/Initial/Clean/Dirty
+    BF_FIELD(VS, 9, 2);
     // supervisor previous privilege
     BF_FIELD(SPP, 8, 1);
     // previous machine interrupt-enable
@@ -238,7 +246,7 @@ public:
 
     mstatus_t mstatus;
 
-    static const T mstatus_reset_val = 0x500001800;
+    static const T mstatus_reset_val = 0x1800;
 };
 } // namespace arch
 } // namespace iss
