@@ -238,7 +238,7 @@ public:
 
     mstatus_t mstatus;
 
-    static const T mstatus_reset_val = 0x1800;
+    static const T mstatus_reset_val = 0x500001800;
 };
 } // namespace arch
 } // namespace iss
