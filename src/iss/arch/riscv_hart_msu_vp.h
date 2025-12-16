@@ -35,7 +35,6 @@
 #ifndef _RISCV_HART_MSU_VP_H
 #define _RISCV_HART_MSU_VP_H
 
-#include "iss/arch/riscv_hart_mu_p.h"
 #include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
@@ -67,78 +66,20 @@ public:
     using this_class = riscv_hart_msu_vp<BASE>;
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
-    static constexpr uint32_t s_mask_lower = 0b00000000011111100000000100100010;
-    //                                         ||||||||||||||||/|/|/|/|||||||||
-    //                                         |||||||||||||||| | | | ||||||||+-- UIE
-    //                                         |||||||||||||||| | | | |||||||+--- SIE
-    //                                         |||||||||||||||| | | | ||||||+---- WPRI
-    //                                         |||||||||||||||| | | | |||||+----- MIE
-    //                                         |||||||||||||||| | | | ||||+------ UPIE
-    //                                         |||||||||||||||| | | | |||+------- SPIE
-    //                                         |||||||||||||||| | | | ||+-------- UBE
-    //                                         |||||||||||||||| | | | |+--------- MPIE
-    //                                         |||||||||||||||| | | | +---------- SPP
-    //                                         |||||||||||||||| | | +------------ VS
-    //                                         |||||||||||||||| | +-------------- MPP
-    //                                         |||||||||||||||| +---------------- FS
-    //                                         |||||||||||||||+------------------ XS
-    //                                         ||||||||||||||+------------------- MPRV
-    //                                         |||||||||||||+-------------------- SUM
-    //                                         ||||||||||||+--------------------- MXR
-    //                                         |||||||||||+---------------------- TVM
-    //                                         ||||||||||+----------------------- TW
-    //                                         |||||||||+------------------------ TSR
-    //                                         ||||||||+------------------------- SPELP
-    //                                         |||||||+-------------------------- SDT
-    //                                         ||||||+--------------------------- WPRI
-    //                                         +--------------------------------- SD / WPRI
-    static constexpr reg_t get_mstatus_mask(unsigned priv_lvl) {
-        return riscv_hart_mu_p<BASE>::get_mstatus_mask(priv_lvl) | ((priv_lvl >= PRIV_S) ? s_mask_lower : 0);
-    }
-    static constexpr reg_t get_mstatus_rd_mask(unsigned priv_lvl) {
-        if(sizeof(reg_t) == 4) {
-            return get_mstatus_mask(priv_lvl);
-        } else if(sizeof(reg_t) == 8) {
-            auto wr_mask = get_mstatus_mask(priv_lvl);
-            switch(priv_lvl) {
-            case PRIV_U:
-                return wr_mask;
-            case PRIV_S:
-                return wr_mask |= 0x300000000;
-            default:
-                return wr_mask |= 0xf00000000;
-            }
-        } else
-            assert(false && "Unsupported XLEN value");
-    }
 
-    template <typename T_ = reg_t, std::enable_if_t<std::is_same<T_, uint32_t>::value>* = nullptr>
-    void write_mstatus(T_ val, unsigned priv_lvl) {
+    void write_mstatus(reg_t val, unsigned priv_lvl) {
         reg_t old_val = this->state.mstatus;
-        auto mask = get_mstatus_mask(priv_lvl);
+        auto mask = base::get_msu_status_mask(priv_lvl);
         auto new_val = (old_val & ~mask) | (val & mask);
-        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
-            // set SD bit if any of FS or VS are dirty
-            // FIXME: this wont work if XS is 01 and FS is 10
-            if(reg_t masked = new_val & riscv_hart_common<BASE>::extension_status_mask && masked & (masked >> 1))
-                new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
-        this->state.mstatus = new_val;
-    }
-
-    template <typename T_ = reg_t, std::enable_if_t<std::is_same<T_, uint64_t>::value>* = nullptr>
-    void write_mstatus(T_ val, unsigned priv_lvl) {
-        reg_t old_val = this->state.mstatus;
-        auto mask = get_mstatus_mask(priv_lvl);
-        auto new_val = (old_val & ~mask) | (val & mask);
-        if((new_val & this->state.mstatus.SXL.Mask) == 0) {
+        if constexpr(sizeof(reg_t) == 8) {
+            // Retain previous SXL and UXL value
             new_val |= old_val & this->state.mstatus.SXL.Mask;
-        }
-        if((new_val & this->state.mstatus.UXL.Mask) == 0) {
+
             new_val |= old_val & this->state.mstatus.UXL.Mask;
         }
-        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
-            if(new_val && riscv_hart_common<BASE>::extension_status_mask)
-                // set SD bit if any of FS, VS and XS are set
+
+        if constexpr(base::extension_status_mask)
+            if((new_val & base::extension_status_mask) == base::extension_status_mask)
                 new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
         this->state.mstatus = new_val;
     }
@@ -439,7 +380,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT>::write(const addr_t& a, const unsigned
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
     auto req_priv_lvl = (addr >> 8) & 0x3;
-    val = this->state.mstatus & get_mstatus_rd_mask(req_priv_lvl);
+    val = this->state.mstatus & base::get_msu_status_mask(req_priv_lvl);
     return iss::Ok;
 }
 
