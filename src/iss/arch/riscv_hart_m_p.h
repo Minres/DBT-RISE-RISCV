@@ -38,7 +38,6 @@
 #include "iss/arch/traits.h"
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
-#include "riscv_hart_common.h"
 #include "util/logging.h"
 #include <algorithm>
 #include <cstdint>
@@ -63,65 +62,12 @@ public:
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
 
-    // Notation for differing fields is: 32 bits / 64 bits
-    static constexpr uint32_t lower_half = 0b00000000000000000001100010001000;
-    //                                       ||||||||||||||||/|/|/|/|||||||||
-    //                                       |||||||||||||||| | | | ||||||||+-- UIE
-    //                                       |||||||||||||||| | | | |||||||+--- SIE
-    //                                       |||||||||||||||| | | | ||||||+---- WPRI
-    //                                       |||||||||||||||| | | | |||||+----- MIE
-    //                                       |||||||||||||||| | | | ||||+------ UPIE
-    //                                       |||||||||||||||| | | | |||+------- SPIE
-    //                                       |||||||||||||||| | | | ||+-------- UBE
-    //                                       |||||||||||||||| | | | |+--------- MPIE
-    //                                       |||||||||||||||| | | | +---------- SPP
-    //                                       |||||||||||||||| | | +------------ VS
-    //                                       |||||||||||||||| | +-------------- MPP
-    //                                       |||||||||||||||| +---------------- FS
-    //                                       |||||||||||||||+------------------ XS
-    //                                       ||||||||||||||+------------------- MPRV
-    //                                       |||||||||||||+-------------------- SUM
-    //                                       ||||||||||||+--------------------- MXR
-    //                                       |||||||||||+---------------------- TVM
-    //                                       ||||||||||+----------------------- TW
-    //                                       |||||||||+------------------------ TSR
-    //                                       ||||||||+------------------------- SPELP
-    //                                       |||||||+-------------------------- SDT
-    //                                       ||||||+--------------------------- WPRI
-    //                                       +--------------------------------- SD / WPRI
-
-    // upper half corresponds to mstatush bit meanings
-    static constexpr uint32_t upper_half = 0b00000000000000000000000000000000;
-    //                                       |||||||||||||||||||||||||||||/|/
-    //                                       ||||||||||||||||||||||||||||| +--- WPRI / UXL
-    //                                       ||||||||||||||||||||||||||||+----- WPRI / SXL
-    //                                       |||||||||||||||||||||||||||+------ SBE
-    //                                       |||||||||||||||||||||||||+-------- MBE
-    //                                       ||||||||||||||||||||||||+--------- GVA
-    //                                       |||||||||||||||||||||||+---------- MPV
-    //                                       ||||||||||||||||||||||+----------- WPRI
-    //                                       |||||||||||||||||||||+------------ MPELP
-    //                                       ||||||||||||||||||||+------------- MDT
-    //                                       +--------------------------------- WPRI / SD
-
-    static constexpr reg_t get_mstatus_mask() {
-        if constexpr(sizeof(reg_t) == 4)
-            return lower_half | riscv_hart_common<BASE>::extension_status_mask;
-        else if constexpr(sizeof(reg_t) == 8)
-            return static_cast<reg_t>(upper_half) << 32 | lower_half | riscv_hart_common<BASE>::extension_status_mask;
-        else
-            static_assert("Unsupported XLEN value");
-    }
-
     void write_mstatus(reg_t val) {
-        constexpr auto mask = get_mstatus_mask();
+        constexpr auto mask = base::get_mstatus_mask();
         auto new_val = (this->state.mstatus() & ~mask) | (val & mask);
-        if constexpr(riscv_hart_common<BASE>::extension_status_mask)
-            // set SD bit if any of FS or VS are dirty
-            // FIXME: this wont work if XS is 01 and FS is 10
-            if(reg_t masked = new_val & riscv_hart_common<BASE>::extension_status_mask; masked & (masked >> 1))
+        if constexpr(base::extension_status_mask)
+            if((new_val & base::extension_status_mask) == base::extension_status_mask)
                 new_val |= reg_t(1) << (sizeof(reg_t) * 8 - 1);
-
         this->state.mstatus = new_val;
     }
 
@@ -351,7 +297,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const addr_t& a, const unsigned le
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::read_status(unsigned addr, reg_t& val) {
-    val = this->state.mstatus & get_mstatus_mask();
+    val = this->state.mstatus & base::get_mstatus_mask();
     return iss::Ok;
 }
 

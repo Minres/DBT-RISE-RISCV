@@ -308,11 +308,78 @@ template <typename WORD_TYPE> struct priv_if {
 };
 
 template <typename BASE = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
-    // Extension status bits (SD needs to be set when writing FS / VS / XS):
+
+    constexpr static unsigned MEM = traits<BASE>::MEM;
+
+    using core = BASE;
+    using this_class = riscv_hart_common<BASE>;
+    using reg_t = typename core::reg_t;
+
+    using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
+    using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
+
+    // Extension status bits (SD needs to be set when any of  FS / VS / XS are dirty [0b11]):
     // TODO implement XS
     static constexpr uint32_t extension_status_mask =
         (traits<BASE>::FP_REGS_SIZE ? (0b11u << 13) : 0u) | (traits<BASE>::V_REGS_SIZE ? (0b11u << 9) : 0u);
 
+    // Notation for differing fields is: 32 bits / 64 bits
+    static constexpr uint32_t mstatus_lower = 0b00000000000000000001100010001000;
+    static constexpr uint32_t sstatus_lower = 0b00000000011111100000000100100010;
+    static constexpr uint32_t ustatus_lower = 0b00000000000000000000000000010001;
+    //                                          ||||||/|||||||||/|/|/|/|||||||||
+    //                                          |||||/ ||||||||| | | | ||||||||+-- UIE
+    //                                          ||||/||||||||||| | | | |||||||+--- SIE
+    //                                          |||/|||||||||||| | | | ||||||+---- WPRI
+    //                                          ||/||||||||||||| | | | |||||+----- MIE
+    //                                          |||||||||||||||| | | | ||||+------ UPIE
+    //                                          |||||||||||||||| | | | |||+------- SPIE
+    //                                          |||||||||||||||| | | | ||+-------- UBE
+    //                                          |||||||||||||||| | | | |+--------- MPIE
+    //                                          |||||||||||||||| | | | +---------- SPP
+    //                                          |||||||||||||||| | | +------------ VS
+    //                                          |||||||||||||||| | +-------------- MPP
+    //                                          |||||||||||||||| +---------------- FS
+    //                                          |||||||||||||||+------------------ XS
+    //                                          ||||||||||||||+------------------- MPRV
+    //                                          |||||||||||||+-------------------- SUM
+    //                                          ||||||||||||+--------------------- MXR
+    //                                          |||||||||||+---------------------- TVM
+    //                                          ||||||||||+----------------------- TW
+    //                                          |||||||||+------------------------ TSR
+    //                                          ||||||||+------------------------- SPELP
+    //                                          |||||||+-------------------------- SDT
+    //                                          |++++++--------------------------- WPRI
+    //                                          +--------------------------------- SD / WPRI
+
+    // upper half does not correspond to mstatush bit meanings (UXL and SXL)
+    static constexpr uint32_t mstatus_upper = 0b00000000000000000000000000001111;
+    static constexpr uint32_t sstatus_upper = 0b00000000000000000000000000000011;
+    //                                          |||||||||||||||||||||||||||||/|/
+    //                                          ||||||||||||||||||||||||||||| +--- WPRI / UXL
+    //                                          ||||||||||||||||||||||||||||+----- WPRI / SXL
+    //                                          |||||||||||||||||||||||||||+------ SBE
+    //                                          |||||||||||||||||||||||||+-------- MBE
+    //                                          ||||||||||||||||||||||||+--------- GVA
+    //                                          |||||||||||||||||||||||+---------- MPV
+    //                                          ||||||||||||||||||||||+----------- WPRI
+    //                                          |||||||||||||||||||||+------------ MPELP
+    //                                          ||||||||||||||||||||+------------- MDT
+    //                                          |+++++++++++++++++++-------------- WPRI
+    //                                          +--------------------------------- WPRI / SD
+
+    static constexpr reg_t get_mstatus_mask() {
+        if constexpr(sizeof(reg_t) == 4)
+            return mstatus_lower | riscv_hart_common<BASE>::extension_status_mask;
+        else if constexpr(sizeof(reg_t) == 8)
+            return static_cast<reg_t>(mstatus_upper) << 32 | mstatus_lower | riscv_hart_common<BASE>::extension_status_mask;
+        else
+            static_assert("Unsupported XLEN value");
+    }
+    static constexpr reg_t get_mu_status_mask(unsigned priv_lvl) { return ustatus_lower | (priv_lvl >= PRIV_M ? get_mstatus_mask() : 0); }
+    static constexpr reg_t get_msu_status_mask(unsigned priv_lvl) {
+        return get_mu_status_mask(priv_lvl) | ((priv_lvl >= PRIV_S) ? sstatus_lower : 0);
+    }
     const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
     const std::array<const char*, 16> trap_str = {{""
                                                    "Instruction address misaligned", // 0
@@ -335,14 +402,6 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
                                                   "Machine software interrupt", "User timer interrupt", "Supervisor timer interrupt",
                                                   "Reserved", "Machine timer interrupt", "User external interrupt",
                                                   "Supervisor external interrupt", "Reserved", "Machine external interrupt"}};
-    constexpr static unsigned MEM = traits<BASE>::MEM;
-
-    using core = BASE;
-    using this_class = riscv_hart_common<BASE>;
-    using reg_t = typename core::reg_t;
-
-    using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
-    using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
 
 #define MK_CSR_RD_CB(FCT) [this](unsigned a, reg_t& r) -> iss::status { return this->FCT(a, r); };
 #define MK_CSR_WR_CB(FCT) [this](unsigned a, reg_t r) -> iss::status { return this->FCT(a, r); };
