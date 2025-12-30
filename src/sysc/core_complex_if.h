@@ -35,6 +35,7 @@
 
 #include <iss/vm_types.h>
 #include <scc/signal_opt_ports.h>
+#include <util/delegate.h>
 
 namespace sysc {
 namespace riscv {
@@ -56,6 +57,8 @@ struct core_complex_if {
 
     //! Allow quantum keeper handling
     virtual void sync(uint64_t) = 0;
+
+    util::delegate<void(std::function<void(void)>&)> exec_on_sysc;
 
     virtual char const* hier_name() = 0;
 

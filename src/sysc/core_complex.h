@@ -242,6 +242,10 @@ protected:
     exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
         return dbus->get_direct_mem_ptr(gp, dmi_data);
     }
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type exec_on_sysc(std::function<void(void)>& f) {
+        quantum_keeper.execute_on_sysc(f);
+    }
     template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type run_iss() {
         core->setup_mt();
         quantum_keeper.check_and_sync(sc_core::SC_ZERO_TIME);
@@ -266,6 +270,10 @@ protected:
         auto result = false;
         quantum_keeper.execute_on_sysc([this, &gp, &dmi_data, &result]() { result = dbus->get_direct_mem_ptr(gp, dmi_data); });
         return result;
+    }
+    template <typename U = QK>
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type exec_on_sysc(std::function<void(void)>& f) {
+        f();
     }
     template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type run_iss() {
         vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);

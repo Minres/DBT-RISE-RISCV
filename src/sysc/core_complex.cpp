@@ -187,6 +187,7 @@ core_complex<BUSWIDTH, QK>::core_complex(sc_module_name const& name)
 #endif
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::init() {
+    core_complex_if::exec_on_sysc = util::delegate<void(std::function<void(void)>&)>::from<this_class, &this_class::exec_on_sysc<QK>>(this);
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
@@ -378,7 +379,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
         }
-        quantum_keeper.reset();
+        quantum_keeper.reset(sc_core::sc_time_stamp());
         core->set_interrupt_execution(false);
         run_iss();
     } while(!core->get_interrupt_execution());

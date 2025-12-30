@@ -244,9 +244,13 @@ public:
     void wait_until(uint64_t flags) {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         PLAT::wait_until(flags);
-        while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
-            sc_core::wait(wfi_evt);
-        }
+        std::function<void(void)> f = [this]() {
+            while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
+                sc_core::wait(this->wfi_evt);
+            }
+            SCCINFO(this->owner->hier_name()) << "Got WFI event";
+        };
+        owner->exec_on_sysc(f);
     }
 
 private:
