@@ -39,7 +39,6 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
-#include "tlm/scc/quantum_keeper.h"
 #include "sysc/memspace_extension.h"
 #include "tlm/scc/tlm_id.h"
 #include "util/range_lut.h"
@@ -56,6 +55,7 @@
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
 #include <util/ities.h>
+#include <util/defer.h>
 // clang-format on
 
 #ifdef HAS_SCV
@@ -405,8 +405,8 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex << addr.val
-                               << ") : 0x"
+        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex
+                               << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
@@ -425,6 +425,10 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             gp.set_extension(&mem_spc);
         tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
         gp.set_extension(&id_ext);
+        DEFER {
+            gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+            gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
+        };
         auto pre_delay = delay;
         exec_b_transport(gp, delay, is_fetch);
         if(pre_delay > delay) {
@@ -436,13 +440,12 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             else
                 dbus_inc += incr;
         }
-        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
+        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
-        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
+        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
-        }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
             gp.set_address(addr.val);
@@ -452,8 +455,6 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
-        gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
-        gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         return true;
     }
 }
@@ -466,8 +467,8 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local time: " << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex << addr.val
-                               << ") : 0x"
+        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex
+                               << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
@@ -487,19 +488,22 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         gp.set_extension(&mem_spc);
         tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
         gp.set_extension(&id_ext);
+        DEFER {
+            gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+            gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
+        };
         auto pre_delay = delay;
         exec_b_transport(gp, delay);
         if(pre_delay > delay)
             quantum_keeper.reset();
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
-        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
+        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
-        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
+        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
-        }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
             gp.set_address(addr.val);
@@ -510,8 +514,6 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
                         .addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
-        gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
-        gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         return true;
     }
 }

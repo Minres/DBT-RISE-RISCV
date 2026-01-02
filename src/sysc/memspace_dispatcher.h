@@ -87,19 +87,18 @@ private:
     std::unordered_map<MEMSPACE, size_t> space_mapping{};
     size_t default_port = 0;
     intor_sckt& mapped_intor(const tlm::tlm_generic_payload& trans, bool dmi = false) {
-        auto prefix = dmi ? "DMI " : "";
-        tlm_memspace_extension<MEMSPACE>* ext;
-        trans.get_extension(ext);
-        if(ext) {
+        if(auto* ext = trans.get_extension<tlm_memspace_extension<MEMSPACE>>()) {
             auto it = space_mapping.find(ext->get_space());
             if(it != space_mapping.end()) {
 #ifndef NDEBUG
+                auto prefix = dmi ? "DMI " : "";
                 SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to initiator " << it->second;
 #endif
                 return initiator[it->second];
             }
         }
 #ifndef NDEBUG
+        auto prefix = dmi ? "DMI " : "";
         SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to default initiator " << default_port;
 #endif
         return initiator[default_port];
