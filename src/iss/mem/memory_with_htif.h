@@ -36,22 +36,24 @@
 #define _MEMORY_WITH_HTIF_
 
 #include "iss/arch/riscv_hart_common.h"
+#include "iss/arch/traits.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
+#include <array>
 #include <cstdlib>
 #include <util/logging.h>
 #include <util/sparse_array.h>
 
 namespace iss {
 namespace mem {
-template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
-    using this_class = memory_with_htif<WORD_TYPE>;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
+template <typename PLAT> struct neumann_memory_with_htif : public memory_elem {
+    using this_class = neumann_memory_with_htif<PLAT>;
+    using reg_t = typename PLAT::reg_t;
 
-    memory_with_htif(arch::priv_if<WORD_TYPE> hart_if)
+    neumann_memory_with_htif(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {}
 
-    ~memory_with_htif() = default;
+    ~neumann_memory_with_htif() = default;
 
     memory_if get_mem_if() override {
         return memory_if{.rd_mem{util::delegate<rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
@@ -59,21 +61,21 @@ template <typename WORD_TYPE> struct memory_with_htif : public memory_elem {
     }
 
     void set_next(memory_if) override {
-        // intenrionally left empty, leaf element
+        // intentionally left empty, leaf element
     }
 
 private:
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        // for(auto offs = 0U; offs < length; ++offs) {
-        //     *(data + offs) = mem[(addr + offs) % mem.size()];
-        // }
-        if(mem.is_allocated(addr)) {
-            const auto& p = mem(addr / mem.page_size);
-            auto offs = addr & mem.page_addr_mask;
+    iss::status read_mem(const iss::addr_t& addr, unsigned length, uint8_t* data) {
+        assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) &&
+               "Only physical addresses are expected in memory_with_htif");
+        mem_type& mem = addr.space == iss::arch::traits<PLAT>::IMEM ? memories[iss::arch::traits<PLAT>::MEM] : memories[addr.space];
+        if(mem.is_allocated(addr.val)) {
+            const auto& p = mem(addr.val / mem.page_size);
+            auto offs = addr.val & mem.page_addr_mask;
             if((offs + length) > mem.page_size) {
                 auto first_part = mem.page_size - offs;
                 std::copy(p.data() + offs, p.data() + offs + first_part, data);
-                const auto& p2 = mem((addr / mem.page_size) + 1);
+                const auto& p2 = mem((addr.val / mem.page_size) + 1);
                 std::copy(p2.data(), p2.data() + length - first_part, data + first_part);
             } else {
                 std::copy(p.data() + offs, p.data() + offs + length, data);
@@ -86,29 +88,34 @@ private:
         return iss::Ok;
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        auto& p = mem(addr / mem.page_size);
-        auto offs = addr & mem.page_addr_mask;
+    iss::status write_mem(const iss::addr_t& addr, unsigned length, uint8_t const* data) {
+        assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) &&
+               "Only physical addresses are expected in memory_with_htif");
+        mem_type& mem = addr.space == iss::arch::traits<PLAT>::IMEM ? memories[iss::arch::traits<PLAT>::MEM] : memories[addr.space];
+        auto& p = mem(addr.val / mem.page_size);
+        auto offs = addr.val & mem.page_addr_mask;
         if((offs + length) > mem.page_size) {
             auto first_part = mem.page_size - offs;
             std::copy(data, data + first_part, p.data() + offs);
-            auto& p2 = mem((addr / mem.page_size) + 1);
+            auto& p2 = mem((addr.val / mem.page_size) + 1);
             std::copy(data + first_part, data + length, p2.data());
         } else {
             std::copy(data, data + length, p.data() + offs);
         }
-        // this->tohost handling in case of riscv-test
-        // according to https://github.com/riscv-software-src/riscv-isa-sim/issues/364#issuecomment-607657754:
-        if(access && iss::access_type::FUNC && addr == hart_if.tohost) {
+        if(addr.val == hart_if.tohost) {
             return hart_if.exec_htif(data, length);
         }
         return iss::Ok;
     }
 
 protected:
-    using mem_type = util::sparse_array<uint8_t, 1ULL << 32>;
-    mem_type mem;
-    arch::priv_if<WORD_TYPE> hart_if;
+    // Currently no type erasure for the sparse_array is available, so all memories
+    // have the largest possible size. Memory footprint should still be small as it
+    // a sparse array
+    using mem_type = util::sparse_array < uint8_t,
+          arch::traits<PLAT>::max_mem_size<1ull << 36 ? arch::traits<PLAT>::max_mem_size : (1ull << 36)>;
+    std::array<mem_type, arch::traits<PLAT>::mem_sizes.size()> memories{};
+    arch::priv_if<reg_t> hart_if;
 };
 } // namespace mem
 } // namespace iss

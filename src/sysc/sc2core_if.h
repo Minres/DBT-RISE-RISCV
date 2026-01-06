@@ -35,6 +35,7 @@
 #ifndef _SYSC_SC2CORE_IF_H_
 #define _SYSC_SC2CORE_IF_H_
 
+#include "iss/arch_if.h"
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include <scc/report.h>
@@ -47,6 +48,9 @@ struct sc2core_if {
     // this is needed since we want to call the destructor with a pointer-to-base
     virtual ~sc2core_if() = default;
 
+    virtual void setup_mt() = 0;
+
+    virtual void enable_disass(bool enable) = 0;
     util::delegate<void(unsigned)> set_hartid;
     util::delegate<void(unsigned)> set_irq_count;
     util::delegate<uint32_t()> get_mode;
@@ -60,6 +64,7 @@ struct sc2core_if {
     //! sets a callback for CSR write requests. The callback gets always 64bit data passed no matter what size the actual CSR has
     using wr_csr_f = std::function<iss::status(unsigned addr, uint64_t)>;
     util::delegate<void(unsigned, wr_csr_f)> register_csr_wr;
+    virtual void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t>) = 0;
 };
 } // namespace sysc
 #endif /* _SYSC_SC2CORE_IF_H_ */

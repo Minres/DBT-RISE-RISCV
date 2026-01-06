@@ -1330,7 +1330,7 @@ private:
     decoder instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
-        if (this->core.read(iss::address_type::PHYSICAL, pc.access, pc.space, pc.val, 4, data) != iss::Ok)
+        if (this->core.read({iss::address_type::LOGICAL, pc.access, arch::traits<ARCH>::IMEM, pc.val}, 4, data) != iss::Ok)
                     return iss::Err;
         return iss::Ok;
     }
@@ -5942,7 +5942,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         else {
                                             uint16_t VLMAX = (uint16_t)(1 << ((uint16_t)(get_pow(traits::VLEN)) + (int16_t)(get_lmul_pow()) - (uint16_t)(get_sew_pow()))) & ~1;
                                             *vl = calculate_new_vl(uimm, VLMAX);
-                                            *(X+rd) = *vl;
+                                            if(rd != 0) {
+                                                *(X+rd) = *vl;
+                                            }
                                             *vstart = 0;
                                         }
                                     }
@@ -29758,6 +29760,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")
                 default: {
+                    if(this->core.can_handle_unknown_instruction()) {
+                        auto res = this->core.handle_unknown_instruction(pc.val, sizeof(instr), reinterpret_cast<uint8_t*>(&instr));
+                        if(std::get<0>(res)) {
+                            *NEXT_PC = std::get<1>(res);
+                            break;
+                        }
+                    }
                     if(this->disass_enabled){
                         std::string mnemonic = "Illegal Instruction";
                         this->core.disass_output(pc.val, mnemonic);

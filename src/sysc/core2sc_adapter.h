@@ -35,15 +35,21 @@
 #ifndef _SYSC_CORE2SC_ADAPTER_H_
 #define _SYSC_CORE2SC_ADAPTER_H_
 
-#include "core_complex.h"
 #include "sc2core_if.h"
+#include "util/delegate.h"
+#include "util/logging.h"
 #include <iostream>
 #include <iss/arch/riscv_hart_common.h>
 #include <iss/iss.h>
 #include <iss/mem/memory_if.h>
 #include <iss/vm_types.h>
+#include <scc/async_event.h>
 #include <scc/report.h>
+#include <shared_mutex>
+#include <sysc/kernel/sc_time.h>
+#include <util/instance_logger.h>
 #include <util/ities.h>
+
 namespace sysc {
 template <typename PLAT> class core2sc_adapter : public PLAT, public sc2core_if {
 public:
@@ -51,6 +57,7 @@ public:
     using core = typename PLAT::core;
     using reg_t = typename PLAT::reg_t;
     using phys_addr_t = typename PLAT::phys_addr_t;
+    using mutex_t = std::shared_mutex;
     core2sc_adapter(sysc::riscv::core_complex_if* owner)
     : owner(owner) {
         this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
@@ -66,9 +73,36 @@ public:
         this->local_irq = util::delegate<void(short, bool)>::from<this_class, &this_class::_local_irq>(this);
         this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd>(this);
         this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr>(this);
+
+        disass_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::disass);
+        disass_delegate.level = logging::log_level::INFO;
+        this->disasslogger.set_logger(disass_delegate);
+        log_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::log);
+        log_delegate.level = static_cast<logging::log_level>(scc::get_logging_level());
+        this->isslogger.set_logger(log_delegate);
+    }
+
+    void setup_mt() override {
+        this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid_mt>(this);
+        this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num_mt>(this);
+        this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode_mt>(this);
+        this->get_state = util::delegate<uint64_t()>::from<this_class, &this_class::_get_state_mt>(this);
+        this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution_mt>(this);
+        this->set_interrupt_execution = util::delegate<void(bool)>::from<this_class, &this_class::_set_interrupt_execution_mt>(this);
+        this->local_irq = util::delegate<void(short, bool)>::from<this_class, &this_class::_local_irq_mt>(this);
+        this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd_mt>(this);
+        this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr_mt>(this);
     }
 
     virtual ~core2sc_adapter() {}
+
+    void enable_disass(bool enable) override {
+        this->disasslogger.set_log_level(enable ? logging::log_level::DEBUG : logging::log_level::INFO);
+    }
+
+    void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
+        PLAT::unknown_instr_cb = handler;
+    };
 
     void notify_phase(iss::arch_if::exec_phase p) {
         if(p == iss::arch_if::ISTART && !first) {
@@ -82,15 +116,53 @@ public:
 
     iss::sync_type needed_sync() const { return iss::PRE_SYNC; }
 
-    void disass_output(uint64_t pc, const std::string instr) {
-        static constexpr std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
-        if(!owner->disass_output(pc, instr)) {
-            std::stringstream s;
-            s << "[p:" << lvl[this->reg.PRIV] << ";s:0x" << std::hex << std::setfill('0') << std::setw(sizeof(reg_t) * 2)
-              << (reg_t)this->state.mstatus << std::dec << ";c:" << this->reg.icount + this->cycle_offset << "]";
-            SCCDEBUG(owner->hier_name()) << "disass: " << "0x" << std::setw(16) << std::right << std::setfill('0') << std::hex << pc
-                                         << "\t\t" << std::setw(40) << std::setfill(' ') << std::left << instr << s.str();
+    void log(logging::log_level lvl, std::string const& msg_type, std::string const& msg, unsigned line, char const* file) {
+        switch(lvl) {
+        case logging::log_level::FATAL:
+            ::scc ::ScLogger<::sc_core ::SC_FATAL>(file, line, sc_core ::SC_MEDIUM).type(owner->hier_name()).get()
+                << "[" << msg_type << "] " << msg;
+            break;
+        case logging::log_level::ERR:
+            ::scc ::ScLogger<::sc_core ::SC_ERROR>(file, line, sc_core ::SC_MEDIUM).type(owner->hier_name()).get() << msg;
+            break;
+        case logging::log_level::WARN:
+            if(::scc ::get_log_verbosity(msg_type) >= sc_core ::SC_LOW)
+                ::scc ::ScLogger<::sc_core ::SC_WARNING>(file, line, sc_core ::SC_MEDIUM).type(owner->hier_name()).get()
+                    << "[" << msg_type << "] " << msg;
+            break;
+        case logging::log_level::INFO:
+            if(::scc ::get_log_verbosity(msg_type) >= sc_core ::SC_MEDIUM)
+                ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_MEDIUM).type(owner->hier_name()).get()
+                    << "[" << msg_type << "] " << msg;
+            break;
+        case logging::log_level::DEBUG:
+            if(::scc ::get_log_verbosity(msg_type) >= sc_core ::SC_HIGH)
+                ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_HIGH).type(owner->hier_name()).get()
+                    << "[" << msg_type << "] " << msg;
+            break;
+        case logging::log_level::TRACE:
+            if(::scc ::get_log_verbosity(msg_type) >= sc_core ::SC_FULL)
+                ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_FULL).type(owner->hier_name()).get()
+                    << "[" << msg_type << "] " << msg;
+            break;
+        case logging::log_level::TRACEALL:
+            if(::scc ::get_log_verbosity(msg_type) >= sc_core ::SC_DEBUG)
+                ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_DEBUG).type(owner->hier_name()).get()
+                    << "[" << msg_type << "] " << msg;
+            break;
+        default:
+            break;
         }
+    }
+
+    void disass(logging::log_level lvl, std::string const& msg_type, std::string const& msg, unsigned line, char const* file) {
+        ::scc ::ScLogger<::sc_core ::SC_INFO>(file, line, sc_core ::SC_HIGH).type(owner->hier_name()).get()
+            << "[" << msg_type << "] " << msg;
+    }
+
+    void disass_output(uint64_t pc, std::string const& instr) {
+        owner->disass_output(pc, instr);
+        PLAT::disass_output(pc, instr);
     };
 
     iss::mem::memory_if get_mem_if() {
@@ -98,18 +170,18 @@ public:
                                    .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
     }
 
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        if(access && iss::access_type::DEBUG)
+    iss::status read_mem(const iss::addr_t& addr, unsigned length, uint8_t* data) {
+        if(iss::is_debug(addr.access))
             return owner->read_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
         else {
-            return owner->read_mem(addr, length, data, is_fetch(access)) ? iss::Ok : iss::Err;
+            return owner->read_mem(addr, length, data) ? iss::Ok : iss::Err;
         }
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(access && iss::access_type::DEBUG)
+    iss::status write_mem(const iss::addr_t& addr, unsigned length, uint8_t const* data) {
+        if(iss::is_debug(addr.access))
             return owner->write_mem_dbg(addr, length, data) ? iss::Ok : iss::Err;
-        if(addr == this->tohost) {
+        if(addr.val == this->tohost) {
             reg_t cur_data = *reinterpret_cast<const reg_t*>(data);
             // Extract Device (bits 63:56)
             uint8_t device = sizeof(reg_t) == 4 ? 0 : (cur_data >> 56) & 0xFF;
@@ -131,7 +203,8 @@ public:
             }
             if(device == 0 && command == 0) {
                 std::array<uint64_t, 8> loaded_payload;
-                auto res = owner->read_mem(payload_addr, 8 * sizeof(uint64_t), reinterpret_cast<uint8_t*>(loaded_payload.data()), false)
+                auto res = owner->read_mem({addr.type, addr.access, addr.space, payload_addr}, 8 * sizeof(uint64_t),
+                                           reinterpret_cast<uint8_t*>(loaded_payload.data()))
                                ? iss::Ok
                                : iss::Err;
                 if(res == iss::Err) {
@@ -171,41 +244,56 @@ public:
     void wait_until(uint64_t flags) {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         PLAT::wait_until(flags);
-        while(this->reg.pending_trap == 0 && (this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
-            sc_core::wait(wfi_evt);
-        }
+        std::function<void(void)> f = [this]() {
+            while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
+                sc_core::wait(this->wfi_evt);
+            }
+            SCCINFO(this->owner->hier_name()) << "Got WFI event";
+        };
+        owner->exec_on_sysc(f);
     }
 
 private:
     void _set_mhartid(unsigned id) { PLAT::set_mhartid(id); }
+    void _set_mhartid_mt(unsigned id) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        PLAT::set_mhartid(id);
+    }
 
     void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
+    void _set_irq_num_mt(unsigned num) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        PLAT::set_irq_num(num);
+    }
 
     uint32_t _get_mode() { return this->reg.PRIV; }
+    uint32_t _get_mode_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->reg.PRIV;
+    }
 
     void _set_interrupt_execution(bool v) { this->interrupt_sim = v ? 1 : 0; }
+    void _set_interrupt_execution_mt(bool v) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        this->interrupt_sim = v ? 1 : 0;
+    }
 
     bool _get_interrupt_execution() { return this->interrupt_sim; }
+    bool _get_interrupt_execution_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->interrupt_sim;
+    }
 
     uint64_t _get_state() { return this->state.mstatus.backing.val; }
+    uint64_t _get_state_mt() {
+        std::shared_lock<mutex_t> lock(sync_mtx);
+        return this->state.mstatus.backing.val;
+    }
 
     void _local_irq(short id, bool value) {
         reg_t mask = 0;
-        switch(id) {
-        case 3: // SW
-            mask = 1 << 3;
-            break;
-        case 7: // timer
-            mask = 1 << 7;
-            break;
-        case 11: // external
-            mask = 1 << 11;
-            break;
-        default:
-            if(id > 15)
-                mask = 1 << id;
-            break;
-        }
+        assert(id < 32 && "CLINT cannot handle more than 32 irq");
+        mask = 1 << id;
         if(value) {
             this->csr[iss::arch::mip] |= mask;
             wfi_evt.notify();
@@ -216,7 +304,13 @@ private:
             SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
     }
 
+    void _local_irq_mt(short id, bool value) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _local_irq(id, value);
+    }
+
     void _register_csr_rd(unsigned addr, rd_csr_f cb) {
+        // we need to remap the callback as the cores expects reg_t size datat
         std::function<iss::status(unsigned addr, reg_t&)> lambda = [cb](unsigned addr, reg_t& r) -> iss::status {
             uint64_t temp = r;
             auto ret = cb(addr, temp);
@@ -225,15 +319,28 @@ private:
         };
         this->register_csr(addr, lambda);
     }
+    void _register_csr_rd_mt(unsigned addr, rd_csr_f cb) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _register_csr_rd(addr, cb);
+    }
+
     void _register_csr_wr(unsigned addr, wr_csr_f cb) {
+        // we need to remap the callback as the cores expects reg_t size datat
         std::function<iss::status(unsigned addr, reg_t)> lambda = [cb](unsigned addr, reg_t r) -> iss::status { return cb(addr, r); };
         this->register_csr(addr, lambda);
     }
+    void _register_csr_wr_mt(unsigned addr, wr_csr_f cb) {
+        std::unique_lock<mutex_t> lock(sync_mtx);
+        _register_csr_wr(addr, cb);
+    }
 
     sysc::riscv::core_complex_if* const owner{nullptr};
+    util::LoggerDelegate log_delegate;
+    util::LoggerDelegate disass_delegate;
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};
+    mutex_t sync_mtx;
 };
 } // namespace sysc
 #endif /* _SYSC_CORE2SC_ADAPTER_H_ */

@@ -46,6 +46,15 @@ def nativeSize(int size){
 def getCString(def val){
     return val.toString()+'ULL'
 }
+def overflowsafeSize(BigInteger val){
+    switch(val) {
+        //case 256:                   return "std::numeric_limits<uint8_t>::max()";
+        //case 65536:                 return "std::numeric_limits<uint16_t>::max()";
+        //case 4294967296:            return "std::numeric_limits<uint32_t>::max()";
+        case 18446744073709551616:  return "std::numeric_limits<uint64_t>::max()";
+        default: return val;
+    }
+}
 %>
 #ifndef _${coreDef.name.toUpperCase()}_H_
 #define _${coreDef.name.toUpperCase()}_H_
@@ -200,8 +209,14 @@ template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     enum sreg_flag_e { FLAGS };
 
-    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = MEM };
+    enum mem_type_e { ${spaces.collect{it.name}.join(', ')}, IMEM = std::numeric_limits<decltype(phys_addr_t::space)>::max()};
     
+    static constexpr std::array<const uint64_t, ${spaces.size()}> mem_sizes{{
+        ${spaces.collect{overflowsafeSize(it.value)}.join(',\n        ')}
+    }};
+
+    static constexpr uint64_t max_mem_size =  ${overflowsafeSize(spaces.collect{it.value}.max())};
+
     enum class opcode_e {<%instructions.eachWithIndex{instr, index -> %>
         ${instr.instruction.name} = ${index},<%}%>
         MAX_OPCODE

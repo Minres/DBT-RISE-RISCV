@@ -39,8 +39,12 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
+#include "sysc/memspace_extension.h"
+#include "tlm/scc/tlm_id.h"
+#include "util/range_lut.h"
 #include <memory>
 #include <sstream>
+#include <sysc/kernel/sc_simcontext.h>
 #include <tlm/scc/tlm_signal_gp.h>
 #ifndef WIN32
 #include <iss/plugin/loader.h>
@@ -51,14 +55,8 @@
 #include <iss/plugin/cycle_estimate.h>
 #include <iss/plugin/instruction_count.h>
 #include <util/ities.h>
-
+#include <util/defer.h>
 // clang-format on
-
-#define STR(X) #X
-#define CREATE_CORE(CN)                                                                                                                    \
-    if(type == STR(CN)) {                                                                                                                  \
-        std::tie(cpu, vm) = create_core<CN##_plat_type>(backend, gdb_port, hart_id);                                                       \
-    } else
 
 #ifdef HAS_SCV
 #include <scv.h>
@@ -91,9 +89,9 @@ iss::debugger::encoder_decoder encdec;
 std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
 } // namespace
 
-template <unsigned int BUSWIDTH>
-int core_complex<BUSWIDTH>::cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func df,
-                                     debugger::target_adapter_if* tgt_adapter) {
+template <unsigned int BUSWIDTH, typename QK>
+int core_complex<BUSWIDTH, QK>::cmd_sysc(int argc, char* argv[], debugger::out_func of, debugger::data_func df,
+                                         debugger::target_adapter_if* tgt_adapter) {
     if(argc > 1) {
         if(strcasecmp(argv[1], "print_time") == 0) {
             std::string t = sc_time_stamp().to_string();
@@ -122,17 +120,15 @@ int core_complex<BUSWIDTH>::cmd_sysc(int argc, char* argv[], debugger::out_func 
     return Err;
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::reset(uint64_t addr) { vm->reset(addr); }
-template <unsigned int BUSWIDTH> inline void core_complex<BUSWIDTH>::start(bool dump) {
-    vm->start(std::numeric_limits<uint64_t>::max(), dump);
-}
-template <unsigned int BUSWIDTH> inline std::pair<uint64_t, bool> core_complex<BUSWIDTH>::load_file(std::string const& name) {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::reset(uint64_t addr) { vm->reset(addr); }
+template <unsigned int BUSWIDTH, typename QK>
+inline std::pair<uint64_t, bool> core_complex<BUSWIDTH, QK>::load_file(std::string const& name) {
     iss::arch_if* cc = vm->get_arch();
     return cc->load_file(name);
 };
 
-template <unsigned int BUSWIDTH>
-void core_complex<BUSWIDTH>::create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
+template <unsigned int BUSWIDTH, typename QK>
+void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id) {
     auto& f = sysc::iss_factory::instance();
     if(type.size() == 0 || type == "?") {
         std::unordered_map<std::string, std::vector<std::string>> core_by_backend;
@@ -183,17 +179,15 @@ void core_complex<BUSWIDTH>::create_cpu(std::string const& type, std::string con
 }
 
 #ifndef CWR_SYSTEMC
-template <unsigned int BUSWIDTH>
-core_complex<BUSWIDTH>::core_complex(sc_module_name const& name)
-: sc_module(name)
-, fetch_lut(tlm_dmi_ext())
-, read_lut(tlm_dmi_ext())
-, write_lut(tlm_dmi_ext()) {
+template <unsigned int BUSWIDTH, typename QK>
+core_complex<BUSWIDTH, QK>::core_complex(sc_module_name const& name)
+: sc_module(name) {
     init();
 }
 #endif
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::init() {
+    core_complex_if::exec_on_sysc = util::delegate<void(std::function<void(void)>&)>::from<this_class, &this_class::exec_on_sysc<QK>>(this);
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
         if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
@@ -201,50 +195,35 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
         }
     });
     dbus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
-        auto lut_entry = read_lut.getEntry(start);
-        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
-            read_lut.removeEntry(lut_entry);
+        for(auto& read_lut : dmi_read_luts) {
+            auto lut_entry = read_lut.getEntry(start);
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
+                read_lut.removeEntry(lut_entry);
+            }
         }
-        lut_entry = write_lut.getEntry(start);
-        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
-            write_lut.removeEntry(lut_entry);
+        for(auto& write_lut : dmi_write_luts) {
+            auto lut_entry = write_lut.getEntry(start);
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && end <= lut_entry.get_end_address() + 1) {
+                write_lut.removeEntry(lut_entry);
+            }
         }
     });
 
-    SC_HAS_PROCESS(core_complex<BUSWIDTH>); // NOLINT
+    SC_HAS_PROCESS(this_class); // NOLINT
     SC_THREAD(run);
     SC_METHOD(rst_cb);
     sensitive << rst_i;
 #ifdef USE_TLM_SIGNAL
-    sw_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(3, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    timer_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(7, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    ext_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(11, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    for(auto i = 0U; i < local_irq_i.size(); ++i)
-        local_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-            cpu->local_irq(16 + i, gp.get_value());
+    for(auto i = 0U; i < clint_irq_i.size(); ++i)
+        clint_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+            core->local_irq(i, gp.get_value());
             return tlm::TLM_COMPLETED;
         });
 #else
-    SC_METHOD(sw_irq_cb);
-    sensitive << sw_irq_i;
-    SC_METHOD(timer_irq_cb);
-    sensitive << timer_irq_i;
-    SC_METHOD(ext_irq_cb);
-    sensitive << ext_irq_i;
-    SC_METHOD(local_irq_cb);
-    for(auto pin : local_irq_i)
-        sensitive << pin;
+    SC_METHOD(clint_irq_cb);
+    dont_initialize();
+    sensitive << clint_irq_i;
 #endif
-    trc.m_db = scv_tr_db::get_default_db();
 
     SC_METHOD(forward);
 #ifndef CWR_SYSTEMC
@@ -257,14 +236,20 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::init() {
 #endif
 }
 
-template <unsigned int BUSWIDTH> core_complex<BUSWIDTH>::~core_complex() {
+template <unsigned int BUSWIDTH, typename QK> core_complex<BUSWIDTH, QK>::~core_complex() {
     for(auto* p : plugin_list)
         delete p;
+    if(post_run_stats.get_value()) {
+        auto instr_if = vm->get_arch()->get_instrumentation_if();
+        auto instrs = instr_if->get_instr_count();
+        auto cycles = instr_if->get_total_cycles();
+        SCCINFO(SCMOD) << "Ran " << instrs << " instructions in " << cycles << " cycles";
+    }
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::trace(sc_trace_file* trf) const {}
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::trace(sc_trace_file* trf) const {}
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elaboration() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::before_end_of_elaboration() {
     auto& type = GET_PROP_VALUE(core_type);
     SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     // cpu = scc::make_unique<core_wrapper>(this);
@@ -277,10 +262,11 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     }
 #endif
     sc_assert(vm);
+    auto instr_trace = GET_PROP_VALUE(enable_instr_trace) ? trc.init(this->name()) : false;
     auto disass = GET_PROP_VALUE(enable_disass);
-    if(disass && trc.m_db)
-        SCCINFO(SCMOD) << "Disasssembly will only be in transaction trace database!";
-    vm->setDisassEnabled(disass || trc.m_db != nullptr);
+    if(disass)
+        core->enable_disass(true);
+    vm->setDisassEnabled(disass || instr_trace);
     if(GET_PROP_VALUE(plugins).length()) {
         auto p = util::split(GET_PROP_VALUE(plugins), ';');
         for(std::string const& opt_val : p) {
@@ -315,8 +301,7 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::before_end_of_elab
     }
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulation() {
-    // quantum_keeper.reset();
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::start_of_simulation() {
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
@@ -334,28 +319,13 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::start_of_simulatio
             }
         }
     }
-    if(trc.m_db != nullptr && trc.stream_handle == nullptr) {
-        string basename(this->name());
-        trc.stream_handle = new scv_tr_stream((basename + ".instr").c_str(), "TRANSACTOR", trc.m_db);
-        trc.instr_tr_handle = new scv_tr_generator<>("execute", *trc.stream_handle);
-    }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::disass_output(uint64_t pc, const std::string instr_str) {
-    if(trc.m_db == nullptr)
-        return false;
-    if(trc.tr_handle.is_active())
-        trc.tr_handle.end_transaction();
-    trc.tr_handle = trc.instr_tr_handle->begin_transaction();
-    trc.tr_handle.record_attribute("PC", pc);
-    trc.tr_handle.record_attribute("INSTR", instr_str);
-    trc.tr_handle.record_attribute("MODE", lvl[core->get_mode()]);
-    trc.tr_handle.record_attribute("MSTATUS", core->get_state());
-    trc.tr_handle.record_attribute("LTIME_START", quantum_keeper.get_current_time().value() / 1000);
-    return true;
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::disass_output(uint64_t pc, std::string const& instr_str) {
+    trc.disass_output(pc, instr_str, lvl[core->get_mode()], core->get_state());
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::forward() {
 #ifndef CWR_SYSTEMC
     set_clock_period(clk_i.read());
 #else
@@ -364,34 +334,29 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::forward() {
 #endif
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::set_clock_period(sc_core::sc_time period) {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::set_clock_period(sc_core::sc_time period) {
     curr_clk = period;
     if(period == SC_ZERO_TIME)
         core->set_interrupt_execution(true);
 }
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::rst_cb() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::rst_cb() {
     if(rst_i.read())
         core->set_interrupt_execution(true);
 }
 
 #ifndef USE_TLM_SIGNAL
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::sw_irq_cb() { core->local_irq(3, sw_irq_i.read()); }
-
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::timer_irq_cb() { core->local_irq(7, timer_irq_i.read()); }
-
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::ext_irq_cb() { core->local_irq(11, ext_irq_i.read()); }
-
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::local_irq_cb() {
-    for(auto i = 0U; i < local_irq_i.size(); ++i) {
-        if(local_irq_i[i].event()) {
-            core->local_irq(16 + i, local_irq_i[i].read());
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::clint_irq_cb() {
+    for(auto i = 0U; i < clint_irq_i.size(); ++i) {
+        if(clint_irq_i[i].event()) {
+            core->local_irq(i, clint_irq_i[i].read());
         }
     }
 }
 #endif
 
-template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::run() {
+    reset(GET_PROP_VALUE(reset_address));
     wait(SC_ZERO_TIME); // separate from elaboration phase
     do {
         wait(SC_ZERO_TIME);
@@ -402,42 +367,58 @@ template <unsigned int BUSWIDTH> void core_complex<BUSWIDTH>::run() {
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
         }
-        quantum_keeper.reset();
+        quantum_keeper.reset(sc_core::sc_time_stamp());
         core->set_interrupt_execution(false);
-        start(dump_ir);
+        run_iss();
     } while(!core->get_interrupt_execution());
-    sc_stop();
+    if(finish_evt_inuse)
+        finish_evt.notify();
+    else {
+        if(sc_core::sc_get_simulator_status() != sc_core::SC_SIM_USER_STOP) // stop simulation
+            sc_stop();
+    }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) {
-    auto& dmi_lut = is_fetch ? fetch_lut : read_lut;
-    auto lut_entry = dmi_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
-        auto offset = addr - lut_entry.get_start_address();
+template <unsigned int BUSWIDTH, typename QK>
+bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, uint8_t* const data) {
+    // basically checking for mem_type_e in CORENAME.h
+    bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
+    auto& dmi_lut = is_fetch ? fetch_lut : get_read_lut(addr.space);
+    auto lut_entry = dmi_lut.getEntry(addr.val);
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
+        auto offset = addr.val - lut_entry.get_start_address();
         std::copy(lut_entry.get_dmi_ptr() + offset, lut_entry.get_dmi_ptr() + offset + length, data);
         if(is_fetch)
             ibus_inc += lut_entry.get_read_latency() / curr_clk;
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
+#ifndef NDEBUG
+        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex
+                               << addr.val << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
+#endif
         return true;
     } else {
-        auto& sckt = is_fetch ? ibus : dbus;
         tlm::tlm_generic_payload gp;
         gp.set_command(tlm::TLM_READ_COMMAND);
-        gp.set_address(addr);
+        gp.set_address(addr.val);
         gp.set_data_ptr(data);
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-            if(is_fetch && trc.tr_handle.is_active()) {
-                trc.tr_handle.end_transaction();
-            }
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-            gp.set_extension(preExt);
-        }
+        sysc::memspace::tlm_memspace_extension<> mem_spc(static_cast<memspace::common>(addr.space));
+        if(!is_fetch)
+            gp.set_extension(&mem_spc);
+        tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
+        gp.set_extension(&id_ext);
+        DEFER {
+            gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+            gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
+        };
         auto pre_delay = delay;
-        sckt->b_transport(gp, delay);
+        exec_b_transport(gp, delay, is_fetch);
         if(pre_delay > delay) {
             quantum_keeper.reset();
         } else {
@@ -447,19 +428,18 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
             else
                 dbus_inc += incr;
         }
-        SCCTRACE(this->name()) << "[local time: " << delay << "]: finish read_mem(0x" << std::hex << addr << ") : 0x"
+        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
                                                  : (unsigned)*data);
-        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
+        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
-        }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
-            gp.set_address(addr);
+            gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
-            if(sckt->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_read_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
+            if(exec_get_direct_mem_ptr(gp, dmi_data)) {
+                if(dmi_data.is_read_allowed() && (addr.val + length - 1) <= dmi_data.get_end_address())
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
@@ -467,79 +447,113 @@ template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem(uint64_t 
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem(uint64_t addr, unsigned length, const uint8_t* const data) {
-    auto lut_entry = write_lut.getEntry(addr);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr + length) <= (lut_entry.get_end_address() + 1)) {
-        auto offset = addr - lut_entry.get_start_address();
+template <unsigned int BUSWIDTH, typename QK>
+bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, const uint8_t* const data) {
+    auto lut_entry = get_write_lut(addr.space).getEntry(addr.val);
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && (addr.val + length) <= (lut_entry.get_end_address() + 1)) {
+        auto offset = addr.val - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
+#ifndef NDEBUG
+        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex
+                               << addr.val << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
+#endif
         return true;
     } else {
         write_buf.resize(length);
         std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
         tlm::tlm_generic_payload gp;
         gp.set_command(tlm::TLM_WRITE_COMMAND);
-        gp.set_address(addr);
+        gp.set_address(addr.val);
         gp.set_data_ptr(write_buf.data());
         gp.set_data_length(length);
         gp.set_streaming_width(length);
         sc_time delay = quantum_keeper.get_local_time();
-        if(trc.m_db != nullptr && trc.tr_handle.is_valid()) {
-            auto preExt = new tlm::scc::scv::tlm_recording_extension(trc.tr_handle, this);
-            gp.set_extension(preExt);
-        }
+        sysc::memspace::tlm_memspace_extension<> mem_spc(static_cast<memspace::common>(addr.space));
+        gp.set_extension(&mem_spc);
+        tlm::scc::initiator_id_extension id_ext{mhartid.get_value()};
+        gp.set_extension(&id_ext);
+        DEFER {
+            gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
+            gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
+        };
         auto pre_delay = delay;
-        dbus->b_transport(gp, delay);
+        exec_b_transport(gp, delay);
         if(pre_delay > delay)
             quantum_keeper.reset();
         else
             dbus_inc += (delay - quantum_keeper.get_local_time()) / curr_clk;
-        SCCTRACE() << "[local time: " << delay << "]: finish write_mem(0x" << std::hex << addr << ") : 0x"
-                   << (length == 4   ? *(uint32_t*)data
-                       : length == 2 ? *(uint16_t*)data
-                                     : (unsigned)*data);
-        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE) {
+        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
+                               << (length == 4   ? *(uint32_t*)data
+                                   : length == 2 ? *(uint16_t*)data
+                                                 : (unsigned)*data);
+        if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
-        }
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
             gp.set_command(tlm::TLM_READ_COMMAND);
-            gp.set_address(addr);
+            gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
-            if(dbus->get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_write_allowed() && (addr + length - 1) <= dmi_data.get_end_address())
-                    write_lut.addEntry(dmi_data, dmi_data.get_start_address(),
-                                       dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
+            if(exec_get_direct_mem_ptr(gp, dmi_data)) {
+                if(dmi_data.is_write_allowed() && (addr.val + length - 1) <= dmi_data.get_end_address())
+                    get_write_lut(addr.space)
+                        .addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
         return true;
     }
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QK>
+bool core_complex<BUSWIDTH, QK>::read_mem_dbg(const addr_t& addr, unsigned length, uint8_t* const data) {
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_READ_COMMAND);
-    gp.set_address(addr);
+    gp.set_address(addr.val);
     gp.set_data_ptr(data);
     gp.set_data_length(length);
     gp.set_streaming_width(length);
+    gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
 
-template <unsigned int BUSWIDTH> bool core_complex<BUSWIDTH>::write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <unsigned int BUSWIDTH, typename QK>
+bool core_complex<BUSWIDTH, QK>::write_mem_dbg(const addr_t& addr, unsigned length, const uint8_t* const data) {
     write_buf.resize(length);
     std::copy(data, data + length, write_buf.begin()); // need to copy as TLM does not guarantee data integrity
     tlm::tlm_generic_payload gp;
     gp.set_command(tlm::TLM_WRITE_COMMAND);
-    gp.set_address(addr);
+    gp.set_address(addr.val);
     gp.set_data_ptr(write_buf.data());
     gp.set_data_length(length);
     gp.set_streaming_width(length);
+    gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
+template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_read_lut(unsigned space) {
+    return get_lut(dmi_read_luts, space);
+};
+template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_write_lut(unsigned space) {
+    return get_lut(dmi_write_luts, space);
+};
+template <unsigned int BUSWIDTH, typename QK>
+util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_lut(lut_vec_t& luts, unsigned space) {
+    if(space >= luts.size()) {
+        luts.reserve(space + 1);
+        // cannot use resize as assignment and move assignment operator are not supported by range_luts with tlm_dmi_ext as defaults
+        while(space >= luts.size())
+            luts.emplace_back(tlm_dmi_ext());
+    }
+    return luts[space];
+};
 
 template class core_complex<scc::LT>;
 template class core_complex<32>;
 template class core_complex<64>;
+template class core_complex<scc::LT, tlm::scc::quantumkeeper_mt>;
+template class core_complex<32, tlm::scc::quantumkeeper_mt>;
+template class core_complex<64, tlm::scc::quantumkeeper_mt>;
 
 } // namespace riscv
 } /* namespace sysc */

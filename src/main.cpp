@@ -102,16 +102,19 @@ int main(int argc, char* argv[]) {
     LOGGER(DEFAULT)::print_time() = false;
     LOGGER(connection)::print_time() = false;
     LOGGER(dbt_rise_iss)::print_time() = false;
+    LOGGER(disass)::print_time() = false;
     auto l = logging::as_log_level(clim["verbose"].as<int>());
-    LOGGER(DEFAULT)::reporting_level() = l;
-    LOGGER(connection)::reporting_level() = l;
-    LOGGER(dbt_rise_iss)::reporting_level() = l;
+    LOGGER(DEFAULT)::set_reporting_level(l);
+    LOGGER(connection)::set_reporting_level(l);
+    LOGGER(dbt_rise_iss)::set_reporting_level(l);
+    LOGGER(disass)::set_reporting_level(l);
     if(clim.count("logfile")) {
         // configure the connection logger
         auto f = fopen(clim["logfile"].as<std::string>().c_str(), "w");
         LOG_OUTPUT(DEFAULT)::stream() = f;
         LOG_OUTPUT(connection)::stream() = f;
         LOG_OUTPUT(dbt_rise_iss)::stream() = f;
+        LOG_OUTPUT(disass)::stream() = f;
     }
 
     std::vector<iss::vm_plugin*> plugin_list;
@@ -207,7 +210,6 @@ int main(int argc, char* argv[]) {
         }
         if(clim.count("disass")) {
             vm->setDisassEnabled(true);
-            LOGGER(disass)::reporting_level() = logging::INFO;
             LOGGER(disass)::print_time() = false;
             auto file_name = clim["disass"].as<std::string>();
             if(file_name.length() > 0) {
@@ -273,10 +275,10 @@ int main(int argc, char* argv[]) {
                 LOG(ERR) << "Error opening file " << filename << std::endl;
                 return 1;
             }
-            LOGGER(DEFAULT)::reporting_level() = logging::ERR;
+            LOGGER(DEFAULT)::set_reporting_level(logging::ERR);
             for(auto addr = start_addr; addr < end_addr; addr += data.size()) {
-                vm->get_arch()->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0 /*MEM*/, addr, data.size(),
-                                     data.data()); // FIXME: get space from iss::arch::traits<ARCH>::mem_type_e::MEM
+                vm->get_arch()->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0 /*iss::arch::traits<ARCH>::MEM*/, addr},
+                                     data.size(), data.data());
 
                 // TODO : obey Target endianess
                 uint32_t to_print = (data[3] << 24) + (data[2] << 16) + (data[1] << 8) + data[0];

@@ -33,7 +33,9 @@
 #ifndef _SYSC_CORE_COMPLEX__IF_H_
 #define _SYSC_CORE_COMPLEX__IF_H_
 
+#include <iss/vm_types.h>
 #include <scc/signal_opt_ports.h>
+#include <util/delegate.h>
 
 namespace sysc {
 namespace riscv {
@@ -41,20 +43,22 @@ struct core_complex_if {
 
     virtual ~core_complex_if() = default;
 
-    virtual bool read_mem(uint64_t addr, unsigned length, uint8_t* const data, bool is_fetch) = 0;
+    virtual bool read_mem(const iss::addr_t& addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem(const iss::addr_t& addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool read_mem_dbg(uint64_t addr, unsigned length, uint8_t* const data) = 0;
+    virtual bool read_mem_dbg(const iss::addr_t& addr, unsigned length, uint8_t* const data) = 0;
 
-    virtual bool write_mem_dbg(uint64_t addr, unsigned length, const uint8_t* const data) = 0;
+    virtual bool write_mem_dbg(const iss::addr_t& addr, unsigned length, const uint8_t* const data) = 0;
 
-    virtual bool disass_output(uint64_t pc, const std::string instr) = 0;
+    virtual void disass_output(uint64_t pc, std::string const& instr) = 0;
 
     virtual unsigned get_last_bus_cycles() = 0;
 
     //! Allow quantum keeper handling
     virtual void sync(uint64_t) = 0;
+
+    util::delegate<void(std::function<void(void)>&)> exec_on_sysc;
 
     virtual char const* hier_name() = 0;
 

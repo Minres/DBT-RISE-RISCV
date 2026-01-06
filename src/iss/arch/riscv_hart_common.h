@@ -36,7 +36,6 @@
 #define _RISCV_HART_COMMON
 
 #include "mstatus.h"
-#include "util/delegate.h"
 #include <array>
 #include <cstdint>
 #include <elfio/elf_types.hpp>
@@ -52,6 +51,9 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <util/delegate.h>
+#include <util/instance_logger.h>
+#include <util/ities.h>
 #include <util/logging.h>
 #include <util/sparse_array.h>
 
@@ -305,7 +307,79 @@ template <typename WORD_TYPE> struct priv_if {
     unsigned& max_irq;
 };
 
-template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
+template <typename BASE = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
+
+    constexpr static unsigned MEM = traits<BASE>::MEM;
+
+    using core = BASE;
+    using this_class = riscv_hart_common<BASE>;
+    using reg_t = typename core::reg_t;
+
+    using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
+    using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
+
+    // Extension status bits (SD needs to be set when any of  FS / VS / XS are dirty [0b11]):
+    // TODO implement XS
+    static constexpr uint32_t extension_status_mask =
+        (traits<BASE>::FP_REGS_SIZE ? (0b11u << 13) : 0u) | (traits<BASE>::V_REGS_SIZE ? (0b11u << 9) : 0u);
+
+    // Notation for differing fields is: 32 bits / 64 bits
+    static constexpr uint32_t mstatus_lower = 0b00000000000000000001100010001000;
+    static constexpr uint32_t sstatus_lower = 0b00000000011111100000000100100010;
+    static constexpr uint32_t ustatus_lower = 0b00000000000000000000000000010001;
+    //                                          ||||||/|||||||||/|/|/|/|||||||||
+    //                                          |||||/ ||||||||| | | | ||||||||+-- UIE
+    //                                          ||||/||||||||||| | | | |||||||+--- SIE
+    //                                          |||/|||||||||||| | | | ||||||+---- WPRI
+    //                                          ||/||||||||||||| | | | |||||+----- MIE
+    //                                          |||||||||||||||| | | | ||||+------ UPIE
+    //                                          |||||||||||||||| | | | |||+------- SPIE
+    //                                          |||||||||||||||| | | | ||+-------- UBE
+    //                                          |||||||||||||||| | | | |+--------- MPIE
+    //                                          |||||||||||||||| | | | +---------- SPP
+    //                                          |||||||||||||||| | | +------------ VS
+    //                                          |||||||||||||||| | +-------------- MPP
+    //                                          |||||||||||||||| +---------------- FS
+    //                                          |||||||||||||||+------------------ XS
+    //                                          ||||||||||||||+------------------- MPRV
+    //                                          |||||||||||||+-------------------- SUM
+    //                                          ||||||||||||+--------------------- MXR
+    //                                          |||||||||||+---------------------- TVM
+    //                                          ||||||||||+----------------------- TW
+    //                                          |||||||||+------------------------ TSR
+    //                                          ||||||||+------------------------- SPELP
+    //                                          |||||||+-------------------------- SDT
+    //                                          |++++++--------------------------- WPRI
+    //                                          +--------------------------------- SD / WPRI
+
+    // upper half does not correspond to mstatush bit meanings (UXL and SXL)
+    static constexpr uint32_t mstatus_upper = 0b00000000000000000000000000001111;
+    static constexpr uint32_t sstatus_upper = 0b00000000000000000000000000000011;
+    //                                          |||||||||||||||||||||||||||||/|/
+    //                                          ||||||||||||||||||||||||||||| +--- WPRI / UXL
+    //                                          ||||||||||||||||||||||||||||+----- WPRI / SXL
+    //                                          |||||||||||||||||||||||||||+------ SBE
+    //                                          |||||||||||||||||||||||||+-------- MBE
+    //                                          ||||||||||||||||||||||||+--------- GVA
+    //                                          |||||||||||||||||||||||+---------- MPV
+    //                                          ||||||||||||||||||||||+----------- WPRI
+    //                                          |||||||||||||||||||||+------------ MPELP
+    //                                          ||||||||||||||||||||+------------- MDT
+    //                                          |+++++++++++++++++++-------------- WPRI
+    //                                          +--------------------------------- WPRI / SD
+
+    static constexpr reg_t get_mstatus_mask() {
+        if constexpr(sizeof(reg_t) == 4)
+            return mstatus_lower | riscv_hart_common<BASE>::extension_status_mask;
+        else if constexpr(sizeof(reg_t) == 8)
+            return static_cast<reg_t>(mstatus_upper) << 32 | mstatus_lower | riscv_hart_common<BASE>::extension_status_mask;
+        else
+            static_assert("Unsupported XLEN value");
+    }
+    static constexpr reg_t get_mu_status_mask(unsigned priv_lvl) { return ustatus_lower | (priv_lvl >= PRIV_M ? get_mstatus_mask() : 0); }
+    static constexpr reg_t get_msu_status_mask(unsigned priv_lvl) {
+        return get_mu_status_mask(priv_lvl) | ((priv_lvl >= PRIV_S) ? sstatus_lower : 0);
+    }
     const std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
     const std::array<const char*, 16> trap_str = {{""
                                                    "Instruction address misaligned", // 0
@@ -328,14 +402,6 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                                                   "Machine software interrupt", "User timer interrupt", "Supervisor timer interrupt",
                                                   "Reserved", "Machine timer interrupt", "User external interrupt",
                                                   "Supervisor external interrupt", "Reserved", "Machine external interrupt"}};
-    constexpr static unsigned MEM = traits<BASE>::MEM;
-
-    using core = BASE;
-    using this_class = riscv_hart_common<BASE, LOGCAT>;
-    using reg_t = typename core::reg_t;
-
-    using rd_csr_f = std::function<iss::status(unsigned addr, reg_t&)>;
-    using wr_csr_f = std::function<iss::status(unsigned addr, reg_t)>;
 
 #define MK_CSR_RD_CB(FCT) [this](unsigned a, reg_t& r) -> iss::status { return this->FCT(a, r); };
 #define MK_CSR_WR_CB(FCT) [this](unsigned a, reg_t r) -> iss::status { return this->FCT(a, r); };
@@ -434,7 +500,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     ~riscv_hart_common() {
         if(io_buf.str().length()) {
-            CPPLOG(INFO) << "tohost send '" << io_buf.str() << "'";
+            ILOG(isslogger, logging::INFO, fmt::format("tohost send '{}'", io_buf.str()));
         }
     }
 
@@ -446,22 +512,22 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
 
-    std::pair<uint64_t, bool> load_file(std::string name, int type) {
+    std::pair<uint64_t, bool> load_file(std::string const& name, int type) override {
         return std::make_pair(entry_address, read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64));
     }
 
-    bool read_elf_file(std::string name, uint8_t expected_elf_class) {
+    bool read_elf_file(std::string const& name, uint8_t expected_elf_class) {
         // Create elfio reader
         ELFIO::elfio reader;
         // Load ELF data
         if(reader.load(name)) {
             // check elf properties
             if(reader.get_class() != expected_elf_class) {
-                CPPLOG(ERR) << "ISA missmatch, selected XLEN does not match supplied file ";
+                ILOG(isslogger, logging::ERR, "ISA missmatch, selected XLEN does not match supplied file ");
                 return false;
             }
             if(reader.get_type() != ELFIO::ET_EXEC && reader.get_type() != ELFIO::ET_DYN) {
-                CPPLOG(ERR) << "Input is neither an executable nor a pie executable (dyn)";
+                ILOG(isslogger, logging::ERR, "Input is neither an executable nor a pie executable (dyn)");
                 return false;
             }
             if(reader.get_machine() != ELFIO::EM_RISCV)
@@ -472,10 +538,12 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                 const auto seg_data = pseg->get_data();
                 const auto type = pseg->get_type();
                 if(type == ELFIO::PT_LOAD && fsize > 0) {
-                    auto res = this->write(iss::address_type::PHYSICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::MEM,
-                                           pseg->get_physical_address(), fsize, reinterpret_cast<const uint8_t* const>(seg_data));
+                    auto res = this->write(
+                        {iss::address_type::LOGICAL, iss::access_type::DEBUG_WRITE, traits<BASE>::IMEM, pseg->get_physical_address()},
+                        fsize, reinterpret_cast<const uint8_t* const>(seg_data));
                     if(res != iss::Ok)
-                        CPPLOG(ERR) << "problem writing " << fsize << " bytes to 0x" << std::hex << pseg->get_physical_address();
+                        ILOG(isslogger, logging::ERR,
+                             fmt::format("problem writing {} bytes to 0x{:x}", fsize, pseg->get_physical_address()));
                 }
             }
             const auto sym_sec = reader.sections[".symtab"];
@@ -494,7 +562,7 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
                     if(name != "") {
                         this->symbol_table[name] = value;
 #ifndef NDEBUG
-                        CPPLOG(TRACE) << "Found Symbol " << name;
+                        ILOG(isslogger, logging::TRACE, fmt::format("Found Symbol {}", name));
 #endif
                     }
                 }
@@ -515,14 +583,14 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         uint64_t buf_ptr = loaded_payload[2];
         uint64_t len = loaded_payload[3];
         std::vector<char> buf(len);
-        if(aif->read(address_type::PHYSICAL, access_type::DEBUG_READ, mem_type, buf_ptr, len, reinterpret_cast<uint8_t*>(buf.data()))) {
-            CPPLOG(ERR) << "SYS_WRITE buffer read went wrong";
+        if(aif->read({address_type::LOGICAL, access_type::DEBUG_READ, mem_type, buf_ptr}, len, reinterpret_cast<uint8_t*>(buf.data()))) {
+            ILOG(isslogger, logging::ERR, "SYS_WRITE buffer read went wrong");
             return iss::Err;
         }
         // we disregard the fd and just log to stdout
         for(size_t i = 0; i < len; i++) {
             if(buf[i] == '\n' || buf[i] == '\0') {
-                CPPLOG(INFO) << "tohost send '" << io_buf.str() << "'";
+                ILOG(isslogger, logging::INFO, fmt::format("tohost send '{}'", io_buf.str()));
                 io_buf.str("");
             } else
                 io_buf << buf[i];
@@ -531,8 +599,8 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
         // Not sure what the correct return value should be
         uint8_t ret_val = 1;
         if(fromhost != std::numeric_limits<uint64_t>::max())
-            if(aif->write(address_type::PHYSICAL, access_type::DEBUG_WRITE, mem_type, fromhost, 1, &ret_val)) {
-                CPPLOG(ERR) << "Fromhost write went wrong";
+            if(aif->write({address_type::LOGICAL, access_type::DEBUG_WRITE, mem_type, fromhost}, 1, &ret_val) != iss::Ok) {
+                ILOG(isslogger, logging::ERR, "Fromhost write went wrong");
                 return iss::Err;
             }
         return iss::Ok;
@@ -542,12 +610,13 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
 
     constexpr reg_t get_pc_mask() { return has_compressed() ? (reg_t)~1 : (reg_t)~3; }
 
-    void disass_output(uint64_t pc, const std::string instr) override {
-        // NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};s:0x{:x};c:{}]", pc, instr, lvl[this->reg.PRIV],
-        // (reg_t)state.mstatus,
-        //                                     this->reg.cycle + cycle_offset);
-        NSCLOG(INFO, LOGCAT) << fmt::format("0x{:016x}    {:40} [p:{};c:{}]", pc, instr, lvl[this->reg.PRIV],
-                                            this->reg.cycle + cycle_offset);
+    void disass_output(uint64_t pc, std::string const& instr) override {
+        static CONSTEXPR char const* fmt_str =
+            sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
+        if(::logging::DEBUG <= disasslogger.get_log_level())
+            ILOG(disasslogger, ::logging::DEBUG,
+                 fmt::format(fmt_str, pc, instr, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                             this->reg.cycle + cycle_offset));
     };
 
     void register_csr(unsigned addr, rd_csr_f f) { csr_rd_cb[addr] = f; }
@@ -854,63 +923,71 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     }
 
     iss::status read_vlenb(unsigned addr, reg_t& val) {
-        val = csr[vlenb];
+        val = traits<BASE>::V_REGS_SIZE;
         return iss::Ok;
     }
 
     priv_if<reg_t> get_priv_if() {
-        return priv_if<reg_t>{.read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
-                              .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
-                              .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
-                              .raise_trap =
-                                  [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
-                                      this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
-                                      this->fault_data = fault_data;
-                                  },
-                              .csr_rd_cb{this->csr_rd_cb},
-                              .csr_wr_cb{csr_wr_cb},
-                              .state{this->state},
-                              .PRIV{this->reg.PRIV},
-                              .PC{this->reg.PC},
-                              .tohost{this->tohost},
-                              .fromhost{this->fromhost},
-                              .max_irq{mcause_max_irq}};
+        return priv_if<reg_t>{
+            .read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
+            .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
+            .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
+            .raise_trap =
+                [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
+                    this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
+                    this->fault_data = fault_data;
+                },
+            .csr_rd_cb{this->csr_rd_cb},
+            .csr_wr_cb{csr_wr_cb},
+            .state{this->state},
+            .PRIV{this->reg.PRIV},
+            .PC{this->reg.PC},
+            .tohost{this->tohost},
+            .fromhost{this->fromhost},
+            .max_irq{mcause_max_irq}};
     }
 
     iss::status execute_htif(uint8_t const* data, unsigned length) {
         reg_t cur_data{0};
         memcpy(&cur_data, data, length);
+        // according to https://github.com/riscv-software-src/riscv-isa-sim/issues/364#issuecomment-607657754:
         // Extract Device (bits 63:56)
         uint8_t device = traits<BASE>::XLEN == 32 ? 0 : (cur_data >> 56) & 0xFF;
         // Extract Command (bits 55:48)
         uint8_t command = traits<BASE>::XLEN == 32 ? 0 : (cur_data >> 48) & 0xFF;
         // Extract payload (bits 47:0)
-        uint64_t payload_addr = cur_data & 0xFFFFFFFFFFFFULL;
-        if(payload_addr & 1) {
-            CPPLOG(FATAL) << "this->tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr
-                          << "), stopping simulation";
+        uint64_t payload_data = cur_data & 0xFFFFFFFFFFFFULL;
+        if(payload_data & 1) {
+            if(payload_data & ~1) {
+                ILOG(isslogger, logging::FATAL,
+                     fmt::format("this->tohost value is 0x{:x} ({}), stopping simulation", payload_data, payload_data));
+            } else {
+                ILOG(isslogger, logging::INFO,
+                     fmt::format("this->tohost value is 0x{:x} ({}), stopping simulation", payload_data, payload_data));
+            }
             this->reg.trap_state = std::numeric_limits<uint32_t>::max();
-            this->interrupt_sim = payload_addr;
+            this->interrupt_sim = payload_data;
             return iss::Ok;
         } else if(device == 0 && command == 0) {
             std::array<uint64_t, 8> loaded_payload;
-            if(memory.rd_mem(access_type::DEBUG_READ, payload_addr, 8 * sizeof(uint64_t),
+            if(memory.rd_mem({address_type::LOGICAL, access_type::DEBUG_READ, traits<BASE>::MEM, payload_data}, 8 * sizeof(uint64_t),
                              reinterpret_cast<uint8_t*>(loaded_payload.data())) == iss::Err)
-                CPPLOG(ERR) << "Syscall read went wrong";
+                ILOG(isslogger, logging::ERR, "Syscall read went wrong");
             uint64_t syscall_num = loaded_payload.at(0);
             if(syscall_num == 64) { // SYS_WRITE
                 return this->execute_sys_write(this, loaded_payload, traits<BASE>::MEM);
             } else {
-                CPPLOG(ERR) << "this->tohost syscall with number 0x" << std::hex << syscall_num << std::dec << " (" << syscall_num
-                            << ") not implemented";
+                ILOG(isslogger, logging::ERR,
+                     fmt::format("this->tohost syscall with number 0x{:x} ({}) not implemented", syscall_num, syscall_num));
                 this->reg.trap_state = std::numeric_limits<uint32_t>::max();
-                this->interrupt_sim = payload_addr;
+                this->interrupt_sim = payload_data;
                 return iss::Ok;
             }
         } else {
-            CPPLOG(ERR) << "this->tohost functionality not implemented for device " << device << " and command " << command;
+            ILOG(isslogger, logging::ERR,
+                 fmt::format("this->tohost functionality not implemented for device {} and command {}", device, command));
             this->reg.trap_state = std::numeric_limits<uint32_t>::max();
-            this->interrupt_sim = payload_addr;
+            this->interrupt_sim = payload_data;
             return iss::Ok;
         }
     }
@@ -927,12 +1004,14 @@ template <typename BASE, typename LOGCAT = logging::disass> struct riscv_hart_co
     void set_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
 protected:
+    util::InstanceLogger<logging::disass> disasslogger;
+    util::InstanceLogger<logging::dbt_rise_iss> isslogger;
     hart_state<reg_t> state;
 
     mem::memory_if memory;
     struct riscv_instrumentation_if : public iss::instrumentation_if {
 
-        riscv_instrumentation_if(riscv_hart_common<BASE, LOGCAT>& arch)
+        riscv_instrumentation_if(riscv_hart_common<BASE>& arch)
         : arch(arch) {}
         /**
          * get the name of this architecture
@@ -963,7 +1042,7 @@ protected:
 
         std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
-        riscv_hart_common<BASE, LOGCAT>& arch;
+        riscv_hart_common<BASE>& arch;
     };
 
     friend struct riscv_instrumentation_if;

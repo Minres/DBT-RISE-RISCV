@@ -271,11 +271,9 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block)
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
-    // const typename traits::addr_t upper_bits = ~traits::PGMASK;
-    phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    auto res = this->core.read(paddr, 4, data);
-    if (res != iss::Ok) 
+    auto res = this->core.read({address_type::LOGICAL, access_type::DEBUG_READ, arch::traits<ARCH>::IMEM, pc.val}, 4, data);
+    if (res != iss::Ok)
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
     if (instr == 0x0000006f || (instr&0xffff)==0xa001){
         this->builder.CreateBr(this->leave_blk);
