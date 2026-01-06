@@ -127,9 +127,6 @@ if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
 endif()
 # Define the library
 add_library(${PROJECT_NAME} SHARED ${LIB_SOURCES})
-if(USE_SC_SIGNAL4IRQ)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC SC_SIGNAL_IF)
-endif()
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-shift-count-overflow)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -242,6 +239,8 @@ endif()
 ###############################################################################
 if(TARGET scc-sysc)
     project(dbt-rise-riscv_sc VERSION 1.0.0)
+    set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of ssc_signals for interrupt delivery")
+
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
         src/sysc/register_cores.cpp
@@ -253,20 +252,22 @@ if(TARGET scc-sysc)
         FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)
         list(APPEND LIB_SOURCES ${GEN_SC_SOURCES})
     endif()
-    add_library(${PROJECT_NAME} ${LIB_SOURCES})
-    target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_SYSTEMC)
-    target_link_libraries(${PROJECT_NAME} PUBLIC dbt-rise-riscv scc-sysc)
+    set(LIB_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/sysc/core_complex.h)
+
+    add_library(${PROJECT_NAME}_sig ${LIB_SOURCES})
+    target_compile_definitions(${PROJECT_NAME}_sig PUBLIC SC_SIGNAL_IF)
+    target_compile_definitions(${PROJECT_NAME}_sig PUBLIC WITH_SYSTEMC SC_SIGNAL_IF)
+    target_link_libraries(${PROJECT_NAME}_sig PUBLIC dbt-rise-riscv scc-sysc)
 
     # if(WITH_LLVM)
     # target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_libs})
     # endif()
-    set(LIB_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/sysc/core_complex.h)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
+    set_target_properties(${PROJECT_NAME}_sig PROPERTIES
         VERSION ${PROJECT_VERSION}
         FRAMEWORK FALSE
         PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
     )
-    install(TARGETS ${PROJECT_NAME} COMPONENT ${PROJECT_NAME}
+    install(TARGETS ${PROJECT_NAME}_sig COMPONENT ${PROJECT_NAME}
         EXPORT ${PROJECT_NAME}Targets # for downstream dependencies
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} # static lib
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} # binaries
@@ -275,6 +276,33 @@ if(TARGET scc-sysc)
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sysc # headers for mac (note the different component -> different package)
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} # headers
     )
+
+    add_library(${PROJECT_NAME}_tlm ${LIB_SOURCES})
+    target_compile_definitions(${PROJECT_NAME}_tlm PUBLIC WITH_SYSTEMC)
+    target_link_libraries(${PROJECT_NAME}_tlm PUBLIC dbt-rise-riscv scc-sysc)
+
+    # if(WITH_LLVM)
+    # target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_libs})
+    # endif()
+    set_target_properties(${PROJECT_NAME}_tlm PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        FRAMEWORK FALSE
+        PUBLIC_HEADER "${LIB_HEADERS}" # specify the public headers
+    )
+    install(TARGETS ${PROJECT_NAME}_tlm COMPONENT ${PROJECT_NAME}
+        EXPORT ${PROJECT_NAME}Targets # for downstream dependencies
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} # static lib
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} # binaries
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} # shared lib
+        FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR} # for mac
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/sysc # headers for mac (note the different component -> different package)
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} # headers
+    )
+    if(USE_SC_SIGNAL4IRQ)
+        add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_sig)
+    else()
+        add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_tlm)
+    endif()
 endif()
 
 project(elfio-test)

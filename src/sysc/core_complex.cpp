@@ -214,21 +214,9 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
     SC_METHOD(rst_cb);
     sensitive << rst_i;
 #ifdef USE_TLM_SIGNAL
-    sw_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(3, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    timer_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(7, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    ext_irq_i.register_nb_transport([this](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-        cpu->local_irq(11, gp.get_value());
-        return tlm::TLM_COMPLETED;
-    });
-    for(auto i = 0U; i < local_irq_i.size(); ++i)
-        local_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
-            cpu->local_irq(16 + i, gp.get_value());
+    for(auto i = 0U; i < clint_irq_i.size(); ++i)
+        clint_irq_i[i].register_nb_transport([this, i](tlm::scc::tlm_signal_gp<bool>& gp, tlm::tlm_phase& p, sc_core::sc_time& t) {
+            core->local_irq(i, gp.get_value());
             return tlm::TLM_COMPLETED;
         });
 #else
