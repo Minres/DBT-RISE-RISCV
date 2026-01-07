@@ -32,9 +32,9 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
-#include "memory_if.h"
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/vm_types.h"
+#include "memory_if.h"
 #include <util/logging.h>
 
 namespace iss {

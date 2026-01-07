@@ -36,13 +36,13 @@ class Pkg(ConanFile):
     }
 
     def requirements(self):
-        self.requires("fmt/8.0.1")
-        self.requires("spdlog/1.9.2")
+        self.requires("fmt/12.0.0")
+        self.requires("spdlog/1.16.0")
         self.requires("boost/1.85.0")
-        self.requires("elfio/3.11")
-        self.requires("lz4/1.9.3")
-        self.requires("yaml-cpp/0.7.0")
-        self.requires("jsoncpp/1.9.5")
+        self.requires("elfio/3.12")
+        self.requires("lz4/1.10.0")
+        self.requires("yaml-cpp/0.8.0")
+        self.requires("jsoncpp/1.9.6")
         self.requires("zlib/1.3.1")
         self.requires("asmjit/cci.20240531")
         if "WITH_LLVM" in os.environ:
