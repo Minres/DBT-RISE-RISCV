@@ -307,7 +307,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::s
         for(auto& s : file_names) {
             std::pair<uint64_t, bool> load_result = load_file(s);
             if(!std::get<1>(load_result)) {
-                SCCWARN(SCMOD) << "Could not load FW file " << s;
+                SCCERR(SCMOD) << "Could not load FW file " << s;
             } else {
 #ifndef CWR_SYSTEMC
                 if(reset_address.is_default_value())
