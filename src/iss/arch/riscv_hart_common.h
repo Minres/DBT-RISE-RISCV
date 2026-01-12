@@ -1028,7 +1028,7 @@ protected:
 
         uint64_t get_instr_count() override { return arch.reg.icount; }
 
-        uint64_t get_pendig_traps() override { return arch.reg.trap_state; }
+        uint64_t get_pending_traps() override { return arch.reg.trap_state; }
 
         uint64_t get_total_cycles() override { return arch.reg.cycle + arch.cycle_offset; }
 
