@@ -216,6 +216,16 @@ public:
         return finish_evt;
     }
 
+    void register_csr_rd(unsigned csr_addr, sc2core_if::rd_csr_f &func) {
+        assert(core != nullptr);
+        core->register_csr_rd(csr_addr, func);
+    }
+
+    void register_csr_wr(unsigned csr_addr, sc2core_if::wr_csr_f &func) {
+        assert(core != nullptr);
+        core->register_csr_wr(csr_addr, func);
+    }
+
 protected:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
     int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
