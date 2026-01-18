@@ -53,8 +53,14 @@ void memory_hierarchy::append(memory_elem& e) {
     hierarchy.push_back(&e);
     update_chain();
 }
-void memory_hierarchy::insert_before(memory_elem&) {}
-void memory_hierarchy::insert_after(memory_elem&) {}
+void memory_hierarchy::insert_before_last(memory_elem& e) {
+    hierarchy.insert(hierarchy.begin() + hierarchy.size() - 1, &e);
+    update_chain();
+}
+void memory_hierarchy::insert_after_first(memory_elem& e) {
+    hierarchy.insert(hierarchy.begin() + 1, &e);
+    update_chain();
+}
 void memory_hierarchy::replace_last(memory_elem& e) {
     auto old = hierarchy.back();
     auto it = std::find_if(std::begin(owned_elems), std::end(owned_elems),
@@ -82,13 +88,13 @@ void memory_hierarchy::append(std::unique_ptr<memory_elem>&& p) {
     owned_elems.push_back(std::move(p));
 }
 
-void memory_hierarchy::insert_before(std::unique_ptr<memory_elem>&& p) {
-    insert_before(*p);
+void memory_hierarchy::insert_before_last(std::unique_ptr<memory_elem>&& p) {
+    insert_before_last(*p);
     owned_elems.push_back(std::move(p));
 }
 
-void memory_hierarchy::insert_after(std::unique_ptr<memory_elem>&& p) {
-    insert_after(*p);
+void memory_hierarchy::insert_after_first(std::unique_ptr<memory_elem>&& p) {
+    insert_after_first(*p);
     owned_elems.push_back(std::move(p));
 }
 

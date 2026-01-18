@@ -65,13 +65,13 @@ struct memory_hierarchy {
     void root(memory_elem&);
     void prepend(memory_elem&);
     void append(memory_elem&);
-    void insert_before(memory_elem&);
-    void insert_after(memory_elem&);
+    void insert_before_last(memory_elem&);
+    void insert_after_first(memory_elem&);
     void replace_last(memory_elem&);
     void prepend(std::unique_ptr<memory_elem>&&);
     void append(std::unique_ptr<memory_elem>&&);
-    void insert_before(std::unique_ptr<memory_elem>&&);
-    void insert_after(std::unique_ptr<memory_elem>&&);
+    void insert_before_last(std::unique_ptr<memory_elem>&&);
+    void insert_after_first(std::unique_ptr<memory_elem>&&);
     void replace_last(std::unique_ptr<memory_elem>&&);
 
 protected:
