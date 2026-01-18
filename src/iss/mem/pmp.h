@@ -40,68 +40,29 @@
 
 namespace iss {
 namespace mem {
-struct clic_config {
-    uint64_t clic_base{0xc0000000};
-    unsigned clic_int_ctl_bits{4};
-    unsigned clic_num_irq{16};
-    unsigned clic_num_trigger{0};
-    bool nmode{false};
-};
-
-inline void read_reg_with_offset(uint32_t reg, uint8_t offs, uint8_t* const data, unsigned length) {
-    auto reg_ptr = reinterpret_cast<uint8_t*>(&reg);
-    switch(offs) {
-    default:
-        for(auto i = 0U; i < length; ++i)
-            *(data + i) = *(reg_ptr + i);
-        break;
-    case 1:
-        for(auto i = 0U; i < length; ++i)
-            *(data + i) = *(reg_ptr + 1 + i);
-        break;
-    case 2:
-        for(auto i = 0U; i < length; ++i)
-            *(data + i) = *(reg_ptr + 2 + i);
-        break;
-    case 3:
-        *data = *(reg_ptr + 3);
-        break;
-    }
-}
-
-inline void write_reg_with_offset(uint32_t& reg, uint8_t offs, const uint8_t* const data, unsigned length) {
-    auto reg_ptr = reinterpret_cast<uint8_t*>(&reg);
-    switch(offs) {
-    default:
-        for(auto i = 0U; i < length; ++i)
-            *(reg_ptr + i) = *(data + i);
-        break;
-    case 1:
-        for(auto i = 0U; i < length; ++i)
-            *(reg_ptr + 1 + i) = *(data + i);
-        break;
-    case 2:
-        for(auto i = 0U; i < length; ++i)
-            *(reg_ptr + 2 + i) = *(data + i);
-        break;
-    case 3:
-        *(reg_ptr + 3) = *data;
-        break;
-    }
-}
 
 template <typename PLAT> struct pmp : public memory_elem {
     using this_class = pmp<PLAT>;
     using reg_t = typename PLAT::reg_t;
+    static constexpr auto cfg_reg_size = sizeof(reg_t);
+    static constexpr auto PMP_SHIFT = 2U;
+    static constexpr auto PMP_R = 0x1U;
+    static constexpr auto PMP_W = 0x2U;
+    static constexpr auto PMP_X = 0x4U;
+    static constexpr auto PMP_A = 0x18U;
+    static constexpr auto PMP_L = 0x80U;
+    static constexpr auto PMP_TOR = 0x1U;
+    static constexpr auto PMP_NA4 = 0x2U;
+    static constexpr auto PMP_NAPOT = 0x3U;
 
     pmp(arch::priv_if<reg_t> hart_if)
     : hart_if(hart_if) {
         for(size_t i = arch::pmpaddr0; i <= arch::pmpaddr15; ++i) {
-            hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_plain);
-            hart_if.csr_wr_cb[i] = MK_CSR_WR_CB(write_plain);
+            hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_pmpaddr);
+            hart_if.csr_wr_cb[i] = MK_CSR_WR_CB(write_pmpaddr);
         }
         for(size_t i = arch::pmpcfg0; i < arch::pmpcfg0 + 16 / sizeof(reg_t); ++i) {
-            hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_plain);
+            hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_pmpcfg);
             hart_if.csr_wr_cb[i] = MK_CSR_WR_CB(write_pmpcfg);
         }
     }
@@ -116,13 +77,16 @@ template <typename PLAT> struct pmp : public memory_elem {
     void set_next(memory_if mem) override { down_stream_mem = mem; }
 
 private:
+    std::array<reg_t, 16> pmpaddr;
+    std::array<reg_t, 16 / sizeof(reg_t)> pmpcfg;
+
     iss::status read_mem(const addr_t& addr, unsigned length, uint8_t* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");
-        if(likely(addr.space == arch::traits<PLAT>::MEM) && !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
-            hart_if.fault_data = addr;
+        if(likely(addr.space == arch::traits<PLAT>::MEM || std::numeric_limits<decltype(phys_addr_t::space)>::max()) &&
+           !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
             if(is_debug(addr.access))
                 throw trap_access(0, addr.val);
-            hart_if.reg.trap_state = (1UL << 31) | ((addr.access == access_type::FETCH ? 1 : 5) << 16); // issue trap 1
+            hart_if.raise_trap(/*trap_id*/ 0, /*cause*/ (addr.access == access_type::FETCH) ? 1 : 5, /*fault_data*/ addr.val);
             return iss::Err;
         }
         return down_stream_mem.rd_mem(addr, length, data);
@@ -131,62 +95,71 @@ private:
     iss::status write_mem(const addr_t& addr, unsigned length, uint8_t const* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");
         if(likely(addr.space == arch::traits<PLAT>::MEM) && !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
-            hart_if.fault_data = addr;
             if(is_debug(addr.access))
                 throw trap_access(0, addr.val);
-            hart_if.reg.trap_state = (1UL << 31) | (7 << 16); // issue trap 1
+            hart_if.raise_trap(/*trap_id*/ 0, /*cause*/ 7, /*fault_data*/ addr.val);
             return iss::Err;
         }
         return down_stream_mem.wr_mem(addr, length, data);
     }
 
-    iss::status read_plain(unsigned addr, reg_t& val) {
-        val = hart_if.csr[addr];
-        return iss::Ok;
+    iss::status read_pmpaddr(unsigned addr, reg_t& val) {
+        if(addr >= arch::pmpaddr0 && addr <= arch::pmpaddr15) {
+            val = pmpaddr[addr - arch::pmpaddr0];
+            return iss::Ok;
+        }
+        return iss::Err;
     }
 
-    iss::status write_plain(unsigned addr, reg_t const& val) {
-        hart_if.csr[addr] = val;
-        return iss::Ok;
+    iss::status write_pmpaddr(unsigned addr, reg_t const& val) {
+        if(addr >= arch::pmpaddr0 && addr <= arch::pmpaddr15) {
+            pmpaddr[addr - arch::pmpaddr0] = val;
+            return iss::Ok;
+        }
+        return iss::Err;
     }
 
+    iss::status read_pmpcfg(unsigned addr, reg_t& val) {
+        if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
+            val = pmpaddr[addr - arch::pmpcfg0];
+            return iss::Ok;
+        }
+        return iss::Err;
+    }
     iss::status write_pmpcfg(unsigned addr, reg_t val) {
-        hart_if.csr[addr] = val & 0x9f9f9f9f;
-        return iss::Ok;
+        if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
+            pmpaddr[addr - arch::pmpcfg0] = val & 0x9f9f9f9f;
+            any_active = false;
+            for(size_t i = 0; i < 16; i++) {
+                auto cfg = pmpcfg[i / cfg_reg_size] >> (i % cfg_reg_size);
+                any_active |= cfg & PMP_A;
+            }
+            return iss::Ok;
+        }
+        return iss::Err;
     }
 
-    bool pmp_check(const access_type type, const uint64_t addr, const unsigned len);
+    bool pmp_check(access_type type, uint64_t addr, unsigned len);
 
 protected:
+    bool any_active = false;
     arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
 };
 
-template <typename PLAT> bool pmp<PLAT>::pmp_check(const access_type type, const uint64_t addr, const unsigned len) {
-    constexpr auto PMP_SHIFT = 2U;
-    constexpr auto PMP_R = 0x1U;
-    constexpr auto PMP_W = 0x2U;
-    constexpr auto PMP_X = 0x4U;
-    constexpr auto PMP_A = 0x18U;
-    constexpr auto PMP_L = 0x80U;
-    constexpr auto PMP_TOR = 0x1U;
-    constexpr auto PMP_NA4 = 0x2U;
-    constexpr auto PMP_NAPOT = 0x3U;
+template <typename PLAT> bool pmp<PLAT>::pmp_check(access_type type, uint64_t addr, unsigned len) {
+    if(!any_active)
+        return true;
     reg_t base = 0;
-    auto any_active = false;
-    auto const cfg_reg_size = sizeof(reg_t);
     for(size_t i = 0; i < 16; i++) {
-        reg_t tor = hart_if.csr[arch::pmpaddr0 + i] << PMP_SHIFT;
-        uint8_t cfg = hart_if.csr[arch::pmpcfg0 + (i / cfg_reg_size)] >> (i % cfg_reg_size);
+        reg_t tor = pmpaddr[i] << PMP_SHIFT;
+        reg_t cfg = pmpcfg[i / cfg_reg_size] >> (i % cfg_reg_size);
         if(cfg & PMP_A) {
-            any_active = true;
             auto pmp_a = (cfg & PMP_A) >> 3;
             auto is_tor = pmp_a == PMP_TOR;
             auto is_na4 = pmp_a == PMP_NA4;
-
-            reg_t mask = (hart_if.csr[arch::pmpaddr0 + i] << 1) | (!is_na4);
+            reg_t mask = (pmpaddr[i] << 1) | (!is_na4);
             mask = ~(mask & ~(mask + 1)) << PMP_SHIFT;
-
             // Check each 4-byte sector of the access
             auto any_match = false;
             auto all_match = true;
@@ -202,7 +175,7 @@ template <typename PLAT> bool pmp<PLAT>::pmp_check(const access_type type, const
                 // If the PMP matches only a strict subset of the access, fail it
                 if(!all_match)
                     return false;
-                return (hart_if.reg.PRIV == arch::PRIV_M && !(cfg & PMP_L)) || (type == access_type::READ && (cfg & PMP_R)) ||
+                return (hart_if.PRIV == arch::PRIV_M && !(cfg & PMP_L)) || (type == access_type::READ && (cfg & PMP_R)) ||
                        (type == access_type::WRITE && (cfg & PMP_W)) || (type == access_type::FETCH && (cfg & PMP_X));
             }
         }
@@ -239,7 +212,7 @@ template <typename PLAT> bool pmp<PLAT>::pmp_check(const access_type type, const
     //        }
     //        tor_base = pmpaddr;
     //    }
-    return !any_active || hart_if.reg.PRIV == arch::PRIV_M;
+    return hart_if.PRIV == arch::PRIV_M;
 }
 
 } // namespace mem
