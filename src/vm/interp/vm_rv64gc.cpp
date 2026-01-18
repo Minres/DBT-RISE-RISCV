@@ -46,7 +46,6 @@
 #include <functional>
 #include <exception>
 #include <vector>
-#include <sstream>
 #include <iss/instruction_decoder.h>
 
 
@@ -4113,7 +4112,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                            "{mnemonic:10} {rd}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.lwsp"),
                             fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
                         this->core.disass_output(pc.val, mnemonic);
                     }
@@ -6273,6 +6272,8 @@ std::unique_ptr<vm_if> create<arch::rv64gc>(arch::rv64gc *core, unsigned short p
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
+
+
 namespace iss {
 namespace {
 

@@ -44,7 +44,6 @@
 #include <functional>
 #include <exception>
 #include <vector>
-#include <sstream>
 #include <iss/instruction_decoder.h>
 
 
@@ -1797,6 +1796,8 @@ std::unique_ptr<vm_if> create<arch::rv32i>(arch::rv32i *core, unsigned short por
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
+
+
 namespace iss {
 namespace {
 
