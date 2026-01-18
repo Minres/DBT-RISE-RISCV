@@ -147,16 +147,10 @@ int main(int argc, char* argv[]) {
             }
             return 0;
         } else if(isa_opt.find(':') == std::string::npos) {
+            if(isa_opt == "tgc5d" || isa_opt == "tgc5e")
+                isa_opt += "_clic_pmp";
             std::tie(cpu, vm) =
                 f.create(isa_opt + ":" + clim["backend"].as<std::string>(), clim["gdb-port"].as<unsigned>(), &semihosting_cb);
-        } else {
-            auto base_isa = isa_opt.substr(0, 5);
-            if(base_isa == "tgc5d" || base_isa == "tgc5e") {
-                isa_opt += "_clic_pmp:" + clim["backend"].as<std::string>();
-            } else {
-                isa_opt += ":" + clim["backend"].as<std::string>();
-            }
-            std::tie(cpu, vm) = f.create(isa_opt, clim["gdb-port"].as<unsigned>(), &semihosting_cb);
         }
         if(!cpu) {
             auto list = f.get_names();

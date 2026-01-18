@@ -938,7 +938,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
                     this->fault_data = fault_data;
                 },
             .csr_rd_cb{this->csr_rd_cb},
-            .csr_wr_cb{csr_wr_cb},
+            .csr_wr_cb{this->csr_wr_cb},
             .state{this->state},
             .PRIV{this->reg.PRIV},
             .PC{this->reg.PC},
