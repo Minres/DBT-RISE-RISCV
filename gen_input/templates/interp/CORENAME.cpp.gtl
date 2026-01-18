@@ -56,7 +56,6 @@ if(vector) {%>
 #include <functional>
 #include <exception>
 #include <vector>
-#include <sstream>
 #include <iss/instruction_decoder.h>
 
 
@@ -453,6 +452,13 @@ std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreD
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
+<% if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") { %>
+#include <iss/mem/clic.h>
+#include <iss/mem/pmp.h>
+<%}%>
+<%
+def array_count = coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e"? 3 : 2;
+%>
 namespace iss {
 namespace {
 <% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
@@ -466,8 +472,8 @@ volatile std::array<bool, 3> dummy = {
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
-        }),<% } else { %>
-volatile std::array<bool, 2> dummy = {<%}%>
+        }),<%} else {%>
+volatile std::array<bool, ${array_count}> dummy = {<%}%>
         core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_m:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::${coreDef.name.toLowerCase()}>();
 		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
@@ -487,7 +493,20 @@ volatile std::array<bool, 2> dummy = {<%}%>
                 cpu->set_semihosting_callback(*cb);
             }
             return {cpu_ptr{cpu}, vm_ptr{vm}};
-        })
+        })<%if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") {%>,
+        core_factory::instance().register_creator("${coreDef.name.toLowerCase()}_clic_pmp:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
+            auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_EXT_N)>();
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if()));
+            iss::mem::clic_config ccfg{.clic_base=0xc0000000, .clic_int_ctl_bits=4, .clic_num_irq=16, .clic_num_trigger=0, .nmode=true};
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_t>>(cpu->get_priv_if(), ccfg));
+		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
+		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
+            if(init_data){
+                auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::${coreDef.name.toLowerCase()}>::reg_t>*>(init_data);
+                cpu->set_semihosting_callback(*cb);
+            }
+            return {cpu_ptr{cpu}, vm_ptr{vm}};
+        })<%}%>
 };
 }
 }
