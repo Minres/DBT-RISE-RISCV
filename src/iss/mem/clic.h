@@ -46,7 +46,7 @@ struct clic_config {
     unsigned clic_num_trigger{0};
     bool nmode{false};
 };
-
+namespace {
 inline void read_reg_with_offset(uint32_t reg, uint8_t offs, uint8_t* const data, unsigned length) {
     auto reg_ptr = reinterpret_cast<uint8_t*>(&reg);
     switch(offs) {
@@ -88,20 +88,21 @@ inline void write_reg_with_offset(uint32_t& reg, uint8_t offs, const uint8_t* co
         break;
     }
 }
+} // namespace
 
 template <typename WORD_TYPE> struct clic : public memory_elem {
     using this_class = clic<WORD_TYPE>;
     using reg_t = WORD_TYPE;
     constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
 
-    clic(arch::priv_if<WORD_TYPE> hart_if, clic_config cfg)
+    clic(arch::priv_if<WORD_TYPE> hart_if, clic_config const& cfg)
     : hart_if(hart_if)
     , cfg(cfg) {
         clic_int_reg.resize(cfg.clic_num_irq, clic_int_reg_t{.raw = 0});
         clic_cfg_reg = 0x30;
         clic_mact_lvl = clic_mprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
         clic_uact_lvl = clic_uprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        hart_if.csr_rd_cb[arch::mtvt] = MK_CSR_RD_CB(read_plain);
+        hart_if.csr_rd_cb[arch::mtvt] = MK_CSR_RD_CB(read_xtvt); // 0x307
         hart_if.csr_wr_cb[arch::mtvt] = MK_CSR_WR_CB(write_xtvt);
         //        hart_if.csr_rd_cb[mxnti] = MK_CSR_RD_CB(read_plain(a,r);};
         //        hart_if.csr_wr_cb[mxnti] = MK_CSR_WR_CB(write_plain(a,r);};
@@ -111,18 +112,18 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
         //        hart_if.csr_wr_cb[mscratchcsw] = MK_CSR_WR_CB(write_plain(a,r);};
         //        hart_if.csr_rd_cb[mscratchcswl] = MK_CSR_RD_CB(read_plain(a,r);};
         //        hart_if.csr_wr_cb[mscratchcswl] = MK_CSR_WR_CB(write_plain(a,r);};
-        hart_if.csr_rd_cb[arch::mintthresh] = MK_CSR_RD_CB(read_plain);
+        hart_if.csr_rd_cb[arch::mintthresh] = MK_CSR_RD_CB(read_intthresh);
         hart_if.csr_wr_cb[arch::mintthresh] = MK_CSR_WR_CB(write_intthresh);
         if(cfg.nmode) {
-            hart_if.csr_rd_cb[arch::utvt] = MK_CSR_RD_CB(read_plain);
+            hart_if.csr_rd_cb[arch::utvt] = MK_CSR_RD_CB(read_xtvt); // 0x007
             hart_if.csr_wr_cb[arch::utvt] = MK_CSR_WR_CB(write_xtvt);
             hart_if.csr_rd_cb[arch::uintstatus] = MK_CSR_RD_CB(read_intstatus);
             hart_if.csr_wr_cb[arch::uintstatus] = MK_CSR_WR_CB(write_null);
-            hart_if.csr_rd_cb[arch::uintthresh] = MK_CSR_RD_CB(read_plain);
+            hart_if.csr_rd_cb[arch::uintthresh] = MK_CSR_RD_CB(read_intthresh);
             hart_if.csr_wr_cb[arch::uintthresh] = MK_CSR_WR_CB(write_intthresh);
         }
-        hart_if.csr[arch::mintthresh] = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        hart_if.csr[arch::uintthresh] = (1 << (cfg.clic_int_ctl_bits)) - 1;
+        clic_intthresh[arch::mintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
+        clic_intthresh[arch::uintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
     }
 
     ~clic() = default;
@@ -137,16 +138,16 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
     std::tuple<uint64_t, uint64_t> get_range() override { return {cfg.clic_base, cfg.clic_base + 0x7fff}; }
 
 private:
-    iss::status read_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t* data) {
-        if(addr >= cfg.clic_base && (addr + length) < (cfg.clic_base + 0x8000))
-            return read_clic(addr, length, data);
-        return down_stream_mem.rd_mem(access, addr, length, data);
+    iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
+        if(addr.space == 0 && addr.val >= cfg.clic_base && (addr.val + length) < (cfg.clic_base + 0x8000))
+            return read_clic(addr.val, length, data);
+        return down_stream_mem.rd_mem(addr, length, data);
     }
 
-    iss::status write_mem(iss::access_type access, uint64_t addr, unsigned length, uint8_t const* data) {
-        if(addr >= cfg.clic_base && (addr + length) < (cfg.clic_base + 0x8000))
-            return write_clic(addr, length, data);
-        return down_stream_mem.wr_mem(access, addr, length, data);
+    iss::status write_mem(addr_t const& addr, unsigned length, uint8_t const* data) {
+        if(addr.space == 0 && addr.val >= cfg.clic_base && (addr.val + length) < (cfg.clic_base + 0x8000))
+            return write_clic(addr.val, length, data);
+        return down_stream_mem.wr_mem(addr, length, data);
     }
 
     iss::status read_clic(uint64_t addr, unsigned length, uint8_t* data);
@@ -155,21 +156,33 @@ private:
 
     iss::status write_null(unsigned addr, reg_t val) { return iss::status::Ok; }
 
-    iss::status read_plain(unsigned addr, reg_t& val) {
-        val = hart_if.csr[addr];
+    iss::status read_xtvt(unsigned addr, reg_t& val) {
+        val = clic_xtvt[addr >> 8];
         return iss::Ok;
     }
 
     iss::status write_xtvt(unsigned addr, reg_t val) {
-        hart_if.csr[addr] = val & ~0x3fULL;
+        clic_xtvt[addr >> 8] = val & ~0x3fULL;
         return iss::Ok;
     }
 
-    iss::status read_cause(unsigned addr, reg_t& val);
-    iss::status write_cause(unsigned addr, reg_t val);
+    iss::status read_intstatus(unsigned addr, reg_t& val) {
+        auto mode = (addr >> 8) & 0x3;
+        val = clic_uact_lvl & 0xff;
+        if(mode == 0x3)
+            val += (clic_mact_lvl & 0xff) << 24;
+        return iss::Ok;
+    }
 
-    iss::status read_intstatus(unsigned addr, reg_t& val);
-    iss::status write_intthresh(unsigned addr, reg_t val);
+    iss::status read_intthresh(unsigned addr, reg_t& val) {
+        val = clic_intthresh[addr >> 8];
+        return iss::Ok;
+    }
+
+    iss::status write_intthresh(unsigned addr, reg_t val) {
+        clic_intthresh[addr >> 8] = (val & 0xff) | (1 << (cfg.clic_int_ctl_bits)) - 1;
+        return iss::Ok;
+    }
 
 protected:
     arch::priv_if<WORD_TYPE> hart_if;
@@ -189,6 +202,8 @@ protected:
     std::vector<clic_int_reg_t> clic_int_reg;
     uint8_t clic_mprev_lvl{0}, clic_uprev_lvl{0};
     uint8_t clic_mact_lvl{0}, clic_uact_lvl{0};
+    std::array<reg_t, 4> clic_intthresh;
+    std::array<reg_t, 4> clic_xtvt;
 };
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
@@ -222,62 +237,6 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t a
         write_reg_with_offset(clic_int_reg[offset].raw, addr & 0x3, data, length);
         clic_int_reg[offset].raw &= 0xf0c70101; // clicIntCtlBits->0xf0, clicintattr->0xc7, clicintie->0x1, clicintip->0x1
     }
-    return iss::Ok;
-}
-
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_cause(unsigned addr, reg_t& val) {
-    if((hart_if.csr[arch::mtvec] & 0x3) == 3) {
-        val = hart_if.csr[addr] & (1UL << (sizeof(reg_t) * 8) | (hart_if.mcause_max_irq - 1) | (0xfUL << 16));
-        auto mode = (addr >> 8) & 0x3;
-        switch(mode) {
-        case 0:
-            val |= clic_uprev_lvl << 16;
-            val |= hart_if.state.mstatus.UPIE << 27;
-            break;
-        default:
-            val |= clic_mprev_lvl << 16;
-            val |= hart_if.state.mstatus.MPIE << 27;
-            val |= hart_if.state.mstatus.MPP << 28;
-            break;
-        }
-    } else
-        val = hart_if.csr[addr] & ((1UL << (sizeof(WORD_TYPE) * 8 - 1)) | (hart_if.mcause_max_irq - 1));
-    return iss::Ok;
-}
-
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_cause(unsigned addr, reg_t val) {
-    if((hart_if.csr[arch::mtvec] & 0x3) == 3) {
-        auto mask = ((1UL << (sizeof(WORD_TYPE) * 8 - 1)) | (hart_if.mcause_max_irq - 1) | (0xfUL << 16));
-        hart_if.csr[addr] = (val & mask) | (hart_if.csr[addr] & ~mask);
-        auto mode = (addr >> 8) & 0x3;
-        switch(mode) {
-        case 0:
-            clic_uprev_lvl = ((val >> 16) & 0xff) | (1 << (8 - cfg.clic_int_ctl_bits)) - 1;
-            hart_if.state.mstatus.UPIE = (val >> 27) & 0x1;
-            break;
-        default:
-            clic_mprev_lvl = ((val >> 16) & 0xff) | (1 << (8 - cfg.clic_int_ctl_bits)) - 1;
-            hart_if.state.mstatus.MPIE = (val >> 27) & 0x1;
-            hart_if.state.mstatus.MPP = (val >> 28) & 0x3;
-            break;
-        }
-    } else {
-        auto mask = ((1UL << (sizeof(WORD_TYPE) * 8 - 1)) | (hart_if.mcause_max_irq - 1));
-        hart_if.csr[addr] = (val & mask) | (hart_if.csr[addr] & ~mask);
-    }
-    return iss::Ok;
-}
-
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_intstatus(unsigned addr, reg_t& val) {
-    auto mode = (addr >> 8) & 0x3;
-    val = clic_uact_lvl & 0xff;
-    if(mode == 0x3)
-        val += (clic_mact_lvl & 0xff) << 24;
-    return iss::Ok;
-}
-
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_intthresh(unsigned addr, reg_t val) {
-    hart_if.csr[addr] = (val & 0xff) | (1 << (cfg.clic_int_ctl_bits)) - 1;
     return iss::Ok;
 }
 
