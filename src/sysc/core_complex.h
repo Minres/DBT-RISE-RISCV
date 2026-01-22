@@ -226,6 +226,11 @@ public:
         core->register_csr_wr(csr_addr, func);
     }
 
+    void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) {
+        assert(core != nullptr);
+        core->register_unknown_instr_handler(handler);
+    }
+
 protected:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
     int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
