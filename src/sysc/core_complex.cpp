@@ -393,11 +393,11 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex
-                               << addr.val << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+        SCCTRACEALL(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex
+                                  << addr.val << ") : 0x"
+                                  << (length == 4   ? *(uint32_t*)data
+                                      : length == 2 ? *(uint16_t*)data
+                                                    : (unsigned)*data);
 #endif
         return true;
     } else {
@@ -455,11 +455,11 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
 #ifndef NDEBUG
-        SCCTRACE(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex
-                               << addr.val << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+        SCCTRACEALL(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex
+                                  << addr.val << ") : 0x"
+                                  << (length == 4   ? *(uint32_t*)data
+                                      : length == 2 ? *(uint16_t*)data
+                                                    : (unsigned)*data);
 #endif
         return true;
     } else {

@@ -1064,7 +1064,7 @@ protected:
     int64_t cycle_offset{0};
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
-    unsigned mcause_max_irq{16U};
+    unsigned mcause_max_irq{traits<BASE>::XLEN};
 };
 
 } // namespace arch
