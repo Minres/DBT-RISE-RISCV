@@ -52,7 +52,7 @@ struct sc2core_if {
 
     virtual void enable_disass(bool enable) = 0;
     util::delegate<void(unsigned)> set_hartid;
-    util::delegate<void(unsigned)> set_irq_count;
+    util::delegate<iss::arch_if*()> get_arch_if;
     util::delegate<uint32_t()> get_mode;
     util::delegate<uint64_t()> get_state;
     util::delegate<bool()> get_interrupt_execution;
