@@ -209,6 +209,14 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
         }
     });
 
+    auto& type = GET_PROP_VALUE(core_type);
+    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
+    create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    if(type == "?")
+        return;
+    sc_assert(vm);
+    auto xlen = core->get_arch_if()->get_instrumentation_if()->get_reg_size(/*x0*/ 0);
+    clint_irq_i.init(xlen);
     SC_HAS_PROCESS(this_class); // NOLINT
     SC_THREAD(run);
     SC_METHOD(rst_cb);
@@ -250,18 +258,6 @@ template <unsigned int BUSWIDTH, typename QK> core_complex<BUSWIDTH, QK>::~core_
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::trace(sc_trace_file* trf) const {}
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::before_end_of_elaboration() {
-    auto& type = GET_PROP_VALUE(core_type);
-    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
-    // cpu = scc::make_unique<core_wrapper>(this);
-    create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
-    if(type == "?")
-        return;
-#ifndef CWR_SYSTEMC
-    if(!local_irq_num.is_default_value()) {
-        core->set_irq_count(16 + local_irq_num);
-    }
-#endif
-    sc_assert(vm);
     auto instr_trace = GET_PROP_VALUE(enable_instr_trace) ? trc.init(this->name()) : false;
     auto disass = GET_PROP_VALUE(enable_disass);
     if(disass)
