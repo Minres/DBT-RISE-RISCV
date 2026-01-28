@@ -97,7 +97,7 @@ public:
 
     sc_core::sc_in<bool> rst_i{"rst_i"};
 
-    sc_core::sc_vector<irq_signal_t> clint_irq_i{"clint_irq_i", 32};
+    sc_core::sc_vector<irq_signal_t> clint_irq_i{"clint_irq_i"};
 
 #ifndef CWR_SYSTEMC
     sc_core::sc_in<sc_core::sc_time> clk_i{"clk_i"};
@@ -121,8 +121,6 @@ public:
     cci::cci_param<bool> dump_ir{"dump_ir", false};
 
     cci::cci_param<uint32_t> mhartid{"mhartid", 0};
-
-    cci::cci_param<uint32_t> local_irq_num{"local_irq_num", 0};
 
     cci::cci_param<std::string> plugins{"plugins", ""};
 
