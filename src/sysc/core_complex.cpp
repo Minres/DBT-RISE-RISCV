@@ -363,6 +363,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
         if(rst_i.read()) {
             reset(GET_PROP_VALUE(reset_address));
             wait(rst_i.negedge_event());
+            reset(GET_PROP_VALUE(reset_address)); // in case it has changed during reset
         }
         while(curr_clk.read() == SC_ZERO_TIME) {
             wait(curr_clk.value_changed_event());
