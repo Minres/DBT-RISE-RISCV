@@ -35,6 +35,7 @@
 #ifndef _SYSC_CORE2SC_ADAPTER_H_
 #define _SYSC_CORE2SC_ADAPTER_H_
 
+#include "iss/arch_if.h"
 #include "sc2core_if.h"
 #include "util/delegate.h"
 #include "util/logging.h"
@@ -65,7 +66,7 @@ public:
             this->csr_rd_cb[iss::arch::timeh] = MK_CSR_RD_CB(read_time);
         this->memories.replace_last(*this);
         this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid>(this);
-        this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num>(this);
+        this->get_arch_if = util::delegate<iss::arch_if*()>::from<this_class, &this_class::_get_arch_if>(this);
         this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode>(this);
         this->get_state = util::delegate<uint64_t()>::from<this_class, &this_class::_get_state>(this);
         this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution>(this);
@@ -84,7 +85,7 @@ public:
 
     void setup_mt() override {
         this->set_hartid = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_mhartid_mt>(this);
-        this->set_irq_count = util::delegate<void(unsigned)>::from<this_class, &this_class::_set_irq_num_mt>(this);
+        this->get_arch_if = util::delegate<iss::arch_if*(void)>::from<this_class, &this_class::_get_arch_if>(this);
         this->get_mode = util::delegate<uint32_t()>::from<this_class, &this_class::_get_mode_mt>(this);
         this->get_state = util::delegate<uint64_t()>::from<this_class, &this_class::_get_state_mt>(this);
         this->get_interrupt_execution = util::delegate<bool()>::from<this_class, &this_class::_get_interrupt_execution_mt>(this);
@@ -260,11 +261,7 @@ private:
         PLAT::set_mhartid(id);
     }
 
-    void _set_irq_num(unsigned num) { PLAT::set_irq_num(num); }
-    void _set_irq_num_mt(unsigned num) {
-        std::unique_lock<mutex_t> lock(sync_mtx);
-        PLAT::set_irq_num(num);
-    }
+    iss::arch_if* _get_arch_if() { return this; }
 
     uint32_t _get_mode() { return this->reg.PRIV; }
     uint32_t _get_mode_mt() {
