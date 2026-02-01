@@ -120,7 +120,7 @@ public:
 
     cci::cci_param<bool> dump_ir{"dump_ir", false};
 
-    cci::cci_param<bool> dump_memory_map{"dump_memory_map", false};
+    cci::cci_param<bool> show_memory_map{"show_memory_map", false};
 
     cci::cci_param<uint32_t> mhartid{"mhartid", 0};
 
@@ -149,7 +149,7 @@ public:
 
     scml_property<bool> dump_ir{"dump_ir", false};
 
-    scml_property<bool> dump_memory_map{"dump_memory_map", false};
+    scml_property<bool> show_memory_map{"show_memory_map", false};
 
     scml_property<uint32_t> mhartid{"mhartid", 0};
 
