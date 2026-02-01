@@ -120,6 +120,8 @@ public:
 
     cci::cci_param<bool> dump_ir{"dump_ir", false};
 
+    cci::cci_param<bool> dump_memory_map{"dump_memory_map", false};
+
     cci::cci_param<uint32_t> mhartid{"mhartid", 0};
 
     cci::cci_param<std::string> plugins{"plugins", ""};
@@ -146,6 +148,8 @@ public:
     scml_property<unsigned> gdb_server_port{"gdb_server_port", 0};
 
     scml_property<bool> dump_ir{"dump_ir", false};
+
+    scml_property<bool> dump_memory_map{"dump_memory_map", false};
 
     scml_property<uint32_t> mhartid{"mhartid", 0};
 

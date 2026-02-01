@@ -40,8 +40,9 @@
 #include <iss/vm_types.h>
 #include "iss_factory.h"
 #include "sysc/memspace_extension.h"
-#include "tlm/scc/tlm_id.h"
-#include "util/range_lut.h"
+#include <tlm/scc/memory_map_collector.h>
+#include <tlm/scc/tlm_id.h>
+#include <util/range_lut.h>
 #include <memory>
 #include <sstream>
 #include <sysc/kernel/sc_simcontext.h>
@@ -314,6 +315,10 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::s
 #endif
             }
         }
+    }
+    if(GET_PROP_VALUE(dump_memory_map)) {
+        auto result = tlm::scc::gather_memory(dbus.get_base_port());
+        SCCINFO(SCOBJ) << "DBUS memory map:\n" << result.to_string();
     }
 }
 
