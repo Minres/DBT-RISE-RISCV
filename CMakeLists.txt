@@ -19,8 +19,7 @@ if(NOT TARGET dbt-rise-core)
     FetchContent_Declare(
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
-        #GIT_TAG         "origin/develop"
-        GIT_TAG c3c48b0
+        GIT_TAG 9b1791a9b74ae796adfad19c96b7736bdd5df3fd
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
