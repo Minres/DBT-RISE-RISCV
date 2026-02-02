@@ -508,11 +508,13 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
 #endif
     if((flags & 0xffffffff) != 0xffffffff) {
         if(trap_id) {
+            auto irq_str = cause < this->irq_str.size() ? this->irq_str.at(cause) : "Unknown";
             ILOG(disasslogger, logging::DEBUG,
-                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", this->irq_str[cause], cause, buffer.data()));
+                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         } else {
+            auto irq_str = cause < this->trap_str.size() ? this->trap_str.at(cause) : "Unknown";
             ILOG(disasslogger, logging::DEBUG,
-                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", this->trap_str[cause], cause, buffer.data()));
+                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         }
     }
     // reset trap state
