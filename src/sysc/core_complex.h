@@ -112,6 +112,8 @@ public:
 
     cci::cci_param<uint64_t> reset_address{"reset_address", 0ULL};
 
+    cci::cci_param<unsigned> finish_condition{"finish_condition", static_cast<unsigned>(iss::finish_cond_e::NONE)};
+
     cci::cci_param<std::string> core_type{"core_type", "rv32imac_m"};
 
     cci::cci_param<std::string> backend{"backend", "interp"};
@@ -270,7 +272,7 @@ protected:
         core->setup_mt();
         quantum_keeper.check_and_sync(sc_core::SC_ZERO_TIME);
         quantum_keeper.run_thread([this]() {
-            vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
+            vm->start(std::numeric_limits<uint64_t>::max(), dump_ir, static_cast<iss::finish_cond_e>(finish_condition.get_value()));
             return quantum_keeper.get_local_absolute_time();
         });
     }
@@ -295,7 +297,7 @@ protected:
         f();
     }
     template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_st>::value>::type run_iss() {
-        vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
+        vm->start(std::numeric_limits<uint64_t>::max(), dump_ir, static_cast<iss::finish_cond_e>(finish_condition.get_value()));
     }
     ///////////////////////////////////////////////////////////////////////////////
     //
