@@ -242,6 +242,7 @@ protected:
 #ifndef USE_TLM_SIGNAL
     void clint_irq_cb();
 #endif
+#if SC_VERSION_MAJOR > 2
     ///////////////////////////////////////////////////////////////////////////////
     // multi-threaded function implementations
     ///////////////////////////////////////////////////////////////////////////////
@@ -255,9 +256,11 @@ protected:
         });
     }
     template <typename U = QK>
-    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value, bool>::type
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value, bool>::type
     exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
-        return dbus->get_direct_mem_ptr(gp, dmi_data);
+        auto result = false;
+        quantum_keeper.execute_on_sysc([this, &gp, &dmi_data, &result]() { result = dbus->get_direct_mem_ptr(gp, dmi_data); });
+        return result;
     }
     template <typename U = QK>
     typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value>::type exec_on_sysc(std::function<void(void)>& f) {
@@ -271,28 +274,27 @@ protected:
             return quantum_keeper.get_local_absolute_time();
         });
     }
+#endif
     ///////////////////////////////////////////////////////////////////////////////
     // single-threaded function implementations
     ///////////////////////////////////////////////////////////////////////////////
     template <typename U = QK>
-    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_st>::value>::type
     exec_b_transport(tlm::tlm_generic_payload& gp, sc_core::sc_time& delay, bool is_fetch = false) {
         auto& sckt = is_fetch ? ibus : dbus;
         gp.set_extension(trc.get_recording_extension(is_fetch));
         sckt->b_transport(gp, delay);
     }
     template <typename U = QK>
-    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_mt>::value, bool>::type
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_st>::value, bool>::type
     exec_get_direct_mem_ptr(tlm::tlm_generic_payload& gp, tlm::tlm_dmi& dmi_data) {
-        auto result = false;
-        quantum_keeper.execute_on_sysc([this, &gp, &dmi_data, &result]() { result = dbus->get_direct_mem_ptr(gp, dmi_data); });
-        return result;
+        return dbus->get_direct_mem_ptr(gp, dmi_data);
     }
     template <typename U = QK>
-    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type exec_on_sysc(std::function<void(void)>& f) {
+    typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_st>::value>::type exec_on_sysc(std::function<void(void)>& f) {
         f();
     }
-    template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper>::value>::type run_iss() {
+    template <typename U = QK> typename std::enable_if<std::is_same<U, tlm::scc::quantumkeeper_st>::value>::type run_iss() {
         vm->start(std::numeric_limits<uint64_t>::max(), dump_ir);
     }
     ///////////////////////////////////////////////////////////////////////////////

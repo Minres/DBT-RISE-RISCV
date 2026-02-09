@@ -4,6 +4,7 @@
 #include <rigtorp/SPSCQueue.h>
 #include <tlm/scc/quantum_keeper.h>
 #include <tlm/scc/scv/tlm_recording_extension.h>
+#include <scc/utilities.h>
 #ifdef HAS_SCV
 #include <scv.h>
 #else
@@ -83,7 +84,7 @@ template <> struct instr_recorder<tlm::scc::quantumkeeper> : instr_recorder_b {
 protected:
     tlm::scc::quantumkeeper& quantum_keeper;
 };
-
+#if SC_VERSION_MAJOR > 2
 template <> struct instr_recorder<tlm::scc::quantumkeeper_mt> : instr_recorder_b {
     void disass_output(uint64_t pc, std::string const& instr_str, char mode, uint64_t status) {
         if(stream_hnd == nullptr)
@@ -122,5 +123,6 @@ protected:
     tlm::scc::quantumkeeper_mt& quantum_keeper;
     rigtorp::SPSCQueue<instr_record> que;
 };
+#endif
 } // namespace riscv
 } // namespace sysc

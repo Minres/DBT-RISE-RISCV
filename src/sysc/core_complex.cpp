@@ -230,7 +230,12 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
 #else
     SC_METHOD(clint_irq_cb);
     dont_initialize();
+#if SC_VERSION_MAJOR > 2
     sensitive << clint_irq_i;
+#else
+    for(auto& s:clint_irq_i)
+        sensitive << s;
+#endif
 #endif
 
     SC_METHOD(forward);
@@ -558,9 +563,10 @@ util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_lut(lut_vec_t& lut
 template class core_complex<scc::LT>;
 template class core_complex<32>;
 template class core_complex<64>;
+#if SC_VERSION_MAJOR > 2
 template class core_complex<scc::LT, tlm::scc::quantumkeeper_mt>;
 template class core_complex<32, tlm::scc::quantumkeeper_mt>;
 template class core_complex<64, tlm::scc::quantumkeeper_mt>;
-
+#endif
 } // namespace riscv
 } /* namespace sysc */
