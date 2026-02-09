@@ -498,7 +498,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         csr_rd_cb[mhartid] = MK_CSR_RD_CB(read_hartid);
     };
 
-    ~riscv_hart_common() {
+    virtual ~riscv_hart_common() {
         if(io_buf.str().length()) {
             ILOG(isslogger, logging::INFO, fmt::format("tohost send '{}'", io_buf.str()));
         }
@@ -510,7 +510,15 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     uint64_t fromhost = std::numeric_limits<uint64_t>::max();
     std::stringstream io_buf;
 
+    void enable_disass_output(bool enable){
+        if(enable)
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(this);
+        else
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(nullptr);
+    }
+
     void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
+
 
     std::pair<uint64_t, bool> load_file(std::string const& name, int type) override {
         return std::make_pair(entry_address, read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64));
@@ -610,13 +618,15 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
     constexpr reg_t get_pc_mask() { return has_compressed() ? (reg_t)~1 : (reg_t)~3; }
 
-    void disass_output(uint64_t pc, std::string const& instr) override {
+    void print_disass_output(uint64_t pc, std::string const& string, bool printpc) {
         static CONSTEXPR char const* fmt_str =
             sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
-        if(::logging::DEBUG <= disasslogger.get_log_level())
-            ILOG(disasslogger, ::logging::DEBUG,
-                 fmt::format(fmt_str, pc, instr, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
-                             this->reg.cycle + cycle_offset));
+        if(printpc) {
+            CLOG(INFO, disass)<<fmt::format(fmt_str, pc, string, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                this->reg.cycle + cycle_offset);
+        } else {
+            CLOG(INFO, disass)<<string;
+        }
     };
 
     void register_csr(unsigned addr, rd_csr_f f) { csr_rd_cb[addr] = f; }
@@ -1004,7 +1014,6 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     void set_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
 protected:
-    util::InstanceLogger<logging::disass> disasslogger;
     util::InstanceLogger<logging::dbt_rise_iss> isslogger;
     hart_state<reg_t> state;
 

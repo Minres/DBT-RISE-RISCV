@@ -64,6 +64,8 @@ struct rv32imac: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
+    virtual void enable_disass(bool) = 0;
+
     struct RV32IMAC_regs {
         uint32_t X0 = 0;
         uint32_t X1 = 0;

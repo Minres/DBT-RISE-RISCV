@@ -75,9 +75,6 @@ public:
         this->register_csr_rd = util::delegate<void(unsigned, rd_csr_f)>::from<this_class, &this_class::_register_csr_rd>(this);
         this->register_csr_wr = util::delegate<void(unsigned, wr_csr_f)>::from<this_class, &this_class::_register_csr_wr>(this);
 
-        disass_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::disass);
-        disass_delegate.level = logging::log_level::INFO;
-        this->disasslogger.set_logger(disass_delegate);
         log_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::log);
         log_delegate.level = static_cast<logging::log_level>(scc::get_logging_level());
         this->isslogger.set_logger(log_delegate);
@@ -98,7 +95,11 @@ public:
     virtual ~core2sc_adapter() {}
 
     void enable_disass(bool enable) override {
-        this->disasslogger.set_log_level(enable ? logging::log_level::DEBUG : logging::log_level::INFO);
+        if(enable)
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(this);
+        else
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(nullptr);
+
     }
 
     void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
@@ -161,9 +162,16 @@ public:
             << "[" << msg_type << "] " << msg;
     }
 
-    void disass_output(uint64_t pc, std::string const& instr) {
-        owner->disass_output(pc, instr);
-        PLAT::disass_output(pc, instr);
+    void record_n_print_disass(uint64_t pc, std::string const& str, bool printpc) {
+        if(!printpc) owner->disass_output(pc, str);
+        static CONSTEXPR char const* fmt_str =
+            sizeof(reg_t) == 4 ? "[disass] 0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "[disass] 0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
+        if(printpc) {
+            SCCINFO(owner->hier_name())<<fmt::format(fmt_str, pc, str, this->lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                this->reg.cycle + this->cycle_offset);
+        } else {
+            SCCINFO(owner->hier_name())<<"[disass] " <<str;
+        }
     };
 
     iss::mem::memory_if get_mem_if() {
@@ -333,7 +341,6 @@ private:
 
     sysc::riscv::core_complex_if* const owner{nullptr};
     util::LoggerDelegate log_delegate;
-    util::LoggerDelegate disass_delegate;
     sc_core::sc_event wfi_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};

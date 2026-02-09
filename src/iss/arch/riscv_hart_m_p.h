@@ -77,6 +77,8 @@ public:
 
     void reset(uint64_t address) override;
 
+    void enable_disass(bool enable) {riscv_hart_common<BASE>::enable_disass_output(enable);}
+
     iss::status read(const addr_t& addr, const unsigned length, uint8_t* const data);
     iss::status write(const addr_t& addr, const unsigned length, const uint8_t* const data);
 
@@ -84,7 +86,7 @@ public:
     uint64_t enter_trap(uint64_t flags, uint64_t addr, uint64_t instr) override;
     uint64_t leave_trap(uint64_t flags) override;
 
-    void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
+    void set_csr(unsigned addr, reg_t val) { this->csr[addr] = val; }
 
 protected:
     std::unordered_map<uint64_t, uint8_t> atomic_reservation;
@@ -406,7 +408,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
 #else
                     sprintf(buffer.data(), "0x%016lx", addr);
 #endif
-                    ILOG(disasslogger, logging::INFO, fmt::format("Semihosting call at address {} occurred ", buffer.data()));
+                    this->disass_output(fmt::format("Semihosting call at address {} occurred ", buffer.data()));
                     this->semihosting_cb(this, &(this->reg.X10) /*a0*/, &(this->reg.X11) /*a1*/);
                     return this->reg.NEXT_PC;
                 }
@@ -464,11 +466,11 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
     if((flags & 0xffffffff) != 0xffffffff) {
         if(trap_id) {
             auto irq_str = cause < this->irq_str.size() ? this->irq_str.at(cause) : "Unknown";
-            ILOG(disasslogger, logging::DEBUG,
+            this->disass_output(
                  fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         } else {
             auto irq_str = cause < this->trap_str.size() ? this->trap_str.at(cause) : "Unknown";
-            ILOG(disasslogger, logging::DEBUG,
+            this->disass_output(
                  fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         }
     }
@@ -483,7 +485,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::l
     this->state.mstatus.MPIE = 1;
     // sets the pc to the value stored in the x epc register.
     this->reg.NEXT_PC = this->csr[mepc] & this->get_pc_mask();
-    ILOG(disasslogger, logging::DEBUG, "Executing xRET");
+    this->disass_output("Executing xRET");
     check_interrupt();
     this->reg.trap_state = this->reg.pending_trap;
     return this->reg.NEXT_PC;

@@ -64,6 +64,8 @@ struct tgc5c: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
+    virtual void enable_disass(bool) = 0;
+
     struct TGC5C_regs {
         uint32_t X0 = 0;
         uint32_t X1 = 0;

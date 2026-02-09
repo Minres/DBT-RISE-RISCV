@@ -64,6 +64,8 @@ struct rv64gc: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
+    virtual void enable_disass(bool) = 0;
+
     struct RV64GC_regs {
         uint64_t X0 = 0;
         uint64_t X1 = 0;

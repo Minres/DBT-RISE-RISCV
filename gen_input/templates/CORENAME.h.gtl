@@ -90,6 +90,8 @@ struct ${coreDef.name.toLowerCase()}: public arch_if {
 
     virtual iss::sync_type needed_sync() const { return iss::NO_SYNC; }
 
+    virtual void enable_disass(bool) = 0;
+
     struct ${coreDef.name}_regs {<%
         registers.each { reg -> if(reg.size>64) {%>
         <% if(reg.size>128) {%>alignas(16) <%}%>uint8_t ${reg.name}[${reg.size/8}] = {0};<%
