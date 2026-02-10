@@ -86,7 +86,7 @@ using irq_signal_t = sc_core::sc_in<bool>;
 
 enum { SW_IRQ = 3, TIMER_IRQ = 7, EXT_IRQ = 11, LOCAL_IRQ_START = 16 };
 
-template <unsigned int BUSWIDTH = scc::LT, typename QK = tlm::scc::quantumkeeper>
+template <unsigned int BUSWIDTH = scc::LT, typename QK = tlm::scc::quantumkeeper_st>
 class core_complex : public sc_core::sc_module, public scc::traceable, public core_complex_if {
 public:
     using this_class = core_complex<BUSWIDTH, QK>;

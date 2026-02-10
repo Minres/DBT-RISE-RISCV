@@ -514,7 +514,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         if(enable)
             this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(this);
         else
-            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(nullptr);
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>(nullptr);
     }
 
     void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
@@ -1011,7 +1011,12 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
     void set_next(mem::memory_if mem_if) override { memory = mem_if; };
 
-    void set_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
+    void set_max_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
+
+    void set_clint_custom_irq_num(unsigned num) {
+        assert(num<=traits<BASE>::XLEN);
+        clint_custom_irq_mask=std::numeric_limits<reg_t>::max()>>(traits<BASE>::XLEN-num);
+    }
 
 protected:
     util::InstanceLogger<logging::dbt_rise_iss> isslogger;
@@ -1060,7 +1065,7 @@ protected:
     instrumentation_if* get_instrumentation_if() override { return &instr_if; };
 
     using csr_type = std::array<typename traits<BASE>::reg_t, 1ULL << 12>;
-    csr_type csr;
+    csr_type csr{0};
 
     std::unordered_map<unsigned, rd_csr_f> csr_rd_cb;
     std::unordered_map<unsigned, wr_csr_f> csr_wr_cb;
@@ -1074,6 +1079,7 @@ protected:
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
     unsigned mcause_max_irq{traits<BASE>::XLEN};
+    reg_t clint_custom_irq_mask{0xffff};
 };
 
 } // namespace arch

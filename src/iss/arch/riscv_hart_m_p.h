@@ -316,7 +316,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
-    auto mask = riscv_hart_common<BASE>::get_irq_mask(3);
+    // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
+    auto mask = riscv_hart_common<BASE>::get_irq_mask(3) & this->clint_custom_irq_mask & 0x0888;
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
