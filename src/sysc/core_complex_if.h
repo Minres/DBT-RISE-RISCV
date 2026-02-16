@@ -34,6 +34,7 @@
 #define _SYSC_CORE_COMPLEX__IF_H_
 
 #include <iss/vm_types.h>
+#include <iss/mem/clic.h>
 #include <scc/signal_opt_ports.h>
 #include <util/delegate.h>
 
@@ -42,6 +43,10 @@ namespace riscv {
 struct core_complex_if {
 
     virtual ~core_complex_if() = default;
+
+    virtual iss::mem::clic_config get_clic_config() {
+        return iss::mem::clic_config{.clic_base=0, .clic_int_ctl_bits=0, .clic_num_irq=0, .clic_num_trigger=0, .nmode=false};
+    }
 
     virtual bool read_mem(const iss::addr_t& addr, unsigned length, uint8_t* const data) = 0;
 
