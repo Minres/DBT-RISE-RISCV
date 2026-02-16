@@ -151,9 +151,6 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const addr_t& a, const unsigned len
             case traits<BASE>::fence:
             case traits<BASE>::fencei:
                 break;
-            case traits<BASE>::fencevma: {
-                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
-            }
             default:
                 return iss::Ok;
             }
@@ -250,9 +247,6 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const addr_t& a, const unsigned le
             case traits<BASE>::fence:
             case traits<BASE>::fencei:
                 break;
-            case traits<BASE>::fencevma: {
-                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
-            }
             default:
                 return iss::Ok;
             }

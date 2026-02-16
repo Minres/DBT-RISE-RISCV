@@ -102,20 +102,21 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
         clic_cfg_reg = 0x30;
         clic_mact_lvl = clic_mprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
         clic_uact_lvl = clic_uprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
-        hart_if.csr_rd_cb[arch::mtvt] = MK_CSR_RD_CB(read_xtvt); // 0x307
+        hart_if.csr_rd_cb[arch::mcause] = MK_CSR_RD_CB(read_cause);
+        hart_if.csr_wr_cb[arch::mcause] = MK_CSR_WR_CB(write_cause);
+        hart_if.csr_rd_cb[arch::mtvec] = MK_CSR_RD_CB(read_xtvec);
+        hart_if.csr_wr_cb[arch::mtvec] = MK_CSR_WR_CB(write_xtvec);
+        hart_if.csr_rd_cb[arch::mtvt] = MK_CSR_RD_CB(read_xtvt);
         hart_if.csr_wr_cb[arch::mtvt] = MK_CSR_WR_CB(write_xtvt);
-        //        hart_if.csr_rd_cb[mxnti] = MK_CSR_RD_CB(read_plain(a,r);};
-        //        hart_if.csr_wr_cb[mxnti] = MK_CSR_WR_CB(write_plain(a,r);};
         hart_if.csr_rd_cb[arch::mintstatus] = MK_CSR_RD_CB(read_intstatus);
         hart_if.csr_wr_cb[arch::mintstatus] = MK_CSR_WR_CB(write_null);
-        //        hart_if.csr_rd_cb[mscratchcsw] = MK_CSR_RD_CB(read_plain(a,r);};
-        //        hart_if.csr_wr_cb[mscratchcsw] = MK_CSR_WR_CB(write_plain(a,r);};
-        //        hart_if.csr_rd_cb[mscratchcswl] = MK_CSR_RD_CB(read_plain(a,r);};
-        //        hart_if.csr_wr_cb[mscratchcswl] = MK_CSR_WR_CB(write_plain(a,r);};
         hart_if.csr_rd_cb[arch::mintthresh] = MK_CSR_RD_CB(read_intthresh);
         hart_if.csr_wr_cb[arch::mintthresh] = MK_CSR_WR_CB(write_intthresh);
         if(cfg.nmode) {
-            hart_if.csr_rd_cb[arch::utvt] = MK_CSR_RD_CB(read_xtvt); // 0x007
+            hart_if.csr_rd_cb[arch::ucause] = MK_CSR_RD_CB(read_cause);
+            hart_if.csr_wr_cb[arch::ucause] = MK_CSR_WR_CB(write_cause);
+            hart_if.csr_rd_cb[arch::utvec] = MK_CSR_RD_CB(read_xtvec);
+            hart_if.csr_rd_cb[arch::utvt] = MK_CSR_RD_CB(read_xtvt);
             hart_if.csr_wr_cb[arch::utvt] = MK_CSR_WR_CB(write_xtvt);
             hart_if.csr_rd_cb[arch::uintstatus] = MK_CSR_RD_CB(read_intstatus);
             hart_if.csr_wr_cb[arch::uintstatus] = MK_CSR_WR_CB(write_null);
@@ -139,13 +140,15 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
 
 private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
-        if(addr.space == 0 && addr.val >= cfg.clic_base && (addr.val + length) < (cfg.clic_base + 0x8000))
+        auto end_addr = addr.val - 1 + length;
+        if(addr.space == 0 && addr.val<=end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
             return read_clic(addr.val, length, data);
         return down_stream_mem.rd_mem(addr, length, data);
     }
 
     iss::status write_mem(addr_t const& addr, unsigned length, uint8_t const* data) {
-        if(addr.space == 0 && addr.val >= cfg.clic_base && (addr.val + length) < (cfg.clic_base + 0x8000))
+        auto end_addr = addr.val - 1 + length;
+        if(addr.space == 0 && addr.val<=end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
             return write_clic(addr.val, length, data);
         return down_stream_mem.wr_mem(addr, length, data);
     }
@@ -184,6 +187,50 @@ private:
         return iss::Ok;
     }
 
+    iss::status read_xtvec(unsigned addr, reg_t& val) {
+        val = hart_if.get_csr(addr);
+        return iss::Ok;
+    }
+
+    iss::status write_xtvec(unsigned addr, reg_t val) {
+        hart_if.set_csr(addr, val);
+        if((val & 0x3) != 0x3) {
+            clic_mprev_lvl = 0xff>>cfg.clic_int_ctl_bits;
+            clic_uprev_lvl = 0xff>>cfg.clic_int_ctl_bits;
+        }
+        return iss::Ok;
+    }
+
+    iss::status read_cause(unsigned addr, reg_t& val) {
+        val = hart_if.get_csr(addr) & ((1UL << (WORD_LEN - 1)) | (hart_if.max_irq - 1));
+        auto xtvec = hart_if.get_csr(arch::mtvec);
+        if((xtvec& 0x3) == 0x3) {
+            if(addr == arch::mcause) { //mcause access
+                val |= hart_if.state.mstatus.MPP<<28 | hart_if.state.mstatus.MPIE<<27 |clic_mprev_lvl<<16;
+            } else if(addr ==arch::ucause) {
+                val |= hart_if.state.mstatus.UPIE<<27 | clic_uprev_lvl<<16;
+            }
+        }
+        return iss::Ok;
+    }
+
+    iss::status write_cause(unsigned addr, reg_t val) {
+        auto mask = ((1UL << (WORD_LEN - 1)) | (hart_if.max_irq - 1));
+        hart_if.set_csr(addr,(val & mask) | (hart_if.get_csr(addr) & ~mask));
+        auto xtvec = hart_if.get_csr(arch::mtvec);
+        if((xtvec & 0x3) == 0x3) {
+            if(addr == arch::mcause){ //mcause access
+                hart_if.state.mstatus.MPIE = (val>>27)&1;
+                clic_mprev_lvl = ((val >> 16) & 0xff) | 0xff>>cfg.clic_int_ctl_bits;
+                hart_if.state.mstatus.MPP = (val <<28)&0x3;
+            } else if(addr ==arch::ucause) {
+                hart_if.state.mstatus.UPIE = (val>>27)&1;
+                clic_uprev_lvl = ((val >> 16) & 0xff) | 0xff>>cfg.clic_int_ctl_bits;
+            }
+        }
+        return iss::Ok;
+    }
+
 protected:
     arch::priv_if<WORD_TYPE> hart_if;
     memory_if down_stream_mem;
@@ -202,8 +249,8 @@ protected:
     std::vector<clic_int_reg_t> clic_int_reg;
     uint8_t clic_mprev_lvl{0}, clic_uprev_lvl{0};
     uint8_t clic_mact_lvl{0}, clic_uact_lvl{0};
-    std::array<reg_t, 4> clic_intthresh;
-    std::array<reg_t, 4> clic_xtvt;
+    std::array<reg_t, 4> clic_intthresh{0};
+    std::array<reg_t, 4> clic_xtvt{0};
 };
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {

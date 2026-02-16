@@ -77,8 +77,8 @@ template <typename PLAT> struct pmp : public memory_elem {
     void set_next(memory_if mem) override { down_stream_mem = mem; }
 
 private:
-    std::array<reg_t, 16> pmpaddr;
-    std::array<reg_t, 16 / sizeof(reg_t)> pmpcfg;
+    std::array<reg_t, 16> pmpaddr{0};
+    std::array<reg_t, 16 / sizeof(reg_t)> pmpcfg{0};
 
     iss::status read_mem(const addr_t& addr, unsigned length, uint8_t* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");

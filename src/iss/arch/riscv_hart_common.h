@@ -295,6 +295,8 @@ template <typename WORD_TYPE> struct priv_if {
 
     std::function<iss::status(unsigned, WORD_TYPE&)> read_csr;
     std::function<iss::status(unsigned, WORD_TYPE)> write_csr;
+    std::function<WORD_TYPE(unsigned)> get_csr;
+    std::function<void(unsigned, WORD_TYPE)> set_csr;
     std::function<iss::status(uint8_t const*, unsigned)> exec_htif;
     std::function<void(uint16_t, uint16_t, WORD_TYPE)> raise_trap; // trap_id, cause, fault_data
     std::unordered_map<unsigned, rd_csr_f>& csr_rd_cb;
@@ -941,6 +943,8 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         return priv_if<reg_t>{
             .read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
             .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
+            .get_csr = [this](unsigned addr) -> reg_t { return csr.at(addr); },
+            .set_csr = [this](unsigned addr, reg_t val) -> void { csr.at(addr)=val;},
             .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
             .raise_trap =
                 [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {

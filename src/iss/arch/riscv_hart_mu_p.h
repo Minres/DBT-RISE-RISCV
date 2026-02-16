@@ -90,7 +90,7 @@ public:
     uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
-    void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
+    void set_csr(unsigned addr, reg_t val) { this->csr[addr] = val; }
 
 protected:
     using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
@@ -103,6 +103,9 @@ protected:
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
+    iss::status write_ideleg(unsigned addr, reg_t val);
+    iss::status write_edeleg(unsigned addr, uint32_t val);
+    iss::status write_edeleg(unsigned addr, uint64_t val);
 
     void check_interrupt();
     mem::neumann_memory_with_htif<BASE> default_mem;
@@ -131,13 +134,17 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
         this->csr_wr_cb[ustatus] = MK_CSR_WR_CB(write_status);
         this->csr_rd_cb[ucause] = MK_CSR_RD_CB(read_cause);
         this->csr_wr_cb[ucause] = MK_CSR_WR_CB(write_cause);
-        this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_plain);
         this->csr_rd_cb[utvec] = MK_CSR_RD_CB(read_tvec);
+        this->csr_wr_cb[utvec] = MK_CSR_WR_CB(write_plain);
         this->csr_rd_cb[uscratch] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[uscratch] = MK_CSR_WR_CB(write_plain);
         this->csr_rd_cb[utval] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[utval] = MK_CSR_WR_CB(write_plain);
         this->csr[misa] |= extension_encoding::N;
+        this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
+        this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
     }
     if(FEAT & FEAT_DEBUG)
         this->add_debug_csrs();
@@ -180,9 +187,6 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& a, const unsigned le
             case traits<BASE>::fence:
             case traits<BASE>::fencei:
                 break;
-            case traits<BASE>::fencevma: {
-                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
-            }
             default:
                 return iss::Ok;
             }
@@ -279,9 +283,6 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::write(const addr_t& a, const unsigned l
             case traits<BASE>::fence:
             case traits<BASE>::fencei:
                 break;
-            case traits<BASE>::fencevma: {
-                this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION << 16;
-            }
             default:
                 return iss::Ok;
             }
@@ -355,6 +356,27 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
     auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
     val = this->csr[mip] & mask;
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ideleg(unsigned addr, reg_t val) {
+    // only U and S mode interrupts can be delegated
+    auto mask = 0b0001'0001'0001;
+    this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_edeleg(unsigned addr, uint32_t val) {
+    // we mask according to privilege spec: bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved)
+    uint32_t mask = 0b0000'0000'0000'0000'1011'0011'1111'0111;
+    this->csr[arch::riscv_csr::medeleg] = (this->csr[arch::riscv_csr::medeleg] & ~mask) | (val & mask);
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_edeleg(unsigned addr, uint64_t val) {
+    // we mask according to privilege spec: bit 3 (break), bit 10 (reserved), bit 11 (Ecall from M) bit 14 (reserved)
+    uint64_t mask = 0b0000'0000'0000'0000'1011'0011'1111'0111;
+    this->csr[arch::riscv_csr::medeleg] = (this->csr[arch::riscv_csr::medeleg] & ~mask) | (val & mask);
     return iss::Ok;
 }
 

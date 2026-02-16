@@ -100,7 +100,7 @@ public:
     uint64_t leave_trap(uint64_t flags) override;
     void wait_until(uint64_t flags) override;
 
-    void set_csr(unsigned addr, reg_t val) { this->csr[addr & this->csr.page_addr_mask] = val; }
+    void set_csr(unsigned addr, reg_t val) { this->csr[addr] = val; }
 
 protected:
     using mem_read_f = iss::status(iss::phys_addr_t addr, unsigned, uint8_t* const);
