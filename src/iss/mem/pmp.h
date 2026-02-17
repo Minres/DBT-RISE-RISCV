@@ -32,6 +32,9 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
+#ifndef ISS_MEM_PMP_H
+#define ISS_MEM_PMP_H
+
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/arch/traits.h"
 #include "iss/vm_types.h"
@@ -217,3 +220,4 @@ template <typename PLAT> bool pmp<PLAT>::pmp_check(access_type type, uint64_t ad
 
 } // namespace mem
 } // namespace iss
+#endif

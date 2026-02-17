@@ -32,6 +32,9 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
+#ifndef ISS_MEM_CLIC_H
+#define ISS_MEM_CLIC_H
+
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
@@ -289,3 +292,4 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t a
 
 } // namespace mem
 } // namespace iss
+#endif

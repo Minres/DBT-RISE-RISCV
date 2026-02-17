@@ -32,6 +32,9 @@
  *       eyck@minres.com - initial implementation
  ******************************************************************************/
 
+#ifndef ISS_MEM_MMU_H
+#define ISS_MEM_MMU_H
+
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/arch/traits.h"
 #include "iss/arch_if.h"
@@ -333,3 +336,4 @@ template <typename PLAT> uint64_t mmu<PLAT>::virt2phys(iss::access_type access, 
 }
 } // namespace mem
 } // namespace iss
+#endif
