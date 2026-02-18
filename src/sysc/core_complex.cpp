@@ -233,7 +233,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
 #if SC_VERSION_MAJOR > 2
     sensitive << clint_irq_i;
 #else
-    for(auto& s:clint_irq_i)
+    for(auto& s : clint_irq_i)
         sensitive << s;
 #endif
 #endif

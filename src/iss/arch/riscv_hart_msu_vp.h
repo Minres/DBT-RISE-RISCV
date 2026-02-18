@@ -90,7 +90,7 @@ public:
 
     void reset(uint64_t address) override;
 
-    void enable_disass(bool enable) {riscv_hart_common<BASE>::enable_disass_output(enable);}
+    void enable_disass(bool enable) { riscv_hart_common<BASE>::enable_disass_output(enable); }
 
     iss::status read(const addr_t& addr, const unsigned length, uint8_t* const data);
     iss::status write(const addr_t& addr, const unsigned length, const uint8_t* const data);
@@ -417,7 +417,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FE
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
     // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
-    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3) & this->clint_custom_irq_mask & (FEAT & FEAT_EXT_N?0xbbb:0xaaa);
+    auto mask =
+        riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3) & this->clint_custom_irq_mask & (FEAT & FEAT_EXT_N ? 0xbbb : 0xaaa);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -497,8 +498,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::ch
     }
 }
 
-template <typename BASE, features_e FEAT>
-uint64_t riscv_hart_msu_vp<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
+template <typename BASE, features_e FEAT> uint64_t riscv_hart_msu_vp<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
     if(flags == std::numeric_limits<uint32_t>::max())
@@ -638,12 +638,10 @@ uint64_t riscv_hart_msu_vp<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr
     if((flags & 0xffffffff) != 0xffffffff) {
         if(trap_id) {
             auto irq_str = cause < this->irq_str.size() ? this->irq_str.at(cause) : "Unknown";
-            this->disass_output(
-                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
+            this->disass_output(fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         } else {
             auto irq_str = cause < this->trap_str.size() ? this->trap_str.at(cause) : "Unknown";
-            this->disass_output(
-                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
+            this->disass_output(fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         }
     }
     // reset trap this->state
@@ -686,7 +684,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_msu_vp<BASE, FEAT>
         // sets the pc to the value stored in the x epc register.
         this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
         this->disass_output(
-             fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
+            fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
         check_interrupt();
     }
     this->reg.trap_state = this->reg.pending_trap;

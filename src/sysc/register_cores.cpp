@@ -49,8 +49,7 @@
 namespace iss {
 namespace interp {
 using namespace sysc;
-__attribute__((used))
-volatile std::array<bool, 15> riscv_init = {
+__attribute__((used)) volatile std::array<bool, 15> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
@@ -69,7 +68,8 @@ volatile std::array<bool, 15> riscv_init = {
     iss_factory::instance().register_creator("rv32imac_mp:interp", // rv32imac_m with PMP
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imac>>(cc);
-                                                 cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::rv32imac>>(cpu->get_priv_if()));
+                                                 cpu->memories.insert_before_last(
+                                                     std::make_unique<iss::mem::pmp<iss::arch::rv32imac>>(cpu->get_priv_if()));
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_mu:interp",

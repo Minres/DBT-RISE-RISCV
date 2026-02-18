@@ -218,12 +218,12 @@ public:
         return finish_evt;
     }
 
-    void register_csr_rd(unsigned csr_addr, sc2core_if::rd_csr_f &func) {
+    void register_csr_rd(unsigned csr_addr, sc2core_if::rd_csr_f& func) {
         assert(core != nullptr);
         core->register_csr_rd(csr_addr, func);
     }
 
-    void register_csr_wr(unsigned csr_addr, sc2core_if::wr_csr_f &func) {
+    void register_csr_wr(unsigned csr_addr, sc2core_if::wr_csr_f& func) {
         assert(core != nullptr);
         core->register_csr_wr(csr_addr, func);
     }

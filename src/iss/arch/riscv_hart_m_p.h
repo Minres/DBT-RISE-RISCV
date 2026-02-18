@@ -77,7 +77,7 @@ public:
 
     void reset(uint64_t address) override;
 
-    void enable_disass(bool enable) {riscv_hart_common<BASE>::enable_disass_output(enable);}
+    void enable_disass(bool enable) { riscv_hart_common<BASE>::enable_disass_output(enable); }
 
     iss::status read(const addr_t& addr, const unsigned length, uint8_t* const data);
     iss::status write(const addr_t& addr, const unsigned length, const uint8_t* const data);
@@ -461,12 +461,10 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::e
     if((flags & 0xffffffff) != 0xffffffff) {
         if(trap_id) {
             auto irq_str = cause < this->irq_str.size() ? this->irq_str.at(cause) : "Unknown";
-            this->disass_output(
-                 fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
+            this->disass_output(fmt::format("Interrupt with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         } else {
             auto irq_str = cause < this->trap_str.size() ? this->trap_str.at(cause) : "Unknown";
-            this->disass_output(
-                 fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
+            this->disass_output(fmt::format("Trap with cause '{}' ({}) occurred  at address {}", irq_str, cause, buffer.data()));
         }
     }
     // reset trap state

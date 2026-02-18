@@ -2,9 +2,9 @@
 
 #include "scv-tr/scv_tr.h"
 #include <rigtorp/SPSCQueue.h>
+#include <scc/utilities.h>
 #include <tlm/scc/quantum_keeper.h>
 #include <tlm/scc/scv/tlm_recording_extension.h>
-#include <scc/utilities.h>
 #ifdef HAS_SCV
 #include <scv.h>
 #else

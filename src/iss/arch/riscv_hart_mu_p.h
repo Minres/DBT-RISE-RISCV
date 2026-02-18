@@ -80,7 +80,7 @@ public:
 
     void reset(uint64_t address) override;
 
-    void enable_disass(bool enable) {riscv_hart_common<BASE>::enable_disass_output(enable);}
+    void enable_disass(bool enable) { riscv_hart_common<BASE>::enable_disass_output(enable); }
 
     iss::status read(const addr_t& addr, const unsigned length, uint8_t* const data);
     iss::status write(const addr_t& addr, const unsigned length, const uint8_t* const data);
@@ -347,7 +347,8 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
     // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
-    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3) & this->clint_custom_irq_mask & (FEAT & FEAT_EXT_N?0x999:0x888);
+    auto mask =
+        riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3) & this->clint_custom_irq_mask & (FEAT & FEAT_EXT_N ? 0x999 : 0x888);
     this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
@@ -572,7 +573,7 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_mu_p<BASE, FEAT>::
         // sets the pc to the value stored in the x epc register.
         this->reg.NEXT_PC = this->csr[uepc | inst_priv << 8];
         this->disass_output(
-             fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
+            fmt::format("Executing xRET, changing privilege level from {} to {}", this->lvl[cur_priv], this->lvl[this->reg.PRIV]));
         check_interrupt();
     }
     this->reg.trap_state = this->reg.pending_trap;

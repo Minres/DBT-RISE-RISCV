@@ -512,15 +512,15 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     uint64_t fromhost = std::numeric_limits<uint64_t>::max();
     std::stringstream io_buf;
 
-    void enable_disass_output(bool enable){
+    void enable_disass_output(bool enable) {
         if(enable)
-            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(this);
+            this->disass_func =
+                util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::print_disass_output>(this);
         else
             this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>(nullptr);
     }
 
     void set_semihosting_callback(semihosting_cb_t<reg_t> cb) { semihosting_cb = cb; };
-
 
     std::pair<uint64_t, bool> load_file(std::string const& name, int type) override {
         return std::make_pair(entry_address, read_elf_file(name, sizeof(reg_t) == 4 ? ELFIO::ELFCLASS32 : ELFIO::ELFCLASS64));
@@ -624,10 +624,10 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         static CONSTEXPR char const* fmt_str =
             sizeof(reg_t) == 4 ? "0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
         if(printpc) {
-            CLOG(INFO, disass)<<fmt::format(fmt_str, pc, string, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
-                this->reg.cycle + cycle_offset);
+            CLOG(INFO, disass) << fmt::format(fmt_str, pc, string, lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                                              this->reg.cycle + cycle_offset);
         } else {
-            CLOG(INFO, disass)<<string;
+            CLOG(INFO, disass) << string;
         }
     };
 
@@ -944,7 +944,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
             .read_csr = [this](unsigned addr, reg_t& val) -> iss::status { return read_csr(addr, val); },
             .write_csr = [this](unsigned addr, reg_t val) -> iss::status { return write_csr(addr, val); },
             .get_csr = [this](unsigned addr) -> reg_t { return csr.at(addr); },
-            .set_csr = [this](unsigned addr, reg_t val) -> void { csr.at(addr)=val;},
+            .set_csr = [this](unsigned addr, reg_t val) -> void { csr.at(addr) = val; },
             .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
             .raise_trap =
                 [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
@@ -1018,8 +1018,8 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     void set_max_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
     void set_clint_custom_irq_num(unsigned num) {
-        assert(num<=traits<BASE>::XLEN);
-        clint_custom_irq_mask=std::numeric_limits<reg_t>::max()>>(traits<BASE>::XLEN-num);
+        assert(num <= traits<BASE>::XLEN);
+        clint_custom_irq_mask = std::numeric_limits<reg_t>::max() >> (traits<BASE>::XLEN - num);
     }
 
 protected:

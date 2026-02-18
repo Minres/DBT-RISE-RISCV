@@ -96,10 +96,11 @@ public:
 
     void enable_disass(bool enable) override {
         if(enable)
-            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(this);
+            this->disass_func =
+                util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(this);
         else
-            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(nullptr);
-
+            this->disass_func =
+                util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(nullptr);
     }
 
     void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
@@ -163,14 +164,15 @@ public:
     }
 
     void record_n_print_disass(uint64_t pc, std::string const& str, bool printpc) {
-        if(!printpc) owner->disass_output(pc, str);
-        static CONSTEXPR char const* fmt_str =
-            sizeof(reg_t) == 4 ? "[disass] 0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]" : "[disass] 0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
+        if(!printpc)
+            owner->disass_output(pc, str);
+        static CONSTEXPR char const* fmt_str = sizeof(reg_t) == 4 ? "[disass] 0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]"
+                                                                  : "[disass] 0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
         if(printpc) {
-            SCCINFO(owner->hier_name())<<fmt::format(fmt_str, pc, str, this->lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
-                this->reg.cycle + this->cycle_offset);
+            SCCINFO(owner->hier_name()) << fmt::format(fmt_str, pc, str, this->lvl[this->reg.PRIV], (reg_t)this->state.mstatus,
+                                                       this->reg.icount, this->reg.cycle + this->cycle_offset);
         } else {
-            SCCINFO(owner->hier_name())<<"[disass] " <<str;
+            SCCINFO(owner->hier_name()) << "[disass] " << str;
         }
     };
 

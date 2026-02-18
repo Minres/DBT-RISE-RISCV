@@ -144,14 +144,14 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
 private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
         auto end_addr = addr.val - 1 + length;
-        if(addr.space == 0 && addr.val<=end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
+        if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
             return read_clic(addr.val, length, data);
         return down_stream_mem.rd_mem(addr, length, data);
     }
 
     iss::status write_mem(addr_t const& addr, unsigned length, uint8_t const* data) {
         auto end_addr = addr.val - 1 + length;
-        if(addr.space == 0 && addr.val<=end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
+        if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
             return write_clic(addr.val, length, data);
         return down_stream_mem.wr_mem(addr, length, data);
     }
@@ -198,8 +198,8 @@ private:
     iss::status write_xtvec(unsigned addr, reg_t val) {
         hart_if.set_csr(addr, val);
         if((val & 0x3) != 0x3) {
-            clic_mprev_lvl = 0xff>>cfg.clic_int_ctl_bits;
-            clic_uprev_lvl = 0xff>>cfg.clic_int_ctl_bits;
+            clic_mprev_lvl = 0xff >> cfg.clic_int_ctl_bits;
+            clic_uprev_lvl = 0xff >> cfg.clic_int_ctl_bits;
         }
         return iss::Ok;
     }
@@ -207,11 +207,11 @@ private:
     iss::status read_cause(unsigned addr, reg_t& val) {
         val = hart_if.get_csr(addr) & ((1UL << (WORD_LEN - 1)) | (hart_if.max_irq - 1));
         auto xtvec = hart_if.get_csr(arch::mtvec);
-        if((xtvec& 0x3) == 0x3) {
-            if(addr == arch::mcause) { //mcause access
-                val |= hart_if.state.mstatus.MPP<<28 | hart_if.state.mstatus.MPIE<<27 |clic_mprev_lvl<<16;
-            } else if(addr ==arch::ucause) {
-                val |= hart_if.state.mstatus.UPIE<<27 | clic_uprev_lvl<<16;
+        if((xtvec & 0x3) == 0x3) {
+            if(addr == arch::mcause) { // mcause access
+                val |= hart_if.state.mstatus.MPP << 28 | hart_if.state.mstatus.MPIE << 27 | clic_mprev_lvl << 16;
+            } else if(addr == arch::ucause) {
+                val |= hart_if.state.mstatus.UPIE << 27 | clic_uprev_lvl << 16;
             }
         }
         return iss::Ok;
@@ -219,16 +219,16 @@ private:
 
     iss::status write_cause(unsigned addr, reg_t val) {
         auto mask = ((1UL << (WORD_LEN - 1)) | (hart_if.max_irq - 1));
-        hart_if.set_csr(addr,(val & mask) | (hart_if.get_csr(addr) & ~mask));
+        hart_if.set_csr(addr, (val & mask) | (hart_if.get_csr(addr) & ~mask));
         auto xtvec = hart_if.get_csr(arch::mtvec);
         if((xtvec & 0x3) == 0x3) {
-            if(addr == arch::mcause){ //mcause access
-                hart_if.state.mstatus.MPIE = (val>>27)&1;
-                clic_mprev_lvl = ((val >> 16) & 0xff) | 0xff>>cfg.clic_int_ctl_bits;
-                hart_if.state.mstatus.MPP = (val <<28)&0x3;
-            } else if(addr ==arch::ucause) {
-                hart_if.state.mstatus.UPIE = (val>>27)&1;
-                clic_uprev_lvl = ((val >> 16) & 0xff) | 0xff>>cfg.clic_int_ctl_bits;
+            if(addr == arch::mcause) { // mcause access
+                hart_if.state.mstatus.MPIE = (val >> 27) & 1;
+                clic_mprev_lvl = ((val >> 16) & 0xff) | 0xff >> cfg.clic_int_ctl_bits;
+                hart_if.state.mstatus.MPP = (val << 28) & 0x3;
+            } else if(addr == arch::ucause) {
+                hart_if.state.mstatus.UPIE = (val >> 27) & 1;
+                clic_uprev_lvl = ((val >> 16) & 0xff) | 0xff >> cfg.clic_int_ctl_bits;
             }
         }
         return iss::Ok;

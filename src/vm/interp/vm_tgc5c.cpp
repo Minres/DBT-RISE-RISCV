@@ -2781,8 +2781,8 @@ std::unique_ptr<vm_if> create<arch::tgc5c>(arch::tgc5c *core, unsigned short por
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 
 
