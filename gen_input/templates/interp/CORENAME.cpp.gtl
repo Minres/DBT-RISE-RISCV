@@ -449,8 +449,8 @@ std::unique_ptr<vm_if> create<arch::${coreDef.name.toLowerCase()}>(arch::${coreD
 } // namespace interp
 } // namespace iss
 
-#include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/riscv_hart_m_p.h><% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
+#include <iss/arch/riscv_hart_msu_vp.h><%}%>
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 <% if(coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCase()=="tgc5e") { %>
