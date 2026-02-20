@@ -40,9 +40,10 @@
 #include <memory>
 #include <util/ities.h>
 #include <vector>
+#include "iss/arch/riscv_hart_common.h"
 
 namespace iss {
-namespace arch {
+namespace mem {
 namespace cache {
 
 enum class state { INVALID, VALID };
@@ -74,17 +75,23 @@ struct wt_policy {
 } // namespace cache
 
 // write thru, allocate on read, direct mapped or set-associative with round-robin replacement policy
-template <typename BASE> class wt_cache : public BASE {
+template <typename PLAT> class wt_cache : public PLAT {
 public:
-    using base_class = BASE;
-    using this_class = wt_cache<BASE>;
-    using reg_t = typename BASE::reg_t;
-    using mem_read_f = typename BASE::mem_read_f;
-    using mem_write_f = typename BASE::mem_write_f;
-    using phys_addr_t = typename BASE::phys_addr_t;
+    using base_class = PLAT;
+    using this_class = wt_cache<PLAT>;
+    using reg_t = typename PLAT::reg_t;
+    using mem_read_f = typename PLAT::mem_read_f;
+    using mem_write_f = typename PLAT::mem_write_f;
+    using phys_addr_t = typename PLAT::phys_addr_t;
 
-    wt_cache(feature_config cfg = feature_config{});
+    wt_cache(arch::priv_if<reg_t> hart_if);
     virtual ~wt_cache() = default;
+    memory_if get_mem_if() override {
+        return memory_if{.rd_mem{util::delegate<rd_mem_func_sig>::from<this_class, &this_class::read_cache>(this)},
+                         .wr_mem{util::delegate<wr_mem_func_sig>::from<this_class, &this_class::write_cache>(this)}};
+    }
+
+    void set_next(memory_if mem) override { down_stream_mem = mem; }
 
     unsigned size{4096};
     unsigned line_sz{64};
@@ -93,28 +100,26 @@ public:
     uint64_t io_addr_mask{0xf0000000};
 
 protected:
-    iss::status read_cache(phys_addr_t addr, unsigned, uint8_t* const);
-    iss::status write_cache(phys_addr_t addr, unsigned, uint8_t const* const);
-    std::function<mem_read_f> cache_mem_rd_delegate;
-    std::function<mem_write_f> cache_mem_wr_delegate;
+    iss::status read_cache(addr_t addr, unsigned, uint8_t* const);
+    iss::status write_cache(addr_t addr, unsigned, uint8_t const* const);
+    arch::priv_if<reg_t> hart_if;
+    memory_if down_stream_mem;
     std::unique_ptr<cache::cache> dcache_ptr;
     std::unique_ptr<cache::cache> icache_ptr;
     size_t get_way_select() { return 0; }
 };
 
-template <typename BASE>
-inline wt_cache<BASE>::wt_cache(feature_config cfg)
-: BASE(cfg)
+template <typename PLAT>
+inline wt_cache<PLAT>::wt_cache(arch::priv_if<reg_t> hart_if)
+: hart_if(hart_if)
 , io_address{cfg.io_address}
 , io_addr_mask{cfg.io_addr_mask} {
     auto cb = base_class::replace_mem_access(
         [this](phys_addr_t a, unsigned l, uint8_t* const d) -> iss::status { return read_cache(a, l, d); },
         [this](phys_addr_t a, unsigned l, uint8_t const* const d) -> iss::status { return write_cache(a, l, d); });
-    cache_mem_rd_delegate = cb.first;
-    cache_mem_wr_delegate = cb.second;
 }
 
-template <typename BASE> iss::status iss::arch::wt_cache<BASE>::read_cache(phys_addr_t a, unsigned l, uint8_t* const d) {
+template <typename PLAT> iss::status wt_cache<PLAT>::read_cache(addr_t a, unsigned l, uint8_t* const d) {
     if(!icache_ptr) {
         icache_ptr.reset(new cache::cache(size, line_sz, ways));
         dcache_ptr.reset(new cache::cache(size, line_sz, ways));
@@ -142,13 +147,13 @@ template <typename BASE> iss::status iss::arch::wt_cache<BASE>::read_cache(phys_
             d[i] = cl.data[start_addr + i];
         return iss::Ok;
     } else
-        return cache_mem_rd_delegate(a, l, d);
+        return down_stream_mem.rd_mem(addr, length, data);
 }
 
-template <typename BASE> iss::status iss::arch::wt_cache<BASE>::write_cache(phys_addr_t a, unsigned l, const uint8_t* const d) {
+template <typename PLAT> iss::status wt_cache<PLAT>::write_cache(addr_t a, unsigned l, const uint8_t* const d) {
     if(!dcache_ptr)
         dcache_ptr.reset(new cache::cache(size, line_sz, ways));
-    auto res = cache_mem_wr_delegate(a, l, d);
+    auto res = down_stream_mem.wr_mem(addr, length, data);
     if(res == iss::Ok && ((a.val & io_addr_mask) != io_address)) {
         auto set_addr = (a.val & (size - 1)) >> util::ilog2(line_sz * ways);
         auto tag_addr = a.val >> util::ilog2(line_sz);

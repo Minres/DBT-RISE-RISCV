@@ -47,28 +47,28 @@ public:
     using this_class = hwl<BASE>;
     using reg_t = typename BASE::reg_t;
 
-    hwl(feature_config cfg = feature_config{});
+    hwl();
     virtual ~hwl() = default;
 
 protected:
-    iss::status read_custom_csr(unsigned addr, reg_t& val) override;
-    iss::status write_custom_csr(unsigned addr, reg_t val) override;
+    iss::status read_hwl_csr(unsigned addr, reg_t& val);
+    iss::status write_hwl_csr(unsigned addr, reg_t val);
 };
 
 template <typename BASE>
-inline hwl<BASE>::hwl(feature_config cfg)
-: BASE(cfg) {
+inline hwl<BASE>::hwl()
+: BASE() {
     for(unsigned addr = 0x800; addr < 0x803; ++addr) {
-        this->register_custom_csr_rd(addr);
-        this->register_custom_csr_wr(addr);
+        this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_hwl_csr);
+        this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_hwl_csr);
     }
     for(unsigned addr = 0x804; addr < 0x807; ++addr) {
-        this->register_custom_csr_rd(addr);
-        this->register_custom_csr_wr(addr);
+        this->csr_rd_cb[addr] = MK_CSR_RD_CB(read_hwl_csr);
+        this->csr_wr_cb[addr] = MK_CSR_WR_CB(write_hwl_csr);
     }
 }
 
-template <typename BASE> inline iss::status iss::arch::hwl<BASE>::read_custom_csr(unsigned addr, reg_t& val) {
+template <typename BASE> inline iss::status iss::arch::hwl<BASE>::read_hwl_csr(unsigned addr, reg_t& val) {
     switch(addr) {
     case 0x800:
         val = this->reg.lpstart0;
@@ -92,7 +92,7 @@ template <typename BASE> inline iss::status iss::arch::hwl<BASE>::read_custom_cs
     return iss::Ok;
 }
 
-template <typename BASE> inline iss::status iss::arch::hwl<BASE>::write_custom_csr(unsigned addr, reg_t val) {
+template <typename BASE> inline iss::status iss::arch::hwl<BASE>::write_hwl_csr(unsigned addr, reg_t val) {
     switch(addr) {
     case 0x800:
         this->reg.lpstart0 = val;
