@@ -7,12 +7,20 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 project(dbt-rise-riscv VERSION 2.1.0 LANGUAGES C CXX)
 
 option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON)
+option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
 
 include(GNUInstallDirs)
 include(flink)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(OPTIMIZE_FOR_NATIVE AND COMPILER_SUPPORTS_MARCH_NATIVE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
 
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
