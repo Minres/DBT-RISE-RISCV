@@ -145,14 +145,16 @@ private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
-            return read_clic(addr.val, length, data);
+            if( read_clic(addr.val, length, data) ==iss::Ok)
+                return iss::Ok;
         return down_stream_mem.rd_mem(addr, length, data);
     }
 
     iss::status write_mem(addr_t const& addr, unsigned length, uint8_t const* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
-            return write_clic(addr.val, length, data);
+            if( write_clic(addr.val, length, data) ==iss::Ok)
+                return iss::Ok;
         return down_stream_mem.wr_mem(addr, length, data);
     }
 
@@ -261,33 +263,40 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t ad
         *data = clic_cfg_reg;
         for(auto i = 1; i < length; ++i)
             *(data + i) = 0;
+        return iss::Ok;
+#if 0
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
         auto offset = ((addr & 0x7fff) - 0x40) / 4;
         read_reg_with_offset(clic_inttrig_reg[offset], addr & 0x3, data, length);
+        return iss::Ok;
+#endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
               (addr + length) <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;
         read_reg_with_offset(clic_int_reg[offset].raw, addr & 0x3, data, length);
-    } else {
-        for(auto i = 0U; i < length; ++i)
-            *(data + i) = 0;
+        return iss::Ok;
     }
-    return iss::Ok;
+    return iss::NotSupported;
 }
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
     if(addr == cfg.clic_base) { // cliccfg
         clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
+        return iss::Ok;
+#if 0
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
         auto offset = ((addr & 0x7fff) - 0x40) / 4;
         write_reg_with_offset(clic_inttrig_reg[offset], addr & 0x3, data, length);
+        return iss::Ok;
+#endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
               (addr + length) <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;
         write_reg_with_offset(clic_int_reg[offset].raw, addr & 0x3, data, length);
         clic_int_reg[offset].raw &= 0xf0c70101; // clicIntCtlBits->0xf0, clicintattr->0xc7, clicintie->0x1, clicintip->0x1
+        return iss::Ok;
     }
-    return iss::Ok;
+    return iss::NotSupported;
 }
 
 } // namespace mem
