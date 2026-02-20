@@ -35,12 +35,12 @@
 #ifndef _RISCV_HART_M_P_WT_CACHE_H
 #define _RISCV_HART_M_P_WT_CACHE_H
 
+#include "iss/arch/riscv_hart_common.h"
 #include <iss/vm_types.h>
 #include <map>
 #include <memory>
 #include <util/ities.h>
 #include <vector>
-#include "iss/arch/riscv_hart_common.h"
 
 namespace iss {
 namespace mem {
@@ -170,7 +170,7 @@ template <typename PLAT> iss::status wt_cache<PLAT>::write_cache(addr_t a, unsig
     return res;
 }
 
-} // namespace arch
+} // namespace mem
 } // namespace iss
 
 #endif /* _RISCV_HART_M_P_H */
