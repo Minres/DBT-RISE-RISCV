@@ -145,7 +145,7 @@ private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
-            if( read_clic(addr.val, length, data) ==iss::Ok)
+            if(read_clic(addr.val, length, data) == iss::Ok)
                 return iss::Ok;
         return down_stream_mem.rd_mem(addr, length, data);
     }
@@ -153,7 +153,7 @@ private:
     iss::status write_mem(addr_t const& addr, unsigned length, uint8_t const* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
-            if( write_clic(addr.val, length, data) ==iss::Ok)
+            if(write_clic(addr.val, length, data) == iss::Ok)
                 return iss::Ok;
         return down_stream_mem.wr_mem(addr, length, data);
     }
