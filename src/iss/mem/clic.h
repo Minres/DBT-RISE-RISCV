@@ -259,10 +259,11 @@ protected:
 };
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
-    if(addr == cfg.clic_base) { // cliccfg
-        *data = clic_cfg_reg;
-        for(auto i = 1; i < length; ++i)
-            *(data + i) = 0;
+    if(addr >= cfg.clic_base && (addr+length-1)<cfg.clic_base+4) { // cliccfg
+        std::array<uint8_t, 4> reg = {0, 0, 0, clic_cfg_reg};
+        auto offset = addr-cfg.clic_base;
+        for(auto i = 0; i < length; ++i)
+            *(data + i) = reg[offset+i];
         return iss::Ok;
 #if 0
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
@@ -280,8 +281,11 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t ad
 }
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
-    if(addr == cfg.clic_base) { // cliccfg
-        clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
+    if(addr >= cfg.clic_base && (addr+length-1)<cfg.clic_base+4) { // cliccfg
+        auto offset = addr-cfg.clic_base;
+        for(auto i = 0; i < length; ++i)
+            if((i+offset) == 0)
+        		clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
         return iss::Ok;
 #if 0
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
