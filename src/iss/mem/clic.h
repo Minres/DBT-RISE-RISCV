@@ -260,7 +260,7 @@ protected:
 
 template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
     if(addr >= cfg.clic_base && (addr + length - 1) < cfg.clic_base + 4) { // cliccfg
-        std::array<uint8_t, 4> reg = {0, 0, 0, clic_cfg_reg};
+        std::array<uint8_t, 4> reg = {clic_cfg_reg, 0, 0, 0};
         auto offset = addr - cfg.clic_base;
         for(auto i = 0; i < length; ++i)
             *(data + i) = reg[offset + i];
