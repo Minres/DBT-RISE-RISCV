@@ -129,8 +129,6 @@ struct tgc5c: public arch_if {
 
 };
 
-struct tgc5c;
-
 template <> struct traits<tgc5c> {
 
     constexpr static char const* const core_type = "TGC5C";

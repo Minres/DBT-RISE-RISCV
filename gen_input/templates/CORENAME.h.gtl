@@ -145,8 +145,6 @@ if(vtype != null) {%>
 <%}%>
 };
 
-struct ${coreDef.name.toLowerCase()};
-
 template <> struct traits<${coreDef.name.toLowerCase()}> {
 
     constexpr static char const* const core_type = "${coreDef.name}";
