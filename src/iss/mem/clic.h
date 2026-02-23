@@ -227,7 +227,7 @@ private:
             if(addr == arch::mcause) { // mcause access
                 hart_if.state.mstatus.MPIE = (val >> 27) & 1;
                 clic_mprev_lvl = ((val >> 16) & 0xff) | 0xff >> cfg.clic_int_ctl_bits;
-                hart_if.state.mstatus.MPP = (val << 28) & 0x3;
+                hart_if.state.mstatus.MPP = (val >> 28) & 0x3;
             } else if(addr == arch::ucause) {
                 hart_if.state.mstatus.UPIE = (val >> 27) & 1;
                 clic_uprev_lvl = ((val >> 16) & 0xff) | 0xff >> cfg.clic_int_ctl_bits;
