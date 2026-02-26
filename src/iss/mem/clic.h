@@ -263,7 +263,7 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t ad
         std::array<uint8_t, 4> reg = {clic_cfg_reg, 0, 0, 0};
         auto offset = addr - cfg.clic_base;
         for(auto i = 0; i < length; ++i)
-            *(data + i) = (i+offset)<reg.size()?reg[offset + i]:0;
+            *(data + i) = (i + offset) < reg.size() ? reg[offset + i] : 0;
         return iss::Ok;
 #if 0
     } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
