@@ -80,6 +80,8 @@ public:
      avail buf is 1 */
     status read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) override;
 
+    status trigger_debugger_stop_event() override;
+
     /* Write all registers. buf is 4-byte aligned and it is in target
      byte order */
     status write_registers(const std::vector<uint8_t>& data) override;
@@ -183,6 +185,10 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::current_thread_query
     return Ok;
 }
 
+template <typename ARCH> status riscv_target_adapter<ARCH>::trigger_debugger_stop_event() {
+    core->trigger_debugger_stop_event();
+    return Ok;
+}
 template <typename ARCH> status riscv_target_adapter<ARCH>::read_registers(std::vector<uint8_t>& data, std::vector<uint8_t>& avail) {
     CPPLOG(TRACE) << "reading target registers";
     data.clear();

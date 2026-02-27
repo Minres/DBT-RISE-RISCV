@@ -255,13 +255,24 @@ public:
     void wait_until(uint64_t flags) {
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         PLAT::wait_until(flags);
+        wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
             while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
-                sc_core::wait(this->wfi_evt);
+                sc_core::wait(this->wfi_evt | this->debugger_stop_evt);
+                bool is_debugger_stop_evt = this->debugger_stop_evt.triggered();
+                if(is_debugger_stop_evt) break;
             }
             SCCINFO(this->owner->hier_name()) << "Got WFI event";
         };
         owner->exec_on_sysc(f);
+        wfi_inst.store(false, std::memory_order_relaxed);
+    }
+
+    void trigger_debugger_stop_event() {
+        if(wfi_inst.load(std::memory_order_relaxed) == true) {
+            SCCDEBUG(owner->hier_name()) << "Trigger debugger stop event";
+            this->debugger_stop_evt.notify(sc_core::SC_ZERO_TIME);
+        }
     }
 
 private:
@@ -344,8 +355,10 @@ private:
     sysc::riscv::core_complex_if* const owner{nullptr};
     util::LoggerDelegate log_delegate;
     sc_core::sc_event wfi_evt;
+    sc_core::sc_event debugger_stop_evt;
     unsigned to_host_wr_cnt = 0;
     bool first{true};
+    std::atomic<bool> wfi_inst{false};
     mutex_t sync_mtx;
 };
 } // namespace sysc
