@@ -272,7 +272,7 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t ad
         return iss::Ok;
 #endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
-              addr <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
+              addr < (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;
         read_reg_with_offset(clic_int_reg[offset].raw, addr & 0x3, data, length);
         return iss::Ok;
@@ -294,7 +294,7 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t a
         return iss::Ok;
 #endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
-              addr <= (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
+              addr < (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;
         write_reg_with_offset(clic_int_reg[offset].raw, addr & 0x3, data, length);
         clic_int_reg[offset].raw &= 0xf0c70101; // clicIntCtlBits->0xf0, clicintattr->0xc7, clicintie->0x1, clicintip->0x1
