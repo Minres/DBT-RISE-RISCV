@@ -134,12 +134,12 @@ using namespace sysc;
 volatile std::array<bool, 4> riscv_init = {
     iss_factory::instance().register_creator("rv32imac_m:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
-                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imc>>(cc);
+                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32imac_mu:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
-                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imc>>(cc);
+                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("tgc5c_m:llvm",
