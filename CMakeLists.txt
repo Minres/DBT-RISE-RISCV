@@ -176,7 +176,7 @@ install(TARGETS ${PROJECT_NAME} COMPONENT ${PROJECT_NAME}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} # headers for mac (note the different component -> different package)
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} # headers
 )
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/incl/iss COMPONENT ${PROJECT_NAME}
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/iss COMPONENT ${PROJECT_NAME}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} # target directory
     FILES_MATCHING # install only matched files
     PATTERN "*.h" # select header files
