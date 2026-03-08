@@ -199,7 +199,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         }
         buffer.resize(num_read);
         for(int i = 0; i < num_read; i++) {
-            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, addr + i}, 1, &buffer[i]);
+            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_WRITE, 0, addr + i}, 1, &buffer[i]);
             if(res != iss::Ok)
                 return;
         }
@@ -277,7 +277,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
 
         for(int i = 0; i < buffer_len; i++) {
             uint8_t character = filename[i];
-            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, (*parameter) + i}, 1, &character);
+            auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_WRITE, 0, (*parameter) + i}, 1, &character);
             if(res != iss::Ok)
                 return;
         }
