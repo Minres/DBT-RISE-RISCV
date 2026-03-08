@@ -4704,7 +4704,8 @@ private:
     }
 };
 
-template <typename ARCH> vm_impl<ARCH>::vm_impl() { this(new ARCH()); }
+template <typename ARCH> vm_impl<ARCH>::vm_impl()
+: vm_base<ARCH>(std::make_unique<ARCH>()) {}
 
 template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
