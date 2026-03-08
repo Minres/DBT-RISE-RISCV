@@ -58,21 +58,22 @@ volatile std::array<bool, 2 + 1> rv32gcv_init = {
         })
 };
 }
-#if defined(WITH_LLVM)
-namespace llvm {
-using namespace sysc;
-volatile std::array<bool, 2> rv32gcv_init = {
-        iss_factory::instance().register_creator("rv32gcv_m:llvm", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
-            auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32gcv>>(cc);
-            return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gcv*>(cpu), gdb_port)}};
-        }),
-        iss_factory::instance().register_creator("rv32gcv_mu:llvm", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
-            auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32gcv>>(cc);
-            return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gcv*>(cpu), gdb_port)}};
-        })
-};
-}
-#endif
+// TODO: generate for and test with LLVM
+// #if defined(WITH_LLVM)
+// namespace llvm {
+// using namespace sysc;
+// volatile std::array<bool, 2> rv32gcv_init = {
+//         iss_factory::instance().register_creator("rv32gcv_m:llvm", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
+//             auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32gcv>>(cc);
+//             return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gcv*>(cpu), gdb_port)}};
+//         }),
+//         iss_factory::instance().register_creator("rv32gcv_mu:llvm", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
+//             auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32gcv>>(cc);
+//             return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32gcv*>(cpu), gdb_port)}};
+//         })
+// };
+// }
+// #endif
 #if defined(WITH_ASMJIT)
 namespace asmjit {
 using namespace sysc;
