@@ -33,6 +33,9 @@
  ******************************************************************************/
 
 #include "semihosting.h"
+#include <algorithm>
+#include <array>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <iss/vm_types.h>
@@ -42,16 +45,16 @@
 
 const char* SYS_OPEN_MODES_STRS[] = {"r", "rb", "r+", "r+b", "w", "wb", "w+", "w+b", "a", "ab", "a+", "a+b"};
 
-template <typename T> T sh_read_field(iss::arch_if* arch_if_ptr, T addr, int len = 4) {
-    uint8_t bytes[4];
-    auto res = arch_if_ptr->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, addr}, 4, &bytes[0]);
-    // auto res = arch_if_ptr->read(iss::address_type::PHYSICAL, iss::access_type::DEBUG_READ, 0, *parameter, 1, &character);
-
-    if(res != iss::Ok) {
+template <typename T> T sh_read_field(iss::arch_if* arch_if_ptr, T addr, size_t len = sizeof(T)) {
+    std::array<uint8_t, sizeof(T)> bytes{};
+    len = std::min(len, sizeof(T));
+    auto res = arch_if_ptr->read({iss::address_type::LOGICAL, iss::access_type::DEBUG_READ, 0, addr}, len, bytes.data());
+    if(res != iss::Ok)
         return 0; // TODO THROW ERROR
-    } else
-        return static_cast<T>(bytes[0]) | (static_cast<T>(bytes[1]) << 8) | (static_cast<T>(bytes[2]) << 16) |
-               (static_cast<T>(bytes[3]) << 24);
+    T value{0};
+    for(size_t i = 0; i < len; ++i)
+        value |= static_cast<T>(bytes[i]) << (8 * i);
+    return value;
 }
 
 template <typename T> std::string sh_read_string(iss::arch_if* arch_if_ptr, T addr, T str_len) {
@@ -67,6 +70,16 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     static std::map<T, FILE*> openFiles;
     static T file_count = 3;
     static T semihostingErrno;
+    auto get_open_file = [call_number, this](T file_handle, FILE*& file) -> bool {
+        auto it = openFiles.find(file_handle);
+        if(it == openFiles.end() || it->second == nullptr) {
+            semihostingErrno = EBADF;
+            *call_number = static_cast<T>(-1);
+            return false;
+        }
+        file = it->second;
+        return true;
+    };
 
     switch(static_cast<semihosting_syscalls>(*call_number)) {
     case semihosting_syscalls::SYS_CLOCK: {
@@ -78,11 +91,13 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     }
     case semihosting_syscalls::SYS_CLOSE: {
         T file_handle = *parameter;
-        if(openFiles.size() <= file_handle && file_handle < 0) {
+        auto it = openFiles.find(file_handle);
+        if(it == openFiles.end() || it->second == nullptr) {
             semihostingErrno = EBADF;
+            *call_number = static_cast<T>(-1);
             return;
         }
-        auto file = openFiles[file_handle];
+        auto file = it->second;
         openFiles.erase(file_handle);
         if(!(file == stdin || file == stdout || file == stderr)) {
             int i = fclose(file);
@@ -112,7 +127,9 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     }
     case semihosting_syscalls::SYS_FLEN: {
         T file_handle = *parameter;
-        auto file = openFiles[file_handle];
+        FILE* file = nullptr;
+        if(!get_open_file(file_handle, file))
+            return;
 
         size_t currentPos = ftell(file);
         if(currentPos < 0)
@@ -151,7 +168,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         // TODO LOG INFO
 
         if(mode >= 12) {
-            // TODO throw ERROR
+            *call_number = static_cast<T>(-1);
             return;
         }
 
@@ -166,7 +183,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         } else {
             file = fopen(path_str.c_str(), SYS_OPEN_MODES_STRS[mode]);
             if(file == nullptr) {
-                // TODO throw error
+                *call_number = static_cast<T>(-1);
                 return;
             }
         }
@@ -179,8 +196,9 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         T file_handle = sh_read_field<T>(arch_if_ptr, (*parameter) + 4);
         T addr = sh_read_field<T>(arch_if_ptr, *parameter);
         T count = sh_read_field<T>(arch_if_ptr, (*parameter) + 8);
-
-        auto file = openFiles[file_handle];
+        FILE* file = nullptr;
+        if(!get_open_file(file_handle, file))
+            return;
 
         std::vector<uint8_t> buffer(count);
         size_t num_read = 0;
@@ -238,7 +256,9 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
     case semihosting_syscalls::SYS_SEEK: {
         T file_handle = sh_read_field<T>(arch_if_ptr, *parameter);
         T pos = sh_read_field<T>(arch_if_ptr, (*parameter) + 1);
-        auto file = openFiles[file_handle];
+        FILE* file = nullptr;
+        if(!get_open_file(file_handle, file))
+            return;
 
         int retval = fseek(file, pos, SEEK_SET);
         if(retval < 0)
@@ -275,7 +295,7 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         ss << "tmp/file-" << std::setfill('0') << std::setw(3) << identifier;
         std::string filename = ss.str();
 
-        for(int i = 0; i < buffer_len; i++) {
+        for(int i = 0; i < buffer_len && i < static_cast<int>(filename.size()); i++) {
             uint8_t character = filename[i];
             auto res = arch_if_ptr->write({iss::address_type::LOGICAL, iss::access_type::DEBUG_WRITE, 0, (*parameter) + i}, 1, &character);
             if(res != iss::Ok)
@@ -287,8 +307,9 @@ template <typename T> void semihosting_callback<T>::operator()(iss::arch_if* arc
         T file_handle = sh_read_field<T>(arch_if_ptr, (*parameter) + 4);
         T addr = sh_read_field<T>(arch_if_ptr, *parameter);
         T count = sh_read_field<T>(arch_if_ptr, (*parameter) + 8);
-
-        auto file = openFiles[file_handle];
+        FILE* file = nullptr;
+        if(!get_open_file(file_handle, file))
+            return;
         std::string str = sh_read_string<T>(arch_if_ptr, addr, count);
         fwrite(&str[0], 1, count, file);
         break;
