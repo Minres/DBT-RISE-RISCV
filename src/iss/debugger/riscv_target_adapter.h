@@ -287,15 +287,19 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::write_single_registe
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::read_mem(uint64_t addr, std::vector<uint8_t>& data) {
+    if(!srv)
+        return Err;
     auto a = map_addr({iss::address_type::VIRTUAL, iss::access_type::DEBUG_READ, 0, addr});
     auto f = [&]() -> status { return core->read(a, data.size(), data.data()); };
-    return srv->execute_syncronized(f);
+    return srv->execute_synchronized(f);
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::write_mem(uint64_t addr, const std::vector<uint8_t>& data) {
+    if(!srv)
+        return Err;
     auto a = map_addr({iss::address_type::VIRTUAL, iss::access_type::DEBUG_WRITE, 0, addr});
     auto f = [&]() -> status { return core->write(a, data.size(), data.data()); };
-    return srv->execute_syncronized(f);
+    return srv->execute_synchronized(f);
 }
 
 template <typename ARCH>
