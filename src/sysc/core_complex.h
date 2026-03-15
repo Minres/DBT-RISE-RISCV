@@ -130,7 +130,7 @@ public:
 
     cci::cci_param<bool> post_run_stats{"post_run_stats", false};
 
-    core_complex(sc_core::sc_module_name const& name);
+    core_complex(sc_core::sc_module_name const& name, size_t clint_irq_size = 32);
 
 #else
     sc_core::sc_in<bool> clk_i{"clk_i"};
@@ -159,7 +159,7 @@ public:
 
     scml_property<bool> post_run_stats{"post_run_stats", false};
 
-    core_complex(sc_core::sc_module_name const& name)
+    core_complex(sc_core::sc_module_name const& name, size_t clint_irq_size = 32)
     : sc_module(name)
     , local_irq_i{"local_irq_i", 16}
     , elf_file{"elf_file", ""}
@@ -170,11 +170,8 @@ public:
     , gdb_server_port{"gdb_server_port", 0}
     , dump_ir{"dump_ir", false}
     , mhartid{"mhartid", 0}
-    , plugins{"plugins", ""}
-    , fetch_lut(tlm_dmi_ext())
-    , read_lut(tlm_dmi_ext())
-    , write_lut(tlm_dmi_ext()) {
-        init();
+    , plugins{"plugins", ""} {
+        init(clint_irq_size);
     }
 
 #endif
@@ -304,8 +301,12 @@ protected:
     ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
     util::range_lut<tlm_dmi_ext> fetch_lut{tlm_dmi_ext()};
-    inline util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space);
-    inline util::range_lut<tlm_dmi_ext>& get_write_lut(unsigned space);
+    util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space) {
+        return space < dmi_read_luts.size() ? dmi_read_luts[space] : get_lut(dmi_read_luts, space);
+    };
+    util::range_lut<tlm_dmi_ext>& get_write_lut(unsigned space) {
+        return space < dmi_write_luts.size() ? dmi_write_luts[space] : get_lut(dmi_write_luts, space);
+    };
 
     QK quantum_keeper;
     std::vector<uint8_t> write_buf;
@@ -320,7 +321,7 @@ protected:
     bool finish_evt_inuse{false};
 
 private:
-    void init();
+    void init(size_t clint_irq_size);
     // we reserve for 8 memory spaces
     using lut_vec_t = std::vector<util::range_lut<tlm_dmi_ext>>;
     lut_vec_t dmi_read_luts{8, util::range_lut<tlm_dmi_ext>(tlm_dmi_ext())};

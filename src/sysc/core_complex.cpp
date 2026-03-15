@@ -180,13 +180,13 @@ void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string
 
 #ifndef CWR_SYSTEMC
 template <unsigned int BUSWIDTH, typename QK>
-core_complex<BUSWIDTH, QK>::core_complex(sc_module_name const& name)
+core_complex<BUSWIDTH, QK>::core_complex(sc_module_name const& name, size_t clint_irq_size)
 : sc_module(name) {
-    init();
+    init(clint_irq_size);
 }
 #endif
 
-template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::init() {
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::init(size_t clint_irq_size) {
     core_complex_if::exec_on_sysc = util::delegate<void(std::function<void(void)>&)>::from<this_class, &this_class::exec_on_sysc<QK>>(this);
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
@@ -209,14 +209,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
         }
     });
 
-    auto& type = GET_PROP_VALUE(core_type);
-    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
-    create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
-    if(type != "?") {
-        sc_assert(vm);
-    }
-    auto xlen = type == "?" ? 32 : core->get_arch_if()->get_instrumentation_if()->get_reg_size(/*x0*/ 0);
-    clint_irq_i.init(xlen);
+    clint_irq_i.init(clint_irq_size);
     SC_HAS_PROCESS(this_class); // NOLINT
     SC_THREAD(run);
     SC_METHOD(rst_cb);
@@ -263,8 +256,14 @@ template <unsigned int BUSWIDTH, typename QK> core_complex<BUSWIDTH, QK>::~core_
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::trace(sc_trace_file* trf) const {}
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::before_end_of_elaboration() {
-    if(!core)
+    auto& type = GET_PROP_VALUE(core_type);
+    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
+    create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
+    if(type != "?") {
+        if(!core || !vm)
+            SCCFATAL(SCOBJ) << "Could not create core " << type;
         return;
+    }
     auto instr_trace = GET_PROP_VALUE(enable_instr_trace) ? trc.init(this->name()) : false;
     auto disass = GET_PROP_VALUE(enable_disass);
     if(disass)
@@ -543,12 +542,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem_dbg(const addr_t& addr, unsigned leng
     gp.set_extension(new sysc::memspace::tlm_memspace_extension<>(static_cast<memspace::common>(addr.space)));
     return dbus->transport_dbg(gp) == length;
 }
-template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_read_lut(unsigned space) {
-    return get_lut(dmi_read_luts, space);
-};
-template <unsigned int BUSWIDTH, typename QK> util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_write_lut(unsigned space) {
-    return get_lut(dmi_write_luts, space);
-};
+
 template <unsigned int BUSWIDTH, typename QK>
 util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_lut(lut_vec_t& luts, unsigned space) {
     if(space >= luts.size()) {
