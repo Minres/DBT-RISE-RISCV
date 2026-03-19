@@ -658,10 +658,10 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
     constexpr reg_t get_irq_mask(size_t mode) {
         std::array<const reg_t, 4> m = {{
-            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b000100010001, // U mode
-            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b001100110011, // S mode
-            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0,              // H mode
-            (std::numeric_limits<reg_t>::max() & ~0xffff) | 0b101110111011  // M mode
+            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b000100010001U, // U mode
+            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b001100110011U, // S mode
+            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b011101110111U, // H mode
+            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b111111111111U  // M mode
         }};
         return m[mode];
     }
@@ -1017,7 +1017,7 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
     void set_max_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
-    void set_clint_custom_irq_num(unsigned num) {
+    void set_clint_irq_num(unsigned num) {
         assert(num <= traits<BASE>::XLEN);
         clint_custom_irq_mask = std::numeric_limits<reg_t>::max() >> (traits<BASE>::XLEN - num);
     }
