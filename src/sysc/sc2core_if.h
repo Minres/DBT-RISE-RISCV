@@ -65,6 +65,7 @@ struct sc2core_if {
     using wr_csr_f = std::function<iss::status(unsigned addr, uint64_t)>;
     util::delegate<void(unsigned, wr_csr_f)> register_csr_wr;
     virtual void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t>) = 0;
+    virtual void set_clint_irq_count(size_t) = 0;
 };
 } // namespace sysc
 #endif /* _SYSC_SC2CORE_IF_H_ */

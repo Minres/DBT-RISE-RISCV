@@ -103,6 +103,8 @@ public:
                 util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(nullptr);
     }
 
+    void set_clint_irq_count(size_t num) override { this->set_clint_irq_num(num); }
+
     void register_unknown_instr_handler(util::delegate<iss::arch_if::unknown_instr_cb_t> handler) override {
         PLAT::unknown_instr_cb = handler;
     };
@@ -260,7 +262,8 @@ public:
             while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
                 sc_core::wait(this->wfi_evt | this->debugger_stop_evt);
                 bool is_debugger_stop_evt = this->debugger_stop_evt.triggered();
-                if(is_debugger_stop_evt) break;
+                if(is_debugger_stop_evt)
+                    break;
             }
             SCCINFO(this->owner->hier_name()) << "Got WFI event";
         };

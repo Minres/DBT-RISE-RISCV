@@ -166,6 +166,7 @@ void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string
             SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
     } else {
         core->set_hartid(hart_id);
+        core->set_clint_irq_count(clint_irq_i.size());
         auto* srv = debugger::server<debugger::gdb_session>::get();
         if(srv)
             tgt_adapter = srv->get_target(0); // FIXME: add core_id
