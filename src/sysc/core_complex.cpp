@@ -258,11 +258,10 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::t
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::before_end_of_elaboration() {
     auto& type = GET_PROP_VALUE(core_type);
-    SCCDEBUG(SCMOD) << "instantiating core " << type << " with " << GET_PROP_VALUE(backend) << " backend";
+    SCCDEBUG(SCMOD) << "instantiating hart" << GET_PROP_VALUE(mhartid) << " " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
-    if(type != "?") {
-        if(!core || !vm)
-            SCCFATAL(SCOBJ) << "Could not create core " << type;
+    if(type != "?" && (!core || !vm)) {
+        SCCFATAL(SCOBJ) << "Could not create core " << type;
         return;
     }
     auto instr_trace = GET_PROP_VALUE(enable_instr_trace) ? trc.init(this->name()) : false;
