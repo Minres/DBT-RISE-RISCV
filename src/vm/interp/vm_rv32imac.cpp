@@ -324,6 +324,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     auto& instr =  this->core.reg.instruction;
     // we fetch at max 4 byte, alignment is 2
     auto *const data = reinterpret_cast<uint8_t*>(&instr);
+    this->core.enable_disass(this->disass_enabled);
 
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
@@ -345,7 +346,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 inst_id = instr_descr[inst_index].op;
 
             // pre execution stuff
-             this->core.reg.last_branch = 0;
+            this->core.reg.last_branch = 0;
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, static_cast<unsigned>(inst_id));
             try{
                 switch(inst_id){
@@ -3195,7 +3196,6 @@ std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned sho
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 

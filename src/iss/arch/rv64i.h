@@ -129,8 +129,6 @@ struct rv64i: public arch_if {
 
 };
 
-struct rv64i;
-
 template <> struct traits<rv64i> {
 
     constexpr static char const* const core_type = "RV64I";
@@ -261,7 +259,7 @@ template <> struct traits<rv64i> {
         RV_MIP_MTIP=128ULL, RV_MIP_UEIP=256ULL, RV_MIP_SEIP=512ULL, RV_MIP_VSEIP=1024ULL,
         RV_MIP_MEIP=2048ULL, RV_MIP_SGEIP=4096ULL, RV_MIP_LCOFIP=8192ULL, XLEN=64ULL,
         FLEN=0ULL, INSTR_ALIGNMENT=4ULL, RFS=32ULL, fence=0ULL,
-        fencei=1ULL, fencevma=2ULL, CSR_SIZE=4096ULL, MISA_VAL=2147483904ULL,
+        fencei=1ULL, fencevma=2ULL, CSR_SIZE=4096ULL, MISA_VAL=9223372036854776064ULL,
         MARCHID_VAL=0ULL, CLIC_NUM_IRQ=0ULL
     };
 

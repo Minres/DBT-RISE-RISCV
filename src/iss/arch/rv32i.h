@@ -129,8 +129,6 @@ struct rv32i: public arch_if {
 
 };
 
-struct rv32i;
-
 template <> struct traits<rv32i> {
 
     constexpr static char const* const core_type = "RV32I";

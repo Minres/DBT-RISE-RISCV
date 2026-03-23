@@ -162,8 +162,6 @@ struct rv64gc: public arch_if {
 
 };
 
-struct rv64gc;
-
 template <> struct traits<rv64gc> {
 
     constexpr static char const* const core_type = "RV64GC";

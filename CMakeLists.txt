@@ -60,6 +60,7 @@ set(LIB_SOURCES
     src/iss/arch/rv32gc.cpp
     src/iss/arch/rv32gcv.cpp
     src/iss/arch/rv64i.cpp
+    src/iss/arch/rv64imac.cpp
     src/iss/arch/rv64gc.cpp
     src/iss/arch/rv64gcv.cpp
     src/iss/arch/tgc5c.cpp
@@ -70,6 +71,7 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv32gc.cpp
     src/vm/interp/vm_rv32gcv.cpp
     src/vm/interp/vm_rv64i.cpp
+    src/vm/interp/vm_rv64imac.cpp
     src/vm/interp/vm_rv64gc.cpp
     src/vm/interp/vm_rv64gcv.cpp
     src/iss/debugger/csr_names.cpp
@@ -102,6 +104,7 @@ if(WITH_ASMJIT)
         src/vm/asmjit/vm_rv32gc.cpp
         src/vm/asmjit/vm_rv32gcv.cpp
         src/vm/asmjit/vm_rv64i.cpp
+        src/vm/asmjit/vm_rv64imac.cpp
         src/vm/asmjit/vm_rv64gc.cpp
         src/vm/asmjit/vm_rv64gcv.cpp
     )

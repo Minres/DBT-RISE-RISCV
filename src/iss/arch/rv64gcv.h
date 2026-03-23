@@ -199,8 +199,6 @@ struct rv64gcv: public arch_if {
 
 };
 
-struct rv64gcv;
-
 template <> struct traits<rv64gcv> {
 
     constexpr static char const* const core_type = "RV64GCV";
@@ -335,7 +333,7 @@ template <> struct traits<rv64gcv> {
         FFLAG_MASK=31ULL, VLEN=512ULL, ELEN=64ULL, EEW_MAX=64ULL,
         FP_SEW_MIN=32ULL, FP_SEW_MAX=64ULL, VSTART_ADDR=8ULL, VXSAT_ADDR=9ULL,
         VXRM_ADDR=10ULL, VCSR_ADDR=15ULL, VL_ADDR=3104ULL, VTYPE_ADDR=3105ULL,
-        VLENB_ADDR=3106ULL, MISA_VAL=9223372036854780205ULL, MARCHID_VAL=0ULL, CLIC_NUM_IRQ=0ULL
+        VLENB_ADDR=3106ULL, MISA_VAL=9223372036856877357ULL, MARCHID_VAL=0ULL, CLIC_NUM_IRQ=0ULL
     };
 
     
