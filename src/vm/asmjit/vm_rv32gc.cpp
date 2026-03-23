@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
-
+ 
 // clang-format off
 #include <iss/arch/rv32gc.h>
 #include <iss/debugger/gdb_session.h>
@@ -5157,7 +5157,7 @@ private:
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                "{mnemonic:10} {rd}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.lwsp"),
                 fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
@@ -10106,8 +10106,8 @@ std::unique_ptr<vm_if> create<arch::rv32gc>(arch::rv32gc *core, unsigned short p
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {

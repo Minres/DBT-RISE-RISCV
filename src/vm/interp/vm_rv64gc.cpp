@@ -459,6 +459,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     auto& instr =  this->core.reg.instruction;
     // we fetch at max 4 byte, alignment is 2
     auto *const data = reinterpret_cast<uint8_t*>(&instr);
+    this->core.enable_disass(this->disass_enabled);
 
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
@@ -480,7 +481,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 inst_id = instr_descr[inst_index].op;
 
             // pre execution stuff
-             this->core.reg.last_branch = 0;
+            this->core.reg.last_branch = 0;
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, static_cast<unsigned>(inst_id));
             try{
                 switch(inst_id){
@@ -3978,8 +3979,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rd}, {rs2}", fmt::arg("mnemonic", "c.subw"),
-                            fmt::arg("rd", name(8+rd)), fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+                            "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.subw"),
+                            fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3999,8 +4000,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rd}, {rd}, {rs2}", fmt::arg("mnemonic", "c.addw"),
-                            fmt::arg("rd", name(8+rd)), fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
+                            "{mnemonic:10} {rd}, {rs2}", fmt::arg("mnemonic", "c.addw"),
+                            fmt::arg("rd", name(8+rd)), fmt::arg("rs2", name(8+rs2)));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers

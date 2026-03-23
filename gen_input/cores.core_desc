@@ -10,9 +10,7 @@ import "ISA/RVV/RVV.core_desc"
 Core RV32I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=32;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned <XLEN> MISA_VAL = 0b01000000000000000000000100000000;
+        unsigned <XLEN> MISA_VAL = 0x40000100;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -21,9 +19,7 @@ Core RV32I provides RVI, Zicsr, Zifencei {
 Core RV32IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
     architectural_state {
         XLEN=32;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100000101;
+        unsigned <XLEN> MISA_VAL = 0x40001105;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -33,9 +29,7 @@ Core RV32GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd, RVSMode {
     architectural_state {
         XLEN=32;
         FLEN=64;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100101101;
+        unsigned <XLEN> MISA_VAL = 0x4000112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -47,9 +41,7 @@ Core RV32GCV provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd, RVSMode, RV
         FLEN=64;
         VLEN=256;
         ELEN=32;
-        // definitions for the architecture wrapper
-        //                        XL    ZYXWVUTSRQPONMLKJIHGFEDCBA
-        unsigned <XLEN> MISA_VAL = 0b01000000000000000001000100101101;
+        unsigned <XLEN> MISA_VAL = 0x4020112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -58,8 +50,16 @@ Core RV32GCV provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcf, Zcd, RVSMode, RV
 Core RV64I provides RVI, Zicsr, Zifencei {
     architectural_state {
         XLEN=64;
-        // definitions for the architecture wrapper
-        unsigned <XLEN> MISA_VAL = 0x80000100;
+        unsigned <XLEN> MISA_VAL = 0x8000000000000100;
+        unsigned int MARCHID_VAL = 0x00000000;
+        unsigned int CLIC_NUM_IRQ = 0;
+    }
+}
+
+Core RV64IMAC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca {
+    architectural_state {
+        XLEN=64;
+        unsigned <XLEN> MISA_VAL = 0x8000000000001105;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
@@ -69,7 +69,6 @@ Core RV64GC provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd, RVSMode {
     architectural_state {
         XLEN=64;
         FLEN=64;
-        // definitions for the architecture wrapper
         unsigned <XLEN> MISA_VAL = 0x800000000000112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
@@ -82,13 +81,12 @@ Core RV64GCV provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd, RVSMode, RVVBase
         FLEN=64;
         VLEN=512;
         ELEN=64;
-        // definitions for the architecture wrapper
-        unsigned <XLEN> MISA_VAL = 0x800000000000112d;
+        unsigned <XLEN> MISA_VAL = 0x800000000020112d;
         unsigned int MARCHID_VAL = 0x00000000;
         unsigned int CLIC_NUM_IRQ = 0;
     }
 }
 
 /*
-for b in interp asmjit; do for i in RV32I RV32IMAC RV32IMACF RV32GC RV64I RV64GC; do ./build/TGC-GEN/scripts/generate_iss.sh -b $b -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done ; done
+for b in interp asmjit; do for i in RV32I RV32IMAC RV32GC RV32GCV RV64I RV64IMAC RV64GC RV64GCV; do ./build/TGC-GEN/scripts/generate_iss.sh -b $b -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done ; done
 */ 

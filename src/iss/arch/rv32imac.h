@@ -129,8 +129,6 @@ struct rv32imac: public arch_if {
 
 };
 
-struct rv32imac;
-
 template <> struct traits<rv32imac> {
 
     constexpr static char const* const core_type = "RV32IMAC";
