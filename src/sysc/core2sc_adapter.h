@@ -99,8 +99,7 @@ public:
             this->disass_func =
                 util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(this);
         else
-            this->disass_func =
-                util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::record_n_print_disass>(nullptr);
+            this->disass_func = util::delegate<void(uint64_t, std::string const&, bool)>::from<this_class, &this_class::no_disass>(this);
     }
 
     void set_clint_irq_count(size_t num) override { this->set_clint_irq_num(num); }
@@ -177,7 +176,7 @@ public:
             SCCINFO(owner->hier_name()) << "[disass] " << str;
         }
     };
-
+    void no_disass(uint64_t pc, std::string const& str, bool printpc) { return; };
     iss::mem::memory_if get_mem_if() {
         return iss::mem::memory_if{.rd_mem{util::delegate<iss::mem::rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
                                    .wr_mem{util::delegate<iss::mem::wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
