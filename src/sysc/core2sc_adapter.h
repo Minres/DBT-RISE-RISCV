@@ -321,7 +321,13 @@ private:
             this->csr[iss::arch::mip] &= ~mask;
         this->check_interrupt();
         if(value)
-            SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id << " Pending trap: " << this->reg.pending_trap;
+            SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id
+#ifndef NDEBUG
+                                         << " (Pending trap: " << std::hex << "0x"
+                                         << ((this->reg.pending_trap >> 16) & 0xff) // 0x80 << 24 | (cause << 16) | trap_id
+                                         << ")"
+#endif
+                ;
     }
 
     void _local_irq_mt(short id, bool value) {
