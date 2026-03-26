@@ -338,8 +338,8 @@ template <typename BASE, features_e FEAT> void riscv_hart_m_p<BASE, FEAT>::check
     bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
     auto enabled_interrupts = m_enabled ? ena_irq : 0;
-
-    if(enabled_interrupts != 0) {
+    this->reg.pending_trap = 0;
+    if(enabled_interrupts) {
         int res = 0;
         while((enabled_interrupts & 1) == 0) {
             enabled_interrupts >>= 1;
