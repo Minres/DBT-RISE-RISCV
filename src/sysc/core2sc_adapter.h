@@ -254,8 +254,12 @@ public:
     }
 
     void wait_until(uint64_t flags) {
-        SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
+        // check if WFI is allowed
         PLAT::wait_until(flags);
+        if(this->reg.trap_state)
+            return;
+        // now wait until something is happening
+        SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
             while((this->mip_csr & this->mie_csr) == 0) {
