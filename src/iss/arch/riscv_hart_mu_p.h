@@ -401,7 +401,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::chec
     bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
     auto enabled_interrupts = m_enabled ? ena_irq : 0;
-
+    this->reg.pending_trap = 0;
     if(enabled_interrupts != 0) {
         int res = 0;
         while((enabled_interrupts & 1) == 0) {
