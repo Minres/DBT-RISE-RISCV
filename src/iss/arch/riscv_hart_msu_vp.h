@@ -488,7 +488,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::ch
     bool mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || (this->reg.PRIV == PRIV_M && mie);
     auto enabled_interrupts = m_enabled ? ena_irq & ~ideleg : 0;
-
+    this->reg.pending_trap = 0;
     if(enabled_interrupts == 0) {
         auto sie = this->state.mstatus.SIE;
         auto s_enabled = this->reg.PRIV < PRIV_S || (this->reg.PRIV == PRIV_S && sie);
