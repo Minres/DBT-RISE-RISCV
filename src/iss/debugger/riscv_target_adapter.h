@@ -133,7 +133,7 @@ public:
 
 protected:
     static inline constexpr addr_t map_addr(const addr_t& i) { return i; }
-    std::string csr_xml;
+    std::string register_xml;
     iss::arch_if* core;
     rp_thread_ref thread_idx;
 };
@@ -420,7 +420,7 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
         {"uint8", "bytes", 8, 'b'},
     }};
 
-    if(!csr_xml.size()) {
+    if(!register_xml.size()) {
         std::ostringstream oss;
         oss << "<?xml version=\"1.0\"?><!DOCTYPE feature SYSTEM \"gdb-target.dtd\"><target version=\"1.0\">\n";
         if(iss::arch::traits<ARCH>::XLEN == 32)
@@ -468,23 +468,25 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::target_xml_query(std
             }
             oss << "  </feature>\n";
         }
-        oss << "  <feature name=\"org.gnu.gdb.riscv.csr\">\n";
-        std::vector<uint8_t> avail;
-        avail.resize(sizeof(typename iss::arch::traits<ARCH>::reg_t));
-        for(auto i = 0U; i < 4096; ++i) {
-            typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, iss::arch::traits<ARCH>::CSR, i);
-            std::fill(avail.begin(), avail.end(), 0xff);
-            auto res = core->read(a, data.size(), data.data());
-            if(res == iss::Ok) {
-                oss << "    <reg name=\"" << get_csr_name(i) << "\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN
-                    << "\"  type=\"int\" regnum=\"" << (i + csr_offset) << "\"/>\n";
+        if(this->srv->report_all_regs()) {
+            oss << "  <feature name=\"org.gnu.gdb.riscv.csr\">\n";
+            std::vector<uint8_t> avail;
+            avail.resize(sizeof(typename iss::arch::traits<ARCH>::reg_t));
+            for(auto i = 0U; i < 4096; ++i) {
+                typed_addr_t<iss::address_type::PHYSICAL> a(iss::access_type::DEBUG_READ, iss::arch::traits<ARCH>::CSR, i);
+                std::fill(avail.begin(), avail.end(), 0xff);
+                auto res = core->read(a, data.size(), data.data());
+                if(res == iss::Ok) {
+                    oss << "    <reg name=\"" << get_csr_name(i) << "\" bitsize=\"" << iss::arch::traits<ARCH>::XLEN
+                        << "\"  type=\"int\" regnum=\"" << (i + csr_offset) << "\"/>\n";
+                }
             }
+            oss << "  </feature>\n";
         }
-        oss << "  </feature>\n";
         oss << "</target>\n";
-        csr_xml = oss.str();
+        register_xml = oss.str();
     }
-    out_buf = csr_xml;
+    out_buf = register_xml;
     return Ok;
 }
 } // namespace debugger
