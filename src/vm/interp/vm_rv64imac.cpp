@@ -364,7 +364,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
             !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
         if(this->debugging_enabled())
-            this->tgt_adapter->check_continue(*PC);
+            this->tgt_adapter->check_break_on_pc(*PC);
         pc.val=*PC;
         if(fetch_ins(pc, data)!=iss::Ok){
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());

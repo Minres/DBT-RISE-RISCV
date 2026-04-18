@@ -34,6 +34,7 @@
 #define _ISS_ARCH_DEBUGGER_RISCV_TARGET_ADAPTER_H_
 
 #include "iss/arch_if.h"
+#include "iss/debugger/target_adapter_if.h"
 #include <iss/arch/traits.h>
 #include <iss/debugger/target_adapter_base.h>
 #include <iss/iss.h>
@@ -343,40 +344,51 @@ template <typename ARCH> status riscv_target_adapter<ARCH>::packetsize_query(std
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::add_break(break_type type, uint64_t addr, unsigned int length) {
+    auto f = [](riscv_target_adapter<ARCH>* self, util::range_lut<uint64_t>& lut, uint64_t addr, unsigned int length) {
+        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
+        auto eaddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr + length});
+        lut.addEntry(++self->bp_count, saddr.val, eaddr.val - saddr.val);
+        CPPLOG(TRACE) << "Adding breakpoint with handle " << self->bp_count << " for addr 0x" << std::hex << saddr.val << std::dec;
+        CPPLOG(TRACE) << "Now having " << self->bp_lut.size() + self->wr_lut.size() + self->rd_lut.size() << " breakpoints";
+        return Ok;
+    };
     switch(type) {
     default:
         return Err;
     case SW_EXEC:
-    case HW_EXEC: {
-        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
-        auto eaddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr + length});
-        target_adapter_base::bp_lut.addEntry(++target_adapter_base::bp_count, saddr.val, eaddr.val - saddr.val);
-        CPPLOG(TRACE) << "Adding breakpoint with handle " << target_adapter_base::bp_count << " for addr 0x" << std::hex << saddr.val
-                      << std::dec;
-        CPPLOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-        return Ok;
-    }
+    case HW_EXEC:
+        return f(this, this->bp_lut, addr, length);
+    case RD_WATCH:
+        return f(this, this->rd_lut, addr, length);
+    case WR_WATCH:
+        return f(this, this->wr_lut, addr, length);
     }
 }
 
 template <typename ARCH> status riscv_target_adapter<ARCH>::remove_break(break_type type, uint64_t addr, unsigned int length) {
+    auto f = [](riscv_target_adapter<ARCH>* self, util::range_lut<uint64_t>& lut, uint64_t addr, unsigned int length) {
+        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
+        unsigned handle = lut.getEntry(saddr.val);
+        if(handle) {
+            CPPLOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val << std::dec;
+            // TODO: check length of addr range
+            lut.removeEntry(handle);
+            CPPLOG(TRACE) << "Now having " << self->bp_lut.size() + self->wr_lut.size() + self->rd_lut.size() << " breakpoints";
+            return Ok;
+        }
+        CPPLOG(TRACE) << "Now having " << self->bp_lut.size() + self->wr_lut.size() + self->rd_lut.size() << " breakpoints";
+        return Err;
+    };
     switch(type) {
     default:
         return Err;
     case SW_EXEC:
-    case HW_EXEC: {
-        auto saddr = map_addr({iss::address_type::PHYSICAL, iss::access_type::FETCH, 0, addr});
-        unsigned handle = target_adapter_base::bp_lut.getEntry(saddr.val);
-        if(handle) {
-            CPPLOG(TRACE) << "Removing breakpoint with handle " << handle << " for addr 0x" << std::hex << saddr.val << std::dec;
-            // TODO: check length of addr range
-            target_adapter_base::bp_lut.removeEntry(handle);
-            CPPLOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-            return Ok;
-        }
-        CPPLOG(TRACE) << "Now having " << target_adapter_base::bp_lut.size() << " breakpoints";
-        return Err;
-    }
+    case HW_EXEC:
+        return f(this, this->bp_lut, addr, length);
+    case RD_WATCH:
+        return f(this, this->rd_lut, addr, length);
+    case WR_WATCH:
+        return f(this, this->wr_lut, addr, length);
     }
 }
 
