@@ -27,15 +27,12 @@ if(NOT TARGET dbt-rise-core)
     FetchContent_Declare(
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
-        GIT_TAG daa01b423360e7677a30d61f913cfa1bf09a1251
+        GIT_TAG 50635c29
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
     FetchContent_GetProperties(dbt_rise_core_git)
-    if(NOT dbt_rise_core_git_POPULATED)
-        FetchContent_Populate(dbt_rise_core_git)
-    endif()
-    add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
+    FetchContent_MakeAvailable(dbt_rise_core_git)
 endif()
 FetchContent_GetProperties(scc_git)
 list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
