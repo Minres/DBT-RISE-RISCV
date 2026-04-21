@@ -89,21 +89,8 @@ namespace {
 iss::debugger::encoder_decoder encdec;
 std::array<const char, 4> lvl = {{'U', 'S', 'H', 'M'}};
 
-inline bool is_within_dmi_range(uint64_t start, unsigned length, uint64_t inclusive_end) {
-    if(length == 0) {
-        return true;
-    }
-    if(start > inclusive_end) {
-        return false;
-    }
-    return static_cast<uint64_t>(length - 1) <= (inclusive_end - start);
-}
-
-inline bool is_invalidate_end_covered(uint64_t end, uint64_t inclusive_end) {
-    if(end <= inclusive_end) {
-        return true;
-    }
-    return inclusive_end != std::numeric_limits<uint64_t>::max() && end == (inclusive_end + 1);
+inline bool is_in_end_range(uint64_t end, uint64_t inclusive_range_end) {
+    return (end <= inclusive_range_end) || ((end >= 0) && ((end - 1) <= inclusive_range_end));
 }
 } // namespace
 
@@ -208,22 +195,20 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::i
     core_complex_if::exec_on_sysc = util::delegate<void(std::function<void(void)>&)>::from<this_class, &this_class::exec_on_sysc<QK>>(this);
     ibus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         auto lut_entry = fetch_lut.getEntry(start);
-        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_invalidate_end_covered(end, lut_entry.get_end_address())) {
+        if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_in_end_range(end, lut_entry.get_end_address())) {
             fetch_lut.removeEntry(lut_entry);
         }
     });
     dbus.register_invalidate_direct_mem_ptr([this](uint64_t start, uint64_t end) -> void {
         for(auto& read_lut : dmi_read_luts) {
             auto lut_entry = read_lut.getEntry(start);
-            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE &&
-               is_invalidate_end_covered(end, lut_entry.get_end_address())) {
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_in_end_range(end, lut_entry.get_end_address())) {
                 read_lut.removeEntry(lut_entry);
             }
         }
         for(auto& write_lut : dmi_write_luts) {
             auto lut_entry = write_lut.getEntry(start);
-            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE &&
-               is_invalidate_end_covered(end, lut_entry.get_end_address())) {
+            if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_in_end_range(end, lut_entry.get_end_address())) {
                 write_lut.removeEntry(lut_entry);
             }
         }
@@ -415,8 +400,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
     bool is_fetch = addr.space == std::numeric_limits<decltype(addr.space)>::max() ? true : false;
     auto& dmi_lut = is_fetch ? fetch_lut : get_read_lut(addr.space);
     auto lut_entry = dmi_lut.getEntry(addr.val);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE &&
-       is_within_dmi_range(addr.val, length, lut_entry.get_end_address())) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_in_end_range(addr.val + length, lut_entry.get_end_address())) {
         auto offset = addr.val - lut_entry.get_start_address();
         std::copy(lut_entry.get_dmi_ptr() + offset, lut_entry.get_dmi_ptr() + offset + length, data);
         if(is_fetch)
@@ -470,7 +454,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
             if(exec_get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_read_allowed() && is_within_dmi_range(addr.val, length, dmi_data.get_end_address()))
+                if(dmi_data.is_read_allowed() && is_in_end_range(addr.val + length, dmi_data.get_end_address()))
                     dmi_lut.addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
         }
@@ -481,8 +465,7 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
 template <unsigned int BUSWIDTH, typename QK>
 bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, const uint8_t* const data) {
     auto lut_entry = get_write_lut(addr.space).getEntry(addr.val);
-    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE &&
-       is_within_dmi_range(addr.val, length, lut_entry.get_end_address())) {
+    if(lut_entry.get_granted_access() != tlm::tlm_dmi::DMI_ACCESS_NONE && is_in_end_range(addr.val + length, lut_entry.get_end_address())) {
         auto offset = addr.val - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
@@ -529,7 +512,7 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
             gp.set_address(addr.val);
             tlm_dmi_ext dmi_data;
             if(exec_get_direct_mem_ptr(gp, dmi_data)) {
-                if(dmi_data.is_write_allowed() && is_within_dmi_range(addr.val, length, dmi_data.get_end_address()))
+                if(dmi_data.is_write_allowed() && is_in_end_range(addr.val + length, dmi_data.get_end_address()))
                     get_write_lut(addr.space)
                         .addEntry(dmi_data, dmi_data.get_start_address(), dmi_data.get_end_address() - dmi_data.get_start_address() + 1);
             }
