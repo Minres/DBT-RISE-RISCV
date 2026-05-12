@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.hpp'
+      - '**.cpp'
+      - '**.h'
+      - '**.c'
+      - '**.S'
+      - '**CMakeLists.txt'
+      - '.github/workflows/**'
+      - 'conanfile.py'
+  pull_request:
+    paths:
+      - '**.hpp'
+      - '**.cpp'
+      - '**.h'
+      - '**.c'
+      - '**.S'
+      - '**CMakeLists.txt'
+      - '.github/workflows/**'
+      - 'conanfile.py'
+
+jobs:
+  cpp-compliance:
+    name: C++ Std Compliance (C++${{ matrix.cpp_std }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        cpp_std: [17, 20]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Cache Conan
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-unit-cpp${{ matrix.cpp_std }}-${{ hashFiles('conanfile.py') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y g++ python3-pip cmake llvm-19-dev
+          pip3 install conan
+          cmake --version
+
+      - name: Configure
+        run: cmake --preset Release -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} -DWITH_LLVM=ON -DWITH_SYSTEM_LLVM=ON
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Smoke test
+        run: ./build/riscv-sim -h
+
+      # NOTE: .so filename is tied to VERSION in top-level CMakeLists.txt - update both together
+      - name: Upload binary
+        if: matrix.cpp_std == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-sim
+          path: |
+            build/riscv-sim
+            build/libdbt-rise-riscv.so.2.1.0
+
+  pmp-tests:
+    name: PMP Functional Tests
+    runs-on: ubuntu-24.04
+    needs: cpp-compliance
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RISC-V toolchain
+        run: sudo apt-get install -y gcc-riscv64-unknown-elf
+
+      - name: Download riscv-sim binary
+        uses: actions/download-artifact@v4
+        with:
+          name: riscv-sim
+
+      - name: Make binary executable
+        run: chmod +x riscv-sim
+
+      - name: Build PMP CSR test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_csr_test \
+            contrib/fw/pmp-csr-test/pmp_csr_test.S
+
+      - name: rv64gc_m CSR test - interp (no PMP, expect exit 2)
+        run: |
+          LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_m --backend interp || rc=$?
+          [ "${rc:-0}" -eq 2 ]
+
+      - name: rv64gc_mp CSR test - interp (with PMP)
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_mp --backend interp
