@@ -124,14 +124,14 @@ private:
 
     iss::status read_pmpcfg(unsigned addr, reg_t& val) {
         if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
-            val = pmpaddr[addr - arch::pmpcfg0];
+            val = pmpcfg[addr - arch::pmpcfg0];
             return iss::Ok;
         }
         return iss::Err;
     }
     iss::status write_pmpcfg(unsigned addr, reg_t val) {
         if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
-            pmpaddr[addr - arch::pmpcfg0] = val & 0x9f9f9f9f;
+            pmpcfg[addr - arch::pmpcfg0] = val & 0x9f9f9f9f;
             any_active = false;
             for(size_t i = 0; i < 16; i++) {
                 auto cfg = pmpcfg[i / cfg_reg_size] >> (i % cfg_reg_size);
