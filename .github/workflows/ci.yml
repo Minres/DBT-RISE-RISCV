@@ -99,3 +99,13 @@ jobs:
 
       - name: rv64gc_mp CSR test - interp (with PMP)
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP enforcement test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_enforce_test \
+            contrib/fw/pmp-enforce-test/pmp_enforce_test.S
+
+      - name: rv64gc_mp enforcement test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp --backend interp

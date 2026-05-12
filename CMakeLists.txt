@@ -87,6 +87,7 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv64i.cpp
     src/vm/interp/vm_rv64imac.cpp
     src/vm/interp/vm_rv64gc.cpp
+    src/vm/interp/vm_rv64gc_mp.cpp
     src/vm/interp/vm_rv64gcv.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
