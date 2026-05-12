@@ -1,6 +1,7 @@
 name: CI C++ Std compliance
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - '**.hpp'
@@ -22,7 +23,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         cpp_std: [17, 20]
@@ -40,16 +41,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y g++ python3-pip cmake
+          sudo apt-get install -y g++ python3-pip cmake llvm-19-dev gcc-riscv64-unknown-elf
           pip3 install conan
           cmake --version
 
       - name: Configure
-        run: WITH_LLVM=1 cmake --preset Release -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} -DWITH_LLVM=ON
+        run: cmake --preset Release -B build -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} -DWITH_LLVM=ON -DWITH_SYSTEM_LLVM=ON -DBUILD_TESTING=ON
 
       - name: Build
-        run: WITH_LLVM=1 cmake --build build -j
+        run: cmake --build build -j
 
       - name: Run smoke test
         run: ./build/riscv-sim -h
