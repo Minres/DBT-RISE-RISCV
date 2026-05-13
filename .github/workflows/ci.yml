@@ -109,3 +109,13 @@ jobs:
 
       - name: rv64gc_mp enforcement test - interp
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP shift test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_shift_test \
+            contrib/fw/pmp-shift-test/pmp_shift_test.S
+
+      - name: rv64gc_mp shift test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_shift_test --isa rv64gc_mp --backend interp
