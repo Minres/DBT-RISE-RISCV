@@ -49,6 +49,7 @@ template <typename PLAT> struct pmp : public memory_elem {
     using reg_t = typename PLAT::reg_t;
     static constexpr auto cfg_reg_size = sizeof(reg_t);
     static constexpr reg_t cfg_valid_mask = sizeof(reg_t) == 8 ? reg_t(0x9f9f9f9f9f9f9f9fULL) : reg_t(0x9f9f9f9fU);
+    static constexpr size_t pmpcfg_stride = cfg_reg_size / 4; // 1 for RV32, 2 for RV64
     static constexpr auto PMP_SHIFT = 2U;
     static constexpr auto PMP_R = 0x1U;
     static constexpr auto PMP_W = 0x2U;
@@ -65,7 +66,7 @@ template <typename PLAT> struct pmp : public memory_elem {
             hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_pmpaddr);
             hart_if.csr_wr_cb[i] = MK_CSR_WR_CB(write_pmpaddr);
         }
-        for(size_t i = arch::pmpcfg0; i < arch::pmpcfg0 + 16 / sizeof(reg_t); ++i) {
+        for(size_t i = arch::pmpcfg0; i < arch::pmpcfg0 + 4; i += pmpcfg_stride) {
             hart_if.csr_rd_cb[i] = MK_CSR_RD_CB(read_pmpcfg);
             hart_if.csr_wr_cb[i] = MK_CSR_WR_CB(write_pmpcfg);
         }
@@ -124,15 +125,15 @@ private:
     }
 
     iss::status read_pmpcfg(unsigned addr, reg_t& val) {
-        if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
-            val = pmpcfg[addr - arch::pmpcfg0];
+        if(addr >= arch::pmpcfg0 && addr < arch::pmpcfg0 + 4) {
+            val = pmpcfg[(addr - arch::pmpcfg0) / pmpcfg_stride];
             return iss::Ok;
         }
         return iss::Err;
     }
     iss::status write_pmpcfg(unsigned addr, reg_t val) {
-        if(addr >= arch::pmpcfg0 && addr < (arch::pmpcfg0 + 16 / sizeof(reg_t))) {
-            pmpcfg[addr - arch::pmpcfg0] = val & cfg_valid_mask;
+        if(addr >= arch::pmpcfg0 && addr < arch::pmpcfg0 + 4) {
+            pmpcfg[(addr - arch::pmpcfg0) / pmpcfg_stride] = val & cfg_valid_mask;
             any_active = false;
             for(size_t i = 0; i < 16; i++) {
                 auto cfg = pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8);
