@@ -119,3 +119,13 @@ jobs:
 
       - name: rv64gc_mp shift test - interp
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_shift_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP upper-cfg test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_upper_cfg_test \
+            contrib/fw/pmp-upper-cfg-test/pmp_upper_cfg_test.S
+
+      - name: rv64gc_mp upper-cfg test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_upper_cfg_test --isa rv64gc_mp --backend interp
