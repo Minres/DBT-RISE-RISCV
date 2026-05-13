@@ -134,7 +134,7 @@ private:
             pmpcfg[addr - arch::pmpcfg0] = val & 0x9f9f9f9f;
             any_active = false;
             for(size_t i = 0; i < 16; i++) {
-                auto cfg = pmpcfg[i / cfg_reg_size] >> (i % cfg_reg_size);
+                auto cfg = pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8);
                 any_active |= cfg & PMP_A;
             }
             return iss::Ok;
@@ -156,7 +156,7 @@ template <typename PLAT> bool pmp<PLAT>::pmp_check(access_type type, uint64_t ad
     reg_t base = 0;
     for(size_t i = 0; i < 16; i++) {
         reg_t tor = pmpaddr[i] << PMP_SHIFT;
-        reg_t cfg = pmpcfg[i / cfg_reg_size] >> (i % cfg_reg_size);
+        reg_t cfg = pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8);
         if(cfg & PMP_A) {
             auto pmp_a = (cfg & PMP_A) >> 3;
             auto is_tor = pmp_a == PMP_TOR;
