@@ -139,3 +139,13 @@ jobs:
 
       - name: rv64gc_mp cfg2 test - interp
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_cfg2_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP TOR test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_tor_test \
+            contrib/fw/pmp-tor-test/pmp_tor_test.S
+
+      - name: rv64gc_mp TOR test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_tor_test --isa rv64gc_mp --backend interp
