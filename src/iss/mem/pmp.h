@@ -171,7 +171,7 @@ template <typename PLAT> bool pmp<PLAT>::pmp_check(access_type type, uint64_t ad
             for(reg_t offset = 0; offset < len; offset += 1 << PMP_SHIFT) {
                 reg_t cur_addr = addr + offset;
                 auto napot_match = ((cur_addr ^ tor) & mask) == 0;
-                auto tor_match = base <= (cur_addr + len - 1) && cur_addr < tor;
+                auto tor_match = base <= cur_addr && cur_addr < tor;
                 auto match = is_tor ? tor_match : napot_match;
                 any_match |= match;
                 all_match &= match;
