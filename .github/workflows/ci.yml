@@ -149,3 +149,33 @@ jobs:
 
       - name: rv64gc_mp TOR test - interp
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_tor_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP 64-entry pmpaddr test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_64entry_addr_test \
+            contrib/fw/pmp-64entry-addr-test/pmp_64entry_addr_test.S
+
+      - name: rv64gc_mp 64-entry pmpaddr test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_addr_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP 64-entry pmpcfg test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_64entry_cfg_test \
+            contrib/fw/pmp-64entry-cfg-test/pmp_64entry_cfg_test.S
+
+      - name: rv64gc_mp 64-entry pmpcfg test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_cfg_test --isa rv64gc_mp --backend interp
+
+      - name: Build PMP 8-entry guard test firmware (VP/S5 model)
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_8entry_guard_test \
+            contrib/fw/pmp-8entry-guard-test/pmp_8entry_guard_test.S
+
+      - name: rv64gc_mp_8 8-entry enforcement test - interp (VP/S5 model)
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_8entry_guard_test --isa rv64gc_mp_8 --backend interp
