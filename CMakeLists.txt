@@ -264,7 +264,7 @@ endif()
 ###############################################################################
 if(TARGET scc-sysc)
     project(dbt-rise-riscv_sc VERSION 1.0.0)
-    set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of ssc_signals for interrupt delivery")
+    set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of sc_signals for interrupt delivery")
 
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
@@ -280,7 +280,6 @@ if(TARGET scc-sysc)
     set(LIB_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/sysc/core_complex.h)
 
     add_library(${PROJECT_NAME}_sig ${LIB_SOURCES})
-    target_compile_definitions(${PROJECT_NAME}_sig PUBLIC SC_SIGNAL_IF)
     target_compile_definitions(${PROJECT_NAME}_sig PUBLIC WITH_SYSTEMC SC_SIGNAL_IF)
     target_link_libraries(${PROJECT_NAME}_sig PUBLIC dbt-rise-riscv scc-sysc)
 
