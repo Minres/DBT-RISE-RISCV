@@ -1,4 +1,4 @@
-[![CI C++ Std compliance](https://github.com/Minres/DBT-RISE-RISCV/actions/workflows/ci-compile.yml/badge.svg)](https://github.com/Minres/DBT-RISE-RISCV/actions/workflows/ci-compile.yml)
+[![CI](https://github.com/Minres/DBT-RISE-RISCV/actions/workflows/ci.yml/badge.svg)](https://github.com/Minres/DBT-RISE-RISCV/actions/workflows/ci.yml)
 
 # DBT-RISE-RISCV
 A instruction set simulator based on DBT-RISE implementing the RISC-V ISA.
