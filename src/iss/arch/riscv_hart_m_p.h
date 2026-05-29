@@ -310,7 +310,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
-    if(UNLIKELY(addr == mieh)) {
+    if(unlikely(addr == mieh)) {
         val = this->mie_csr >> 32;
         return iss::Ok;
     }
@@ -320,7 +320,9 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
-    uint64_t lval = addr == mieh ? val << 32 : val;
+    uint64_t lval = val;
+    if(addr == mieh)
+        lval <<= 32;
     // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
     auto mask = riscv_hart_common<BASE>::get_irq_mask(3) & this->clint_custom_irq_mask & ~0x777ULL;
     this->mie_csr = (this->mie_csr & ~mask) | (lval & mask);
@@ -329,7 +331,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
-    if(UNLIKELY(addr == miph)) {
+    if(unlikely(addr == miph)) {
         val = this->mip_csr >> 32;
         return iss::Ok;
     }
