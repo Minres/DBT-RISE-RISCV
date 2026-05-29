@@ -185,6 +185,15 @@ riscv_hart_msu_vp<BASE, FEAT>::riscv_hart_msu_vp()
     if(FEAT & FEAT_DEBUG)
         this->add_debug_csrs();
 
+    if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
+        this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_plain);
+        this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
+        this->csr_wr_cb[mieh] = MK_CSR_WR_CB(write_ie);
+        this->csr_rd_cb[midelegh] = MK_CSR_RD_CB(read_plain);
+        this->csr_wr_cb[midelegh] = MK_CSR_WR_CB(write_ideleg);
+    }
+
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     this->set_next(mmu.get_mem_if());
@@ -407,11 +416,25 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FE
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
-    val = this->csr[mie];
-    if(addr < mie)
-        val &= this->csr[mideleg];
-    if(addr < sie)
-        val &= this->csr[sideleg];
+    val = this->mie_csr;
+    if(addr == mie) {
+        val &= this->mie_csr;
+        return iss::Ok;
+    }
+    if(addr == sie) {
+        val &= this->sie_csr;
+        return iss::Ok;
+    }
+    if((FEAT & FEAT_AIA) && traits<BASE>::XLEN == 32) {
+        if(addr == mieh) {
+            val &= this->mie_csr >> 32;
+            return iss::Ok;
+        }
+        if(addr == sieh) {
+            val &= this->sie_csr >> 32;
+            return iss::Ok;
+        }
+    }
     return iss::Ok;
 }
 
@@ -423,17 +446,17 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FE
         mask &= ~0x444ULL; // clear H mode bits
     else
         mask &= ~0x555ULL; // clear H & U mode bits
-    this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
+    this->mie_csr = (this->mie_csr & ~mask) | (val & mask);
     check_interrupt();
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
-    val = this->csr[mip];
-    if(addr < mip)
-        val &= this->csr[mideleg];
-    if(addr < sip)
-        val &= this->csr[sideleg];
+    val = this->mip_csr;
+    if(addr == mideleg)
+        val &= this->mideleg_csr;
+    if(addr == sideleg)
+        val &= this->sideleg_csr;
     return iss::Ok;
 }
 
@@ -476,8 +499,8 @@ template <typename BASE, features_e FEAT> inline void riscv_hart_msu_vp<BASE, FE
 
 template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::check_interrupt() {
     auto status = this->state.mstatus;
-    auto ip = this->csr[mip];
-    auto ie = this->csr[mie];
+    auto ip = this->mip_csr;
+    auto ie = this->mie_csr;
     auto ideleg = this->csr[mideleg];
     // Multiple simultaneous interrupts and traps at the same privilege level are
     // handled in the following decreasing priority order:
