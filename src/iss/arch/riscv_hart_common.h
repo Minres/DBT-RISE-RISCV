@@ -1082,6 +1082,7 @@ protected:
     uint64_t mideleg_csr{0};
     uint64_t sie_csr{0};
     uint64_t sip_csr{0};
+    uint64_t sideleg_csr{0};
     reg_t fault_data;
 
     int64_t cycle_offset{0};
