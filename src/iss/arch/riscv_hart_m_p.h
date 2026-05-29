@@ -114,6 +114,12 @@ riscv_hart_m_p<BASE, FEAT>::riscv_hart_m_p()
     if(FEAT & FEAT_DEBUG)
         this->add_debug_csrs();
 
+    if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
+        this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_plain);
+        this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
+        this->csr_wr_cb[mieh] = MK_CSR_WR_CB(write_ie);
+    }
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
     this->memories.root(*this);
@@ -304,22 +310,31 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
+    if(UNLIKELY(addr == mieh)) {
+        val = this->mie_csr >> 32;
+        return iss::Ok;
+    }
     auto mask = riscv_hart_common<BASE>::get_irq_mask(3);
-    val = this->csr[mie] & mask;
+    val = this->mie_csr & mask;
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
+    uint64_t lval = addr == mieh ? val << 32 : val;
     // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
     auto mask = riscv_hart_common<BASE>::get_irq_mask(3) & this->clint_custom_irq_mask & ~0x777ULL;
-    this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
+    this->mie_csr = (this->mie_csr & ~mask) | (lval & mask);
     check_interrupt();
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_m_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
+    if(UNLIKELY(addr == miph)) {
+        val = this->mip_csr >> 32;
+        return iss::Ok;
+    }
     auto mask = riscv_hart_common<BASE>::get_irq_mask(3);
-    val = this->csr[mip] & mask;
+    val = this->mip_csr & mask;
     return iss::Ok;
 }
 
@@ -333,7 +348,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_m_p<BASE, FEAT>::check
     // handled in the following decreasing priority order:
     // external interrupts, software interrupts, timer interrupts, then finally
     // any synchronous traps.
-    auto ena_irq = this->csr[mip] & this->csr[mie];
+    auto ena_irq = this->mip_csr & this->mie_csr;
 
     bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;
