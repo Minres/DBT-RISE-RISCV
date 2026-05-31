@@ -656,15 +656,12 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
     }
 
-    constexpr uint64_t get_irq_mask(size_t mode) {
-        std::array<const uint64_t, 4> m = {{
-            (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b000100010001U, // U mode
-            (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b001100110011U, // S mode
-            (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b011101110111U, // H mode
-            (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b111111111111U  // M mode
-        }};
-        return m[mode];
-    }
+    std::array<const uint64_t, 4> mie_mip_mask = {{
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b000100010001U, // U mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b001100110011U, // S mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b011101110111U, // H mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b111111111111U  // M mode
+    }};
 
     iss::status read_csr(unsigned addr, reg_t& val) {
         if(addr >= csr.size()) {
@@ -1089,7 +1086,7 @@ protected:
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
     unsigned mcause_max_irq{traits<BASE>::XLEN};
-    reg_t clint_custom_irq_mask{0xffff};
+    uint64_t clint_custom_irq_mask{0xffff};
 };
 
 } // namespace arch
