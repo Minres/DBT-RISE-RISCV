@@ -1052,6 +1052,7 @@ protected:
 
         std::unordered_map<std::string, uint64_t> const& get_symbol_table(std::string name) override { return arch.symbol_table; }
 
+        unsigned get_core_id() override { return arch.mhartid_reg; };
         riscv_hart_common<BASE>& arch;
     };
 
