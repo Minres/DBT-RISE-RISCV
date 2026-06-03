@@ -258,7 +258,7 @@ public:
         PLAT::wait_until(flags);
         wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
-            while((this->csr[iss::arch::mip] & this->csr[iss::arch::mie]) == 0) {
+            while((this->mip_csr & this->mie_csr) == 0) {
                 sc_core::wait(this->wfi_evt | this->debugger_stop_evt);
                 bool is_debugger_stop_evt = this->debugger_stop_evt.triggered();
                 if(is_debugger_stop_evt)
@@ -311,14 +311,18 @@ private:
     }
 
     void _local_irq(short id, bool value) {
-        reg_t mask = 0;
-        assert(id < 32 && "CLINT cannot handle more than 32 irq");
+        uint64_t mask = 0;
+        if(sizeof(reg_t) == 4) {
+            assert(id < 32 && "CLINT cannot handle more than 32 irq");
+        } else {
+            assert(id < 64 && "CLINT cannot handle more than 64 irq");
+        }
         mask = 1 << id;
         if(value) {
-            this->csr[iss::arch::mip] |= mask;
+            this->mip_csr |= mask;
             wfi_evt.notify();
         } else
-            this->csr[iss::arch::mip] &= ~mask;
+            this->mip_csr &= ~mask;
         this->check_interrupt();
         if(value)
             SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id

@@ -39,6 +39,7 @@
 #include "iss/vm_if.h"
 #include "iss/vm_types.h"
 #include "riscv_hart_common.h"
+#include "util/ities.h"
 #include "util/logging.h"
 #include <algorithm>
 #include <array>
@@ -103,6 +104,7 @@ protected:
     iss::status read_ie(unsigned addr, reg_t& val);
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
+    iss::status write_ip(unsigned addr, reg_t val);
     iss::status write_ideleg(unsigned addr, reg_t val);
     iss::status write_edeleg(unsigned addr, uint32_t val);
     iss::status write_edeleg(unsigned addr, uint64_t val);
@@ -117,7 +119,7 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
     this->csr_rd_cb[mstatus] = MK_CSR_RD_CB(read_status);
     this->csr_wr_cb[mstatus] = MK_CSR_WR_CB(write_status);
     this->csr_rd_cb[mip] = MK_CSR_RD_CB(read_ip);
-    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_plain);
+    this->csr_wr_cb[mip] = MK_CSR_WR_CB(write_ip);
     this->csr_rd_cb[mie] = MK_CSR_RD_CB(read_ie);
     this->csr_wr_cb[mie] = MK_CSR_WR_CB(write_ie);
     this->csr_rd_cb[mcounteren] = MK_CSR_RD_CB(read_null);
@@ -148,6 +150,17 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
     }
     if(FEAT & FEAT_DEBUG)
         this->add_debug_csrs();
+
+    if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
+        this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_ip);
+        this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
+        this->csr_wr_cb[mieh] = MK_CSR_WR_CB(write_ie);
+        if(FEAT & FEAT_EXT_N) {
+            this->csr_rd_cb[midelegh] = MK_CSR_RD_CB(read_plain);
+            this->csr_wr_cb[midelegh] = MK_CSR_WR_CB(write_ideleg);
+        }
+    }
 
     this->rd_func = util::delegate<arch_if::rd_func_sig>::from<this_class, &this_class::read>(this);
     this->wr_func = util::delegate<arch_if::wr_func_sig>::from<this_class, &this_class::write>(this);
@@ -340,34 +353,74 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ie(unsigned addr, reg_t& val) {
-    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
-    val = this->csr[mie] & mask;
-    return iss::Ok;
-}
-
-template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
-    // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
-    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3) & FEAT & FEAT_EXT_N;
-    mask &= this->clint_custom_irq_mask;
+    auto mask = this->mie_mip_mask[(addr >> 8) & 0x3];
     if(FEAT & FEAT_EXT_N)
         mask &= ~0x666ULL; // clear H & S mode bits
     else
         mask &= ~0x777ULL; // clear H, S & U mode bits
-    this->csr[mie] = (this->csr[mie] & ~mask) | (val & mask);
+    if(unlikely(addr == mieh))
+        val = (this->mie_csr & mask) >> 32;
+    else
+        val = this->mie_csr & mask;
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ie(unsigned addr, reg_t val) {
+    uint64_t lval = val;
+    if(addr == mieh) {
+        lval <<= 32;
+        lval |= static_cast<uint32_t>(this->mie_csr);
+    } else if(sizeof(reg_t) == 4)
+        lval |= this->mie_csr & ~static_cast<uint64_t>(std::numeric_limits<reg_t>::max());
+    // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
+    auto mask = this->mie_mip_mask[(addr >> 8) & 0x3] & this->clint_custom_irq_mask;
+    if(FEAT & FEAT_EXT_N)
+        mask &= ~0x666ULL; // clear H & S mode bits
+    else
+        mask &= ~0x777ULL; // clear H, S & U mode bits
+    this->mie_csr = (this->mie_csr & ~mask) | (lval & mask);
     check_interrupt();
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ip(unsigned addr, reg_t& val) {
-    auto mask = riscv_hart_common<BASE>::get_irq_mask((addr >> 8) & 0x3);
-    val = this->csr[mip] & mask;
+    auto mask = this->mie_mip_mask[(addr >> 8) & 0x3];
+    if(FEAT & FEAT_EXT_N)
+        mask &= ~0x666ULL; // clear H & S mode bits
+    else
+        mask &= ~0x777ULL; // clear H, S & U mode bits
+    if(unlikely(addr == miph))
+        val = (this->mip_csr & mask) >> 32;
+    else
+        val = this->mip_csr & mask;
+    return iss::Ok;
+}
+
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ip(unsigned addr, reg_t val) {
+    uint64_t lval = val;
+    if(addr == mieh) {
+        lval <<= 32;
+        lval |= static_cast<uint32_t>(this->mip_csr);
+    } else if(sizeof(reg_t) == 4)
+        lval |= this->mip_csr & ~static_cast<uint64_t>(std::numeric_limits<reg_t>::max());
+    // generate mask from allowed writable bits, the number of custom interrupts and the available ie bits
+    auto mask = this->mie_mip_mask[(addr >> 8) & 0x3] & this->clint_custom_irq_mask;
+    if(FEAT & FEAT_EXT_N)
+        mask &= ~0x666ULL; // clear H & S mode bits
+    else
+        mask &= ~0x777ULL; // clear H, S & U mode bits
+    this->mip_csr = (this->mip_csr & ~mask) | (lval & mask);
+    check_interrupt();
     return iss::Ok;
 }
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ideleg(unsigned addr, reg_t val) {
-    // only U and S mode interrupts can be delegated
-    auto mask = 0b0001'0001'0001;
-    this->csr[mideleg] = (this->csr[mideleg] & ~mask) | (val & mask);
+    uint64_t lval = val;
+    if(addr == midelegh)
+        lval <<= 32;
+    // only U mode interrupts can be delegated
+    auto mask = 0xffff'0111ul;
+    this->mideleg_csr = (this->mideleg_csr & ~mask) | (lval & mask);
     return iss::Ok;
 }
 
@@ -396,7 +449,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::chec
     // handled in the following decreasing priority order:
     // external interrupts, software interrupts, timer interrupts, then finally
     // any synchronous traps.
-    auto ena_irq = this->csr[mip] & this->csr[mie];
+    auto ena_irq = this->mip_csr & this->mie_csr;
 
     bool mstatus_mie = this->state.mstatus.MIE;
     auto m_enabled = this->reg.PRIV < PRIV_M || mstatus_mie;

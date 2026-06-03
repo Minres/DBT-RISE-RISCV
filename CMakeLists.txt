@@ -22,20 +22,34 @@ if(OPTIMIZE_FOR_NATIVE AND COMPILER_SUPPORTS_MARCH_NATIVE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
+option(WITH_SYSTEM_LLVM "Use system-installed LLVM (llvm-dev from apt) instead of Conan-built" OFF)
+set(LLVM_MAJOR_VERSION "19" CACHE STRING "System LLVM major version when WITH_SYSTEM_LLVM=ON")
+if(WITH_SYSTEM_LLVM)
+    set(LLVM_DIR "/usr/lib/llvm-${LLVM_MAJOR_VERSION}/lib/cmake/llvm" CACHE PATH "" FORCE)
+    find_package(LLVM REQUIRED CONFIG BYPASS_PROVIDER)
+    message(STATUS "Found system LLVM ${LLVM_VERSION}")
+    if(NOT TARGET llvm-core::llvm-core)
+        add_library(llvm-core::llvm-core INTERFACE IMPORTED GLOBAL)
+        target_include_directories(llvm-core::llvm-core INTERFACE ${LLVM_INCLUDE_DIRS})
+        target_compile_definitions(llvm-core::llvm-core INTERFACE ${LLVM_DEFINITIONS})
+        target_link_libraries(llvm-core::llvm-core INTERFACE LLVM-${LLVM_VERSION_MAJOR})
+    endif()
+    if(NOT WITH_LLVM)
+        set(WITH_LLVM ON CACHE BOOL "Build LLVM backend" FORCE)
+    endif()
+endif()
+
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
     FetchContent_Declare(
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
-        GIT_TAG daa01b423360e7677a30d61f913cfa1bf09a1251
+        GIT_TAG 9b571ff9
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
     FetchContent_GetProperties(dbt_rise_core_git)
-    if(NOT dbt_rise_core_git_POPULATED)
-        FetchContent_Populate(dbt_rise_core_git)
-    endif()
-    add_subdirectory(${dbt_rise_core_git_SOURCE_DIR} ${dbt_rise_core_git_BINARY_DIR})
+    FetchContent_MakeAvailable(dbt_rise_core_git)
 endif()
 FetchContent_GetProperties(scc_git)
 list(APPEND CMAKE_MODULE_PATH ${scc_git_SOURCE_DIR}/cmake)
@@ -73,6 +87,7 @@ set(LIB_SOURCES
     src/vm/interp/vm_rv64i.cpp
     src/vm/interp/vm_rv64imac.cpp
     src/vm/interp/vm_rv64gc.cpp
+    src/vm/interp/vm_rv64gc_mp.cpp
     src/vm/interp/vm_rv64gcv.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
@@ -249,7 +264,7 @@ endif()
 ###############################################################################
 if(TARGET scc-sysc)
     project(dbt-rise-riscv_sc VERSION 1.0.0)
-    set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of ssc_signals for interrupt delivery")
+    set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of sc_signals for interrupt delivery")
 
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
@@ -265,7 +280,6 @@ if(TARGET scc-sysc)
     set(LIB_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/sysc/core_complex.h)
 
     add_library(${PROJECT_NAME}_sig ${LIB_SOURCES})
-    target_compile_definitions(${PROJECT_NAME}_sig PUBLIC SC_SIGNAL_IF)
     target_compile_definitions(${PROJECT_NAME}_sig PUBLIC WITH_SYSTEMC SC_SIGNAL_IF)
     target_link_libraries(${PROJECT_NAME}_sig PUBLIC dbt-rise-riscv scc-sysc)
 

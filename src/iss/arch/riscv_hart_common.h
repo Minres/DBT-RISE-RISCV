@@ -60,7 +60,7 @@
 namespace iss {
 namespace arch {
 
-enum features_e { FEAT_NONE, FEAT_EXT_N = 1, FEAT_DEBUG = 2 };
+enum features_e { FEAT_NONE, FEAT_EXT_N = 1, FEAT_DEBUG = 2, FEAT_AIA = 4 };
 enum extension_encoding {
     A = 1UL << 0,
     B = 1UL << 1,
@@ -135,12 +135,14 @@ enum riscv_csr {
     sie = 0x104,
     stvec = 0x105,
     scounteren = 0x106,
+    sieh = 0x114,
     // Supervisor Trap Handling
     sscratch = 0x140,
     sepc = 0x141,
     scause = 0x142,
     stval = 0x143,
     sip = 0x144,
+    siph = 0x154,
     // Supervisor Protection and Translation
     satp = 0x180,
     /* machine-level CSR */
@@ -154,18 +156,24 @@ enum riscv_csr {
     misa = 0x301,
     medeleg = 0x302,
     mideleg = 0x303,
+    midelegh = 0x313, // AIA defined
     mie = 0x304,
+    mieh = 0x314, // AIA defined
     mtvec = 0x305,
     mcounteren = 0x306,
     mtvt = 0x307, // CLIC
     mstatush = 0x310,
     medelegh = 0x312,
+    // AIA defined
+    mvienh = 0x318,
+    mviph = 0x319,
     // Machine Trap Handling
     mscratch = 0x340,
     mepc = 0x341,
     mcause = 0x342,
     mtval = 0x343,
     mip = 0x344,
+    miph = 0x354,         // AIA defined
     mxnti = 0x345,        // CLIC
     mintstatus = 0xFB1,   // MRW Current interrupt levels (CLIC) - addr subject to change
     mintthresh = 0x347,   // MRW Interrupt-level threshold (CLIC) - addr subject to change
@@ -648,15 +656,12 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
         this->csr_rd_cb[dcsr] = MK_CSR_RD_CB(read_debug);
     }
 
-    constexpr reg_t get_irq_mask(size_t mode) {
-        std::array<const reg_t, 4> m = {{
-            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b000100010001U, // U mode
-            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b001100110011U, // S mode
-            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b011101110111U, // H mode
-            (std::numeric_limits<reg_t>::max() & ~0xffffULL) | 0b111111111111U  // M mode
-        }};
-        return m[mode];
-    }
+    std::array<const uint64_t, 4> mie_mip_mask = {{
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b000100010001U, // U mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b001100110011U, // S mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b011101110111U, // H mode
+        (std::numeric_limits<uint64_t>::max() & ~0xffffULL) | 0b111111111111U  // M mode
+    }};
 
     iss::status read_csr(unsigned addr, reg_t& val) {
         if(addr >= csr.size()) {
@@ -1070,13 +1075,19 @@ protected:
     reg_t mhartid_reg{0x0};
     uint64_t mcycle_csr{0};
     uint64_t minstret_csr{0};
+    uint64_t mie_csr{0};
+    uint64_t mip_csr{0};
+    uint64_t mideleg_csr{0};
+    uint64_t sie_csr{0};
+    uint64_t sip_csr{0};
+    uint64_t sideleg_csr{0};
     reg_t fault_data;
 
     int64_t cycle_offset{0};
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
     unsigned mcause_max_irq{traits<BASE>::XLEN};
-    reg_t clint_custom_irq_mask{0xffff};
+    uint64_t clint_custom_irq_mask{0xffff};
 };
 
 } // namespace arch
