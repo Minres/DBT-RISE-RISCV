@@ -8,7 +8,7 @@ project(dbt-rise-riscv VERSION 2.1.0 LANGUAGES C CXX)
 
 option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON)
 option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
-
+option(NO_GENERIC_CORES "Leave out the genric cores to improve build times" OFF)
 include(GNUInstallDirs)
 include(flink)
 
@@ -69,29 +69,33 @@ endif()
 add_subdirectory(softvector)
 set(LIB_SOURCES
     src/iss/plugin/instruction_count.cpp
-    src/iss/arch/rv32i.cpp
-    src/iss/arch/rv32imac.cpp
-    src/iss/arch/rv32gc.cpp
-    src/iss/arch/rv32gcv.cpp
-    src/iss/arch/rv64i.cpp
-    src/iss/arch/rv64imac.cpp
-    src/iss/arch/rv64gc.cpp
-    src/iss/arch/rv64gcv.cpp
     src/iss/arch/tgc5c.cpp
     src/iss/mem/memory_if.cpp
     src/vm/interp/vm_tgc5c.cpp
-    src/vm/interp/vm_rv32i.cpp
-    src/vm/interp/vm_rv32imac.cpp
-    src/vm/interp/vm_rv32gc.cpp
-    src/vm/interp/vm_rv32gcv.cpp
-    src/vm/interp/vm_rv64i.cpp
-    src/vm/interp/vm_rv64imac.cpp
-    src/vm/interp/vm_rv64gc.cpp
-    src/vm/interp/vm_rv64gc_mp.cpp
-    src/vm/interp/vm_rv64gcv.cpp
     src/iss/debugger/csr_names.cpp
     src/iss/semihosting/semihosting.cpp
 )
+if(NOT NO_GENERIC_CORES)
+    list(APPEND LIB_SOURCES
+        src/iss/arch/rv32i.cpp
+        src/iss/arch/rv32imac.cpp
+        src/iss/arch/rv32gc.cpp
+        src/iss/arch/rv32gcv.cpp
+        src/iss/arch/rv64i.cpp
+        src/iss/arch/rv64imac.cpp
+        src/iss/arch/rv64gc.cpp
+        src/iss/arch/rv64gcv.cpp
+        src/vm/interp/vm_rv32i.cpp
+        src/vm/interp/vm_rv32imac.cpp
+        src/vm/interp/vm_rv32gc.cpp
+        src/vm/interp/vm_rv32gcv.cpp
+        src/vm/interp/vm_rv64i.cpp
+        src/vm/interp/vm_rv64imac.cpp
+        src/vm/interp/vm_rv64gc.cpp
+        src/vm/interp/vm_rv64gc_mp.cpp
+        src/vm/interp/vm_rv64gcv.cpp
+    )
+endif()
 if(TARGET yaml-cpp::yaml-cpp)
     list(APPEND LIB_SOURCES
         src/iss/plugin/cycle_estimate.cpp
@@ -102,27 +106,35 @@ endif()
 if(WITH_LLVM)
     list(APPEND LIB_SOURCES
         src/vm/llvm/vm_tgc5c.cpp
-        src/vm/llvm/vm_rv32i.cpp
-        src/vm/llvm/vm_rv32imac.cpp
-        src/vm/llvm/vm_rv32gc.cpp
-        src/vm/llvm/vm_rv64i.cpp
-        src/vm/llvm/vm_rv64gc.cpp
         src/vm/llvm/fp_impl.cpp
     )
+    if(NOT NO_GENERIC_CORES)
+        list(APPEND LIB_SOURCES
+            src/vm/llvm/vm_rv32i.cpp
+            src/vm/llvm/vm_rv32imac.cpp
+            src/vm/llvm/vm_rv32gc.cpp
+            src/vm/llvm/vm_rv64i.cpp
+            src/vm/llvm/vm_rv64gc.cpp
+        )
+    endif()
 endif()
 
 if(WITH_ASMJIT)
     list(APPEND LIB_SOURCES
         src/vm/asmjit/vm_tgc5c.cpp
-        src/vm/asmjit/vm_rv32i.cpp
-        src/vm/asmjit/vm_rv32imac.cpp
-        src/vm/asmjit/vm_rv32gc.cpp
-        src/vm/asmjit/vm_rv32gcv.cpp
-        src/vm/asmjit/vm_rv64i.cpp
-        src/vm/asmjit/vm_rv64imac.cpp
-        src/vm/asmjit/vm_rv64gc.cpp
-        src/vm/asmjit/vm_rv64gcv.cpp
     )
+    if(NOT NO_GENERIC_CORES)
+        list(APPEND LIB_SOURCES
+            src/vm/asmjit/vm_rv32i.cpp
+            src/vm/asmjit/vm_rv32imac.cpp
+            src/vm/asmjit/vm_rv32gc.cpp
+            src/vm/asmjit/vm_rv32gcv.cpp
+            src/vm/asmjit/vm_rv64i.cpp
+            src/vm/asmjit/vm_rv64imac.cpp
+            src/vm/asmjit/vm_rv64gc.cpp
+            src/vm/asmjit/vm_rv64gcv.cpp
+        )
+    endif()
 endif()
 
 if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
