@@ -13,7 +13,11 @@ ${name}: <% instrList.each { %>
   ${it.instruction.name}:
     index: ${index++}
     encoding: ${it.encoding}
-    mask: ${it.mask}<%if(it.attributes.size) {%>
+    mask: ${it.mask}
+    bitfields:<% it.instruction.encoding.fields.each { if(it instanceof com.minres.coredsl.coreDsl.BitValue) { %>
+      - ${it.value.size}'b${it.value.toString(2).replace(' ', '0')} <% } else { %>
+      - ${it.name}[${it.startIndex.value}:${it.endIndex.value}]<% } } 
+    if(it.attributes.size) {%>
     attributes: ${it.attributes}<%}%>
     size:   ${it.length}
     branch:   ${it.modifiesPC}
