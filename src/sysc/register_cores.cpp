@@ -50,7 +50,7 @@
 namespace iss {
 namespace interp {
 using namespace sysc;
-__attribute__((used)) volatile std::array<bool, 20> riscv_init = {
+__attribute__((used)) volatile std::array<bool, 21> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
