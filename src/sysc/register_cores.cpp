@@ -132,6 +132,13 @@ __attribute__((used)) volatile std::array<bool, 20> riscv_init = {
                                                      std::make_unique<iss::mem::pmp<iss::arch::rv64gc>>(cpu->get_priv_if()));
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
                                              }),
+    iss_factory::instance().register_creator("rv64gc_mp_64:interp",
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
+                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64gc>>(cc);
+                                                 cpu->memories.insert_before_last(
+                                                     std::make_unique<iss::mem::pmp<iss::arch::rv64gc, 64>>(cpu->get_priv_if()));
+                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv64gc*>(cpu), gdb_port)}};
+                                             }),
     iss_factory::instance().register_creator("rv64gc_mp_8:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv64gc>>(cc);

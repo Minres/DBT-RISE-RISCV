@@ -97,8 +97,8 @@ jobs:
           LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_m --backend interp || rc=$?
           [ "${rc:-0}" -eq 2 ]
 
-      - name: rv64gc_mp CSR test - interp (with PMP)
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 CSR test - interp (with PMP)
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP enforcement test firmware
         run: |
@@ -107,8 +107,8 @@ jobs:
             -o pmp_enforce_test \
             contrib/fw/pmp-enforce-test/pmp_enforce_test.S
 
-      - name: rv64gc_mp enforcement test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 enforcement test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP shift test firmware
         run: |
@@ -117,8 +117,8 @@ jobs:
             -o pmp_shift_test \
             contrib/fw/pmp-shift-test/pmp_shift_test.S
 
-      - name: rv64gc_mp shift test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_shift_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 shift test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_shift_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP upper-cfg test firmware
         run: |
@@ -127,8 +127,8 @@ jobs:
             -o pmp_upper_cfg_test \
             contrib/fw/pmp-upper-cfg-test/pmp_upper_cfg_test.S
 
-      - name: rv64gc_mp upper-cfg test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_upper_cfg_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 upper-cfg test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_upper_cfg_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP cfg2 test firmware
         run: |
@@ -137,8 +137,8 @@ jobs:
             -o pmp_cfg2_test \
             contrib/fw/pmp-cfg2-test/pmp_cfg2_test.S
 
-      - name: rv64gc_mp cfg2 test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_cfg2_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 cfg2 test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_cfg2_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP TOR test firmware
         run: |
@@ -147,8 +147,8 @@ jobs:
             -o pmp_tor_test \
             contrib/fw/pmp-tor-test/pmp_tor_test.S
 
-      - name: rv64gc_mp TOR test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_tor_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 TOR test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_tor_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 64-entry pmpaddr test firmware
         run: |
@@ -157,8 +157,8 @@ jobs:
             -o pmp_64entry_addr_test \
             contrib/fw/pmp-64entry-addr-test/pmp_64entry_addr_test.S
 
-      - name: rv64gc_mp 64-entry pmpaddr test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_addr_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 64-entry pmpaddr test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_addr_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 64-entry pmpcfg test firmware
         run: |
@@ -167,8 +167,8 @@ jobs:
             -o pmp_64entry_cfg_test \
             contrib/fw/pmp-64entry-cfg-test/pmp_64entry_cfg_test.S
 
-      - name: rv64gc_mp 64-entry pmpcfg test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_cfg_test --isa rv64gc_mp --backend interp
+      - name: rv64gc_mp_64 64-entry pmpcfg test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_cfg_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 8-entry guard test firmware (VP/S5 model)
         run: |
