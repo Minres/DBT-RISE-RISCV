@@ -45,7 +45,7 @@
 namespace iss {
 namespace mem {
 
-template <typename PLAT, size_t NUM_ENTRIES = 64> struct pmp : public memory_elem {
+template <typename PLAT, size_t NUM_ENTRIES = 16> struct pmp : public memory_elem {
     static_assert(NUM_ENTRIES > 0 && NUM_ENTRIES <= 64 && (NUM_ENTRIES % sizeof(typename PLAT::reg_t)) == 0,
                   "NUM_ENTRIES must be a multiple of sizeof(reg_t) and at most 64");
     using this_class = pmp<PLAT, NUM_ENTRIES>;
