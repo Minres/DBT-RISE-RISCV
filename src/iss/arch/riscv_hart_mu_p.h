@@ -105,6 +105,7 @@ protected:
     iss::status write_ie(unsigned addr, reg_t val);
     iss::status read_ip(unsigned addr, reg_t& val);
     iss::status write_ip(unsigned addr, reg_t val);
+    iss::status read_ideleg(unsigned addr, reg_t& val);
     iss::status write_ideleg(unsigned addr, reg_t val);
     iss::status write_edeleg(unsigned addr, uint32_t val);
     iss::status write_edeleg(unsigned addr, uint64_t val);
@@ -143,7 +144,7 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
         this->csr_rd_cb[utval] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[utval] = MK_CSR_WR_CB(write_plain);
         this->csr[misa] |= extension_encoding::N;
-        this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_plain);
+        this->csr_rd_cb[mideleg] = MK_CSR_RD_CB(read_ideleg);
         this->csr_wr_cb[mideleg] = MK_CSR_WR_CB(write_ideleg);
         this->csr_rd_cb[medeleg] = MK_CSR_RD_CB(read_plain);
         this->csr_wr_cb[medeleg] = MK_CSR_WR_CB(write_edeleg);
@@ -157,7 +158,7 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
         this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
         this->csr_wr_cb[mieh] = MK_CSR_WR_CB(write_ie);
         if(FEAT & FEAT_EXT_N) {
-            this->csr_rd_cb[midelegh] = MK_CSR_RD_CB(read_plain);
+            this->csr_rd_cb[midelegh] = MK_CSR_RD_CB(read_ideleg);
             this->csr_wr_cb[midelegh] = MK_CSR_WR_CB(write_ideleg);
         }
     }
@@ -414,12 +415,27 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     return iss::Ok;
 }
 
+template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::read_ideleg(unsigned addr, reg_t& val) {
+    if(unlikely(addr == midelegh))
+        val = (this->mideleg_csr) >> 32;
+    else
+        val = this->mideleg_csr;
+    return iss::Ok;
+}
+
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ideleg(unsigned addr, reg_t val) {
     uint64_t lval = val;
-    if(addr == midelegh)
+    if(addr == midelegh) {
         lval <<= 32;
-    // only U mode interrupts can be delegated
-    auto mask = 0xffff'0111ul;
+        lval |= static_cast<uint32_t>(this->mideleg_csr);
+    } else if(sizeof(reg_t) == 4)
+        lval |= this->mideleg_csr & ~static_cast<uint64_t>(std::numeric_limits<reg_t>::max());
+    // only U mode interrupts can be delegated, if N-Mode is configured
+    auto mask = ~0xfffff000ULL;
+    if(FEAT & FEAT_EXT_N)
+        mask &= ~0xeeeULL; // clear H & S mode bits
+    else
+        mask &= ~0xfffULL; // clear H, S & U mode bits
     this->mideleg_csr = (this->mideleg_csr & ~mask) | (lval & mask);
     return iss::Ok;
 }
