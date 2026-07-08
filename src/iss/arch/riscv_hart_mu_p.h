@@ -431,11 +431,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
     } else if(sizeof(reg_t) == 4)
         lval |= this->mideleg_csr & ~static_cast<uint64_t>(std::numeric_limits<reg_t>::max());
     // only U mode interrupts can be delegated, if N-Mode is configured
-    auto mask = ~0xfffff000ULL;
-    if(FEAT & FEAT_EXT_N)
-        mask &= ~0xeeeULL; // clear H & S mode bits
-    else
-        mask &= ~0xfffULL; // clear H, S & U mode bits
+    auto mask = (this->clint_custom_irq_mask | 0xffffULL) & ~0xfeeeULL;
     this->mideleg_csr = (this->mideleg_csr & ~mask) | (lval & mask);
     return iss::Ok;
 }
