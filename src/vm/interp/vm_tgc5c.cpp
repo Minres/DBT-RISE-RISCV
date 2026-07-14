@@ -2153,8 +2153,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     uint8_t nzimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        //No disass specified, using instruction name
-                        std::string mnemonic = "c.nop";
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.nop"));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -2673,8 +2673,8 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                 case arch::traits<ARCH>::opcode_e::C__EBREAK: {
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
-                        //No disass specified, using instruction name
-                        std::string mnemonic = "c.ebreak";
+                        auto mnemonic = fmt::format(
+                            "{mnemonic:10} ", fmt::arg("mnemonic", "c.ebreak"));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
