@@ -44,7 +44,7 @@ if(NOT TARGET dbt-rise-core)
     FetchContent_Declare(
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
-        GIT_TAG 412702e2
+        GIT_TAG ab939b51
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
@@ -270,6 +270,9 @@ if(BUILD_TESTING)
             COMMAND riscv-sim -f ${CMAKE_BINARY_DIR}/../../Firmwares/hello-world/hello --backend asmjit)
     endif()
 endif()
+
+add_executable(decoder_test src/decoder_test.cpp)
+target_link_libraries(decoder_test PUBLIC dbt-rise-riscv)
 
 ###############################################################################
 #

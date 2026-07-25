@@ -46,6 +46,7 @@
 #include <vector>
 #include <iss/instruction_decoder.h>
 
+#include <fstream>
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -287,7 +288,10 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
             g_instr_descr.push_back(new_instr_descr);
     }
         return std::move(g_instr_descr);
-    }()) {}
+    }()) {
+    // std::ofstream json_out{"idecode_tree.json"};
+    // json_out<<instr_decoder.print_tree_as_pretty_json();
+}
 
 inline bool is_icount_limit_enabled(finish_cond_e cond){
     return (cond & finish_cond_e::ICOUNT_LIMIT) == finish_cond_e::ICOUNT_LIMIT;
