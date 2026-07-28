@@ -4,6 +4,10 @@ RVI:
     index: 0
     encoding: 0b00000000000000000000000000110111
     mask: 0b00000000000000000000000001111111
+    bitfields:
+      - imm[31:12]
+      - rd[4:0]
+      - 7'b110111 
     size:   32
     branch:   false
     delay:   1
@@ -11,6 +15,10 @@ RVI:
     index: 1
     encoding: 0b00000000000000000000000000010111
     mask: 0b00000000000000000000000001111111
+    bitfields:
+      - imm[31:12]
+      - rd[4:0]
+      - 7'b10111 
     size:   32
     branch:   false
     delay:   1
@@ -18,6 +26,13 @@ RVI:
     index: 2
     encoding: 0b00000000000000000000000001101111
     mask: 0b00000000000000000000000001111111
+    bitfields:
+      - imm[20:20]
+      - imm[10:1]
+      - imm[11:11]
+      - imm[19:12]
+      - rd[4:0]
+      - 7'b1101111 
     size:   32
     branch:   true
     delay:   1
@@ -25,6 +40,12 @@ RVI:
     index: 3
     encoding: 0b00000000000000000000000001100111
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b1100111 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -32,6 +53,15 @@ RVI:
     index: 4
     encoding: 0b00000000000000000000000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b0 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -39,6 +69,15 @@ RVI:
     index: 5
     encoding: 0b00000000000000000001000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b1 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -46,6 +85,15 @@ RVI:
     index: 6
     encoding: 0b00000000000000000100000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b100 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -53,6 +101,15 @@ RVI:
     index: 7
     encoding: 0b00000000000000000101000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -60,6 +117,15 @@ RVI:
     index: 8
     encoding: 0b00000000000000000110000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b110 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -67,6 +133,15 @@ RVI:
     index: 9
     encoding: 0b00000000000000000111000001100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[12:12]
+      - imm[10:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b111 
+      - imm[4:1]
+      - imm[11:11]
+      - 7'b1100011 
     size:   32
     branch:   true
     delay:   [1,1]
@@ -74,6 +149,12 @@ RVI:
     index: 10
     encoding: 0b00000000000000000000000000000011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b11 
     size:   32
     branch:   false
     delay:   1
@@ -81,6 +162,12 @@ RVI:
     index: 11
     encoding: 0b00000000000000000001000000000011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b11 
     size:   32
     branch:   false
     delay:   1
@@ -88,6 +175,12 @@ RVI:
     index: 12
     encoding: 0b00000000000000000010000000000011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b10 
+      - rd[4:0]
+      - 7'b11 
     size:   32
     branch:   false
     delay:   1
@@ -95,6 +188,12 @@ RVI:
     index: 13
     encoding: 0b00000000000000000100000000000011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b100 
+      - rd[4:0]
+      - 7'b11 
     size:   32
     branch:   false
     delay:   1
@@ -102,6 +201,12 @@ RVI:
     index: 14
     encoding: 0b00000000000000000101000000000011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b11 
     size:   32
     branch:   false
     delay:   1
@@ -109,6 +214,13 @@ RVI:
     index: 15
     encoding: 0b00000000000000000000000000100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b0 
+      - imm[4:0]
+      - 7'b100011 
     size:   32
     branch:   false
     delay:   1
@@ -116,6 +228,13 @@ RVI:
     index: 16
     encoding: 0b00000000000000000001000000100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b1 
+      - imm[4:0]
+      - 7'b100011 
     size:   32
     branch:   false
     delay:   1
@@ -123,6 +242,13 @@ RVI:
     index: 17
     encoding: 0b00000000000000000010000000100011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:5]
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b10 
+      - imm[4:0]
+      - 7'b100011 
     size:   32
     branch:   false
     delay:   1
@@ -130,6 +256,12 @@ RVI:
     index: 18
     encoding: 0b00000000000000000000000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -137,6 +269,12 @@ RVI:
     index: 19
     encoding: 0b00000000000000000010000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b10 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -144,6 +282,12 @@ RVI:
     index: 20
     encoding: 0b00000000000000000011000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b11 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -151,6 +295,12 @@ RVI:
     index: 21
     encoding: 0b00000000000000000100000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b100 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -158,6 +308,12 @@ RVI:
     index: 22
     encoding: 0b00000000000000000110000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b110 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -165,6 +321,12 @@ RVI:
     index: 23
     encoding: 0b00000000000000000111000000010011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b111 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -172,6 +334,13 @@ RVI:
     index: 24
     encoding: 0b00000000000000000001000000010011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - shamt[4:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -179,6 +348,13 @@ RVI:
     index: 25
     encoding: 0b00000000000000000101000000010011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - shamt[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -186,6 +362,13 @@ RVI:
     index: 26
     encoding: 0b01000000000000000101000000010011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b100000 
+      - shamt[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b10011 
     size:   32
     branch:   false
     delay:   1
@@ -193,6 +376,13 @@ RVI:
     index: 27
     encoding: 0b00000000000000000000000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -200,6 +390,13 @@ RVI:
     index: 28
     encoding: 0b01000000000000000000000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b100000 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -207,6 +404,13 @@ RVI:
     index: 29
     encoding: 0b00000000000000000001000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -214,6 +418,13 @@ RVI:
     index: 30
     encoding: 0b00000000000000000010000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b10 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -221,6 +432,13 @@ RVI:
     index: 31
     encoding: 0b00000000000000000011000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b11 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -228,6 +446,13 @@ RVI:
     index: 32
     encoding: 0b00000000000000000100000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b100 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -235,6 +460,13 @@ RVI:
     index: 33
     encoding: 0b00000000000000000101000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -242,6 +474,13 @@ RVI:
     index: 34
     encoding: 0b01000000000000000101000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b100000 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -249,6 +488,13 @@ RVI:
     index: 35
     encoding: 0b00000000000000000110000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b110 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -256,6 +502,13 @@ RVI:
     index: 36
     encoding: 0b00000000000000000111000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b0 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b111 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -263,6 +516,14 @@ RVI:
     index: 37
     encoding: 0b00000000000000000000000000001111
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - fm[3:0]
+      - pred[3:0]
+      - succ[3:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b1111 
     size:   32
     branch:   false
     delay:   1
@@ -270,6 +531,12 @@ RVI:
     index: 38
     encoding: 0b00000000000000000000000001110011
     mask: 0b11111111111111111111111111111111
+    bitfields:
+      - 12'b0 
+      - 5'b0 
+      - 3'b0 
+      - 5'b0 
+      - 7'b1110011 
     attributes: [[name:no_cont]]
     size:   32
     branch:   false
@@ -278,6 +545,12 @@ RVI:
     index: 39
     encoding: 0b00000000000100000000000001110011
     mask: 0b11111111111111111111111111111111
+    bitfields:
+      - 12'b1 
+      - 5'b0 
+      - 3'b0 
+      - 5'b0 
+      - 7'b1110011 
     attributes: [[name:no_cont]]
     size:   32
     branch:   false
@@ -286,6 +559,13 @@ RVI:
     index: 40
     encoding: 0b00110000001000000000000001110011
     mask: 0b11111111111111111111111111111111
+    bitfields:
+      - 7'b11000 
+      - 5'b10 
+      - 5'b0 
+      - 3'b0 
+      - 5'b0 
+      - 7'b1110011 
     attributes: [[name:no_cont]]
     size:   32
     branch:   false
@@ -294,6 +574,13 @@ RVI:
     index: 41
     encoding: 0b00010000010100000000000001110011
     mask: 0b11111111111111111111111111111111
+    bitfields:
+      - 7'b1000 
+      - 5'b101 
+      - 5'b0 
+      - 3'b0 
+      - 5'b0 
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -302,6 +589,12 @@ Zicsr:
     index: 42
     encoding: 0b00000000000000000001000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -309,6 +602,12 @@ Zicsr:
     index: 43
     encoding: 0b00000000000000000010000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - rs1[4:0]
+      - 3'b10 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -316,6 +615,12 @@ Zicsr:
     index: 44
     encoding: 0b00000000000000000011000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - rs1[4:0]
+      - 3'b11 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -323,6 +628,12 @@ Zicsr:
     index: 45
     encoding: 0b00000000000000000101000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - zimm[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -330,6 +641,12 @@ Zicsr:
     index: 46
     encoding: 0b00000000000000000110000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - zimm[4:0]
+      - 3'b110 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -337,6 +654,12 @@ Zicsr:
     index: 47
     encoding: 0b00000000000000000111000001110011
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - csr[11:0]
+      - zimm[4:0]
+      - 3'b111 
+      - rd[4:0]
+      - 7'b1110011 
     size:   32
     branch:   false
     delay:   1
@@ -345,6 +668,12 @@ Zifencei:
     index: 48
     encoding: 0b00000000000000000001000000001111
     mask: 0b00000000000000000111000001111111
+    bitfields:
+      - imm[11:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b1111 
     attributes: [[name:flush]]
     size:   32
     branch:   false
@@ -354,6 +683,13 @@ RVM:
     index: 49
     encoding: 0b00000010000000000000000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b0 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -361,6 +697,13 @@ RVM:
     index: 50
     encoding: 0b00000010000000000001000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b1 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -368,6 +711,13 @@ RVM:
     index: 51
     encoding: 0b00000010000000000010000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b10 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -375,6 +725,13 @@ RVM:
     index: 52
     encoding: 0b00000010000000000011000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b11 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -382,6 +739,13 @@ RVM:
     index: 53
     encoding: 0b00000010000000000100000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b100 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -389,6 +753,13 @@ RVM:
     index: 54
     encoding: 0b00000010000000000101000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b101 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -396,6 +767,13 @@ RVM:
     index: 55
     encoding: 0b00000010000000000110000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b110 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -403,6 +781,13 @@ RVM:
     index: 56
     encoding: 0b00000010000000000111000000110011
     mask: 0b11111110000000000111000001111111
+    bitfields:
+      - 7'b1 
+      - rs2[4:0]
+      - rs1[4:0]
+      - 3'b111 
+      - rd[4:0]
+      - 7'b110011 
     size:   32
     branch:   false
     delay:   1
@@ -411,6 +796,14 @@ Zca:
     index: 57
     encoding: 0b0000000000000000
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b0 
+      - imm[5:4]
+      - imm[9:6]
+      - imm[2:2]
+      - imm[3:3]
+      - rd[2:0]
+      - 2'b0 
     size:   16
     branch:   false
     delay:   1
@@ -418,6 +811,14 @@ Zca:
     index: 58
     encoding: 0b0100000000000000
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b10 
+      - uimm[5:3]
+      - rs1[2:0]
+      - uimm[2:2]
+      - uimm[6:6]
+      - rd[2:0]
+      - 2'b0 
     size:   16
     branch:   false
     delay:   1
@@ -425,6 +826,14 @@ Zca:
     index: 59
     encoding: 0b1100000000000000
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b110 
+      - uimm[5:3]
+      - rs1[2:0]
+      - uimm[2:2]
+      - uimm[6:6]
+      - rs2[2:0]
+      - 2'b0 
     size:   16
     branch:   false
     delay:   1
@@ -432,6 +841,12 @@ Zca:
     index: 60
     encoding: 0b0000000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b0 
+      - imm[5:5]
+      - rs1[4:0]
+      - imm[4:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -439,6 +854,12 @@ Zca:
     index: 61
     encoding: 0b0000000000000001
     mask: 0b1110111110000011
+    bitfields:
+      - 3'b0 
+      - nzimm[5:5]
+      - 5'b0 
+      - nzimm[4:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -446,6 +867,17 @@ Zca:
     index: 62
     encoding: 0b0010000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b1 
+      - imm[11:11]
+      - imm[4:4]
+      - imm[9:8]
+      - imm[10:10]
+      - imm[6:6]
+      - imm[7:7]
+      - imm[3:1]
+      - imm[5:5]
+      - 2'b1 
     attributes: [[name:enable, value:1]]
     size:   16
     branch:   true
@@ -454,6 +886,12 @@ Zca:
     index: 63
     encoding: 0b0100000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b10 
+      - imm[5:5]
+      - rd[4:0]
+      - imm[4:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -461,6 +899,12 @@ Zca:
     index: 64
     encoding: 0b0110000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b11 
+      - imm[17:17]
+      - rd[4:0]
+      - imm[16:12]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -468,6 +912,15 @@ Zca:
     index: 65
     encoding: 0b0110000100000001
     mask: 0b1110111110000011
+    bitfields:
+      - 3'b11 
+      - nzimm[9:9]
+      - 5'b10 
+      - nzimm[4:4]
+      - nzimm[6:6]
+      - nzimm[8:7]
+      - nzimm[5:5]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -475,6 +928,12 @@ Zca:
     index: 66
     encoding: 0b0110000000000001
     mask: 0b1111000001111111
+    bitfields:
+      - 3'b11 
+      - 1'b0 
+      - rd[4:0]
+      - 5'b0 
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -482,6 +941,13 @@ Zca:
     index: 67
     encoding: 0b1000000000000001
     mask: 0b1111110000000011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b0 
+      - rs1[2:0]
+      - shamt[4:0]
+      - 2'b1 
     attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
@@ -490,6 +956,13 @@ Zca:
     index: 68
     encoding: 0b1000010000000001
     mask: 0b1111110000000011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b1 
+      - rs1[2:0]
+      - shamt[4:0]
+      - 2'b1 
     attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
@@ -498,6 +971,13 @@ Zca:
     index: 69
     encoding: 0b1000100000000001
     mask: 0b1110110000000011
+    bitfields:
+      - 3'b100 
+      - imm[5:5]
+      - 2'b10 
+      - rs1[2:0]
+      - imm[4:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -505,6 +985,14 @@ Zca:
     index: 70
     encoding: 0b1000110000000001
     mask: 0b1111110001100011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b11 
+      - rd[2:0]
+      - 2'b0 
+      - rs2[2:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -512,6 +1000,14 @@ Zca:
     index: 71
     encoding: 0b1000110000100001
     mask: 0b1111110001100011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b11 
+      - rd[2:0]
+      - 2'b1 
+      - rs2[2:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -519,6 +1015,14 @@ Zca:
     index: 72
     encoding: 0b1000110001000001
     mask: 0b1111110001100011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b11 
+      - rd[2:0]
+      - 2'b10 
+      - rs2[2:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -526,6 +1030,14 @@ Zca:
     index: 73
     encoding: 0b1000110001100001
     mask: 0b1111110001100011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 2'b11 
+      - rd[2:0]
+      - 2'b11 
+      - rs2[2:0]
+      - 2'b1 
     size:   16
     branch:   false
     delay:   1
@@ -533,6 +1045,17 @@ Zca:
     index: 74
     encoding: 0b1010000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b101 
+      - imm[11:11]
+      - imm[4:4]
+      - imm[9:8]
+      - imm[10:10]
+      - imm[6:6]
+      - imm[7:7]
+      - imm[3:1]
+      - imm[5:5]
+      - 2'b1 
     size:   16
     branch:   true
     delay:   1
@@ -540,6 +1063,15 @@ Zca:
     index: 75
     encoding: 0b1100000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b110 
+      - imm[8:8]
+      - imm[4:3]
+      - rs1[2:0]
+      - imm[7:6]
+      - imm[2:1]
+      - imm[5:5]
+      - 2'b1 
     size:   16
     branch:   true
     delay:   [1,1]
@@ -547,6 +1079,15 @@ Zca:
     index: 76
     encoding: 0b1110000000000001
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b111 
+      - imm[8:8]
+      - imm[4:3]
+      - rs1[2:0]
+      - imm[7:6]
+      - imm[2:1]
+      - imm[5:5]
+      - 2'b1 
     size:   16
     branch:   true
     delay:   [1,1]
@@ -554,6 +1095,12 @@ Zca:
     index: 77
     encoding: 0b0000000000000010
     mask: 0b1111000000000011
+    bitfields:
+      - 3'b0 
+      - 1'b0 
+      - rs1[4:0]
+      - shamt[4:0]
+      - 2'b10 
     attributes: [[name:enable, value:1]]
     size:   16
     branch:   false
@@ -562,6 +1109,13 @@ Zca:
     index: 78
     encoding: 0b0100000000000010
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b10 
+      - uimm[5:5]
+      - rd[4:0]
+      - uimm[4:2]
+      - uimm[7:6]
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -569,6 +1123,12 @@ Zca:
     index: 79
     encoding: 0b1000000000000010
     mask: 0b1111000000000011
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - rd[4:0]
+      - rs2[4:0]
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -576,6 +1136,12 @@ Zca:
     index: 80
     encoding: 0b1000000000000010
     mask: 0b1111000001111111
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - rs1[4:0]
+      - 5'b0 
+      - 2'b10 
     size:   16
     branch:   true
     delay:   1
@@ -583,6 +1149,12 @@ Zca:
     index: 81
     encoding: 0b1000000000000010
     mask: 0b1111111111111111
+    bitfields:
+      - 3'b100 
+      - 1'b0 
+      - 5'b0 
+      - 5'b0 
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -590,6 +1162,12 @@ Zca:
     index: 82
     encoding: 0b1001000000000010
     mask: 0b1111000000000011
+    bitfields:
+      - 3'b100 
+      - 1'b1 
+      - rd[4:0]
+      - rs2[4:0]
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -597,6 +1175,12 @@ Zca:
     index: 83
     encoding: 0b1001000000000010
     mask: 0b1111000001111111
+    bitfields:
+      - 3'b100 
+      - 1'b1 
+      - rs1[4:0]
+      - 5'b0 
+      - 2'b10 
     size:   16
     branch:   true
     delay:   1
@@ -604,6 +1188,12 @@ Zca:
     index: 84
     encoding: 0b1001000000000010
     mask: 0b1111111111111111
+    bitfields:
+      - 3'b100 
+      - 1'b1 
+      - 5'b0 
+      - 5'b0 
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -611,6 +1201,12 @@ Zca:
     index: 85
     encoding: 0b1100000000000010
     mask: 0b1110000000000011
+    bitfields:
+      - 3'b110 
+      - uimm[5:2]
+      - uimm[7:6]
+      - rs2[4:0]
+      - 2'b10 
     size:   16
     branch:   false
     delay:   1
@@ -618,6 +1214,12 @@ Zca:
     index: 86
     encoding: 0b0000000000000000
     mask: 0b1111111111111111
+    bitfields:
+      - 3'b0 
+      - 1'b0 
+      - 5'b0 
+      - 5'b0 
+      - 2'b0 
     size:   16
     branch:   false
     delay:   1
