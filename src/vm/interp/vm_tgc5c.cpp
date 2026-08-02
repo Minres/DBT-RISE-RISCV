@@ -99,7 +99,7 @@ protected:
     using compile_ret_t = virt_addr_t;
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
-    inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+    inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index] : "illegal";}
 
 
     virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
@@ -2236,8 +2236,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         if(imm == 0 || rd >= traits::RFS) {
                             raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                         }
-                        if(rd != 0) {
-                            *(X+rd) = (uint32_t)((int32_t)sext<18>(imm));
+                        else {
+                            if(rd != 0) {
+                                *(X+rd) = (uint32_t)((int32_t)sext<18>(imm));
+                            }
                         }
                     }
                     break;
@@ -2568,7 +2570,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                                    if(rd >= traits::RFS) {
+                                    if(rd >= traits::RFS || rs2 >= traits::RFS) {
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {
@@ -2637,7 +2639,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                                    if(rd >= traits::RFS) {
+                                    if(rd >= traits::RFS || rs2 >= traits::RFS) {
                                         raise(0, traits::RV_CAUSE_ILLEGAL_INSTRUCTION);
                                     }
                                     else {

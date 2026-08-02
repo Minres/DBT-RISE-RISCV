@@ -180,7 +180,7 @@ protected:
     using compile_ret_t = virt_addr_t;
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
-    inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+    inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index] : "illegal";}
 <%
 if(floating_point) {%>
     inline const char *fname(size_t index){return index < 32?name(index+traits::F0):"illegal";}     
