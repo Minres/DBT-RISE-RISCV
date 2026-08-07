@@ -328,7 +328,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         if(fetch_ins(pc, data)!=iss::Ok){
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
             process_spawn_blocks();
-            if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            if(this->sync_exec && POST_SYNC) this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
             *PC = super::core.enter_trap(trap_state, pc.val, instr);
         } else {
             if (is_jump_to_self_enabled(cond) &&

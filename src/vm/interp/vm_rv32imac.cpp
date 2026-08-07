@@ -46,6 +46,7 @@
 #include <vector>
 #include <iss/instruction_decoder.h>
 
+#include <fstream>
 
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
@@ -98,7 +99,7 @@ protected:
     using compile_ret_t = virt_addr_t;
     using compile_func = compile_ret_t (this_class::*)(virt_addr_t &pc, code_word_t instr);
 
-    inline const char *name(size_t index){return traits::reg_aliases.at(index);}
+    inline const char *name(size_t index){return index<traits::reg_aliases.size()?traits::reg_aliases[index] : "illegal";}
 
 
     virt_addr_t execute_inst(finish_cond_e cond, virt_addr_t start, uint64_t icount_limit) override;
@@ -298,7 +299,10 @@ vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
             g_instr_descr.push_back(new_instr_descr);
     }
         return std::move(g_instr_descr);
-    }()) {}
+    }()) {
+    // std::ofstream json_out{"idecode_tree.json"};
+    // json_out<<instr_decoder.print_tree_as_pretty_json();
+}
 
 inline bool is_icount_limit_enabled(finish_cond_e cond){
     return (cond & finish_cond_e::ICOUNT_LIMIT) == finish_cond_e::ICOUNT_LIMIT;
@@ -335,7 +339,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         if(fetch_ins(pc, data)!=iss::Ok){
             if(this->sync_exec && PRE_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
             process_spawn_blocks();
-            if(this->sync_exec && POST_SYNC) this->do_sync(PRE_SYNC, std::numeric_limits<unsigned>::max());
+            if(this->sync_exec && POST_SYNC) this->do_sync(POST_SYNC, std::numeric_limits<unsigned>::max());
             *PC = super::core.enter_trap(trap_state, pc.val, instr);
         } else {
             if (is_jump_to_self_enabled(cond) &&
