@@ -230,7 +230,7 @@ iss::status riscv_hart_mu_p<BASE, FEAT>::read(const addr_t& a, const unsigned le
                 }
                 auto res = this->memory.rd_mem({address_type::PHYSICAL, a.access, a.space, a.val}, length, data);
                 if(unlikely(res != iss::Ok && !is_debug(access))) {
-                    auto trap_id = is_fetch(a.access)?traits<BASE>::RV_CAUSE_FETCH_ACCESS:traits<BASE>::RV_CAUSE_LOAD_ACCESS;
+                    auto trap_id = is_fetch(a.access) ? traits<BASE>::RV_CAUSE_FETCH_ACCESS : traits<BASE>::RV_CAUSE_LOAD_ACCESS;
                     this->reg.trap_state = (1UL << 31) | trap_id << 16;
                     this->fault_data = addr;
                 }
