@@ -88,5 +88,10 @@ Core RV64GCV provides RVI, Zicsr, Zifencei, RVM, RVA, Zca, Zcd, RVSMode, RVVBase
 }
 
 /*
-for b in interp asmjit; do for i in RV32I RV32IMAC RV32GC RV32GCV RV64I RV64IMAC RV64GC RV64GCV; do ./build/TGC-GEN/scripts/generate_iss.sh -b $b -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc; done ; done
+* for b in interp asmjit; do
+* 	for i in RV32I RV32IMAC RV32GC RV32GCV RV64I RV64IMAC RV64GC RV64GCV; do
+*  		./build/TGC-GEN/scripts/generate_iss.sh -b $b -o . -m src -r gen_input -t gen_input/templates -c $i gen_input/cores.core_desc
+* 	done
+*done
 */ 
+// for i in $(grep Core iss/dbt-rise-riscv/gen_input/cores.core_desc  | awk '{print($2);}'); do ./generators/scripts/generate_iss.sh -c $i  -o iss/dbt-rise-riscv -t iss/dbt-rise-riscv/gen_input/templates -r generators/CoreDSL ./iss/dbt-rise-riscv/gen_input/cores.core_desc; done
