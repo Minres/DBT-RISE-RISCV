@@ -94,7 +94,7 @@ private:
            !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
             if(is_debug(addr.access))
                 throw trap_access(0, addr.val);
-            hart_if.raise_trap(/*trap_id*/ 0, /*cause*/ (addr.access == access_type::FETCH) ? 1 : 5, /*fault_data*/ addr.val);
+            // trap is raised in privilege wrapper
             return iss::Err;
         }
         return down_stream_mem.rd_mem(addr, length, data);
@@ -105,7 +105,7 @@ private:
         if(likely(addr.space == arch::traits<PLAT>::MEM) && !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
             if(is_debug(addr.access))
                 throw trap_access(0, addr.val);
-            hart_if.raise_trap(/*trap_id*/ 0, /*cause*/ 7, /*fault_data*/ addr.val);
+            // trap is raised in privilege wrapper, so we just return error
             return iss::Err;
         }
         return down_stream_mem.wr_mem(addr, length, data);

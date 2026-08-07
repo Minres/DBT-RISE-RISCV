@@ -267,13 +267,14 @@ iss::status riscv_hart_msu_vp<BASE, FEAT>::read(const addr_t& a, const unsigned 
                     return iss::Err;
                 }
                 auto res = this->memory.rd_mem({address_type::VIRTUAL, a.access, a.space, a.val}, length, data);
-                if(unlikely(res != iss::Ok && (access & access_type::DEBUG) == 0)) {
-                    this->reg.trap_state = (1UL << 31) | traits<BASE>::RV_CAUSE_LOAD_ACCESS << 16;
+                if(unlikely(res != iss::Ok &&  !is_debug(a.access))) {
+                    auto trap_id = is_fetch(a.access)?traits<BASE>::RV_CAUSE_FETCH_ACCESS:traits<BASE>::RV_CAUSE_LOAD_ACCESS;
+                    this->reg.trap_state = (1UL << 31) | trap_id << 16;
                     this->fault_data = addr;
                 }
                 return res;
             } catch(trap_access& ta) {
-                if((access & access_type::DEBUG) == 0) {
+                if(!is_debug(access)) {
                     this->reg.trap_state = (1UL << 31) | ta.id;
                     this->fault_data = ta.addr;
                 }
@@ -283,7 +284,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT>::read(const addr_t& a, const unsigned 
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        if((access & access_type::DEBUG) == 0) {
+        if(!is_debug(access)) {
             this->reg.trap_state = (1UL << 31) | ta.id;
             this->fault_data = ta.addr;
         }
@@ -386,7 +387,7 @@ iss::status riscv_hart_msu_vp<BASE, FEAT>::write(const addr_t& a, const unsigned
         }
         return iss::Ok;
     } catch(trap_access& ta) {
-        if((access & access_type::DEBUG) == 0) {
+        if(!is_debug(access)) {
             this->reg.trap_state = (1UL << 31) | ta.id;
             this->fault_data = ta.addr;
         }
