@@ -47,6 +47,7 @@
 #include <scc/async_event.h>
 #include <scc/report.h>
 #include <shared_mutex>
+#include <sysc/kernel/sc_simcontext.h>
 #include <sysc/kernel/sc_time.h>
 #include <util/instance_logger.h>
 #include <util/ities.h>
@@ -262,6 +263,7 @@ public:
         SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
         wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
+            auto start = sc_core::sc_time_stamp();
             while((this->mip_csr & this->mie_csr) == 0) {
                 sc_core::wait(this->wfi_evt | this->debugger_stop_evt);
                 bool is_debugger_stop_evt = this->debugger_stop_evt.triggered();
@@ -269,6 +271,11 @@ public:
                     break;
             }
             SCCINFO(this->owner->hier_name()) << "Got WFI event";
+            auto duration = sc_core::sc_time_stamp() - start;
+            if(clk_if && duration > sc_core::SC_ZERO_TIME) {
+                auto cycles = duration.value() / clk_if->read().value();
+                this->reg.cycle += cycles;
+            }
         };
         owner->exec_on_sysc(f);
         wfi_inst.store(false, std::memory_order_relaxed);
