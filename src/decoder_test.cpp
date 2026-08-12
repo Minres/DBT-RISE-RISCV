@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     }());
 
     std::ofstream json_out{"idecode_tree.json"};
-    json_out << instr_decoder.print_tree_as_pretty_json();
+    json_out << instr_decoder.print_tree_as_json();
 
     auto inst_index1 = instr_decoder.decode_instr(0x8440);
     auto inst_index2 = instr_decoder.decode_instr(0x86b0);
