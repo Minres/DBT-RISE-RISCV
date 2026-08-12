@@ -170,7 +170,6 @@ void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string
             SCCFATAL() << "Could not create vm for isa " << type << " and backend " << backend;
     } else {
         core->set_hartid(hart_id);
-        core->set_clk_if(clk_i.get_interface(0));
         core->set_clint_irq_count(clint_irq_i.size());
         auto* srv = debugger::server<debugger::gdb_session>::get();
         if(srv)
@@ -313,6 +312,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::s
         sc_core::sc_stop();
         return;
     }
+    core->set_clk_if(clk_i.get_interface(0));
     if(GET_PROP_VALUE(elf_file).size() > 0) {
         auto file_names = util::split(GET_PROP_VALUE(elf_file), ',');
         for(auto& s : file_names) {
