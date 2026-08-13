@@ -114,7 +114,7 @@ public:
             auto cycle_incr = owner->get_last_bus_cycles();
             if(cycle_incr > 1)
                 this->instr_if.update_last_instr_cycles(cycle_incr);
-            owner->sync(this->instr_if.get_total_cycles());
+            owner->qk_sync(this->instr_if.get_total_cycles());
         }
         first = false;
     }
@@ -275,7 +275,9 @@ public:
             if(clk_if && duration > sc_core::SC_ZERO_TIME) {
                 auto cycles = duration.value() / clk_if->read().value();
                 this->reg.cycle += cycles;
+                SCCINFO(owner->hier_name()) << "Increasing cycles by " << cycles << " after WFI";
             }
+            owner->qk_reset(this->instr_if.get_total_cycles());
         };
         owner->exec_on_sysc(f);
         wfi_inst.store(false, std::memory_order_relaxed);

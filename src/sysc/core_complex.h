@@ -43,6 +43,7 @@
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
 #include <scc/utilities.h>
+#include <sysc/kernel/sc_simcontext.h>
 #include <sysc/kernel/sc_time.h>
 #include <tlm/scc/initiator_mixin.h>
 #include <tlm/scc/quantum_keeper.h>
@@ -184,9 +185,13 @@ public:
         return mem_incr > 1 ? mem_incr : 1;
     }
 
-    void sync(uint64_t cycle) override {
+    void qk_sync(uint64_t cycle) override {
         auto core_inc = curr_clk * (cycle - last_sync_cycle);
         quantum_keeper.check_and_sync(core_inc);
+        last_sync_cycle = cycle;
+    }
+    void qk_reset(uint64_t cycle) override {
+        quantum_keeper.reset(sc_core::sc_time_stamp());
         last_sync_cycle = cycle;
     }
 
