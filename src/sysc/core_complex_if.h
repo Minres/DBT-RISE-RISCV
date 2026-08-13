@@ -61,7 +61,9 @@ struct core_complex_if {
     virtual unsigned get_last_bus_cycles() = 0;
 
     //! Allow quantum keeper handling
-    virtual void sync(uint64_t) = 0;
+    virtual void qk_sync(uint64_t) = 0;
+
+    virtual void qk_reset(uint64_t) = 0;
 
     util::delegate<void(std::function<void(void)>&)> exec_on_sysc;
 
