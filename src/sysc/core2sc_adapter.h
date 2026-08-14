@@ -270,12 +270,12 @@ public:
                 if(is_debugger_stop_evt)
                     break;
             }
-            SCCINFO(this->owner->hier_name()) << "Got WFI event";
+            SCCDEBUG(this->owner->hier_name()) << "Got WFI event";
             auto duration = sc_core::sc_time_stamp() - start;
             if(clk_if && duration > sc_core::SC_ZERO_TIME) {
                 auto cycles = duration.value() / clk_if->read().value();
                 this->reg.cycle += cycles;
-                SCCINFO(owner->hier_name()) << "Increasing cycles by " << cycles << " after WFI";
+                SCCDEBUG(owner->hier_name()) << "Increasing cycles by " << cycles << " after WFI";
             }
             owner->qk_reset(this->instr_if.get_total_cycles());
         };

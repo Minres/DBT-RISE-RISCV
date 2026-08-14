@@ -437,15 +437,18 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
         auto transport_start = sc_core::sc_time_stamp();
         exec_b_transport(gp, delay, is_fetch);
         auto transport_time = sc_core::sc_time_stamp() - transport_start;
-        auto time_taken = (delay + sc_core::sc_time_stamp()) - (pre_delay + transport_start);
+        auto completion = delay + sc_core::sc_time_stamp();
+        auto time_taken = (completion) - (pre_delay + transport_start);
         auto incr = time_taken.value() / curr_clk.read().value();
         if(is_fetch)
             ibus_inc += incr;
         else
             dbus_inc += incr;
 
-        if(transport_time.value())
-            quantum_keeper.reset();
+        if(transport_time.value()) {
+            quantum_keeper.reset(completion);
+            qk_preaccounted_cycles += incr;
+        }
         SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data
@@ -502,12 +505,15 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         auto transport_start = sc_core::sc_time_stamp();
         exec_b_transport(gp, delay);
         auto transport_time = sc_core::sc_time_stamp() - transport_start;
-        auto time_taken = (delay + sc_core::sc_time_stamp()) - (pre_delay + transport_start);
+        auto completion = delay + sc_core::sc_time_stamp();
+        auto time_taken = (completion) - (pre_delay + transport_start);
         auto incr = time_taken.value() / curr_clk.read().value();
         dbus_inc += incr;
 
-        if(transport_time.value())
-            quantum_keeper.reset();
+        if(transport_time.value()) {
+            quantum_keeper.reset(completion);
+            qk_preaccounted_cycles += incr;
+        }
         SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
                                << (length == 4   ? *(uint32_t*)data
                                    : length == 2 ? *(uint16_t*)data

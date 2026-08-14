@@ -186,12 +186,16 @@ public:
     }
 
     void qk_sync(uint64_t cycle) override {
-        auto core_inc = curr_clk * (cycle - last_sync_cycle);
+        auto cycle_delta = cycle - last_sync_cycle;
+        auto preaccounted = std::min(cycle_delta, qk_preaccounted_cycles);
+        qk_preaccounted_cycles -= preaccounted;
+        assert(qk_preaccounted_cycles <= cycle_delta);
+        auto core_inc = curr_clk * (cycle_delta - preaccounted);
         quantum_keeper.check_and_sync(core_inc);
         last_sync_cycle = cycle;
     }
     void qk_reset(uint64_t cycle) override {
-        quantum_keeper.reset(sc_core::sc_time_stamp());
+        quantum_keeper.reset(quantum_keeper.get_local_absolute_time());
         last_sync_cycle = cycle;
     }
 
@@ -305,6 +309,7 @@ protected:
     //
     ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
+    uint64_t qk_preaccounted_cycles{0};
     util::range_lut<tlm_dmi_ext> fetch_lut{tlm_dmi_ext()};
     util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space) {
         return space < dmi_read_luts.size() ? dmi_read_luts[space] : get_lut(dmi_read_luts, space);
