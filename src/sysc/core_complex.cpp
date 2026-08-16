@@ -433,20 +433,19 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
             gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         };
-        auto pre_delay = delay;
-        auto transport_start = sc_core::sc_time_stamp();
+        auto sc_time_pre = sc_core::sc_time_stamp();
+        auto local_time_pre = delay + sc_time_pre;
         exec_b_transport(gp, delay, is_fetch);
-        auto transport_time = sc_core::sc_time_stamp() - transport_start;
-        auto completion = delay + sc_core::sc_time_stamp();
-        auto time_taken = (completion) - (pre_delay + transport_start);
-        auto incr = time_taken.value() / curr_clk.read().value();
+        auto sc_duration = sc_core::sc_time_stamp() - sc_time_pre;
+        auto local_time_post = delay + sc_core::sc_time_stamp();
+        auto incr = (local_time_post.value() - local_time_pre.value()) / curr_clk.read().value();
         if(is_fetch)
             ibus_inc += incr;
         else
             dbus_inc += incr;
 
-        if(transport_time.value()) {
-            quantum_keeper.reset(completion);
+        if(sc_duration.value()) {
+            quantum_keeper.reset(local_time_post);
             qk_preaccounted_cycles += incr;
         }
         SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
@@ -501,17 +500,16 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
             gp.set_extension<tlm::scc::initiator_id_extension>(nullptr);
             gp.set_extension<sysc::memspace::tlm_memspace_extension<>>(nullptr);
         };
-        auto pre_delay = delay;
-        auto transport_start = sc_core::sc_time_stamp();
+        auto sc_time_pre = sc_core::sc_time_stamp();
+        auto local_time_pre = delay + sc_time_pre;
         exec_b_transport(gp, delay);
-        auto transport_time = sc_core::sc_time_stamp() - transport_start;
-        auto completion = delay + sc_core::sc_time_stamp();
-        auto time_taken = (completion) - (pre_delay + transport_start);
-        auto incr = time_taken.value() / curr_clk.read().value();
+        auto sc_duration = sc_core::sc_time_stamp() - sc_time_pre;
+        auto local_time_post = delay + sc_core::sc_time_stamp();
+        auto incr = (local_time_post.value() - local_time_pre.value()) / curr_clk.read().value();
         dbus_inc += incr;
 
-        if(transport_time.value()) {
-            quantum_keeper.reset(completion);
+        if(sc_duration.value()) {
+            quantum_keeper.reset(local_time_post);
             qk_preaccounted_cycles += incr;
         }
         SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
