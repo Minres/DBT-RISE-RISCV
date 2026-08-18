@@ -57,14 +57,10 @@ ${coreDef.name.toLowerCase()}::${coreDef.name.toLowerCase()}()  = default;
 ${coreDef.name.toLowerCase()}::~${coreDef.name.toLowerCase()}() = default;
 
 void ${coreDef.name.toLowerCase()}::reset(uint64_t address) {
-    auto base_ptr = reinterpret_cast<traits<${coreDef.name.toLowerCase()}>::reg_t*>(get_regs_base_ptr());
-    for(size_t i=0; i<traits<${coreDef.name.toLowerCase()}>::NUM_REGS; ++i)
-        *(base_ptr+i)=0;
+    std::memset(&reg, 0, sizeof(reg));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.PRIV=0x3;
-    reg.trap_state=0;
-    reg.icount=0;
 }
 
 uint8_t *${coreDef.name.toLowerCase()}::get_regs_base_ptr() {
