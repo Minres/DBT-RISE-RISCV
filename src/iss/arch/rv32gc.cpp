@@ -50,14 +50,10 @@ rv32gc::rv32gc()  = default;
 rv32gc::~rv32gc() = default;
 
 void rv32gc::reset(uint64_t address) {
-    auto base_ptr = reinterpret_cast<traits<rv32gc>::reg_t*>(get_regs_base_ptr());
-    for(size_t i=0; i<traits<rv32gc>::NUM_REGS; ++i)
-        *(base_ptr+i)=0;
+    std::memset(&reg, 0, sizeof(reg));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.PRIV=0x3;
-    reg.trap_state=0;
-    reg.icount=0;
 }
 
 uint8_t *rv32gc::get_regs_base_ptr() {

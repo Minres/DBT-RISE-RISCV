@@ -50,14 +50,10 @@ rv64imac::rv64imac()  = default;
 rv64imac::~rv64imac() = default;
 
 void rv64imac::reset(uint64_t address) {
-    auto base_ptr = reinterpret_cast<traits<rv64imac>::reg_t*>(get_regs_base_ptr());
-    for(size_t i=0; i<traits<rv64imac>::NUM_REGS; ++i)
-        *(base_ptr+i)=0;
+    std::memset(&reg, 0, sizeof(reg));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.PRIV=0x3;
-    reg.trap_state=0;
-    reg.icount=0;
 }
 
 uint8_t *rv64imac::get_regs_base_ptr() {
