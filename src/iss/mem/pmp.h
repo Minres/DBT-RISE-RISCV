@@ -167,11 +167,17 @@ template <typename PLAT, size_t NUM_ENTRIES> bool pmp<PLAT, NUM_ENTRIES>::pmp_ch
             auto is_na4 = pmp_a == PMP_NA4;
             reg_t mask = (pmpaddr[i] << 1) | (!is_na4);
             mask = ~(mask & ~(mask + 1)) << PMP_SHIFT;
-            // Check each 4-byte sector of the access
+            // Check every 4-byte sector the access touches. Counting offsets up to len
+            // skips the last sector whenever addr is not sector aligned, which fetches can
+            // be: fetch_ins always asks for 4 bytes and the fetch alignment is 2 on a
+            // compressed ISA, so an instruction at addr%4==2 spans two sectors. Note this
+            // also inspects the 2 bytes the ISS over-reads past a compressed instruction,
+            // so a fetch at the very end of an executable region is denied conservatively.
             auto any_match = false;
             auto all_match = true;
-            for(reg_t offset = 0; offset < len; offset += 1 << PMP_SHIFT) {
-                reg_t cur_addr = addr + offset;
+            constexpr reg_t sector_size = 1 << PMP_SHIFT;
+            reg_t last_sector = (addr + len - 1) & ~(sector_size - 1);
+            for(reg_t cur_addr = addr & ~(sector_size - 1); cur_addr <= last_sector; cur_addr += sector_size) {
                 auto napot_match = ((cur_addr ^ tor) & mask) == 0;
                 auto tor_match = base <= cur_addr && cur_addr < tor;
                 auto match = is_tor ? tor_match : napot_match;
