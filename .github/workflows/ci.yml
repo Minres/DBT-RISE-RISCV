@@ -179,3 +179,43 @@ jobs:
 
       - name: rv64gc_mp_8 8-entry enforcement test - interp (VP/S5 model)
         run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_8entry_guard_test --isa rv64gc_mp_8 --backend interp
+
+      - name: Build PMP fetch deny test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_fetch_deny_test \
+            contrib/fw/pmp-fetch-deny-test/pmp_fetch_deny_test.S
+
+      - name: rv64gc_mp_64 fetch execute-permission test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_fetch_deny_test --isa rv64gc_mp_64 --backend interp
+
+      - name: Build PMP fetch straddle test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_fetch_straddle_test \
+            contrib/fw/pmp-fetch-straddle-test/pmp_fetch_straddle_test.S
+
+      - name: rv64gc_mp_64 straddling-fetch sector test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_fetch_straddle_test --isa rv64gc_mp_64 --backend interp
+
+      - name: Build PMP lock test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_lock_test \
+            contrib/fw/pmp-lock-test/pmp_lock_test.S
+
+      - name: rv64gc_mp_64 lock-bit test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_lock_test --isa rv64gc_mp_64 --backend interp
+
+      - name: Build PMP no-entry U-mode test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_noentry_umode_test \
+            contrib/fw/pmp-noentry-umode-test/pmp_noentry_umode_test.S
+
+      - name: rv64gc_mup no-entry U-mode denial test - interp
+        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_noentry_umode_test --isa rv64gc_mup --backend interp
