@@ -167,8 +167,10 @@ protected:
 };
 
 template <typename PLAT, size_t NUM_ENTRIES> bool pmp<PLAT, NUM_ENTRIES>::pmp_check(access_type type, uint64_t addr, unsigned len) {
+    // No entry can match, so this is the no-match outcome: M mode is unrestricted while
+    // S/U mode fails, since entries are implemented. Matches the fall-through below.
     if(!any_active)
-        return true;
+        return hart_if.PRIV == arch::PRIV_M;
     reg_t base = 0;
     for(size_t i = 0; i < NUM_ENTRIES; i++) {
         reg_t tor = pmpaddr[i] << PMP_SHIFT;

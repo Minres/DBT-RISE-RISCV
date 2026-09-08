@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <iss/arch/riscv_hart_m_p.h>
+#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/rv64gc.h>
 #include <iss/factory.h>
 #include <iss/mem/pmp.h>
@@ -24,7 +25,7 @@ struct rv64gc_mp_hart : public arch::riscv_hart_m_p<arch::rv64gc> {
     }
 };
 
-// rv64gc_mp_8_hart: same as rv64gc_mp but with only 8 PMP entries (models SiFive S5).
+// rv64gc_mp_64_hart: same wiring, with the full 64 PMP entries.
 struct rv64gc_mp_64_hart : public arch::riscv_hart_m_p<arch::rv64gc> {
     mem::pmp<arch::rv64gc, 64> pmp_obj{this->get_priv_if()};
 
@@ -34,6 +35,7 @@ struct rv64gc_mp_64_hart : public arch::riscv_hart_m_p<arch::rv64gc> {
     }
 };
 
+// rv64gc_mp_8_hart: only 8 PMP entries (models SiFive S5).
 struct rv64gc_mp_8_hart : public arch::riscv_hart_m_p<arch::rv64gc> {
     mem::pmp<arch::rv64gc, 8> pmp_obj{this->get_priv_if()};
 
@@ -43,9 +45,21 @@ struct rv64gc_mp_8_hart : public arch::riscv_hart_m_p<arch::rv64gc> {
     }
 };
 
+// rv64gc_mup_hart: PMP on a hart that also implements U mode, so the privilege
+// dependent parts of pmp_check are reachable. The M-only wrappers pin PRIV to
+// PRIV_M, which makes any S/U behaviour untestable.
+struct rv64gc_mup_hart : public arch::riscv_hart_mu_p<arch::rv64gc> {
+    mem::pmp<arch::rv64gc> pmp_obj{this->get_priv_if()};
+
+    rv64gc_mup_hart() {
+        pmp_obj.set_next(this->default_mem.get_mem_if());
+        memory = pmp_obj.get_mem_if();
+    }
+};
+
 namespace {
 
-volatile std::array<bool, 3> rv64gc_mp_dummy = {
+volatile std::array<bool, 4> rv64gc_mp_dummy = {
     core_factory::instance().register_creator("rv64gc_mp:interp",
                                               [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr> {
                                                   auto* cpu = new rv64gc_mp_hart();
@@ -66,8 +80,18 @@ volatile std::array<bool, 3> rv64gc_mp_dummy = {
                                                   }
                                                   return {cpu_ptr{cpu}, vm_ptr{iss::interp::create<arch::rv64gc>(cpu, port, false)}};
                                               }),
-    core_factory::instance().register_creator("rv64gc_mp_8:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr> {
-        auto* cpu = new rv64gc_mp_8_hart();
+    core_factory::instance().register_creator("rv64gc_mp_8:interp",
+                                              [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr> {
+                                                  auto* cpu = new rv64gc_mp_8_hart();
+                                                  if(init_data) {
+                                                      auto* cb =
+                                                          reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv64gc>::reg_t>*>(init_data);
+                                                      cpu->set_semihosting_callback(*cb);
+                                                  }
+                                                  return {cpu_ptr{cpu}, vm_ptr{iss::interp::create<arch::rv64gc>(cpu, port, false)}};
+                                              }),
+    core_factory::instance().register_creator("rv64gc_mup:interp", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr> {
+        auto* cpu = new rv64gc_mup_hart();
         if(init_data) {
             auto* cb = reinterpret_cast<semihosting_cb_t<arch::traits<arch::rv64gc>::reg_t>*>(init_data);
             cpu->set_semihosting_callback(*cb);
