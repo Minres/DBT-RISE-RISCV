@@ -189,37 +189,6 @@ template <typename PLAT, size_t NUM_ENTRIES> bool pmp<PLAT, NUM_ENTRIES>::pmp_ch
         }
         base = tor;
     }
-    //    constexpr auto pmp_num_regs = 16;
-    //    reg_t tor_base = 0;
-    //    auto any_active = false;
-    //    auto lower_addr = addr >>2;
-    //    auto upper_addr = (addr+len-1)>>2;
-    //    for (size_t i = 0; i < pmp_num_regs; i++) {
-    //        uint8_t cfg = csr[pmpcfg0+(i/4)]>>(i%4);
-    //        uint8_t cfg_next = i==(pmp_num_regs-1)? 0 : csr[pmpcfg0+((i+1)/4)]>>((i+1)%4);
-    //        auto pmpaddr = csr[pmpaddr0+i];
-    //        if (cfg & PMP_A) {
-    //            any_active=true;
-    //            auto is_tor = bit_sub<3, 2>(cfg) == PMP_TOR;
-    //            auto is_napot = bit_sub<4, 1>(cfg) && bit_sub<3, 2>(cfg_next)!= PMP_TOR;
-    //            if(is_napot) {
-    //                reg_t mask = bit_sub<3, 1>(cfg)?~( pmpaddr & ~(pmpaddr + 1)): 0x3fffffff;
-    //                auto mpmpaddr = pmpaddr & mask;
-    //                if((lower_addr&mask) == mpmpaddr && (upper_addr&mask)==mpmpaddr)
-    //                    return  (hart_if.reg.PRIV == PRIV_M && !(cfg & PMP_L)) ||
-    //                            (type == access_type::READ && (cfg & PMP_R)) ||
-    //                            (type == access_type::WRITE && (cfg & PMP_W)) ||
-    //                            (type == access_type::FETCH && (cfg & PMP_X));
-    //            } else if(is_tor) {
-    //                if(lower_addr>=tor_base && upper_addr<=pmpaddr)
-    //                    return  (hart_if.reg.PRIV == PRIV_M && !(cfg & PMP_L)) ||
-    //                            (type == access_type::READ && (cfg & PMP_R)) ||
-    //                            (type == access_type::WRITE && (cfg & PMP_W)) ||
-    //                            (type == access_type::FETCH && (cfg & PMP_X));
-    //            }
-    //        }
-    //        tor_base = pmpaddr;
-    //    }
     return hart_if.PRIV == arch::PRIV_M;
 }
 
