@@ -90,10 +90,9 @@ private:
 
     iss::status read_mem(const addr_t& addr, unsigned length, uint8_t* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");
+        // debug accesses bypass PMP so a debugger can inspect protected memory
         if(likely(addr.space == arch::traits<PLAT>::MEM || std::numeric_limits<decltype(phys_addr_t::space)>::max()) &&
            !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
-            if(is_debug(addr.access))
-                throw trap_access(0, addr.val);
             // trap is raised in privilege wrapper
             return iss::Err;
         }
@@ -102,9 +101,8 @@ private:
 
     iss::status write_mem(const addr_t& addr, unsigned length, uint8_t const* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");
+        // debug accesses bypass PMP so a debugger can modify protected memory
         if(likely(addr.space == arch::traits<PLAT>::MEM) && !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
-            if(is_debug(addr.access))
-                throw trap_access(0, addr.val);
             // trap is raised in privilege wrapper, so we just return error
             return iss::Err;
         }
