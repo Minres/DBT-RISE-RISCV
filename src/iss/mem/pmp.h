@@ -91,7 +91,8 @@ private:
     iss::status read_mem(const addr_t& addr, unsigned length, uint8_t* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) && "Only physical addresses are expected in pmp");
         // debug accesses bypass PMP so a debugger can inspect protected memory
-        if(likely(addr.space == arch::traits<PLAT>::MEM || std::numeric_limits<decltype(phys_addr_t::space)>::max()) &&
+        // instruction fetches arrive in the IMEM space, data reads in MEM; both are subject to PMP
+        if(likely(addr.space == arch::traits<PLAT>::MEM || addr.space == arch::traits<PLAT>::IMEM) &&
            !pmp_check(addr.access, addr.val, length) && !is_debug(addr.access)) {
             // trap is raised in privilege wrapper
             return iss::Err;
