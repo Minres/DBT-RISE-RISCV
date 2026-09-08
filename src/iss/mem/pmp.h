@@ -126,6 +126,9 @@ private:
         return iss::Err;
     }
 
+    // config byte of entry i, extracted from the cfg register that packs it
+    uint8_t cfg_byte(size_t i) const { return (pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8)) & 0xff; }
+
     iss::status read_pmpcfg(unsigned addr, reg_t& val) {
         if(addr >= arch::pmpcfg0 && addr < arch::pmpcfg0 + (NUM_ENTRIES / cfg_reg_size) * pmpcfg_stride) {
             val = pmpcfg[(addr - arch::pmpcfg0) / pmpcfg_stride];
@@ -137,10 +140,8 @@ private:
         if(addr >= arch::pmpcfg0 && addr < arch::pmpcfg0 + (NUM_ENTRIES / cfg_reg_size) * pmpcfg_stride) {
             pmpcfg[(addr - arch::pmpcfg0) / pmpcfg_stride] = val & cfg_valid_mask;
             any_active = false;
-            for(size_t i = 0; i < NUM_ENTRIES; i++) {
-                auto cfg = pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8);
-                any_active |= cfg & PMP_A;
-            }
+            for(size_t i = 0; i < NUM_ENTRIES; i++)
+                any_active |= cfg_byte(i) & PMP_A;
             return iss::Ok;
         }
         return iss::Err;
@@ -160,7 +161,7 @@ template <typename PLAT, size_t NUM_ENTRIES> bool pmp<PLAT, NUM_ENTRIES>::pmp_ch
     reg_t base = 0;
     for(size_t i = 0; i < NUM_ENTRIES; i++) {
         reg_t tor = pmpaddr[i] << PMP_SHIFT;
-        reg_t cfg = pmpcfg[i / cfg_reg_size] >> ((i % cfg_reg_size) * 8);
+        reg_t cfg = cfg_byte(i);
         if(cfg & PMP_A) {
             auto pmp_a = (cfg & PMP_A) >> 3;
             auto is_tor = pmp_a == PMP_TOR;
