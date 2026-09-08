@@ -8,16 +8,7 @@
 // Pass: PMP denies load -> load fault fires -> j . (exit 0)
 // Fail: any CSR trap, OR load succeeds without fault -> semihosting SYS_EXIT (exit 2)
 
-.macro semihosting_fail
-    li   a0, 0x18
-    .option push
-    .option norvc
-    slli zero, zero, 0x1f
-    ebreak
-    srai zero, zero, 7
-    .option pop
-    j    .
-.endm
+#include "pmp_test_common.h"
 
 .section .text
 .globl _start

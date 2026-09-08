@@ -3,6 +3,8 @@
 // Pass: write 0x9F -> read back 0x9F -> write 0 -> read back 0 -> j . (exit 0)
 // Fail: any trap or readback mismatch -> semihosting SYS_EXIT (exit 2)
 
+#include "pmp_test_common.h"
+
 .section .text
 .globl _start
 _start:
@@ -24,11 +26,4 @@ _start:
     j    .                  // pass
 
 fail:
-    li   a0, 0x18
-    .option push
-    .option norvc
-    slli zero, zero, 0x1f
-    ebreak
-    srai zero, zero, 7
-    .option pop
-    j    .
+    semihosting_fail

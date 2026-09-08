@@ -5,6 +5,8 @@
 // Pass: readback == written value -> j . (exit 0)
 // Fail: readback != written value -> semihosting SYS_EXIT (exit 2)
 
+#include "pmp_test_common.h"
+
 .section .text
 .globl _start
 _start:
@@ -17,11 +19,4 @@ _start:
     j    .              // pass: ISS detects j . and exits 0
 
 fail:
-    li   a0, 0x18
-    .option push
-    .option norvc
-    slli zero, zero, 0x1f
-    ebreak
-    srai zero, zero, 7
-    .option pop
-    j    .
+    semihosting_fail

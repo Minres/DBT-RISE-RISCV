@@ -8,6 +8,8 @@
 // Pass: load fault fires -> j . (exit 0)
 // Fail: load succeeds without fault -> semihosting SYS_EXIT (exit 2)
 
+#include "pmp_test_common.h"
+
 .section .text
 .globl _start
 _start:
@@ -38,14 +40,7 @@ _start:
 
     // No fault fired -> bug present
 fail:
-    li   a0, 0x18
-    .option push
-    .option norvc
-    slli zero, zero, 0x1f
-    ebreak
-    srai zero, zero, 7
-    .option pop
-    j    .
+    semihosting_fail
 
 pmp_fault:
     j    .              // load denied as expected -> PASS
