@@ -120,7 +120,12 @@ private:
 
     iss::status write_pmpaddr(unsigned addr, reg_t const& val) {
         if(addr >= arch::pmpaddr0 && addr < arch::pmpaddr0 + NUM_ENTRIES) {
-            pmpaddr[addr - arch::pmpaddr0] = val;
+            auto i = addr - arch::pmpaddr0;
+            // L freezes the entry's own address; a locked TOR entry additionally freezes
+            // the preceding address register, which supplies its lower bound
+            auto locked_as_tor_base = i + 1 < NUM_ENTRIES && (cfg_byte(i + 1) & PMP_L) && ((cfg_byte(i + 1) & PMP_A) >> 3) == PMP_TOR;
+            if(!(cfg_byte(i) & PMP_L) && !locked_as_tor_base)
+                pmpaddr[i] = val;
             return iss::Ok;
         }
         return iss::Err;
@@ -138,7 +143,13 @@ private:
     }
     iss::status write_pmpcfg(unsigned addr, reg_t val) {
         if(addr >= arch::pmpcfg0 && addr < arch::pmpcfg0 + (NUM_ENTRIES / cfg_reg_size) * pmpcfg_stride) {
-            pmpcfg[(addr - arch::pmpcfg0) / pmpcfg_stride] = val & cfg_valid_mask;
+            auto reg = (addr - arch::pmpcfg0) / pmpcfg_stride;
+            // a locked entry keeps its config byte until reset, so retain those bytes
+            reg_t locked = 0;
+            for(size_t b = 0; b < cfg_reg_size; b++)
+                if(cfg_byte(reg * cfg_reg_size + b) & PMP_L)
+                    locked |= reg_t(0xff) << (b * 8);
+            pmpcfg[reg] = (pmpcfg[reg] & locked) | ((val & cfg_valid_mask) & ~locked);
             any_active = false;
             for(size_t i = 0; i < NUM_ENTRIES; i++)
                 any_active |= cfg_byte(i) & PMP_A;
