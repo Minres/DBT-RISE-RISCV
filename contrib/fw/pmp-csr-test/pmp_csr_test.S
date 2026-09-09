@@ -20,7 +20,7 @@ _start:
 
     j    .              // pass: ISS detects j . and exits 0
 
-fail:
+trap_entry fail
     // Semihosting SYS_EXIT: the ISS checks for slli+ebreak+srai and intercepts
     // before dispatching to mtvec. Must use 4-byte ebreak (not c.ebreak) so the
     // check lands at the correct offsets (-4 and +4 from the ebreak address).

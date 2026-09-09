@@ -32,10 +32,10 @@ _start:
 
     semihosting_fail    // no fault: enforcement did not fire -> FAIL
 
-phase1_trap:
+trap_entry phase1_trap
     semihosting_fail    // CSR trapped: PMP unavailable -> FAIL
 
-phase2_trap:
+trap_entry phase2_trap
     j    .              // load denied as expected -> PASS
 
     .align 2

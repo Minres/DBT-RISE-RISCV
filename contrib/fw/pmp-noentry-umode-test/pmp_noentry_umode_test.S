@@ -37,7 +37,7 @@ _start:
     // Only reached if mret did not transfer control at all
     semihosting_fail
 
-pmp_fault:
+trap_entry pmp_fault
     j    .                  // U-mode access denied as expected -> PASS
 
 umode_entry:

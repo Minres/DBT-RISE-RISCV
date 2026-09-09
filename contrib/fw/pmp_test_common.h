@@ -23,4 +23,14 @@
     j    .              // fallback if semihosting is not configured
 .endm
 
+// Start a trap handler. mtvec's low two bits hold the vectoring mode, so a
+// handler that is only 2-byte aligned has its address truncated and the hart
+// vectors two bytes early. That lands inside a preceding semihosting_fail, whose
+// trailing `j .` reads as the pass condition, so a misaligned handler makes a
+// test pass without its body ever running. Always declare handlers with this.
+.macro trap_entry name
+    .align 2
+\name\():
+.endm
+
 #endif // PMP_TEST_COMMON_H

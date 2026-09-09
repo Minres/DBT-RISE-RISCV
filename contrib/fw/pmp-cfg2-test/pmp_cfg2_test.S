@@ -20,5 +20,5 @@ _start:
 
     j    .              // pass: ISS detects j . and exits 0
 
-fail:
+trap_entry fail
     semihosting_fail

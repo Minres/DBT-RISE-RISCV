@@ -62,5 +62,5 @@ _start:
 
     j    .                      // every locked value retained -> PASS
 
-fail:
+trap_entry fail
     semihosting_fail

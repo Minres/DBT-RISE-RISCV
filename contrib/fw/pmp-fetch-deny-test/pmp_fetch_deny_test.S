@@ -9,8 +9,8 @@
 // X permission. L=1 is required because pmp_check grants M-mode unconditionally
 // when L=0.
 //
-// Pass: fetch of target is denied -> fault fires -> j . (exit 0)
-// Fail: any CSR trap, OR the fetch succeeds -> semihosting SYS_EXIT (exit 2)
+// Pass: fetch of target is denied and reports an instruction access fault -> j . (exit 0)
+// Fail: any CSR trap, the fetch succeeds, or the cause is wrong -> semihosting SYS_EXIT (exit 2)
 
 #include "pmp_test_common.h"
 
@@ -35,11 +35,18 @@ _start:
 
     jr   t5             // fetch from target: PMP must deny (no X)
 
-csr_trap:
+trap_entry csr_trap
     semihosting_fail    // CSR trapped: PMP unavailable -> FAIL
 
-pmp_fault:
-    j    .              // fetch denied as expected -> PASS
+trap_entry pmp_fault
+    // A denied fetch is an instruction access fault, not a load access fault.
+    csrr t1, mcause
+    li   t2, 1          // RV_CAUSE_FETCH_ACCESS
+    bne  t1, t2, fail
+    j    .              // fetch denied with the correct cause -> PASS
+
+fail:
+    semihosting_fail
 
     .align 2            // 4-byte align so the NA4 region covers this exactly
 target:

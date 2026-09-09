@@ -17,5 +17,5 @@ _start:
 
     j    .                  // pass
 
-fail:
+trap_entry fail
     semihosting_fail

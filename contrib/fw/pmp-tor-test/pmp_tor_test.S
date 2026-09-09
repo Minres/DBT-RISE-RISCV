@@ -39,10 +39,10 @@ _start:
     ld   t2, 0(t5)
 
     // No fault fired -> bug present
-fail:
+trap_entry fail
     semihosting_fail
 
-pmp_fault:
+trap_entry pmp_fault
     j    .              // load denied as expected -> PASS
 
     .align 3            // 8-byte align for ld

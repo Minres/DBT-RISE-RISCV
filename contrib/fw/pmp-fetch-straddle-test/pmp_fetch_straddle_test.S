@@ -19,8 +19,8 @@
 //        fall-through allows the fetch, the jump runs -> FAIL.
 // Fixed: sector base+4 matches, the overlap is partial -> denied -> PASS.
 //
-// Pass: fetch of the straddling instruction is denied -> j . (exit 0)
-// Fail: any CSR trap, OR the fetch succeeds -> semihosting SYS_EXIT (exit 2)
+// Pass: the straddling fetch is denied and reports an instruction access fault -> j . (exit 0)
+// Fail: any CSR trap, the fetch succeeds, or the cause is wrong -> semihosting SYS_EXIT (exit 2)
 
 #include "pmp_test_common.h"
 
@@ -46,10 +46,14 @@ _start:
 
     jr   t5             // enter at straddle_base, which is 4-byte aligned
 
-csr_trap:
+trap_entry csr_trap
     semihosting_fail    // CSR trapped: PMP unavailable -> FAIL
 
-pmp_fault:
+trap_entry pmp_fault
+    // A denied fetch is an instruction access fault, not a load access fault.
+    csrr t1, mcause
+    li   t2, 1          // RV_CAUSE_FETCH_ACCESS
+    bne  t1, t2, fetch_allowed
     j    .              // straddling fetch denied as expected -> PASS
 
 fetch_allowed:

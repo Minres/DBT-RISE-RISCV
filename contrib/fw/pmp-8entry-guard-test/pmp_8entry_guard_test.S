@@ -30,10 +30,10 @@ _start:
 
     semihosting_fail        // no fault -> FAIL
 
-phase1_trap:
+trap_entry phase1_trap
     semihosting_fail        // CSR trap -> FAIL
 
-phase2_trap:
+trap_entry phase2_trap
     j    .                  // load denied as expected -> PASS
 
     .align 2
