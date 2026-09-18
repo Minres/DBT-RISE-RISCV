@@ -8,7 +8,8 @@ project(dbt-rise-riscv VERSION 2.1.0 LANGUAGES C CXX)
 
 option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON)
 option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
-option(NO_GENERIC_CORES "Leave out the genric cores to improve build times" OFF)
+option(NO_GENERIC_CORES "Leave out the generic cores to improve build times" OFF)
+option(DBT_RISE_RISCV_ENABLE_VECTOR "Build RISC-V vector cores and VMs" ON)
 include(GNUInstallDirs)
 include(flink)
 
@@ -80,21 +81,25 @@ if(NOT NO_GENERIC_CORES)
         src/iss/arch/rv32i.cpp
         src/iss/arch/rv32imac.cpp
         src/iss/arch/rv32gc.cpp
-        src/iss/arch/rv32gcv.cpp
         src/iss/arch/rv64i.cpp
         src/iss/arch/rv64imac.cpp
         src/iss/arch/rv64gc.cpp
-        src/iss/arch/rv64gcv.cpp
         src/vm/interp/vm_rv32i.cpp
         src/vm/interp/vm_rv32imac.cpp
         src/vm/interp/vm_rv32gc.cpp
-        src/vm/interp/vm_rv32gcv.cpp
         src/vm/interp/vm_rv64i.cpp
         src/vm/interp/vm_rv64imac.cpp
         src/vm/interp/vm_rv64gc.cpp
         src/vm/interp/vm_rv64gc_mp.cpp
-        src/vm/interp/vm_rv64gcv.cpp
     )
+    if(DBT_RISE_RISCV_ENABLE_VECTOR)
+        list(APPEND LIB_SOURCES
+            src/iss/arch/rv32gcv.cpp
+            src/iss/arch/rv64gcv.cpp
+            src/vm/interp/vm_rv32gcv.cpp
+            src/vm/interp/vm_rv64gcv.cpp
+        )
+    endif()
 endif()
 if(TARGET yaml-cpp::yaml-cpp)
     list(APPEND LIB_SOURCES
@@ -128,12 +133,16 @@ if(WITH_ASMJIT)
             src/vm/asmjit/vm_rv32i.cpp
             src/vm/asmjit/vm_rv32imac.cpp
             src/vm/asmjit/vm_rv32gc.cpp
-            src/vm/asmjit/vm_rv32gcv.cpp
             src/vm/asmjit/vm_rv64i.cpp
             src/vm/asmjit/vm_rv64imac.cpp
             src/vm/asmjit/vm_rv64gc.cpp
-            src/vm/asmjit/vm_rv64gcv.cpp
         )
+        if(DBT_RISE_RISCV_ENABLE_VECTOR)
+            list(APPEND LIB_SOURCES
+                src/vm/asmjit/vm_rv32gcv.cpp
+                src/vm/asmjit/vm_rv64gcv.cpp
+            )
+        endif()
     endif()
 endif()
 
@@ -283,10 +292,16 @@ if(TARGET scc-sysc)
 
     set(LIB_SOURCES
         src/sysc/core_complex.cpp
-        src/sysc/register_cores.cpp
-        src/sysc/register_rv32gcv.cpp
-        src/sysc/register_rv64gcv.cpp
     )
+    if(NOT NO_GENERIC_CORES)
+        list(APPEND LIB_SOURCES src/sysc/register_cores.cpp)
+        if(DBT_RISE_RISCV_ENABLE_VECTOR)
+            list(APPEND LIB_SOURCES
+                src/sysc/register_rv32gcv.cpp
+                src/sysc/register_rv64gcv.cpp
+            )
+        endif()
+    endif()
 
     if(IS_DIRECTORY "${PROJECT_SOURCE_DIR}/../dbt-rise-custom")
         FILE(GLOB GEN_SC_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../dbt-rise-custom/src/sysc/register_*.cpp)
