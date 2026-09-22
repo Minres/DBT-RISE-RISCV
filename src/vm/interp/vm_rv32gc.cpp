@@ -3742,7 +3742,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox32(((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox32((((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4546,11 +4546,14 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     }
                     // used registers
                     auto* F = reinterpret_cast<uint64_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::F0]);
+                    auto* FCSR = reinterpret_cast<uint32_t*>(this->regs_base_ptr+arch::traits<ARCH>::reg_byte_offsets[arch::traits<ARCH>::FCSR]);
                     // calculate next pc value
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
                         *(F+rd) = NaNBox64(f32tof64(unbox_s(traits::FLEN, *(F+rs1)), get_rm(rm)));
+                        uint32_t flags = fget_flags();
+                        *FCSR = (*FCSR & ~traits::FFLAG_MASK) | (flags & traits::FFLAG_MASK);
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -4592,7 +4595,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox64(((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox64((((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
