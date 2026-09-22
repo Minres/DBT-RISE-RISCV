@@ -487,16 +487,20 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
 
         csr_rd_cb[mcycle] = MK_CSR_RD_CB(read_cycle);
         csr_wr_cb[mcycle] = MK_CSR_WR_CB(write_cycle);
-        if(traits<BASE>::XLEN == 32)
+        if(traits<BASE>::XLEN == 32) {
             csr_rd_cb[mcycleh] = MK_CSR_RD_CB(read_cycle);
-        if(traits<BASE>::XLEN == 32)
             csr_wr_cb[mcycleh] = MK_CSR_WR_CB(write_cycle);
+        }
         csr_rd_cb[minstret] = MK_CSR_RD_CB(read_instret);
         csr_wr_cb[minstret] = MK_CSR_WR_CB(write_instret);
-        if(traits<BASE>::XLEN == 32)
+        if(traits<BASE>::XLEN == 32) {
             csr_rd_cb[minstreth] = MK_CSR_RD_CB(read_instret);
-        if(traits<BASE>::XLEN == 32)
             csr_wr_cb[minstreth] = MK_CSR_WR_CB(write_instret);
+        }
+        if(traits<BASE>::XLEN == 32) {
+            csr_rd_cb[mstatush] = MK_CSR_RD_CB(read_null);
+            csr_wr_cb[mstatush] = MK_CSR_WR_CB(write_null);
+        }
         csr_rd_cb[mhartid] = MK_CSR_RD_CB(read_hartid);
     };
 
