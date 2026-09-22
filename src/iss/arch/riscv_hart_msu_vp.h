@@ -631,6 +631,8 @@ template <typename BASE, features_e FEAT> uint64_t riscv_hart_msu_vp<BASE, FEAT>
         case traits<BASE>::RV_CAUSE_ILLEGAL_INSTRUCTION:
 #ifdef MTVAL_ILLEGAL_INFORMATIVE
             this->csr[utval | (new_priv << 8)] = (!this->has_compressed() || (tval & 0x3) == 3) ? tval : tval & 0xffff;
+#else
+            this->csr[utval | (new_priv << 8)] = 0;
 #endif
             break;
         case traits<BASE>::RV_CAUSE_BREAKPOINT:
