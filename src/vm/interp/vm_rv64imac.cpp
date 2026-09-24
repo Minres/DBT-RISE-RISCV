@@ -3737,13 +3737,13 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     break;
                 }// @suppress("No break at end of case")
                 case arch::traits<ARCH>::opcode_e::C__SRLI: {
-                    uint8_t nzuimm = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
+                    uint8_t shamt = ((bit_sub<2,5>(instr)) | (bit_sub<12,1>(instr) << 5));
                     uint8_t rs1 = ((bit_sub<7,3>(instr)));
                     if(this->disass_enabled){
                         /* generate console output when executing the command */
                         auto mnemonic = fmt::format(
-                            "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.srli"),
-                            fmt::arg("rs1", name(8+rs1)), fmt::arg("nzuimm", nzuimm));
+                            "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.srli"),
+                            fmt::arg("rs1", name(8+rs1)), fmt::arg("shamt", shamt));
                         this->core.disass_output(pc.val, mnemonic);
                     }
                     // used registers
@@ -3752,7 +3752,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 2;
                     // execute instruction
                     {
-                        *(X+rs1 + 8) = *(X+rs1 + 8) >> nzuimm;
+                        if(shamt) {
+                            *(X+rs1 + 8) = *(X+rs1 + 8) >> shamt;
+                        }
                     }
                     break;
                 }// @suppress("No break at end of case")
