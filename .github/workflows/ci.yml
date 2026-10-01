@@ -71,6 +71,7 @@ jobs:
     name: PMP Functional Tests
     runs-on: ubuntu-24.04
     needs: cpp-compliance
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -94,11 +95,11 @@ jobs:
 
       - name: rv64gc_m CSR test - interp (no PMP, expect exit 2)
         run: |
-          LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_m --backend interp || rc=$?
+          LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_csr_test --isa rv64gc_m --backend interp || rc=$?
           [ "${rc:-0}" -eq 2 ]
 
       - name: rv64gc_mp_64 CSR test - interp (with PMP)
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_csr_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_csr_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP enforcement test firmware
         run: |
@@ -108,7 +109,7 @@ jobs:
             contrib/fw/pmp-enforce-test/pmp_enforce_test.S
 
       - name: rv64gc_mp_64 enforcement test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_enforce_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP shift test firmware
         run: |
@@ -118,7 +119,7 @@ jobs:
             contrib/fw/pmp-shift-test/pmp_shift_test.S
 
       - name: rv64gc_mp_64 shift test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_shift_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_shift_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP upper-cfg test firmware
         run: |
@@ -128,7 +129,7 @@ jobs:
             contrib/fw/pmp-upper-cfg-test/pmp_upper_cfg_test.S
 
       - name: rv64gc_mp_64 upper-cfg test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_upper_cfg_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_upper_cfg_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP cfg2 test firmware
         run: |
@@ -138,7 +139,7 @@ jobs:
             contrib/fw/pmp-cfg2-test/pmp_cfg2_test.S
 
       - name: rv64gc_mp_64 cfg2 test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_cfg2_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_cfg2_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP TOR test firmware
         run: |
@@ -148,7 +149,7 @@ jobs:
             contrib/fw/pmp-tor-test/pmp_tor_test.S
 
       - name: rv64gc_mp_64 TOR test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_tor_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_tor_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 64-entry pmpaddr test firmware
         run: |
@@ -158,7 +159,7 @@ jobs:
             contrib/fw/pmp-64entry-addr-test/pmp_64entry_addr_test.S
 
       - name: rv64gc_mp_64 64-entry pmpaddr test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_addr_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_64entry_addr_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 64-entry pmpcfg test firmware
         run: |
@@ -168,7 +169,7 @@ jobs:
             contrib/fw/pmp-64entry-cfg-test/pmp_64entry_cfg_test.S
 
       - name: rv64gc_mp_64 64-entry pmpcfg test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_64entry_cfg_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_64entry_cfg_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP 8-entry guard test firmware (VP/S5 model)
         run: |
@@ -178,7 +179,7 @@ jobs:
             contrib/fw/pmp-8entry-guard-test/pmp_8entry_guard_test.S
 
       - name: rv64gc_mp_8 8-entry enforcement test - interp (VP/S5 model)
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_8entry_guard_test --isa rv64gc_mp_8 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_8entry_guard_test --isa rv64gc_mp_8 --backend interp
 
       - name: Build PMP fetch deny test firmware
         run: |
@@ -188,7 +189,7 @@ jobs:
             contrib/fw/pmp-fetch-deny-test/pmp_fetch_deny_test.S
 
       - name: rv64gc_mp_64 fetch execute-permission test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_fetch_deny_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_fetch_deny_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP fetch straddle test firmware
         run: |
@@ -198,7 +199,17 @@ jobs:
             contrib/fw/pmp-fetch-straddle-test/pmp_fetch_straddle_test.S
 
       - name: rv64gc_mp_64 straddling-fetch sector test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_fetch_straddle_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_fetch_straddle_test --isa rv64gc_mp_64 --backend interp
+
+      - name: Build PMP top-sector test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_top_sector_test \
+            contrib/fw/pmp-top-sector-test/pmp_top_sector_test.S
+
+      - name: rv64gc_mp_64 M-mode load from top 4-byte sector completes - interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_top_sector_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP lock test firmware
         run: |
@@ -208,7 +219,7 @@ jobs:
             contrib/fw/pmp-lock-test/pmp_lock_test.S
 
       - name: rv64gc_mp_64 lock-bit test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_lock_test --isa rv64gc_mp_64 --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_lock_test --isa rv64gc_mp_64 --backend interp
 
       - name: Build PMP no-entry U-mode test firmware
         run: |
@@ -218,4 +229,4 @@ jobs:
             contrib/fw/pmp-noentry-umode-test/pmp_noentry_umode_test.S
 
       - name: rv64gc_mup no-entry U-mode denial test - interp
-        run: LD_LIBRARY_PATH=. ./riscv-sim -f pmp_noentry_umode_test --isa rv64gc_mup --backend interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_noentry_umode_test --isa rv64gc_mup --backend interp
