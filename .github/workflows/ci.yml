@@ -201,6 +201,16 @@ jobs:
       - name: rv64gc_mp_64 straddling-fetch sector test - interp
         run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_fetch_straddle_test --isa rv64gc_mp_64 --backend interp
 
+      - name: Build PMP top-sector test firmware
+        run: |
+          riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
+            -Wl,-Ttext=0x10000,--no-dynamic-linker \
+            -o pmp_top_sector_test \
+            contrib/fw/pmp-top-sector-test/pmp_top_sector_test.S
+
+      - name: rv64gc_mp_64 M-mode load from top 4-byte sector completes - interp
+        run: LD_LIBRARY_PATH=. timeout 60 ./riscv-sim -f pmp_top_sector_test --isa rv64gc_mp_64 --backend interp
+
       - name: Build PMP lock test firmware
         run: |
           riscv64-unknown-elf-gcc -nostdlib -march=rv64gc -mabi=lp64 -I contrib/fw \
