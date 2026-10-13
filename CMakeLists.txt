@@ -10,6 +10,7 @@ option(UPDATE_EXTERNAL_PROJECT "Whether to pull changes in external projects" ON
 option(OPTIMIZE_FOR_NATIVE "Build with -march=native" OFF)
 option(NO_GENERIC_CORES "Leave out the generic cores to improve build times" OFF)
 option(DBT_RISE_RISCV_ENABLE_VECTOR "Build RISC-V vector cores and VMs" ON)
+option(DBT_RISE_RISCV_BUILD_SC_TESTS "Build the GoogleTest suite for the SystemC wrapper (needs SystemC, CCI and GTest)" OFF)
 include(GNUInstallDirs)
 include(flink)
 
@@ -356,6 +357,10 @@ if(TARGET scc-sysc)
         add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_sig)
     else()
         add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_tlm)
+    endif()
+    if(DBT_RISE_RISCV_BUILD_SC_TESTS)
+        enable_testing()
+        add_subdirectory(tests/sysc)
     endif()
 endif()
 
