@@ -47,6 +47,10 @@ class Pkg(ConanFile):
         self.requires("asmjit/cci.20240531")
         if "WITH_LLVM" in os.environ:
             self.requires("llvm-core/19.1.7")
+        if "WITH_SYSTEMC" in os.environ:
+            self.requires("systemc/3.0.1", override=True)
+            self.requires("systemc-cci/1.0.0")
+            self.requires("gtest/1.15.0")
         if os.path.isdir("dbt-rise-plugins"):
             self.requires("lua/5.4.3")
 

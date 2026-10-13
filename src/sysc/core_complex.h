@@ -59,6 +59,7 @@
 #endif
 #endif
 #include <memory>
+#include <optional>
 #include <tlm>
 #include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
@@ -309,6 +310,8 @@ protected:
     //
     ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
+    bool iss_running{false};
+    std::optional<uint64_t> pending_reset_addr;
     uint64_t qk_preaccounted_cycles{0};
     util::range_lut<tlm_dmi_ext> fetch_lut{tlm_dmi_ext()};
     util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space) {
