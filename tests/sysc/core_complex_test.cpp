@@ -16,14 +16,17 @@ constexpr int32_t loop_count_addr = 0x404;
 
 // Counts its own starts in one RAM word, then spins incrementing another.
 // RAM survives a core reset, so the start count tells how often the core
-// came out of reset. It starts with a nop because a reset taken while the core
-// waits in its quantum keeper resumes at the instruction after the reset
-// address.
+// came out of reset.
 std::vector<uint32_t> counting_program() {
     using namespace rv32;
     return {
-        addi(0, 0, 0), lw(5, start_count_addr, 0), addi(5, 5, 1), sw(5, start_count_addr, 0), lw(6, loop_count_addr, 0), // loop:
-        addi(6, 6, 1), sw(6, loop_count_addr, 0),  jal(0, -12),                                                          // j loop
+        lw(5, start_count_addr, 0),
+        addi(5, 5, 1),
+        sw(5, start_count_addr, 0),
+        lw(6, loop_count_addr, 0), // loop:
+        addi(6, 6, 1),
+        sw(6, loop_count_addr, 0),
+        jal(0, -12), // j loop
     };
 }
 
@@ -74,6 +77,16 @@ TEST_F(CoreComplexTest, KeepsExecutingAfterAResetWhileRunning) {
     sc_start(sc_time(100, SC_US));
 
     EXPECT_GT(loop_count(), loops_at_reset);
+}
+
+TEST_F(CoreComplexTest, RestartsAtTheResetAddressAfterAResetWhileRunning) {
+    sc_spawn([this] {
+        wait(sc_time(100, SC_US));
+        tb->cpu.reset(reset_address);
+    });
+    sc_start(sc_time(200, SC_US));
+
+    EXPECT_EQ(start_count(), 2u);
 }
 
 } // namespace
