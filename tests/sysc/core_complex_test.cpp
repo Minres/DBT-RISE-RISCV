@@ -62,4 +62,18 @@ TEST_F(CoreComplexTest, AdvancesSimulationTimeWhileRunning) {
     EXPECT_GT(loop_count(), loops_at_100us);
 }
 
+// A peripheral may reset the core from its own process while the core thread
+// is suspended in its quantum keeper.
+TEST_F(CoreComplexTest, KeepsExecutingAfterAResetWhileRunning) {
+    sc_spawn([this] {
+        wait(sc_time(100, SC_US));
+        tb->cpu.reset(reset_address);
+    });
+    sc_start(sc_time(100, SC_US) + sc_time(1, SC_NS));
+    auto loops_at_reset = loop_count();
+    sc_start(sc_time(100, SC_US));
+
+    EXPECT_GT(loop_count(), loops_at_reset);
+}
+
 } // namespace

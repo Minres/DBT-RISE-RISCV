@@ -125,7 +125,11 @@ int core_complex<BUSWIDTH, QK>::cmd_sysc(int argc, char* argv[], debugger::out_f
     return Err;
 }
 
-template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::reset(uint64_t addr) { vm->reset(addr); }
+template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::reset(uint64_t addr) {
+    vm->reset(addr);
+    // the reset clears the cycle counter, qk_sync would otherwise see a wrapped delta and stall the core
+    last_sync_cycle = vm->get_arch()->get_instrumentation_if()->get_total_cycles();
+}
 template <unsigned int BUSWIDTH, typename QK>
 inline std::pair<uint64_t, bool> core_complex<BUSWIDTH, QK>::load_file(std::string const& name) {
     iss::arch_if* cc = vm->get_arch();
