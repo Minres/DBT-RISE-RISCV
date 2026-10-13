@@ -126,6 +126,12 @@ int core_complex<BUSWIDTH, QK>::cmd_sysc(int argc, char* argv[], debugger::out_f
 }
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::reset(uint64_t addr) {
+    if(iss_running) {
+        // the core may be suspended mid-instruction, so stop it at the next instruction boundary and let run() apply the reset
+        pending_reset_addr = addr;
+        core->set_interrupt_execution(true);
+        return;
+    }
     vm->reset(addr);
     // the reset clears the cycle counter, qk_sync would otherwise see a wrapped delta and stall the core
     last_sync_cycle = vm->get_arch()->get_instrumentation_if()->get_total_cycles();
@@ -389,7 +395,14 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::r
         }
         quantum_keeper.reset(sc_core::sc_time_stamp());
         core->set_interrupt_execution(false);
+        iss_running = true;
         run_iss();
+        iss_running = false;
+        if(pending_reset_addr) {
+            reset(*pending_reset_addr);
+            pending_reset_addr.reset();
+            core->set_interrupt_execution(false);
+        }
     } while(!core->get_interrupt_execution());
     if(finish_evt_inuse)
         finish_evt.notify();

@@ -59,6 +59,7 @@
 #endif
 #endif
 #include <memory>
+#include <optional>
 #include <tlm>
 #include <tlm_utils/tlm_quantumkeeper.h>
 #include <util/range_lut.h>
@@ -191,9 +192,8 @@ public:
         qk_preaccounted_cycles -= preaccounted;
         assert(qk_preaccounted_cycles <= cycle_delta);
         auto core_inc = curr_clk * (cycle_delta - preaccounted);
-        // record before syncing: the core may be reset while suspended here and reset() resyncs last_sync_cycle
-        last_sync_cycle = cycle;
         quantum_keeper.check_and_sync(core_inc);
+        last_sync_cycle = cycle;
     }
     void qk_reset(uint64_t cycle) override {
         quantum_keeper.reset(quantum_keeper.get_local_absolute_time());
@@ -310,6 +310,8 @@ protected:
     //
     ///////////////////////////////////////////////////////////////////////////////
     uint64_t last_sync_cycle = 0;
+    bool iss_running{false};
+    std::optional<uint64_t> pending_reset_addr;
     uint64_t qk_preaccounted_cycles{0};
     util::range_lut<tlm_dmi_ext> fetch_lut{tlm_dmi_ext()};
     util::range_lut<tlm_dmi_ext>& get_read_lut(unsigned space) {
