@@ -191,8 +191,9 @@ public:
         qk_preaccounted_cycles -= preaccounted;
         assert(qk_preaccounted_cycles <= cycle_delta);
         auto core_inc = curr_clk * (cycle_delta - preaccounted);
-        quantum_keeper.check_and_sync(core_inc);
+        // record before syncing: the core may be reset while suspended here and reset() resyncs last_sync_cycle
         last_sync_cycle = cycle;
+        quantum_keeper.check_and_sync(core_inc);
     }
     void qk_reset(uint64_t cycle) override {
         quantum_keeper.reset(quantum_keeper.get_local_absolute_time());
