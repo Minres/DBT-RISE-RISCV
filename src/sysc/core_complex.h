@@ -225,12 +225,12 @@ public:
         return finish_evt;
     }
 
-    void register_csr_rd(unsigned csr_addr, sc2core_if::rd_csr_f& func) {
+    void register_csr_rd(unsigned csr_addr, sc2core_if::rd_csr_f const& func) {
         assert(core != nullptr);
         core->register_csr_rd(csr_addr, func);
     }
 
-    void register_csr_wr(unsigned csr_addr, sc2core_if::wr_csr_f& func) {
+    void register_csr_wr(unsigned csr_addr, sc2core_if::wr_csr_f const& func) {
         assert(core != nullptr);
         core->register_csr_wr(csr_addr, func);
     }
@@ -239,6 +239,8 @@ public:
         assert(core != nullptr);
         core->register_unknown_instr_handler(handler);
     }
+
+    unsigned get_reg_width() { return reg_width; }
 
 protected:
     void create_cpu(std::string const& type, std::string const& backend, unsigned gdb_port, uint32_t hart_id);
@@ -341,6 +343,7 @@ private:
     lut_vec_t dmi_write_luts{8, util::range_lut<tlm_dmi_ext>(tlm_dmi_ext())};
     util::range_lut<tlm_dmi_ext>& get_lut(lut_vec_t& luts, unsigned space);
     std::vector<iss::vm_plugin*> plugin_list;
+    unsigned reg_width{0};
 };
 } // namespace riscv
 } /* namespace sysc */
