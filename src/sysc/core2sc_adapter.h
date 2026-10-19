@@ -47,7 +47,7 @@
 #include <iss/mem/memory_if.h>
 #include <iss/vm_types.h>
 #include <scc/async_event.h>
-#include <scc/report.h>
+#include <scp/report.h>
 #include <shared_mutex>
 #include <sysc/kernel/sc_simcontext.h>
 #include <sysc/kernel/sc_time.h>
@@ -180,10 +180,10 @@ public:
         static CONSTEXPR char const* fmt_str = sizeof(reg_t) == 4 ? "[disass] 0x{:08x}    {:40} [p:{};s:0x{:02x};i:{};c:{}]"
                                                                   : "[disass] 0x{:012x}    {:40} [p:{};s:0x{:04x};i:{};c:{}]";
         if(printpc) {
-            SCCINFO(owner->hier_name()) << fmt::format(fmt_str, pc, str, this->lvl[this->reg.PRIV], (reg_t)this->state.mstatus,
-                                                       this->reg.icount, this->reg.cycle + this->cycle_offset);
+            SCP_INFO(()) << fmt::format(fmt_str, pc, str, this->lvl[this->reg.PRIV], (reg_t)this->state.mstatus, this->reg.icount,
+                                        this->reg.cycle + this->cycle_offset);
         } else {
-            SCCINFO(owner->hier_name()) << "[disass] " << str;
+            SCP_INFO(()) << "[disass] " << str;
         }
     };
     void no_disass(uint64_t pc, std::string const& str, bool printpc) { return; };
@@ -216,8 +216,8 @@ public:
                     SCCERR(owner->hier_name()) << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr
                                                << "), stopping simulation";
                 } else {
-                    SCCINFO(owner->hier_name())
-                        << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr << "), stopping simulation";
+                    SCP_INFO(()) << "tohost value is 0x" << std::hex << payload_addr << std::dec << " (" << payload_addr
+                                 << "), stopping simulation";
                 }
                 this->reg.trap_state = std::numeric_limits<uint32_t>::max();
                 this->interrupt_sim = payload_addr;
@@ -269,7 +269,7 @@ public:
         if(this->reg.trap_state)
             return;
         // now wait until something is happening
-        SCCDEBUG(owner->hier_name()) << "Sleeping until interrupt";
+        SCP_DEBUG(()) << "Sleeping until interrupt";
         wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
             auto start = sc_core::sc_time_stamp();
@@ -279,12 +279,12 @@ public:
                 if(is_debugger_stop_evt)
                     break;
             }
-            SCCDEBUG(this->owner->hier_name()) << "Got WFI event";
+            SCP_DEBUG(()) << "Got WFI event";
             auto duration = sc_core::sc_time_stamp() - start;
             if(clk_if && duration > sc_core::SC_ZERO_TIME) {
                 auto cycles = duration.value() / clk_if->read().value();
                 this->reg.cycle += cycles;
-                SCCDEBUG(owner->hier_name()) << "Increasing cycles by " << cycles << " after WFI";
+                SCP_DEBUG(()) << "Increasing cycles by " << cycles << " after WFI";
             }
             owner->qk_reset(this->instr_if.get_total_cycles());
         };
@@ -294,7 +294,7 @@ public:
 
     void cancel_wait() {
         if(wfi_inst.load(std::memory_order_relaxed) == true) {
-            SCCDEBUG(owner->hier_name()) << "Trigger debugger stop event";
+            SCP_DEBUG(()) << "Trigger debugger stop event";
             this->debugger_stop_evt.notify(sc_core::SC_ZERO_TIME);
         }
     }
@@ -345,11 +345,11 @@ private:
                 this->mip_csr &= ~mask;
             this->check_interrupt();
             if(value)
-                SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id
+                SCP_TRACE(()) << "Triggering interrupt " << id
 #ifndef NDEBUG
-                                             << " (Pending trap: " << std::hex << "0x"
-                                             << ((this->reg.pending_trap >> 16) & 0xff) // 0x80 << 24 | (cause << 16) | trap_id
-                                             << ")"
+                              << " (Pending trap: " << std::hex << "0x"
+                              << ((this->reg.pending_trap >> 16) & 0xff) // 0x80 << 24 | (cause << 16) | trap_id
+                              << ")"
 #endif
                     ;
         } else if(clic_ptr) { // CLIC mode
@@ -390,6 +390,7 @@ private:
     }
 
     sysc::riscv::core_complex_if* const owner{nullptr};
+    SCP_LOGGER(owner->hier_name());
     util::LoggerDelegate log_delegate;
     sc_core::sc_event wfi_evt;
     sc_core::sc_event debugger_stop_evt;

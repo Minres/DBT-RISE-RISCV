@@ -38,7 +38,6 @@
 #include "iss/arch_if.h"
 #include <iss/iss.h>
 #include <iss/vm_types.h>
-#include <scc/report.h>
 #include <util/delegate.h>
 #include <util/ities.h>
 

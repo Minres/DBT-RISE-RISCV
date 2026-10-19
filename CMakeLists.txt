@@ -41,12 +41,16 @@ if(WITH_SYSTEM_LLVM)
     endif()
 endif()
 
+if(NOT TARGET scc-util)
+    option(WITH_SCP4SCC "Build SCC with SCP compatibility support" ON)
+endif()
+
 include(FetchContent)
 if(NOT TARGET dbt-rise-core)
     FetchContent_Declare(
         dbt_rise_core_git
         GIT_REPOSITORY "https://github.com/Minres/DBT-RISE-Core.git"
-        GIT_TAG 6d53b71b9d0062ad3dc0305efd53b58de638f305
+        GIT_TAG b7f6c15d3ef1d26c3184e293b8ab11403882e54a
         GIT_SHALLOW OFF
         UPDATE_DISCONNECTED NOT ${UPDATE_EXTERNAL_PROJECT} # When enabled, this option causes the update step to be skipped.
     )
@@ -288,6 +292,13 @@ target_link_libraries(decoder_test PUBLIC dbt-rise-riscv)
 #
 ###############################################################################
 if(TARGET scc-sysc)
+    if(NOT WITH_SCP4SCC)
+        message(FATAL_ERROR
+            "The dbt-rise-riscv SystemC wrapper requires SCC's SCP compatibility support. "
+            "Set WITH_SCP4SCC=ON before configuring SCC (before add_subdirectory(scc) "
+            "or FetchContent_MakeAvailable(scc_git) in the parent project).")
+    endif()
+
     project(dbt-rise-riscv_sc VERSION 1.0.0)
     set(USE_SC_SIGNAL4IRQ OFF CACHE BOOL "Enable the use of sc_signals for interrupt delivery")
 
