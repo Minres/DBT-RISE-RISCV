@@ -51,7 +51,7 @@
 #ifndef WIN32
 #include <iss/plugin/loader.h>
 #endif
-#include <scc/report.h>
+#include <scp/report.h>
 #include <util/ities.h>
 #include <array>
 #include <iss/plugin/cycle_estimate.h>
@@ -115,8 +115,8 @@ int core_complex<BUSWIDTH, QK>::cmd_sysc(int argc, char* argv[], debugger::out_f
             } else
                 return Err;
             // no check needed as it is only called if debug server is active
-            tgt_adapter->add_break_condition([t]() -> unsigned {
-                SCCTRACE() << "Checking condition at " << sc_time_stamp();
+            tgt_adapter->add_break_condition([this, t]() -> unsigned {
+                SCP_TRACE(()) << "Checking condition at " << sc_time_stamp();
                 return sc_time_stamp() >= t ? std::numeric_limits<unsigned>::max() : 0;
             });
             return Ok;
@@ -162,7 +162,7 @@ void core_complex<BUSWIDTH, QK>::create_cpu(std::string const& type, std::string
                 os << "\n";
             os << "  backend " << e.first << ":\n  - " << util::join(e.second, "\n  - ");
         }
-        SCCINFO(SCMOD) << "\n" << os.str();
+        SCP_INFO(()) << "\n" << os.str();
     } else if(type.find(':') == std::string::npos) {
         std::tie(core, vm) = f.create(type + ":" + backend, gdb_port, this);
     } else {
@@ -265,7 +265,7 @@ template <unsigned int BUSWIDTH, typename QK> core_complex<BUSWIDTH, QK>::~core_
         auto instr_if = vm->get_arch()->get_instrumentation_if();
         auto instrs = instr_if->get_instr_count();
         auto cycles = instr_if->get_total_cycles();
-        SCCINFO(SCMOD) << "Ran " << instrs << " instructions in " << cycles << " cycles";
+        SCP_INFO(()) << "Ran " << instrs << " instructions in " << cycles << " cycles";
     }
 }
 
@@ -273,7 +273,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::t
 
 template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::before_end_of_elaboration() {
     auto& type = GET_PROP_VALUE(core_type);
-    SCCDEBUG(SCMOD) << "instantiating hart" << GET_PROP_VALUE(mhartid) << " " << type << " with " << GET_PROP_VALUE(backend) << " backend";
+    SCP_DEBUG(()) << "instantiating hart" << GET_PROP_VALUE(mhartid) << " " << type << " with " << GET_PROP_VALUE(backend) << " backend";
     create_cpu(type, GET_PROP_VALUE(backend), GET_PROP_VALUE(gdb_server_port), GET_PROP_VALUE(mhartid));
     if(type != "?" && (!core || !vm)) {
         SCCFATAL(SCOBJ) << "Could not create core " << type;
@@ -343,7 +343,7 @@ template <unsigned int BUSWIDTH, typename QK> void core_complex<BUSWIDTH, QK>::s
     }
     if(GET_PROP_VALUE(show_memory_map)) {
         auto result = tlm::scc::gather_memory(dbus.get_base_port());
-        SCCINFO(SCOBJ) << "DBUS memory map:\n" << result.to_string();
+        SCP_INFO(()) << "DBUS memory map:\n" << result.to_string();
     }
 }
 
@@ -426,13 +426,11 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             ibus_inc += lut_entry.get_read_latency() / curr_clk;
         else
             dbus_inc += lut_entry.get_read_latency() / curr_clk;
-#ifndef NDEBUG
-        SCCTRACEALL(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex
-                                  << addr.val << ") : 0x"
-                                  << (length == 4   ? *(uint32_t*)data
-                                      : length == 2 ? *(uint16_t*)data
-                                                    : (unsigned)*data);
-#endif
+        SCP_TRACEALL(()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_read_mem(0x" << std::hex << addr.val
+                         << ") : 0x"
+                         << (length == 4   ? *(uint32_t*)data
+                             : length == 2 ? *(uint16_t*)data
+                                           : (unsigned)*data);
         return true;
     } else {
         tlm::tlm_generic_payload gp;
@@ -466,10 +464,10 @@ bool core_complex<BUSWIDTH, QK>::read_mem(const addr_t& addr, unsigned length, u
             quantum_keeper.reset(local_time_post);
             qk_preaccounted_cycles += incr;
         }
-        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+        SCP_TRACE(()) << "[local offset: +" << delay << "]: finish read_mem(0x" << std::hex << addr.val << ") : 0x"
+                      << (length == 4   ? *(uint32_t*)data
+                          : length == 2 ? *(uint16_t*)data
+                                        : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {
@@ -492,13 +490,11 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
         auto offset = addr.val - lut_entry.get_start_address();
         std::copy(data, data + length, lut_entry.get_dmi_ptr() + offset);
         dbus_inc += lut_entry.get_write_latency() / curr_clk;
-#ifndef NDEBUG
-        SCCTRACEALL(this->name()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex
-                                  << addr.val << ") : 0x"
-                                  << (length == 4   ? *(uint32_t*)data
-                                      : length == 2 ? *(uint16_t*)data
-                                                    : (unsigned)*data);
-#endif
+        SCP_TRACEALL(()) << "[local offset: +" << quantum_keeper.get_local_time() << "]: finish dmi_write_mem(0x" << std::hex << addr.val
+                         << ") : 0x"
+                         << (length == 4   ? *(uint32_t*)data
+                             : length == 2 ? *(uint16_t*)data
+                                           : (unsigned)*data);
         return true;
     } else {
         write_buf.resize(length);
@@ -530,10 +526,10 @@ bool core_complex<BUSWIDTH, QK>::write_mem(const addr_t& addr, unsigned length, 
             quantum_keeper.reset(local_time_post);
             qk_preaccounted_cycles += incr;
         }
-        SCCTRACE(this->name()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
-                               << (length == 4   ? *(uint32_t*)data
-                                   : length == 2 ? *(uint16_t*)data
-                                                 : (unsigned)*data);
+        SCP_TRACE(()) << "[local offset: +" << delay << "]: finish write_mem(0x" << std::hex << addr.val << ") : 0x"
+                      << (length == 4   ? *(uint32_t*)data
+                          : length == 2 ? *(uint16_t*)data
+                                        : (unsigned)*data);
         if(gp.get_response_status() != tlm::TLM_OK_RESPONSE)
             return false;
         if(gp.is_dmi_allowed() && !GET_PROP_VALUE(disable_dmi)) {

@@ -23,6 +23,8 @@ Along with the different ISA implementations there is a wrapper implementing the
 For an example take a look at [ https://github.com/Minres/RISCV-VP]( https://github.com/Minres/RISCV-VP).
 
 Last but not least a SystemC wrapper is provided to allow easy integration into SystemC based virtual platforms (e.g. https://github.com/Minres/RISCV-VP).
+The SystemC wrapper requires SCP logging support. This is supported by the SCC and only requires setting the option `WITH_SCP4SCC` before adding SCC:
+
 
 Since DBT-RISE uses a generative approach other needed combinations or custom extension can be generated. For further information please do not hesitate to contact [info@minres.com](mailto:info@minres.com).
 

@@ -43,6 +43,7 @@
 #include <scc/tick2time.h>
 #include <scc/traceable.h>
 #include <scc/utilities.h>
+#include <scp/report.h>
 #include <sysc/kernel/sc_simcontext.h>
 #include <sysc/kernel/sc_time.h>
 #include <tlm/scc/initiator_mixin.h>
@@ -347,6 +348,7 @@ private:
     std::vector<iss::vm_plugin*> plugin_list;
     unsigned reg_width{0};
     std::vector<std::unique_ptr<cci::cci_param_untyped>> dyn_params;
+    SCP_LOGGER();
 };
 } // namespace riscv
 } /* namespace sysc */

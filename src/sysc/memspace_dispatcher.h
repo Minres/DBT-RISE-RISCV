@@ -32,12 +32,12 @@
 
 #ifndef _SYSC_MEMSPACE_DISPATCHER_H_
 #define _SYSC_MEMSPACE_DISPATCHER_H_
-#include "scc/report.h"
 #include "scc/utilities.h"
 #include "tlm/scc/initiator_mixin.h"
 #include "tlm/scc/target_mixin.h"
 #include <cstddef>
 #include <cstdint>
+#include <scp/report.h>
 
 #include <sysc/kernel/sc_module.h>
 #include <sysc/memspace_extension.h>
@@ -75,7 +75,7 @@ struct memspace_dispatcher : sc_core::sc_module {
     void map_space_to_port(MEMSPACE space_id, unsigned port_idx) {
         sc_assert(port_idx < initiator.size() && "Targeted port index is higher than registered initiator sockets");
         if(space_mapping.count(space_id))
-            SCCDEBUG(SCMOD) << "remapping of space_id " << static_cast<unsigned>(space_id);
+            SCP_DEBUG(()) << "remapping of space_id " << static_cast<unsigned>(space_id);
         space_mapping[space_id] = port_idx;
     };
     void set_default_port(unsigned port_idx) {
@@ -84,23 +84,20 @@ struct memspace_dispatcher : sc_core::sc_module {
     };
 
 private:
+    SCP_LOGGER();
     std::unordered_map<MEMSPACE, size_t> space_mapping{};
     size_t default_port = 0;
     intor_sckt& mapped_intor(const tlm::tlm_generic_payload& trans, bool dmi = false) {
         if(auto* ext = trans.get_extension<tlm_memspace_extension<MEMSPACE>>()) {
             auto it = space_mapping.find(ext->get_space());
             if(it != space_mapping.end()) {
-#ifndef NDEBUG
                 auto prefix = dmi ? "DMI " : "";
-                SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to initiator " << it->second;
-#endif
+                SCP_TRACE(()) << "Sending " << prefix << "transaction to initiator " << it->second;
                 return initiator[it->second];
             }
         }
-#ifndef NDEBUG
         auto prefix = dmi ? "DMI " : "";
-        SCCTRACE(SCMOD) << "Sending " << prefix << "transaction to default initiator " << default_port;
-#endif
+        SCP_TRACE(()) << "Sending " << prefix << "transaction to default initiator " << default_port;
         return initiator[default_port];
     }
 };
