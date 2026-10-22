@@ -63,7 +63,7 @@ template <typename BASE, features_e FEAT = FEAT_NONE> class riscv_hart_msu_vp : 
 public:
     using core = BASE;
     using base = riscv_hart_common<BASE>;
-    using this_class = riscv_hart_msu_vp<BASE>;
+    using this_class = riscv_hart_msu_vp<BASE, FEAT>;
     using reg_t = typename core::reg_t;
     using phys_addr_t = typename core::phys_addr_t;
 
@@ -187,6 +187,7 @@ riscv_hart_msu_vp<BASE, FEAT>::riscv_hart_msu_vp()
         this->add_debug_csrs();
 
     if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->max_clint_irq_num = 64;
         this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
         this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_ip);
         this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
@@ -484,7 +485,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_msu_vp<BASE, FE
     switch(addr) {
     case mip:
     case miph:
-        if(unlikely(addr == mieh))
+        if(unlikely(addr == miph))
             val = (this->mip_csr & mask) >> 32;
         else
             val = this->mip_csr & mask;

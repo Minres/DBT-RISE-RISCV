@@ -56,6 +56,14 @@ TEST_F(CoreComplexTest, RunsAProgramFromTheResetAddress) {
     EXPECT_GT(loop_count(), 0u);
 }
 
+TEST_F(CoreComplexTest, RunsAProgramOnAnRv32imacCoreWithPmpAndAia) {
+    tb->cpu.core_type.set_value("rv32imac_mp_aia");
+    sc_start(sc_time(100, SC_US));
+
+    EXPECT_EQ(start_count(), 1u);
+    EXPECT_GT(loop_count(), 0u);
+}
+
 TEST_F(CoreComplexTest, AdvancesSimulationTimeWhileRunning) {
     sc_start(sc_time(100, SC_US));
     auto loops_at_100us = loop_count();
@@ -87,6 +95,59 @@ TEST_F(CoreComplexTest, RestartsAtTheResetAddressAfterAResetWhileRunning) {
     sc_start(sc_time(200, SC_US));
 
     EXPECT_EQ(start_count(), 2u);
+}
+
+constexpr uint64_t trap_handler_addr = 0x100;
+constexpr int32_t mcause_addr = 0x408;
+constexpr unsigned upper_local_irq = 40;
+
+// Enables only upper_local_irq through mieh, then spins. The trap handler
+// stores mcause and spins.
+std::vector<uint32_t> upper_local_irq_program() {
+    using namespace rv32;
+    constexpr unsigned mstatus = 0x300, mtvec = 0x305, mieh = 0x314, mcause = 0x342;
+    constexpr unsigned mstatus_mie = 0x8;
+    std::vector<uint32_t> program{
+        addi(5, 0, trap_handler_addr),           // t0 = handler
+        csrrw(0, mtvec, 5),                      // mtvec = t0
+        addi(5, 0, 1 << (upper_local_irq - 32)), // t0 = enable bit
+        csrrw(0, mieh, 5),                       // mieh = t0
+        csrrsi(0, mstatus, mstatus_mie),         // mstatus.MIE = 1
+        jal(0, 0),                               // spin
+    };
+    program.resize(trap_handler_addr / 4, 0);
+    std::vector<uint32_t> trap_handler{
+        csrrs(6, mcause, 0),   // t1 = mcause
+        sw(6, mcause_addr, 0), // store t1
+        jal(0, 0),             // spin
+    };
+    program.insert(program.end(), trap_handler.begin(), trap_handler.end());
+    return program;
+}
+
+class AiaCoreComplexTest : public SystemCTestFixture {
+protected:
+    void SetUp() override {
+        tlm::tlm_global_quantum::instance().set(sc_time(1, SC_US));
+        tb = std::make_unique<testbench>("tb", 64);
+        tb->cpu.core_type.set_value("rv32imac_mp_aia");
+        tb->load(reset_address, upper_local_irq_program());
+    }
+
+    void TearDown() override {
+        tb.reset();
+        SystemCTestFixture::TearDown();
+    }
+
+    std::unique_ptr<testbench> tb;
+};
+
+TEST_F(AiaCoreComplexTest, TakesALocalInterruptAbove31OnRv32) {
+    sc_spawn([this] { tb->clint_irq[upper_local_irq].write_now(true); });
+    sc_start(sc_time(100, SC_US));
+
+    constexpr uint32_t interrupt_bit = 1U << 31;
+    EXPECT_EQ(tb->read_word(mcause_addr), interrupt_bit | upper_local_irq);
 }
 
 } // namespace
