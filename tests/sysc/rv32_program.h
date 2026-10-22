@@ -14,6 +14,12 @@ constexpr uint32_t lw(unsigned rd, int32_t offset, unsigned rs1) { return i_type
 
 constexpr uint32_t addi(unsigned rd, unsigned rs1, int32_t imm) { return i_type(imm, rs1, 0, rd, 0x13); }
 
+constexpr uint32_t csrrw(unsigned rd, unsigned csr, unsigned rs1) { return i_type(csr, rs1, 1, rd, 0x73); }
+
+constexpr uint32_t csrrs(unsigned rd, unsigned csr, unsigned rs1) { return i_type(csr, rs1, 2, rd, 0x73); }
+
+constexpr uint32_t csrrsi(unsigned rd, unsigned csr, unsigned uimm) { return i_type(csr, uimm, 6, rd, 0x73); }
+
 constexpr uint32_t sw(unsigned rs2, int32_t offset, unsigned rs1) {
     auto imm = static_cast<uint32_t>(offset & 0xfff);
     return ((imm >> 5) << 25) | (rs2 << 20) | (rs1 << 15) | (2 << 12) | ((imm & 0x1f) << 7) | 0x23;
