@@ -1019,8 +1019,11 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
     void set_max_irq_num(unsigned i) { mcause_max_irq = std::max(1u << util::ilog2(i), 16u); }
 
     void set_clint_irq_num(unsigned num) {
-        assert(num <= traits<BASE>::XLEN);
-        clint_custom_irq_mask = std::numeric_limits<reg_t>::max() >> (traits<BASE>::XLEN - num);
+        assert(num <= max_clint_irq_num && "CLINT irq count exceeds what the hart supports");
+        clint_custom_irq_mask = num >= 64 ? std::numeric_limits<uint64_t>::max() : (1ULL << num) - 1;
+        // mcause needs to be able to hold the highest irq number
+        while(mcause_max_irq < num)
+            mcause_max_irq <<= 1;
     }
 
 protected:
@@ -1091,6 +1094,8 @@ protected:
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
     unsigned mcause_max_irq{traits<BASE>::XLEN};
+    // AIA adds mieh/miph on RV32, so a hart with FEAT_AIA may raise this to 64
+    unsigned max_clint_irq_num{traits<BASE>::XLEN};
     uint64_t clint_custom_irq_mask{0xffff};
 };
 
