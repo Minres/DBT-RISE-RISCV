@@ -56,6 +56,14 @@ TEST_F(CoreComplexTest, RunsAProgramFromTheResetAddress) {
     EXPECT_GT(loop_count(), 0u);
 }
 
+TEST_F(CoreComplexTest, RunsAProgramOnAnRv32imacCoreWithPmpAndAia) {
+    tb->cpu.core_type.set_value("rv32imac_mp_aia");
+    sc_start(sc_time(100, SC_US));
+
+    EXPECT_EQ(start_count(), 1u);
+    EXPECT_GT(loop_count(), 0u);
+}
+
 TEST_F(CoreComplexTest, AdvancesSimulationTimeWhileRunning) {
     sc_start(sc_time(100, SC_US));
     auto loops_at_100us = loop_count();
