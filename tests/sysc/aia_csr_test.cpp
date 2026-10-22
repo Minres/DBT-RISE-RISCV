@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/rv32gc.h>
 #include <iss/arch/rv32imac.h>
 
 namespace {
@@ -36,6 +38,16 @@ private:
 using MuAiaCsrTest = AiaCsrTest<riscv_hart_mu_p<rv32imac, FEAT_AIA>>;
 
 TEST_F(MuAiaCsrTest, WritingMiphSetsTheUpperHalfOfMipAndLeavesTheLowerHalfAlone) {
+    constexpr reg_t irq40 = 1U << (40 - 32);
+    write_csr(miph, irq40);
+
+    EXPECT_EQ(read_csr(miph), irq40);
+    EXPECT_EQ(read_csr(mip), 0u);
+}
+
+using MsuAiaCsrTest = AiaCsrTest<riscv_hart_msu_vp<rv32gc, FEAT_AIA>>;
+
+TEST_F(MsuAiaCsrTest, WritingMiphSetsTheUpperHalfOfMipAndLeavesTheLowerHalfAlone) {
     constexpr reg_t irq40 = 1U << (40 - 32);
     write_csr(miph, irq40);
 
