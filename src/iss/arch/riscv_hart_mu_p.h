@@ -153,6 +153,7 @@ riscv_hart_mu_p<BASE, FEAT>::riscv_hart_mu_p()
         this->add_debug_csrs();
 
     if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->max_clint_irq_num = 64;
         this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
         this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_ip);
         this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
@@ -400,7 +401,7 @@ template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT
 
 template <typename BASE, features_e FEAT> iss::status riscv_hart_mu_p<BASE, FEAT>::write_ip(unsigned addr, reg_t val) {
     uint64_t lval = val;
-    if(addr == mieh) {
+    if(addr == miph) {
         lval <<= 32;
         lval |= static_cast<uint32_t>(this->mip_csr);
     } else if(sizeof(reg_t) == 4)
