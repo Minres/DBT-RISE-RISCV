@@ -324,13 +324,8 @@ private:
     }
 
     void _local_irq(short id, bool value) {
-        uint64_t mask = 0;
-        if(sizeof(reg_t) == 4) {
-            assert(id < 32 && "CLINT cannot handle more than 32 irq");
-        } else {
-            assert(id < 64 && "CLINT cannot handle more than 64 irq");
-        }
-        mask = 1 << id;
+        assert(id < this->max_clint_irq_num && "CLINT irq id exceeds what the hart supports");
+        uint64_t const mask = 1ULL << id;
         if(value) {
             this->mip_csr |= mask;
             wfi_evt.notify();

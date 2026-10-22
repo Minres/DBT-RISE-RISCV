@@ -116,6 +116,7 @@ riscv_hart_m_p<BASE, FEAT>::riscv_hart_m_p()
         this->add_debug_csrs();
 
     if(FEAT & FEAT_AIA && traits<BASE>::XLEN == 32) {
+        this->max_clint_irq_num = 64;
         this->csr_rd_cb[miph] = MK_CSR_RD_CB(read_ip);
         this->csr_wr_cb[miph] = MK_CSR_WR_CB(write_ip);
         this->csr_rd_cb[mieh] = MK_CSR_RD_CB(read_ie);
