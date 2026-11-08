@@ -85,9 +85,9 @@ public:
         this->isslogger.set_logger(log_delegate);
     }
 
-    void setup_clic(iss::mem::clic<core>* c) {
+    void setup_clic(iss::mem::clic_if* c) {
         clic_ptr = c;
-        clic_ptr->re_configure(owner->get_clic_config());
+        clic_ptr->configure(owner->get_clic_config());
     }
 
     void setup_mt() override {
@@ -401,7 +401,7 @@ private:
     bool first{true};
     std::atomic<bool> wfi_inst{false};
     mutex_t sync_mtx;
-    iss::mem::clic<core>* clic_ptr{nullptr};
+    iss::mem::clic_if* clic_ptr{nullptr};
 };
 } // namespace riscv
 } // namespace sysc

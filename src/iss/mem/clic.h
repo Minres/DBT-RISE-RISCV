@@ -94,10 +94,21 @@ inline void write_reg_with_offset(uint32_t& reg, uint8_t offs, const uint8_t* co
 }
 } // namespace
 
-template <typename PLAT> struct clic : public memory_elem {
+struct clic_if {
+    virtual void configure(clic_config const& cfg) = 0;
+    virtual void trigger_irq(unsigned id, bool value) = 0;
+    virtual bool irq_pending() = 0;
+};
+
+template <typename PLAT> struct clic : public memory_elem, public clic_if {
     using this_class = clic<PLAT>;
     using reg_t = typename PLAT::reg_t;
     constexpr static unsigned WORD_LEN = sizeof(reg_t) * 8;
+
+    clic(arch::priv_if<reg_t> hart_if)
+    : hart_if(hart_if) {
+        init();
+    }
 
     clic(arch::priv_if<reg_t> hart_if, clic_config const& cfg)
     : hart_if(hart_if)
@@ -116,7 +127,7 @@ template <typename PLAT> struct clic : public memory_elem {
 
     std::tuple<uint64_t, uint64_t> get_range() override { return {cfg.clic_base, cfg.clic_base + 0x7fff}; }
 
-    void trigger_irq(unsigned id, bool value) {
+    void trigger_irq(unsigned id, bool value) override {
         assert(id < cfg.clic_num_irq);
         auto& w = pending_irq[(id >> 6) & 0x3f];
         if(value) {
@@ -130,7 +141,7 @@ template <typename PLAT> struct clic : public memory_elem {
             hart_if.raise_trap(1, cause, 0);
     }
 
-    bool irq_pending() {
+    bool irq_pending() override {
         bool res = false;
         for(auto i = 0; i < cfg.clic_num_irq; i += 64) {
             res |= pending_irq[i] != 0;
@@ -139,7 +150,8 @@ template <typename PLAT> struct clic : public memory_elem {
         }
         return res;
     }
-    void re_configure(clic_config const& cfg) {
+
+    void configure(clic_config const& cfg) override {
         this->cfg = cfg;
         init();
     }

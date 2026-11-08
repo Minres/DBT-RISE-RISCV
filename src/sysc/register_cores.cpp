@@ -92,9 +92,7 @@ __attribute__((used)) volatile std::array<bool, 24> riscv_init = {
     iss_factory::instance().register_creator("rv32imac_mu_clic:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
-                                                 iss::mem::clic_config cfg;
-                                                 auto clic_inst =
-                                                     std::make_unique<iss::mem::clic<iss::arch::rv32imac>>(cpu->get_priv_if(), cfg);
+                                                 auto clic_inst = std::make_unique<iss::mem::clic<iss::arch::rv32imac>>(cpu->get_priv_if());
                                                  cpu->setup_clic(clic_inst.get());
                                                  cpu->memories.insert_before_last(std::move(clic_inst));
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
