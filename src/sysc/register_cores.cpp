@@ -196,6 +196,7 @@ __attribute__((used)) volatile std::array<bool, 24> riscv_init = {
 #if defined(WITH_LLVM)
 namespace llvm {
 using namespace sysc;
+using namespace sysc::riscv;
 volatile std::array<bool, 4> riscv_init = {
     iss_factory::instance().register_creator("rv32imac_m:llvm",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
@@ -222,6 +223,7 @@ volatile std::array<bool, 4> riscv_init = {
 #if defined(WITH_ASMJIT)
 namespace asmjit {
 using namespace sysc;
+using namespace sysc::riscv;
 volatile std::array<bool, 16> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:asmjit",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {

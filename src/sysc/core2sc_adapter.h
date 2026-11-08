@@ -336,11 +336,7 @@ private:
         reg_t res;
         this->read_csr(iss::arch::mtval, res);
         if((res & 0x3) != 3 || clic_ptr == nullptr) { // CLINT mode
-            if(sizeof(reg_t) == 4) {
-                assert(id < 32 && "CLINT cannot handle more than 32 irq");
-            } else {
-                assert(id < 64 && "CLINT cannot handle more than 64 irq");
-            }
+            assert(id < this->max_clint_irq_num && "CLINT irq id exceeds what the hart supports");
             uint64_t const mask = 1ULL << id;
             if(value) {
                 this->mip_csr |= mask;
