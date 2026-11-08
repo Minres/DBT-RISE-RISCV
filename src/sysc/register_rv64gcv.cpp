@@ -42,6 +42,7 @@
 namespace iss {
 namespace interp {
 using namespace sysc;
+using namespace sysc::riscv;
 
 volatile std::array<bool, 2 + 1> rv64gcv_init = {
         iss_factory::instance().register_creator("rv64gcv_msu:interp", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {

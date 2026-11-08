@@ -595,7 +595,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_msu_vp<BASE, FEAT>::ch
         int res = 0;
         while((enabled_interrupts & 1) == 0)
             enabled_interrupts >>= 1, res++;
-        this->reg.pending_trap = 0x80ULL << 24 | res << 16 | 1; // 0x80 << 24 | (cause << 16) | trap_id
+        this->reg.pending_trap = 0x80ULL << 24 | res << 16 | 1;
     }
 }
 

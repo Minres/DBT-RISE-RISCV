@@ -380,13 +380,15 @@ template <typename BASE, features_e FEAT> void riscv_hart_m_p<BASE, FEAT>::check
             enabled_interrupts >>= 1;
             res++;
         }
-        this->reg.pending_trap = res << 16 | 1; // 0x80 << 24 | (cause << 16) | trap_id
+        this->reg.pending_trap = 0x80ULL << 24 | res << 16 | 1;
     }
 }
 
 template <typename BASE, features_e FEAT> uint64_t riscv_hart_m_p<BASE, FEAT>::enter_trap(uint64_t flags, uint64_t addr, uint64_t tval) {
     // flags are ACTIVE[31:31], CAUSE[30:16], TRAPID[15:0]
     // calculate and write mcause val
+    if(flags == std::numeric_limits<uint64_t>::max())
+        flags = this->reg.trap_state;
     auto const trap_id = bit_sub<0, 16>(flags);
     auto cause = bit_sub<16, 15>(flags);
     // calculate effective privilege level

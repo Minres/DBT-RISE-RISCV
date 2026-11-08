@@ -38,6 +38,7 @@
 #include "iss/arch/riscv_hart_common.h"
 #include "iss/vm_types.h"
 #include "memory_if.h"
+#include <limits>
 #include <util/logging.h>
 
 namespace iss {
@@ -93,14 +94,58 @@ inline void write_reg_with_offset(uint32_t& reg, uint8_t offs, const uint8_t* co
 }
 } // namespace
 
-template <typename WORD_TYPE> struct clic : public memory_elem {
-    using this_class = clic<WORD_TYPE>;
-    using reg_t = WORD_TYPE;
-    constexpr static unsigned WORD_LEN = sizeof(WORD_TYPE) * 8;
+template <typename PLAT> struct clic : public memory_elem {
+    using this_class = clic<PLAT>;
+    using reg_t = typename PLAT::reg_t;
+    constexpr static unsigned WORD_LEN = sizeof(reg_t) * 8;
 
-    clic(arch::priv_if<WORD_TYPE> hart_if, clic_config const& cfg)
+    clic(arch::priv_if<reg_t> hart_if, clic_config const& cfg)
     : hart_if(hart_if)
     , cfg(cfg) {
+        init();
+    }
+
+    ~clic() = default;
+
+    memory_if get_mem_if() override {
+        return memory_if{.rd_mem{util::delegate<rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
+                         .wr_mem{util::delegate<wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
+    }
+
+    void set_next(memory_if mem) override { down_stream_mem = mem; }
+
+    std::tuple<uint64_t, uint64_t> get_range() override { return {cfg.clic_base, cfg.clic_base + 0x7fff}; }
+
+    void trigger_irq(unsigned id, bool value) {
+        assert(id < cfg.clic_num_irq);
+        auto& w = pending_irq[(id >> 6) & 0x3f];
+        if(value) {
+            w |= (1ull << id) & 0x3f;
+        } else {
+            w &= ~((1ull << id) & 0x3f);
+        }
+        uint16_t cause = std::numeric_limits<uint16_t>::max();
+        // TODO: check for correct irq id based on CLIC spec and assign it to cause
+        if(cause != std::numeric_limits<uint16_t>::max())
+            hart_if.raise_trap(1, cause, 0);
+    }
+
+    bool irq_pending() {
+        bool res = false;
+        for(auto i = 0; i < cfg.clic_num_irq; i += 64) {
+            res |= pending_irq[i] != 0;
+            if(res)
+                break;
+        }
+        return res;
+    }
+    void re_configure(clic_config const& cfg) {
+        this->cfg = cfg;
+        init();
+    }
+
+private:
+    void init() {
         clic_int_reg.resize(cfg.clic_num_irq, clic_int_reg_t{.raw = 0});
         clic_cfg_reg = 0x30;
         clic_mact_lvl = clic_mprev_lvl = (1 << (cfg.clic_int_ctl_bits)) - 1;
@@ -125,23 +170,20 @@ template <typename WORD_TYPE> struct clic : public memory_elem {
             hart_if.csr_wr_cb[arch::uintstatus] = MK_CSR_WR_CB(write_null);
             hart_if.csr_rd_cb[arch::uintthresh] = MK_CSR_RD_CB(read_intthresh);
             hart_if.csr_wr_cb[arch::uintthresh] = MK_CSR_WR_CB(write_intthresh);
+        } else {
+            hart_if.csr_rd_cb.erase(arch::ucause);
+            hart_if.csr_wr_cb.erase(arch::ucause);
+            hart_if.csr_rd_cb.erase(arch::utvec);
+            hart_if.csr_rd_cb.erase(arch::utvt);
+            hart_if.csr_wr_cb.erase(arch::utvt);
+            hart_if.csr_rd_cb.erase(arch::uintstatus);
+            hart_if.csr_wr_cb.erase(arch::uintstatus);
+            hart_if.csr_rd_cb.erase(arch::uintthresh);
+            hart_if.csr_wr_cb.erase(arch::uintthresh);
         }
         clic_intthresh[arch::mintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
         clic_intthresh[arch::uintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
     }
-
-    ~clic() = default;
-
-    memory_if get_mem_if() override {
-        return memory_if{.rd_mem{util::delegate<rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
-                         .wr_mem{util::delegate<wr_mem_func_sig>::from<this_class, &this_class::write_mem>(this)}};
-    }
-
-    void set_next(memory_if mem) override { down_stream_mem = mem; }
-
-    std::tuple<uint64_t, uint64_t> get_range() override { return {cfg.clic_base, cfg.clic_base + 0x7fff}; }
-
-private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
@@ -237,10 +279,11 @@ private:
     }
 
 protected:
-    arch::priv_if<WORD_TYPE> hart_if;
+    arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
     clic_config cfg;
     uint8_t clic_cfg_reg{0};
+    std::array<uint64_t, 64> pending_irq;
     std::array<uint32_t, 32> clic_inttrig_reg;
     union clic_int_reg_t {
         struct {
@@ -258,19 +301,18 @@ protected:
     std::array<reg_t, 4> clic_xtvt{0};
 };
 
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
+template <typename PLAT> iss::status clic<PLAT>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {
     if(addr >= cfg.clic_base && addr < (cfg.clic_base + 4)) { // cliccfg
         std::array<uint8_t, 4> reg = {clic_cfg_reg, 0, 0, 0};
         auto offset = addr - cfg.clic_base;
         for(auto i = 0; i < length; ++i)
             *(data + i) = (i + offset) < reg.size() ? reg[offset + i] : 0;
         return iss::Ok;
-#if 0
-    } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
+    } else if(cfg.clic_num_trigger && addr >= (cfg.clic_base + 0x40) &&
+              (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
         auto offset = ((addr & 0x7fff) - 0x40) / 4;
         read_reg_with_offset(clic_inttrig_reg[offset], addr & 0x3, data, length);
         return iss::Ok;
-#endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
               addr < (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;
@@ -280,19 +322,19 @@ template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::read_clic(uint64_t ad
     return iss::NotSupported;
 }
 
-template <typename WORD_TYPE> iss::status clic<WORD_TYPE>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
+template <typename PLAT> iss::status clic<PLAT>::write_clic(uint64_t addr, unsigned length, const uint8_t* const data) {
     if(addr >= cfg.clic_base && addr < (cfg.clic_base + 4)) { // cliccfg
         auto offset = addr - cfg.clic_base;
         for(auto i = 0; i < length; ++i)
             if((i + offset) == 0)
                 clic_cfg_reg = (clic_cfg_reg & ~0x1e) | (*data & 0x1e);
         return iss::Ok;
-#if 0
-    } else if(addr >= (cfg.clic_base + 0x40) && (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
+    } else if(cfg.clic_num_trigger && addr >= (cfg.clic_base + 0x40) &&
+              (addr + length) <= (cfg.clic_base + 0x40 + cfg.clic_num_trigger * 4)) { // clicinttrig
         auto offset = ((addr & 0x7fff) - 0x40) / 4;
         write_reg_with_offset(clic_inttrig_reg[offset], addr & 0x3, data, length);
+        // TODO: Implement clicinttrig functionality
         return iss::Ok;
-#endif
     } else if(addr >= (cfg.clic_base + 0x1000) &&
               addr < (cfg.clic_base + 0x1000 + cfg.clic_num_irq * 4)) { // clicintip/clicintie/clicintattr/clicintctl
         auto offset = ((addr & 0x7fff) - 0x1000) / 4;

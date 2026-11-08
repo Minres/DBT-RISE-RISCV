@@ -42,6 +42,8 @@
 #include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/mem/pmp.h>
+
+#include "iss/mem/clic.h"
 #include "iss_factory.h"
 #include "core2sc_adapter.h"
 #include <array>
@@ -50,11 +52,13 @@
 namespace iss {
 namespace interp {
 using namespace sysc;
-__attribute__((used)) volatile std::array<bool, 23> riscv_init = {
+using namespace sysc::riscv;
+
+__attribute__((used)) volatile std::array<bool, 24> riscv_init = {
     iss_factory::instance().register_creator("rv32i_m:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::rv32i>>(cc);
-                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
+                                                 return {core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32i*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32i_mu:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
@@ -83,6 +87,16 @@ __attribute__((used)) volatile std::array<bool, 23> riscv_init = {
     iss_factory::instance().register_creator("rv32imac_mu:interp",
                                              [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
                                                  auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
+                                                 return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
+                                             }),
+    iss_factory::instance().register_creator("rv32imac_mu_clic:interp",
+                                             [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
+                                                 auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::rv32imac>>(cc);
+                                                 iss::mem::clic_config cfg;
+                                                 auto clic_inst =
+                                                     std::make_unique<iss::mem::clic<iss::arch::rv32imac>>(cpu->get_priv_if(), cfg);
+                                                 cpu->setup_clic(clic_inst.get());
+                                                 cpu->memories.insert_before_last(std::move(clic_inst));
                                                  return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::rv32imac*>(cpu), gdb_port)}};
                                              }),
     iss_factory::instance().register_creator("rv32gc_m:interp",

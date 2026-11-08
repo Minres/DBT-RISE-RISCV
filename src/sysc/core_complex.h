@@ -247,6 +247,8 @@ protected:
     int cmd_sysc(int argc, char* argv[], iss::debugger::out_func, iss::debugger::data_func, iss::debugger::target_adapter_if*);
     void before_end_of_elaboration() override;
     void start_of_simulation() override;
+    iss::mem::clic_config get_clic_config() override;
+
     void forward();
     void run();
     void rst_cb();
@@ -344,6 +346,7 @@ private:
     util::range_lut<tlm_dmi_ext>& get_lut(lut_vec_t& luts, unsigned space);
     std::vector<iss::vm_plugin*> plugin_list;
     unsigned reg_width{0};
+    std::vector<std::unique_ptr<cci::cci_param_untyped>> dyn_params;
 };
 } // namespace riscv
 } /* namespace sysc */

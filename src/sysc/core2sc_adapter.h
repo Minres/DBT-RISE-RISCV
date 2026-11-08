@@ -35,7 +35,9 @@
 #ifndef _SYSC_CORE2SC_ADAPTER_H_
 #define _SYSC_CORE2SC_ADAPTER_H_
 
+#include "core_complex_if.h"
 #include "iss/arch_if.h"
+#include "iss/mem/clic.h"
 #include "sc2core_if.h"
 #include "util/delegate.h"
 #include "util/logging.h"
@@ -53,6 +55,8 @@
 #include <util/ities.h>
 
 namespace sysc {
+namespace riscv {
+
 template <typename PLAT> class core2sc_adapter : public PLAT, public sc2core_if {
 public:
     using this_class = core2sc_adapter<PLAT>;
@@ -60,7 +64,7 @@ public:
     using reg_t = typename PLAT::reg_t;
     using phys_addr_t = typename PLAT::phys_addr_t;
     using mutex_t = std::shared_mutex;
-    core2sc_adapter(sysc::riscv::core_complex_if* owner)
+    core2sc_adapter(core_complex_if* owner)
     : owner(owner) {
         this->csr_rd_cb[iss::arch::time] = MK_CSR_RD_CB(read_time);
         if(sizeof(reg_t) == 4)
@@ -79,6 +83,11 @@ public:
         log_delegate.log = util::delegate<util::LoggerDelegate::delegate_fn>(*this, &core2sc_adapter::log);
         log_delegate.level = static_cast<logging::log_level>(scc::get_logging_level());
         this->isslogger.set_logger(log_delegate);
+    }
+
+    void setup_clic(iss::mem::clic<core>* c) {
+        clic_ptr = c;
+        clic_ptr->re_configure(owner->get_clic_config());
     }
 
     void setup_mt() override {
@@ -264,7 +273,7 @@ public:
         wfi_inst.store(true, std::memory_order_relaxed);
         std::function<void(void)> f = [this]() {
             auto start = sc_core::sc_time_stamp();
-            while((this->mip_csr & this->mie_csr) == 0) {
+            while((this->mip_csr & this->mie_csr) == 0 && !clic_ptr->irq_pending()) {
                 sc_core::wait(this->wfi_evt | this->debugger_stop_evt);
                 bool is_debugger_stop_evt = this->debugger_stop_evt.triggered();
                 if(is_debugger_stop_evt)
@@ -324,22 +333,34 @@ private:
     }
 
     void _local_irq(short id, bool value) {
-        assert(id < this->max_clint_irq_num && "CLINT irq id exceeds what the hart supports");
-        uint64_t const mask = 1ULL << id;
-        if(value) {
-            this->mip_csr |= mask;
-            wfi_evt.notify();
-        } else
-            this->mip_csr &= ~mask;
-        this->check_interrupt();
-        if(value)
-            SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id
+        reg_t res;
+        this->read_csr(iss::arch::mtval, res);
+        if((res & 0x3) != 3 || clic_ptr == nullptr) { // CLINT mode
+            if(sizeof(reg_t) == 4) {
+                assert(id < 32 && "CLINT cannot handle more than 32 irq");
+            } else {
+                assert(id < 64 && "CLINT cannot handle more than 64 irq");
+            }
+            uint64_t const mask = 1ULL << id;
+            if(value) {
+                this->mip_csr |= mask;
+                wfi_evt.notify();
+            } else
+                this->mip_csr &= ~mask;
+            this->check_interrupt();
+            if(value)
+                SCCTRACE(owner->hier_name()) << "Triggering interrupt " << id
 #ifndef NDEBUG
-                                         << " (Pending trap: " << std::hex << "0x"
-                                         << ((this->reg.pending_trap >> 16) & 0xff) // 0x80 << 24 | (cause << 16) | trap_id
-                                         << ")"
+                                             << " (Pending trap: " << std::hex << "0x"
+                                             << ((this->reg.pending_trap >> 16) & 0xff) // 0x80 << 24 | (cause << 16) | trap_id
+                                             << ")"
 #endif
-                ;
+                    ;
+        } else if(clic_ptr) { // CLIC mode
+            clic_ptr->trigger_irq(id, value);
+            if(value)
+                wfi_evt.notify();
+        }
     }
 
     void _local_irq_mt(short id, bool value) {
@@ -380,6 +401,8 @@ private:
     bool first{true};
     std::atomic<bool> wfi_inst{false};
     mutex_t sync_mtx;
+    iss::mem::clic<core>* clic_ptr{nullptr};
 };
+} // namespace riscv
 } // namespace sysc
 #endif /* _SYSC_CORE2SC_ADAPTER_H_ */

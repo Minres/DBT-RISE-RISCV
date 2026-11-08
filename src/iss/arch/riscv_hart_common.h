@@ -309,7 +309,7 @@ template <typename WORD_TYPE> struct priv_if {
     unsigned& max_irq;
 };
 
-template <typename BASE = logging::disass> struct riscv_hart_common : public BASE, public mem::memory_elem {
+template <typename BASE> struct riscv_hart_common : public BASE, public mem::memory_elem {
 
     constexpr static unsigned MEM = traits<BASE>::MEM;
 
@@ -949,8 +949,12 @@ template <typename BASE = logging::disass> struct riscv_hart_common : public BAS
             .exec_htif = [this](uint8_t const* data, unsigned length) -> iss::status { return execute_htif(data, length); },
             .raise_trap =
                 [this](uint16_t trap_id, uint16_t cause, reg_t fault_data) {
-                    this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
-                    this->fault_data = fault_data;
+                    if(trap_id == 1) {
+                        this->reg.pending_trap = 0x80ULL << 24 | cause << 16 | 1;
+                    } else {
+                        this->reg.trap_state = 0x80ULL << 24 | (cause << 16) | trap_id;
+                        this->fault_data = fault_data;
+                    }
                 },
             .csr_rd_cb{this->csr_rd_cb},
             .csr_wr_cb{this->csr_wr_cb},

@@ -39,6 +39,7 @@
 #include <iss/iss.h>
 #include <iss/vm_types.h>
 #include "iss_factory.h"
+#include "scc/utilities.h"
 #include "sysc/memspace_extension.h"
 #include <tlm/scc/memory_map_collector.h>
 #include <tlm/scc/tlm_id.h>
@@ -585,6 +586,29 @@ util::range_lut<tlm_dmi_ext>& core_complex<BUSWIDTH, QK>::get_lut(lut_vec_t& lut
     }
     return luts[space];
 };
+template <unsigned int BUSWIDTH, typename QK> iss::mem::clic_config core_complex<BUSWIDTH, QK>::get_clic_config() {
+    auto clic_base = scc::make_unique<cci::cci_param<uint64_t>>("clic_base", 0);
+    auto clic_int_ctl_bits = scc::make_unique<cci::cci_param<unsigned>>("clic_int_ctl_bits", 0);
+    auto clic_num_irq = scc::make_unique<cci::cci_param<unsigned>>("clic_num_irq", 0);
+    auto clic_num_trigger = scc::make_unique<cci::cci_param<unsigned>>("clic_num_trigger", 0);
+    auto nmode = scc::make_unique<cci::cci_param<bool>>("nmode", false);
+    iss::mem::clic_config clic_cfg{.clic_base = clic_base->get_value(),
+                                   .clic_int_ctl_bits = clic_int_ctl_bits->get_value(),
+                                   .clic_num_irq = clic_num_irq->get_value(),
+                                   .clic_num_trigger = clic_num_trigger->get_value(),
+                                   .nmode = nmode->get_value()};
+    clic_base->lock();
+    dyn_params.push_back(std::move(clic_base));
+    clic_int_ctl_bits->lock();
+    dyn_params.push_back(std::move(clic_int_ctl_bits));
+    clic_num_irq->lock();
+    dyn_params.push_back(std::move(clic_num_irq));
+    clic_num_trigger->lock();
+    dyn_params.push_back(std::move(clic_num_trigger));
+    nmode->lock();
+    dyn_params.push_back(std::move(nmode));
+    return clic_cfg;
+}
 
 template class core_complex<scc::LT>;
 template class core_complex<32>;

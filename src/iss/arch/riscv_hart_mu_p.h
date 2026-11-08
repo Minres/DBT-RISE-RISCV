@@ -475,7 +475,7 @@ template <typename BASE, features_e FEAT> void riscv_hart_mu_p<BASE, FEAT>::chec
             enabled_interrupts >>= 1;
             res++;
         }
-        this->reg.pending_trap = res << 16 | 1; // 0x80 << 24 | (cause << 16) | trap_id
+        this->reg.pending_trap = 0x80ULL << 24 | res << 16 | 1;
     }
 }
 
