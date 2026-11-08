@@ -98,6 +98,7 @@ struct clic_if {
     virtual void configure(clic_config const& cfg) = 0;
     virtual void trigger_irq(unsigned id, bool value) = 0;
     virtual bool irq_pending() = 0;
+    virtual ~clic_if() = default;
 };
 
 template <typename PLAT> struct clic : public memory_elem, public clic_if {
@@ -116,7 +117,7 @@ template <typename PLAT> struct clic : public memory_elem, public clic_if {
         init();
     }
 
-    ~clic() = default;
+    virtual ~clic() = default;
 
     memory_if get_mem_if() override {
         return memory_if{.rd_mem{util::delegate<rd_mem_func_sig>::from<this_class, &this_class::read_mem>(this)},
