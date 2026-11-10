@@ -1029,6 +1029,8 @@ template <typename BASE> struct riscv_hart_common : public BASE, public mem::mem
         while(mcause_max_irq < num)
             mcause_max_irq <<= 1;
     }
+    // This resolves ambiguity between the methods inherited from arch_if and memory_elem
+    checkpoint_if* get_checkpoint_if() override { return nullptr; }
 
 protected:
     util::InstanceLogger<logging::dbt_rise_iss> isslogger;
@@ -1092,8 +1094,8 @@ protected:
     uint64_t sie_csr{0};
     uint64_t sip_csr{0};
     uint64_t sideleg_csr{0};
-    reg_t fault_data;
-
+    reg_t fault_data{0};
+    std::unordered_map<uint64_t, uint8_t> atomic_reservation;
     int64_t cycle_offset{0};
     int64_t instret_offset{0};
     semihosting_cb_t<reg_t> semihosting_cb;
@@ -1103,6 +1105,89 @@ protected:
     uint64_t clint_custom_irq_mask{0xffff};
 };
 
+template <typename CORE> struct checkpoint_impl : checkpoint_if {
+    explicit checkpoint_impl(CORE& hart)
+    : hart(hart) {}
+
+    struct snapshot {
+        decltype(std::declval<typename CORE::core>().reg) registers;
+        hart_state<typename CORE::reg_t> state;
+        typename CORE::csr_type csr;
+        std::unordered_map<uint64_t, uint8_t> atomic_reservation;
+        uint64_t mcycle_csr, minstret_csr, mie_csr, mip_csr;
+        uint64_t mideleg_csr, sie_csr, sip_csr, sideleg_csr;
+        typename CORE::reg_t fault_data;
+        int64_t cycle_offset, instret_offset;
+        checkpoint_hndl memory;
+
+        explicit snapshot(CORE& hart)
+        : registers(hart.reg)
+        , state(hart.state)
+        , csr(hart.csr)
+        , atomic_reservation(hart.atomic_reservation)
+        , mcycle_csr(hart.mcycle_csr)
+        , minstret_csr(hart.minstret_csr)
+        , mie_csr(hart.mie_csr)
+        , mip_csr(hart.mip_csr)
+        , mideleg_csr(hart.mideleg_csr)
+        , sie_csr(hart.sie_csr)
+        , sip_csr(hart.sip_csr)
+        , sideleg_csr(hart.sideleg_csr)
+        , fault_data(hart.fault_data)
+        , cycle_offset(hart.cycle_offset)
+        , instret_offset(hart.instret_offset)
+        , memory(hart.memories.create()) {}
+
+        void restore(CORE& hart) const {
+            hart.reg = registers;
+            hart.state = state;
+            hart.csr = csr;
+            hart.atomic_reservation = atomic_reservation;
+            hart.mcycle_csr = mcycle_csr;
+            hart.minstret_csr = minstret_csr;
+            hart.mie_csr = mie_csr;
+            hart.mip_csr = mip_csr;
+            hart.mideleg_csr = mideleg_csr;
+            hart.sie_csr = sie_csr;
+            hart.sip_csr = sip_csr;
+            hart.sideleg_csr = sideleg_csr;
+            hart.fault_data = fault_data;
+            hart.cycle_offset = cycle_offset;
+            hart.instret_offset = instret_offset;
+        }
+    };
+
+    checkpoint_hndl create() override {
+        const auto handle = next_handle;
+        snapshot ss{hart};
+        snapshots.try_emplace(handle, std::move(ss));
+        ++next_handle;
+        return handle;
+    }
+
+    bool restore(checkpoint_hndl handle) override {
+        auto it = snapshots.find(handle);
+        if(it == snapshots.end())
+            return false;
+        if(!hart.memories.restore(it->second.memory))
+            return false;
+        it->second.restore(hart);
+        return true;
+    }
+
+    bool drop(checkpoint_hndl handle) override {
+        auto it = snapshots.find(handle);
+        if(it == snapshots.end())
+            return false;
+        const auto success = hart.memories.drop(it->second.memory);
+        snapshots.erase(it);
+        return success;
+    }
+
+    CORE& hart;
+    checkpoint_hndl next_handle{1};
+    std::unordered_map<checkpoint_hndl, snapshot> snapshots;
+};
 } // namespace arch
 } // namespace iss
 

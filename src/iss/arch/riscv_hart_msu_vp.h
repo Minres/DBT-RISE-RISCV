@@ -35,17 +35,17 @@
 #ifndef _RISCV_HART_MSU_VP_H
 #define _RISCV_HART_MSU_VP_H
 
-#include "iss/arch/traits.h"
-#include "iss/vm_if.h"
-#include "iss/vm_types.h"
 #include "riscv_hart_common.h"
-#include "util/logging.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <elfio/elf_types.hpp>
 #include <elfio/elfio.hpp>
+#include <iss/arch/traits.h>
+#include <iss/vm_if.h>
+#include <iss/vm_types.h>
 #include <limits>
+#include <util/logging.h>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -53,8 +53,6 @@
 #include <iss/mem/memory_with_htif.h>
 #include <iss/mem/mmu.h>
 #include <optional>
-#include <type_traits>
-#include <unordered_map>
 
 namespace iss {
 namespace arch {
@@ -65,6 +63,7 @@ public:
     using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_msu_vp<BASE, FEAT>;
     using reg_t = typename core::reg_t;
+    using csr_type = typename base::csr_type;
     using phys_addr_t = typename core::phys_addr_t;
 
     void write_mstatus(reg_t val, unsigned priv_lvl) {

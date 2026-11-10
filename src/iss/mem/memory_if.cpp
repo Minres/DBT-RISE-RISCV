@@ -34,15 +34,63 @@
 
 #include "memory_if.h"
 #include <algorithm>
+#include <stdexcept>
 
 namespace iss {
 namespace mem {
+checkpoint_if::checkpoint_hndl memory_hierarchy::create() {
+    const auto handle = next_handle;
+    auto& snapshot = snapshots.try_emplace(handle).first->second;
+    try {
+        snapshot.reserve(hierarchy.size());
+        auto root_elem = root_set ? hierarchy[0] : nullptr;
+        for(size_t i = root_set ? 1 : 0; i < hierarchy.size(); ++i) {
+            if(hierarchy[i] != root_elem) {
+                auto* checkpoint = hierarchy[i]->get_checkpoint_if();
+                if(checkpoint && std::none_of(snapshot.begin(), snapshot.end(),
+                                              [checkpoint](const element_checkpoint& e) { return e.first == checkpoint; }))
+                    snapshot.emplace_back(checkpoint, checkpoint->create());
+            }
+        }
+    } catch(...) {
+        for(auto& element : snapshot)
+            element.first->drop(element.second);
+        snapshots.erase(handle);
+        throw;
+    }
+    ++next_handle;
+    return handle;
+}
+
+bool memory_hierarchy::restore(checkpoint_hndl handle) {
+    auto it = snapshots.find(handle);
+    if(it == snapshots.end())
+        return false;
+    for(auto& element : it->second)
+        if(!element.first->restore(element.second))
+            return false;
+    return true;
+}
+
+bool memory_hierarchy::drop(checkpoint_hndl handle) {
+    auto it = snapshots.find(handle);
+    if(it == snapshots.end())
+        return false;
+    bool success = true;
+    for(auto& element : it->second)
+        success = element.first->drop(element.second) && success;
+    snapshots.erase(it);
+    return success;
+}
+
 void memory_hierarchy::root(memory_elem& e) {
+    check_mutable();
     hierarchy.push_front(&e);
     root_set = true;
     update_chain();
 }
 void memory_hierarchy::prepend(memory_elem& e) {
+    check_mutable();
     if(root_set)
         hierarchy.insert(hierarchy.begin() + 1, &e);
     else
@@ -50,18 +98,22 @@ void memory_hierarchy::prepend(memory_elem& e) {
     update_chain();
 }
 void memory_hierarchy::append(memory_elem& e) {
+    check_mutable();
     hierarchy.push_back(&e);
     update_chain();
 }
 void memory_hierarchy::insert_before_last(memory_elem& e) {
+    check_mutable();
     hierarchy.insert(hierarchy.begin() + hierarchy.size() - 1, &e);
     update_chain();
 }
 void memory_hierarchy::insert_after_first(memory_elem& e) {
+    check_mutable();
     hierarchy.insert(hierarchy.begin() + 1, &e);
     update_chain();
 }
 void memory_hierarchy::replace_last(memory_elem& e) {
+    check_mutable();
     auto old = hierarchy.back();
     auto it = std::find_if(std::begin(owned_elems), std::end(owned_elems),
                            [old](std::unique_ptr<memory_elem> const& p) { return p.get() == old; });
@@ -71,6 +123,11 @@ void memory_hierarchy::replace_last(memory_elem& e) {
     hierarchy.push_back(&e);
     update_chain();
 }
+void memory_hierarchy::check_mutable() const {
+    if(!snapshots.empty())
+        throw std::logic_error("Drop memory checkpoints before changing the hierarchy");
+}
+
 void memory_hierarchy::update_chain() {
     bool tail = false;
     for(size_t i = 1; i < hierarchy.size(); ++i) {

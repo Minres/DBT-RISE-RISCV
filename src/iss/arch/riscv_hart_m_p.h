@@ -35,13 +35,14 @@
 #ifndef _RISCV_HART_M_P_H
 #define _RISCV_HART_M_P_H
 
-#include "iss/arch/traits.h"
-#include "iss/vm_if.h"
-#include "iss/vm_types.h"
-#include "util/logging.h"
+#include "riscv_hart_common.h"
 #include <algorithm>
 #include <cstdint>
 #include <elfio/elf_types.hpp>
+#include <iss/arch/traits.h>
+#include <iss/vm_if.h>
+#include <iss/vm_types.h>
+#include <util/logging.h>
 #ifndef FMT_HEADER_ONLY
 #define FMT_HEADER_ONLY
 #endif
@@ -49,7 +50,6 @@
 #include <elfio/elfio.hpp>
 #include <fmt/format.h>
 #include <iss/mem/memory_with_htif.h>
-#include <unordered_map>
 
 namespace iss {
 namespace arch {
@@ -60,6 +60,7 @@ public:
     using base = riscv_hart_common<BASE>;
     using this_class = riscv_hart_m_p<BASE, FEAT>;
     using reg_t = typename core::reg_t;
+    using csr_type = typename base::csr_type;
     using phys_addr_t = typename core::phys_addr_t;
 
     void write_mstatus(reg_t val) {
@@ -87,9 +88,11 @@ public:
     uint64_t leave_trap(uint64_t flags) override;
 
     void set_csr(unsigned addr, reg_t val) { this->csr[addr] = val; }
+    checkpoint_if* get_checkpoint_if() override { return &checkpoints; }
 
 protected:
-    std::unordered_map<uint64_t, uint8_t> atomic_reservation;
+    friend struct checkpoint_impl<this_class>;
+    checkpoint_impl<this_class> checkpoints{*this};
 
     iss::status read_status(unsigned addr, reg_t& val);
     iss::status write_status(unsigned addr, reg_t val);
@@ -164,10 +167,10 @@ iss::status riscv_hart_m_p<BASE, FEAT>::read(const addr_t& a, const unsigned len
             }
         } break;
         case traits<BASE>::RES: {
-            auto it = atomic_reservation.find(addr);
-            if(it != atomic_reservation.end() && it->second != 0) {
+            auto it = this->atomic_reservation.find(addr);
+            if(it != this->atomic_reservation.end() && it->second != 0) {
                 memset(data, 0xff, length);
-                atomic_reservation.erase(addr);
+                this->atomic_reservation.erase(addr);
             } else
                 memset(data, 0, length);
         } break;
@@ -261,7 +264,7 @@ iss::status riscv_hart_m_p<BASE, FEAT>::write(const addr_t& a, const unsigned le
             }
         }
         case traits<BASE>::RES: {
-            atomic_reservation[addr] = data[0];
+            this->atomic_reservation[addr] = data[0];
         } break;
         default: {
             if(unlikely(is_fetch(access) && (addr & 0x1) == 1)) {

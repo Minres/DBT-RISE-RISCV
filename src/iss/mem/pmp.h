@@ -84,6 +84,8 @@ template <typename PLAT, size_t NUM_ENTRIES = 16> struct pmp : public memory_ele
 
     void set_next(memory_if mem) override { down_stream_mem = mem; }
 
+    checkpoint_if* get_checkpoint_if() override { return &checkpoints; }
+
 private:
     std::array<reg_t, NUM_ENTRIES> pmpaddr{0};
     std::array<reg_t, NUM_ENTRIES / cfg_reg_size> pmpcfg{0};
@@ -164,6 +166,7 @@ protected:
     bool any_active = false;
     arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
+    memory_checkpoint<decltype(pmpaddr), decltype(pmpcfg), bool> checkpoints{pmpaddr, pmpcfg, any_active};
 };
 
 template <typename PLAT, size_t NUM_ENTRIES> bool pmp<PLAT, NUM_ENTRIES>::pmp_check(access_type type, uint64_t addr, unsigned len) {

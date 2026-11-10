@@ -197,6 +197,10 @@ private:
         clic_intthresh[arch::mintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
         clic_intthresh[arch::uintthresh >> 8] = (1 << (cfg.clic_int_ctl_bits)) - 1;
     }
+
+    checkpoint_if* get_checkpoint_if() override { return &checkpoints; }
+
+private:
     iss::status read_mem(addr_t const& addr, unsigned length, uint8_t* data) {
         auto end_addr = addr.val - 1 + length;
         if(addr.space == 0 && addr.val <= end_addr && addr.val >= cfg.clic_base && end_addr <= (cfg.clic_base + 0x7fff))
@@ -312,6 +316,10 @@ protected:
     uint8_t clic_mact_lvl{0}, clic_uact_lvl{0};
     std::array<reg_t, 4> clic_intthresh{0};
     std::array<reg_t, 4> clic_xtvt{0};
+    memory_checkpoint<uint8_t, decltype(pending_irq), decltype(clic_inttrig_reg), decltype(clic_int_reg), uint8_t, uint8_t, uint8_t,
+                      uint8_t, decltype(clic_intthresh), decltype(clic_xtvt)>
+        checkpoints{clic_cfg_reg,   pending_irq,   clic_inttrig_reg, clic_int_reg,   clic_mprev_lvl,
+                    clic_uprev_lvl, clic_mact_lvl, clic_uact_lvl,    clic_intthresh, clic_xtvt};
 };
 
 template <typename PLAT> iss::status clic<PLAT>::read_clic(uint64_t addr, unsigned length, uint8_t* const data) {

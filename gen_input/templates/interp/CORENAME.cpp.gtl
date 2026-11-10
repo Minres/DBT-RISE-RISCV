@@ -503,7 +503,7 @@ volatile std::array<bool, ${array_count}> dummy = {<%}%>
             auto* cpu = new iss::arch::riscv_hart_mu_p<iss::arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_EXT_N)>();
             cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if()));
             iss::mem::clic_config ccfg{.clic_base=0xc0000000, .clic_int_ctl_bits=4, .clic_num_irq=16, .clic_num_trigger=0, .nmode=true};
-            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_t>>(cpu->get_priv_if(), ccfg));
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if(), ccfg));
 		    auto vm = new interp::${coreDef.name.toLowerCase()}::vm_impl<arch::${coreDef.name.toLowerCase()}>(*cpu, false);
 		    if (port != 0) debugger::server<debugger::gdb_session>::run_server(vm, port);
             if(init_data){

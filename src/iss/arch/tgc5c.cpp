@@ -50,14 +50,10 @@ tgc5c::tgc5c()  = default;
 tgc5c::~tgc5c() = default;
 
 void tgc5c::reset(uint64_t address) {
-    auto base_ptr = reinterpret_cast<traits<tgc5c>::reg_t*>(get_regs_base_ptr());
-    for(size_t i=0; i<traits<tgc5c>::NUM_REGS; ++i)
-        *(base_ptr+i)=0;
+    std::memset(&reg, 0, sizeof(reg));
     reg.PC=address;
     reg.NEXT_PC=reg.PC;
     reg.PRIV=0x3;
-    reg.trap_state=0;
-    reg.icount=0;
 }
 
 uint8_t *tgc5c::get_regs_base_ptr() {

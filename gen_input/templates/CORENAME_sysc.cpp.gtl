@@ -48,6 +48,7 @@ def array_count = coreDef.name.toLowerCase()=="tgc5d" || coreDef.name.toLowerCas
 namespace iss {
 namespace interp {
 using namespace sysc;
+using namespace sysc::riscv;
 <% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) { %>
 volatile std::array<bool, ${array_count} + 1> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}_msu:interp", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
@@ -67,7 +68,7 @@ volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
             auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_EXT_N)>>(cc);
             cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if()));
             iss::mem::clic_config ccfg{.clic_base=0xc0000000, .clic_int_ctl_bits=4, .clic_num_irq=16, .clic_num_trigger=0, .nmode=true};
-            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_t>>(cpu->get_priv_if(), ccfg));
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if(), ccfg));
             return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
 };
@@ -75,6 +76,7 @@ volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
 #if defined(WITH_LLVM)
 namespace llvm {
 using namespace sysc;
+using namespace sysc::riscv;
 volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}_m:llvm", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
             auto* cpu = new core2sc_adapter<arch::riscv_hart_m_p<arch::${coreDef.name.toLowerCase()}>>(cc);
@@ -88,7 +90,7 @@ volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
             auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_EXT_N)>>(cc);
             cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if()));
             iss::mem::clic_config ccfg{.clic_base=0xc0000000, .clic_int_ctl_bits=4, .clic_num_irq=16, .clic_num_trigger=0, .nmode=true};
-            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_t>>(cpu->get_priv_if(), ccfg));
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if(), ccfg));
             return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
 };
@@ -97,6 +99,7 @@ volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
 #if defined(WITH_ASMJIT)
 namespace asmjit {
 using namespace sysc;
+using namespace sysc::riscv;
 <% if(instructions.find{it.instruction.name.toLowerCase() == "sret"}) {%>
 volatile std::array<bool, ${array_count} + 1> ${coreDef.name.toLowerCase()}_init = {
         iss_factory::instance().register_creator("${coreDef.name.toLowerCase()}_msu:asmjit", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
@@ -116,7 +119,7 @@ volatile std::array<bool, ${array_count}> ${coreDef.name.toLowerCase()}_init = {
             auto* cpu = new core2sc_adapter<arch::riscv_hart_mu_p<arch::${coreDef.name.toLowerCase()}, (iss::arch::features_e)(iss::arch::FEAT_EXT_N)>>(cc);
             cpu->memories.insert_before_last(std::make_unique<iss::mem::pmp<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if()));
             iss::mem::clic_config ccfg{.clic_base=0xc0000000, .clic_int_ctl_bits=4, .clic_num_irq=16, .clic_num_trigger=0, .nmode=true};
-            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::traits<iss::arch::${coreDef.name.toLowerCase()}>::reg_t>>(cpu->get_priv_if(), ccfg));
+            cpu->memories.insert_before_last(std::make_unique<iss::mem::clic<iss::arch::${coreDef.name.toLowerCase()}>>(cpu->get_priv_if(), ccfg));
             return {sysc::core_ptr{cpu}, vm_ptr{create(static_cast<arch::${coreDef.name.toLowerCase()}*>(cpu), gdb_port)}};
         })<%}%>
 };

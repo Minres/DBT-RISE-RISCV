@@ -64,6 +64,8 @@ template <typename PLAT> struct neumann_memory_with_htif : public memory_elem {
         // intentionally left empty, leaf element
     }
 
+    checkpoint_if* get_checkpoint_if() override { return nullptr; }
+
 private:
     iss::status read_mem(const iss::addr_t& addr, unsigned length, uint8_t* data) {
         assert((addr.type == iss::address_type::PHYSICAL || is_debug(addr.access)) &&

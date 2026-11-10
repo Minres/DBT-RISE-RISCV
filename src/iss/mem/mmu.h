@@ -93,6 +93,9 @@ template <typename PLAT> struct mmu : public memory_elem {
     }
 
     void set_next(memory_if mem) override { down_stream_mem = mem; }
+
+    checkpoint_if* get_checkpoint_if() override { return &checkpoints; }
+
     void flush_tlb(std::optional<reg_t> vaddr, std::optional<reg_t> asid) {
         // we do not control the tlb to the granularity allowed by the spec (evicting only parts)
         // we flush the entire buffer
@@ -229,9 +232,10 @@ private:
     }
 
 protected:
-    reg_t satp;
+    reg_t satp{0};
     std::unordered_map<reg_t, uint64_t> tlb;
     vm_info vm_setting{0, 0, 0, 0};
+    memory_checkpoint<reg_t, decltype(tlb), vm_info> checkpoints{satp, tlb, vm_setting};
     arch::priv_if<reg_t> hart_if;
     memory_if down_stream_mem;
 };
