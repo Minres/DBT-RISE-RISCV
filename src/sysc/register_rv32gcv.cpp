@@ -78,6 +78,8 @@ volatile std::array<bool, 2 + 1> rv32gcv_init = {
 #if defined(WITH_ASMJIT)
 namespace asmjit {
 using namespace sysc;
+using namespace sysc::riscv;
+
 volatile std::array<bool, 2 + 1> rv32gcv_init = {
         iss_factory::instance().register_creator("rv32gcv_msu:asmjit", [](unsigned gdb_port, sysc::riscv::core_complex_if* cc) -> iss_factory::base_t {
             auto* cpu = new core2sc_adapter<arch::riscv_hart_msu_vp<arch::rv32gcv>>(cc);
