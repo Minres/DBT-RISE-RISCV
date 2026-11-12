@@ -37,6 +37,7 @@
 #define ELFIO_NO_INTTYPES
 #endif
 
+#include <cstdint>
 #include <elfio/elfio_dump.hpp>
 #include <iostream>
 
