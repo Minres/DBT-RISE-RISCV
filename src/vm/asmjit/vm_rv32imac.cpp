@@ -82,6 +82,8 @@ public:
     using code_word_t = typename super::code_word_t;
     using mem_type_e = typename super::mem_type_e;
     using addr_t = typename super::addr_t;
+    using reg_t = typename traits::reg_t;
+
 
 
     vm_impl();
@@ -148,7 +150,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 98> instr_descr = {{
+    static constexpr std::array<instruction_descriptor, 98> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -349,7 +351,7 @@ private:
     }};
 
     //needs to be declared after instr_descr
-    decoder instr_decoder;
+    decoder<reg_t, traits::INSTR_ALIGNMENT> instr_decoder;
 
     /* instruction definitions */
     /* instruction 0: LUI */
@@ -4532,8 +4534,10 @@ private:
 
         gen_instr_prologue(jh);
         /*generate behavior*/
-        mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
-              gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), shamt));
+        if(shamt){
+            mov(cc, get_ptr_for(jh, traits::X0+ rs1+8),
+                  gen_operation(cc, shr, load_reg_from_mem_Gp(jh, traits::X0 + rs1+8), shamt));
+        }
         auto returnValue = CONT;
         
         gen_sync(jh, POST_SYNC, 78);
@@ -4941,14 +4945,14 @@ private:
     /* instruction 88: C__SLLI */
     continuation_e __c__slli(virt_addr_t& pc, code_word_t instr, jit_holder& jh){
         uint64_t PC = pc.val;
-        uint8_t nzuimm = ((bit_sub<2,5>(instr)));
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
         uint8_t rs1 = ((bit_sub<7,5>(instr)));
         if(this->disass_enabled){
             /* generate disass */
             
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.slli"),
-                fmt::arg("rs1", name(rs1)), fmt::arg("nzuimm", nzuimm));
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             InvokeNode* call_print_disass;
             char* mnemonic_ptr = strdup(mnemonic.c_str());
             jh.disass_collection.push_back(mnemonic_ptr);
@@ -4975,7 +4979,7 @@ private:
         else {
             if(rs1!=0){
                 mov(cc, get_ptr_for(jh, traits::X0+ rs1),
-                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), nzuimm));
+                      gen_operation(cc, shl, load_reg_from_mem_Gp(jh, traits::X0 + rs1), shamt));
             }
         }
         auto returnValue = CONT;
@@ -5417,13 +5421,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-        }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {}
 
 template <typename ARCH>
@@ -5436,7 +5437,7 @@ continuation_e vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, jit_hold
         return ILLEGAL_FETCH;
     if (instr == 0x0000006f || (instr&0xffff)==0xa001)
         return JUMP_TO_SELF;
-    uint32_t inst_index = instr_decoder.decode_instr(instr);
+    uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
         f = instr_descr[inst_index].op;
