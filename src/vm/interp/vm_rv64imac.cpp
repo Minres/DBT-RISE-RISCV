@@ -158,7 +158,7 @@ private:
         typename arch::traits<ARCH>::opcode_e op;
     };
 
-    const std::array<instruction_descriptor, 132> instr_descr = {{
+    static constexpr std::array<instruction_descriptor, 132> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::AUIPC},
@@ -295,7 +295,7 @@ private:
     }};
 
     //needs to be declared after instr_descr
-    decoder instr_decoder;
+    decoder<reg_t, traits::INSTR_ALIGNMENT> instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
         if (this->core.read({iss::address_type::LOGICAL, pc.access, arch::traits<ARCH>::IMEM, pc.val}, 4, data) != iss::Ok)
@@ -326,13 +326,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-    }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {
     // std::ofstream json_out{"idecode_tree.json"};
     // json_out<<instr_decoder.print_tree_as_pretty_json();
@@ -378,7 +375,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-            uint32_t inst_index = instr_decoder.decode_instr(instr);
+            uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
                 inst_id = instr_descr[inst_index].op;

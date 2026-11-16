@@ -156,7 +156,7 @@ protected:
         }
         else {
             uint64_t box = ~((uint64_t)0);
-            return (uint64_t)(((uint128_t)(box)<<32)|val);
+            return (uint64_t)(((uint128_t)box<<32)|val);
         }
     }
 
@@ -175,7 +175,7 @@ protected:
         }
         else {
             uint64_t box = ~((uint64_t)0);
-            return (uint64_t)(((uint128_t)(box)<<64)|val);
+            return (uint64_t)(((uint128_t)box<<64)|val);
         }
     }
 
@@ -191,7 +191,7 @@ private:
         typename arch::traits<ARCH>::opcode_e op;
     };
 
-    const std::array<instruction_descriptor, 200> instr_descr = {{
+    static constexpr std::array<instruction_descriptor, 200> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::LUI},
         {32, 0b00000000000000000000000000010111, 0b00000000000000000000000001111111, arch::traits<ARCH>::opcode_e::AUIPC},
@@ -396,7 +396,7 @@ private:
     }};
 
     //needs to be declared after instr_descr
-    decoder instr_decoder;
+    decoder<reg_t, traits::INSTR_ALIGNMENT> instr_decoder;
 
     iss::status fetch_ins(virt_addr_t pc, uint8_t * data){
         if (this->core.read({iss::address_type::LOGICAL, pc.access, arch::traits<ARCH>::IMEM, pc.val}, 4, data) != iss::Ok)
@@ -427,13 +427,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-    }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {
     // std::ofstream json_out{"idecode_tree.json"};
     // json_out<<instr_decoder.print_tree_as_pretty_json();
@@ -479,7 +476,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-            uint32_t inst_index = instr_decoder.decode_instr(instr);
+            uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
                 inst_id = instr_descr[inst_index].op;
@@ -4984,7 +4981,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox32(((uint32_t)(bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox32(((uint32_t)bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2)))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5005,7 +5002,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox32(((uint32_t)((~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1))<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox32(((uint32_t)(~bit_sub<31, 31-31+1>(unbox_s(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<31)|bit_sub<0, 30-0+1>(unbox_s(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5864,7 +5861,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox64(((uint64_t)(bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox64(((uint64_t)bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2)))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -5885,7 +5882,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                        *(F+rd) = NaNBox64(((uint64_t)((~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1))<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
+                        *(F+rd) = NaNBox64(((uint64_t)(~bit_sub<63, 63-63+1>(unbox_d(traits::FLEN, *(F+rs2))))& ((1ULL << 1)-1)<<63)|bit_sub<0, 62-0+1>(unbox_d(traits::FLEN, *(F+rs1))));
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -6205,7 +6202,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     *NEXT_PC = *PC + 4;
                     // execute instruction
                     {
-                                    super::template write_mem<uint64_t>(traits::FENCE, traits::fencevma, ((uint16_t)((uint8_t)rs1)<<8)|(uint8_t)asid);
+                                    super::template write_mem<uint64_t>(traits::FENCE, traits::fencevma, ((uint16_t)(uint8_t)rs1<<8)|(uint8_t)asid);
                                     if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                 }
                     break;

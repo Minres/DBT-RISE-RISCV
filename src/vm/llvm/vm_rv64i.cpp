@@ -145,7 +145,7 @@ private:
         compile_func op;
     };
 
-    const std::array<instruction_descriptor, 61> instr_descr = {{
+    static constexpr std::array<instruction_descriptor, 61> instr_descr = {{
          /* entries are: size, valid value, valid mask, function ptr */
         /* instruction LUI, encoding '0b00000000000000000000000000110111' */
         {32, 0b00000000000000000000000000110111, 0b00000000000000000000000001111111, &this_class::__lui},
@@ -272,7 +272,7 @@ private:
     }};
 
     //needs to be declared after instr_descr
-    decoder instr_decoder;
+    decoder<reg_t, traits::INSTR_ALIGNMENT> instr_decoder;
 
     /* instruction definitions */
     /* instruction 0: LUI */
@@ -3642,7 +3642,7 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block)
         this->builder.CreateBr(this->leave_blk);
         return std::make_tuple(JUMP_TO_SELF, nullptr);
         }
-    uint32_t inst_index = instr_decoder.decode_instr(instr);
+    uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
     compile_func f = nullptr;
     if(inst_index < instr_descr.size())
         f = instr_descr[inst_index].op;
