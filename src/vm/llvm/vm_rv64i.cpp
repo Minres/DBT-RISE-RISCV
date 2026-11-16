@@ -67,6 +67,8 @@ public:
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
     using addr_t = typename super::addr_t;
+    using reg_t = typename traits::reg_t;
+
 
     vm_impl();
 
@@ -3617,13 +3619,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-        }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {}
 
 template <typename ARCH>
@@ -3632,11 +3631,9 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block)
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
-    // const typename traits::addr_t upper_bits = ~traits::PGMASK;
-    phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    auto res = this->core.read(paddr, 4, data);
-    if (res != iss::Ok) 
+    auto res = this->core.read({address_type::LOGICAL, access_type::DEBUG_READ, arch::traits<ARCH>::IMEM, pc.val}, 4, data);
+    if (res != iss::Ok)
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
     if (instr == 0x0000006f || (instr&0xffff)==0xa001){
         this->builder.CreateBr(this->leave_blk);
@@ -3742,9 +3739,11 @@ std::unique_ptr<vm_if> create<arch::rv64i>(arch::rv64i *core, unsigned short por
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
+
 volatile std::array<bool, 2> dummy = {
         core_factory::instance().register_creator("rv64i|m_p|llvm", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv64i>();
