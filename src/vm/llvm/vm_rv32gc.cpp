@@ -68,6 +68,8 @@ public:
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
     using addr_t = typename super::addr_t;
+    using reg_t = typename traits::reg_t;
+
 
     vm_impl();
 
@@ -4916,12 +4918,14 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->builder.CreateStore(
-        this->builder.CreateLShr(
-           this->gen_reg_load(traits::X0+ rs1+8),
-           this->gen_ext(this->gen_const(8,shamt), 32,false))
-        ,
-        get_reg_ptr(rs1+8 + traits::X0), false);
+        if(shamt) {
+            this->builder.CreateStore(
+            this->builder.CreateLShr(
+               this->gen_reg_load(traits::X0+ rs1+8),
+               this->gen_ext(this->gen_const(8,shamt), 32,false))
+            ,
+            get_reg_ptr(rs1+8 + traits::X0), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5353,13 +5357,13 @@ private:
     /* instruction 88: C__SLLI */
     std::tuple<continuation_e, BasicBlock*> __c__slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
-        uint8_t nzuimm = ((bit_sub<2,5>(instr)));
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
         uint8_t rs1 = ((bit_sub<7,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.slli"),
-                fmt::arg("rs1", name(rs1)), fmt::arg("nzuimm", nzuimm));
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5385,7 +5389,7 @@ private:
                 this->builder.CreateStore(
                 this->builder.CreateShl(
                    this->gen_reg_load(traits::X0+ rs1),
-                   this->gen_ext(this->gen_const(8,nzuimm), 32,false))
+                   this->gen_ext(this->gen_const(8,shamt), 32,false))
                 ,
                 get_reg_ptr(rs1 + traits::X0), false);
             }
@@ -5407,7 +5411,7 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                "{mnemonic:10} {rd}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.lwsp"),
                 fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
             std::vector<Value*> args {
                 this->core_ptr,
@@ -8342,9 +8346,8 @@ private:
             this->gen_ext(this->gen_const(8,1), 64),
             this->gen_ext(get_rm(bb, rm), 8)
         };
-        auto res =NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_271_args));
         this->builder.CreateStore(
-        res,
+        NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("fmadd_d"), fmadd_d_271_args)),
         get_reg_ptr(rd + traits::F0), false);
         std::vector<Value*> fget_flags_276_args{
         };
@@ -8900,6 +8903,21 @@ private:
         this->builder.CreateStore(
         NaNBox64(bb, this->builder.CreateCall(this->mod->getFunction("f32tof64"), f32tof64_317_args)),
         get_reg_ptr(rd + traits::F0), false);
+        std::vector<Value*> fget_flags_320_args{
+        };
+        auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_320_args);
+        this->builder.CreateStore(
+        this->builder.CreateOr(
+           (this->builder.CreateAnd(
+              this->gen_reg_load(traits::FCSR),
+              this->gen_const(32,~ static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ),
+           (this->builder.CreateAnd(
+              flags,
+              this->gen_const(32,static_cast<uint32_t>(traits::FFLAG_MASK)))
+           ))
+        ,
+        get_reg_ptr(traits::FCSR), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -8937,15 +8955,15 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_d_321_args{
+        std::vector<Value*> unbox_d_322_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
-        };std::vector<Value*> unbox_d_322_args{
+        };std::vector<Value*> unbox_d_323_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
         };
         this->builder.CreateStore(
-        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_321_args), 63, 63-63+1), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_322_args), 0, 62-0+1), 64))),
+        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_322_args), 63, 63-63+1), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_323_args), 0, 62-0+1), 64))),
         get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -8984,15 +9002,15 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_d_324_args{
+        std::vector<Value*> unbox_d_325_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
-        };std::vector<Value*> unbox_d_325_args{
+        };std::vector<Value*> unbox_d_326_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
         };
         this->builder.CreateStore(
-        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_324_args), 63, 63-63+1)), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_325_args), 0, 62-0+1), 64))),
+        NaNBox64(bb, this->builder.CreateOr(this->builder.CreateShl(this->gen_ext(this->builder.CreateNot(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_325_args), 63, 63-63+1)), 64), 63), this->gen_ext(this->gen_slice(this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_326_args), 0, 62-0+1), 64))),
         get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
@@ -9031,20 +9049,20 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        std::vector<Value*> unbox_d_327_args{
+        std::vector<Value*> unbox_d_328_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs2)
-        };std::vector<Value*> unbox_d_328_args{
+        };std::vector<Value*> unbox_d_329_args{
             this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
             this->gen_reg_load(traits::F0+ rs1)
         };
         this->builder.CreateStore(
         NaNBox64(bb, this->builder.CreateXor(
            (this->builder.CreateAnd(
-              this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_327_args),
+              this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_328_args),
               this->gen_const(64,((uint64_t)1<<63)))
            ),
-           this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_328_args))
+           this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_329_args))
         ),
         get_reg_ptr(rd + traits::F0), false);
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
@@ -9088,18 +9106,18 @@ private:
             this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> unbox_d_331_args{
+            std::vector<Value*> unbox_d_332_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs1)
-            };std::vector<Value*> unbox_d_332_args{
+            };std::vector<Value*> unbox_d_333_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs2)
-            };std::vector<Value*> fcmp_d_330_args{
-                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_331_args),
+            };std::vector<Value*> fcmp_d_331_args{
                 this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_332_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_333_args),
                 this->gen_ext(this->gen_const(8,0), 32)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_330_args);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_331_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
@@ -9107,9 +9125,9 @@ private:
                     32, false),
                 get_reg_ptr(rd + traits::X0), false);
             }
-            std::vector<Value*> fget_flags_333_args{
+            std::vector<Value*> fget_flags_334_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_333_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_334_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -9164,18 +9182,18 @@ private:
             this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> unbox_d_336_args{
+            std::vector<Value*> unbox_d_337_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs1)
-            };std::vector<Value*> unbox_d_337_args{
+            };std::vector<Value*> unbox_d_338_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs2)
-            };std::vector<Value*> fcmp_d_335_args{
-                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_336_args),
+            };std::vector<Value*> fcmp_d_336_args{
                 this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_337_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_338_args),
                 this->gen_ext(this->gen_const(8,2), 32)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_335_args);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_336_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
@@ -9183,9 +9201,9 @@ private:
                     32, false),
                 get_reg_ptr(rd + traits::X0), false);
             }
-            std::vector<Value*> fget_flags_338_args{
+            std::vector<Value*> fget_flags_339_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_338_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_339_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -9240,18 +9258,18 @@ private:
             this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> unbox_d_341_args{
+            std::vector<Value*> unbox_d_342_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs1)
-            };std::vector<Value*> unbox_d_342_args{
+            };std::vector<Value*> unbox_d_343_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs2)
-            };std::vector<Value*> fcmp_d_340_args{
-                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_341_args),
+            };std::vector<Value*> fcmp_d_341_args{
                 this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_342_args),
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_343_args),
                 this->gen_ext(this->gen_const(8,1), 32)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_340_args);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fcmp_d"), fcmp_d_341_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
@@ -9259,9 +9277,9 @@ private:
                     32, false),
                 get_reg_ptr(rd + traits::X0), false);
             }
-            std::vector<Value*> fget_flags_343_args{
+            std::vector<Value*> fget_flags_344_args{
             };
-            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_343_args);
+            auto flags =this->builder.CreateCall(this->mod->getFunction("fget_flags"), fget_flags_344_args);
             this->builder.CreateStore(
             this->builder.CreateOr(
                (this->builder.CreateAnd(
@@ -9315,13 +9333,13 @@ private:
             this->gen_raise_trap(0, static_cast<uint32_t>(traits::RV_CAUSE_ILLEGAL_INSTRUCTION));
         }
         else{
-            std::vector<Value*> unbox_d_346_args{
+            std::vector<Value*> unbox_d_347_args{
                 this->gen_const(32,static_cast<uint32_t>(traits::FLEN)),
                 this->gen_reg_load(traits::F0+ rs1)
-            };std::vector<Value*> fclass_d_345_args{
-                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_346_args)
+            };std::vector<Value*> fclass_d_346_args{
+                this->builder.CreateCall(this->mod->getFunction("unbox_d"), unbox_d_347_args)
             };
-            auto res =this->builder.CreateCall(this->mod->getFunction("fclass_d"), fclass_d_345_args);
+            auto res =this->builder.CreateCall(this->mod->getFunction("fclass_d"), fclass_d_346_args);
             if(rd!=0) {
                 this->builder.CreateStore(
                 this->gen_ext(
@@ -9648,13 +9666,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-        }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {}
 
 template <typename ARCH>
@@ -9663,11 +9678,9 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block)
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
-    // const typename traits::addr_t upper_bits = ~traits::PGMASK;
-    phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    auto res = this->core.read(paddr, 4, data);
-    if (res != iss::Ok) 
+    auto res = this->core.read({address_type::LOGICAL, access_type::DEBUG_READ, arch::traits<ARCH>::IMEM, pc.val}, 4, data);
+    if (res != iss::Ok)
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
     if (instr == 0x0000006f || (instr&0xffff)==0xa001){
         this->builder.CreateBr(this->leave_blk);
@@ -9772,8 +9785,8 @@ std::unique_ptr<vm_if> create<arch::rv32gc>(arch::rv32gc *core, unsigned short p
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {

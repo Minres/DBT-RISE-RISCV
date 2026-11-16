@@ -67,6 +67,8 @@ public:
     using phys_addr_t = typename super::phys_addr_t;
     using code_word_t = typename super::code_word_t;
     using addr_t = typename super::addr_t;
+    using reg_t = typename traits::reg_t;
+
 
     vm_impl();
 
@@ -4744,12 +4746,14 @@ private:
         
         this->gen_instr_prologue();
         /*generate behavior*/
-        this->builder.CreateStore(
-        this->builder.CreateLShr(
-           this->gen_reg_load(traits::X0+ rs1+8),
-           this->gen_ext(this->gen_const(8,shamt), 32,false))
-        ,
-        get_reg_ptr(rs1+8 + traits::X0), false);
+        if(shamt) {
+            this->builder.CreateStore(
+            this->builder.CreateLShr(
+               this->gen_reg_load(traits::X0+ rs1+8),
+               this->gen_ext(this->gen_const(8,shamt), 32,false))
+            ,
+            get_reg_ptr(rs1+8 + traits::X0), false);
+        }
         bb = BasicBlock::Create(this->mod->getContext(), "entry", this->func, this->leave_blk);
         auto returnValue = std::make_tuple(CONT,bb);
         
@@ -5181,13 +5185,13 @@ private:
     /* instruction 88: C__SLLI */
     std::tuple<continuation_e, BasicBlock*> __c__slli(virt_addr_t& pc, code_word_t instr, BasicBlock* bb){
         uint64_t PC = pc.val;
-        uint8_t nzuimm = ((bit_sub<2,5>(instr)));
+        uint8_t shamt = ((bit_sub<2,5>(instr)));
         uint8_t rs1 = ((bit_sub<7,5>(instr)));
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rs1}, {nzuimm}", fmt::arg("mnemonic", "c.slli"),
-                fmt::arg("rs1", name(rs1)), fmt::arg("nzuimm", nzuimm));
+                "{mnemonic:10} {rs1}, {shamt}", fmt::arg("mnemonic", "c.slli"),
+                fmt::arg("rs1", name(rs1)), fmt::arg("shamt", shamt));
             std::vector<Value*> args {
                 this->core_ptr,
                 this->gen_const(64, pc.val),
@@ -5213,7 +5217,7 @@ private:
                 this->builder.CreateStore(
                 this->builder.CreateShl(
                    this->gen_reg_load(traits::X0+ rs1),
-                   this->gen_ext(this->gen_const(8,nzuimm), 32,false))
+                   this->gen_ext(this->gen_const(8,shamt), 32,false))
                 ,
                 get_reg_ptr(rs1 + traits::X0), false);
             }
@@ -5235,7 +5239,7 @@ private:
         if(this->disass_enabled){
             /* generate console output when executing the command */
             auto mnemonic = fmt::format(
-                "{mnemonic:10} {rd}, sp, {uimm:#05x}", fmt::arg("mnemonic", "c.lwsp"),
+                "{mnemonic:10} {rd}, {uimm:#05x}(sp)", fmt::arg("mnemonic", "c.lwsp"),
                 fmt::arg("rd", name(rd)), fmt::arg("uimm", uimm));
             std::vector<Value*> args {
                 this->core_ptr,
@@ -5674,13 +5678,10 @@ template <typename ARCH>
 vm_impl<ARCH>::vm_impl(ARCH &core, unsigned core_id, unsigned cluster_id)
 : vm_base<ARCH>(core, core_id, cluster_id)
 , instr_decoder([this]() {
-        std::vector<generic_instruction_descriptor> g_instr_descr;
-        g_instr_descr.reserve(instr_descr.size());
-        for (uint32_t i = 0; i < instr_descr.size(); ++i) {
-            generic_instruction_descriptor new_instr_descr {instr_descr[i].value, instr_descr[i].mask, i};
-            g_instr_descr.push_back(new_instr_descr);
-        }
-        return std::move(g_instr_descr);
+        std::array<generic_instruction_descriptor, instr_descr.size()> g_instr_descr;
+        for (uint32_t i = 0; i < instr_descr.size(); ++i) 
+            g_instr_descr[i] = {instr_descr[i].value, instr_descr[i].mask, i};
+        return g_instr_descr;
     }()) {}
 
 template <typename ARCH>
@@ -5689,11 +5690,9 @@ vm_impl<ARCH>::gen_single_inst_behavior(virt_addr_t &pc, BasicBlock *this_block)
     // we fetch at max 4 byte, alignment is 2
     enum {TRAP_ID=1<<16};
     code_word_t instr = 0;
-    // const typename traits::addr_t upper_bits = ~traits::PGMASK;
-    phys_addr_t paddr(pc);
     auto *const data = (uint8_t *)&instr;
-    auto res = this->core.read(paddr, 4, data);
-    if (res != iss::Ok) 
+    auto res = this->core.read({address_type::LOGICAL, access_type::DEBUG_READ, arch::traits<ARCH>::IMEM, pc.val}, 4, data);
+    if (res != iss::Ok)
         return std::make_tuple(ILLEGAL_FETCH, nullptr);
     if (instr == 0x0000006f || (instr&0xffff)==0xa001){
         this->builder.CreateBr(this->leave_blk);
@@ -5799,9 +5798,11 @@ std::unique_ptr<vm_if> create<arch::rv32imac>(arch::rv32imac *core, unsigned sho
 
 #include <iss/arch/riscv_hart_m_p.h>
 #include <iss/arch/riscv_hart_mu_p.h>
+#include <iss/arch/riscv_hart_msu_vp.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
+
 volatile std::array<bool, 2> dummy = {
         core_factory::instance().register_creator("rv32imac|m_p|llvm", [](unsigned port, void* init_data) -> std::tuple<cpu_ptr, vm_ptr>{
             auto* cpu = new iss::arch::riscv_hart_m_p<iss::arch::rv32imac>();
