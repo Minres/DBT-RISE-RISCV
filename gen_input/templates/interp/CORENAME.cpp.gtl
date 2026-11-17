@@ -248,6 +248,12 @@ if(vector) {%>
     inline void set_tval(uint64_t new_tval){
         tval = new_tval;
     }
+
+    inline bool has_synchronous_exception() const {
+        auto state = this->core.reg.trap_state;
+        return (state & 0x80000000ULL) != 0 && (state & 0xffffULL) == 0;
+    }
+
     uint64_t fetch_count{0};
     uint64_t tval{0};
 
