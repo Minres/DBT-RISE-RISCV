@@ -364,6 +364,9 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
     auto *const data = reinterpret_cast<uint8_t*>(&instr);
     this->core.enable_disass(this->disass_enabled);
 
+    if((cond & finish_cond_e::SINGLE_EXEC) == finish_cond_e::SINGLE_EXEC)
+        count_limit = (is_icount_limit_enabled(cond)?icount:fetch_count) +1;
+
     while(!this->core.should_stop() &&
             !(is_icount_limit_enabled(cond) && icount >= count_limit) &&
             !(is_fcount_limit_enabled(cond) && fetch_count >= count_limit)){
