@@ -1413,7 +1413,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-            uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
+            uint32_t inst_index = instr_decoder.decode_instr(instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
                 inst_id = instr_descr[inst_index].op;

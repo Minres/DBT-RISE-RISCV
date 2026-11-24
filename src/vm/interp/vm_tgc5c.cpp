@@ -339,7 +339,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
         } else {
             if (is_jump_to_self_enabled(cond) &&
                     (instr == 0x0000006f || (instr&0xffff)==0xa001)) throw simulation_stopped(0); // 'J 0' or 'C.J 0'
-            uint32_t inst_index = instr_decoder.decode_instr_cached(pc.val, instr);
+            uint32_t inst_index = instr_decoder.decode_instr(instr);
             opcode_e inst_id = arch::traits<ARCH>::opcode_e::MAX_OPCODE;;
             if(inst_index <instr_descr.size())
                 inst_id = instr_descr[inst_index].op;
@@ -716,7 +716,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         int8_t res_1 = super::template read_mem<int8_t>(traits::MEM, load_address);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         int8_t res = (int8_t)res_1;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
@@ -748,7 +748,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         int16_t res_2 = super::template read_mem<int16_t>(traits::MEM, load_address);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         int16_t res = (int16_t)res_2;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
@@ -780,7 +780,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         int32_t res_3 = super::template read_mem<int32_t>(traits::MEM, load_address);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         int32_t res = (int32_t)res_3;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
@@ -812,7 +812,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         uint8_t res_4 = super::template read_mem<uint8_t>(traits::MEM, load_address);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint8_t res = res_4;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
@@ -844,7 +844,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t load_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         uint16_t res_5 = super::template read_mem<uint16_t>(traits::MEM, load_address);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint16_t res = res_5;
                                         if(rd != 0) {
                                             *(X+rd) = (uint32_t)res;
@@ -876,7 +876,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint8_t>(traits::MEM, store_address, (uint8_t)*(X+rs2));
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
@@ -904,7 +904,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint16_t>(traits::MEM, store_address, (uint16_t)*(X+rs2));
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
@@ -932,7 +932,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t store_address = (uint32_t)((uint64_t)(*(X+rs1)) + (int64_t)((int16_t)sext<12>(imm)));
                                         super::template write_mem<uint32_t>(traits::MEM, store_address, (uint32_t)*(X+rs2));
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
@@ -1488,7 +1488,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                                     super::template write_mem<uint32_t>(traits::FENCE, traits::fence, (uint8_t)pred << 4 | succ);
-                                    if(has_synchronous_exception()) throw memory_access_exception();
+                                    if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                 }
                     break;
                 }// @suppress("No break at end of case")
@@ -1580,15 +1580,15 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rd != 0) {
                                             uint32_t res_6 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                             uint32_t xrd = res_6;
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrs1);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                             *(X+rd) = xrd;
                                         }
                                         else {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrs1);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                     }
                                 }
@@ -1616,12 +1616,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t res_7 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_7;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | xrs1);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
                                             *(X+rd) = xrd;
@@ -1652,12 +1652,12 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t res_8 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_8;
                                         uint32_t xrs1 = *(X+rs1);
                                         if(rs1 != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~xrs1);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
                                             *(X+rd) = xrd;
@@ -1688,10 +1688,10 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t res_9 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_9;
                                         super::template write_mem<uint32_t>(traits::CSR, csr, (uint32_t)zimm);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         if(rd != 0) {
                                             *(X+rd) = xrd;
                                         }
@@ -1721,11 +1721,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t res_10 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_10;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd | (uint32_t)zimm);
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
                                             *(X+rd) = xrd;
@@ -1756,11 +1756,11 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     }
                                     else {
                                         uint32_t res_11 = super::template read_mem<uint32_t>(traits::CSR, csr);
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         uint32_t xrd = res_11;
                                         if(zimm != 0) {
                                             super::template write_mem<uint32_t>(traits::CSR, csr, xrd & ~((uint32_t)zimm));
-                                            if(has_synchronous_exception()) throw memory_access_exception();
+                                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                         }
                                         if(rd != 0) {
                                             *(X+rd) = xrd;
@@ -1786,7 +1786,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     // execute instruction
                     {
                                     super::template write_mem<uint32_t>(traits::FENCE, traits::fencei, imm);
-                                    if(has_synchronous_exception()) throw memory_access_exception();
+                                    if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                 }
                     break;
                 }// @suppress("No break at end of case")
@@ -2104,7 +2104,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
                         int32_t res_12 = super::template read_mem<int32_t>(traits::MEM, offs);
-                        if(has_synchronous_exception()) throw memory_access_exception();
+                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                         *(X+rd + 8) = (uint32_t)(int32_t)res_12;
                     }
                     break;
@@ -2128,7 +2128,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                     {
                         uint32_t offs = (uint32_t)((uint64_t)(*(X+rs1 + 8)) + (uint64_t)(uimm));
                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2 + 8));
-                        if(has_synchronous_exception()) throw memory_access_exception();
+                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                     }
                     break;
                 }// @suppress("No break at end of case")
@@ -2554,7 +2554,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                         else {
                             uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
                             int32_t res_13 = super::template read_mem<int32_t>(traits::MEM, offs);
-                            if(has_synchronous_exception()) throw memory_access_exception();
+                            if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                             *(X+rd) = (uint32_t)(int32_t)res_13;
                         }
                     }
@@ -2722,7 +2722,7 @@ typename vm_base<ARCH>::virt_addr_t vm_impl<ARCH>::execute_inst(finish_cond_e co
                                     else {
                                         uint32_t offs = (uint32_t)((uint64_t)(*(X+2)) + (uint64_t)(uimm));
                                         super::template write_mem<uint32_t>(traits::MEM, offs, (uint32_t)*(X+rs2));
-                                        if(has_synchronous_exception()) throw memory_access_exception();
+                                        if(this->core.reg.trap_state>=0x80000000UL) throw memory_access_exception();
                                     }
                                 }
                     break;
