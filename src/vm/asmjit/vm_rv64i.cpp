@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *******************************************************************************/
- 
+
 // clang-format off
 #include <iss/arch/rv64i.h>
 #include <iss/debugger/gdb_session.h>
@@ -3603,8 +3603,8 @@ std::unique_ptr<vm_if> create<arch::rv64i>(arch::rv64i *core, unsigned short por
 } // namespace iss
 
 #include <iss/arch/riscv_hart_m_p.h>
-#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/arch/riscv_hart_msu_vp.h>
+#include <iss/arch/riscv_hart_mu_p.h>
 #include <iss/factory.h>
 namespace iss {
 namespace {
